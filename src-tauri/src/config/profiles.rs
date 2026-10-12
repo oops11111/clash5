@@ -463,14 +463,58 @@ pub(crate) async fn profiles_save_file_safe() -> Result<()> {
         .await
 }
 
-pub(crate) async fn profiles_update_item_safe(index: &str, item: &mut PrfItem) -> Result<()> {
+pub(crate) async fn profiles_update_item_safe(index: &str, item: &mut PrfItem) -> Result<BindingSync> {
+    let yaml = item.file_data.as_deref().map(std::string::ToString::to_string);
     Config::profiles()
         .await
         .with_data_modify(|mut profiles| async move {
             profiles.update_item(index, item).await?;
             Ok((profiles, ()))
         })
-        .await
+        .await?;
+
+    let Some(yaml) = yaml else {
+        return Ok(BindingSync::Skipped);
+    };
+    Ok(reconcile_clash5_snapshot(index.to_string(), yaml).await)
+}
+
+pub(crate) async fn reconcile_clash5_snapshot(
+    provider_id: std::string::String,
+    yaml: std::string::String,
+) -> BindingSync {
+    let Some(nodes) = (match clash5_data::parse_inline_nodes(&yaml) {
+        Ok(nodes) => nodes,
+        Err(error) => return BindingSync::Failed(error),
+    }) else {
+        return BindingSync::Skipped;
+    };
+    let result = with_clash5_binding_store(move |store| store.refresh_provider(&provider_id, &nodes)).await;
+    match result {
+        Ok(_) => BindingSync::Applied,
+        Err(error) => BindingSync::Failed(error),
+    }
+}
+
+pub(crate) enum BindingSync {
+    Applied,
+    Skipped,
+    Failed(clash5_data::DataError),
+}
+
+pub(crate) async fn with_clash5_binding_store<T, F>(operation: F) -> std::result::Result<T, clash5_data::DataError>
+where
+    T: Send + 'static,
+    F: FnOnce(&mut clash5_data::BindingStore) -> std::result::Result<T, clash5_data::DataError> + Send + 'static,
+{
+    tokio::task::spawn_blocking(move || {
+        let root = dirs::app_home_dir().map_err(|_| clash5_data::DataError::Database)?;
+        std::fs::create_dir_all(&root).map_err(|_| clash5_data::DataError::Database)?;
+        let mut store = clash5_data::BindingStore::open(root.join("clash5-nodes.sqlite"))?;
+        operation(&mut store)
+    })
+    .await
+    .map_err(|_| clash5_data::DataError::Database)?
 }
 
 #[derive(Debug, PartialEq, Eq)]

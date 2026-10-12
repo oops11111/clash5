@@ -10,6 +10,7 @@ members = [
   "crates/clash-verge-limiter",
 ]
 resolver = "2"
+exclude = ["crates/clash5-data"]
 
 [profile.release]
 panic = "unwind"
