@@ -20,6 +20,8 @@ The data crate has its own lock file and is excluded from the desktop workspace 
 
 Four initial IPC commands register a manual identity, create or update a binding, list bindings, and purge orphan bindings. Their errors expose structured codes without raw SQLite or credential text. The registration command records identity only; the existing profile configuration remains the source of the actual proxy definition. There is no UI for these commands yet.
 
+IPC source values use `{ "kind": "manual" }` or `{ "kind": "subscription", "provider_id": "<profile UID>" }`. Binding input omits `orphan` and `disappeared_at`; those fields are derived by the store and appear in listings.
+
 ## Verification
 
 After `cargo fetch --manifest-path crates/clash5-data/Cargo.toml --locked`, run:

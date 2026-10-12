@@ -5,6 +5,7 @@ use serde_json::Value;
 use std::{collections::BTreeMap, path::Path, time::Duration};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Source {
     Manual,
     Subscription { provider_id: String },
@@ -29,7 +30,9 @@ pub struct Binding {
     pub priority: i64,
     pub enabled: bool,
     pub config: Value,
+    #[serde(default)]
     pub orphan: bool,
+    #[serde(default)]
     pub disappeared_at: Option<String>,
 }
 #[derive(Default, Debug, PartialEq, Eq, Serialize)]

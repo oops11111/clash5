@@ -260,3 +260,20 @@ fn provider_only_profile_does_not_clear_inline_binding_snapshot() {
         Err(DataError::InvalidInput)
     ));
 }
+
+#[test]
+fn binding_ipc_source_and_draft_fields_are_stable() {
+    let wire = json!({
+        "id": "binding", "plugin_id": "fixture", "target_id": node().stable_id().unwrap(),
+        "source": { "kind": "subscription", "provider_id": "profile-a" },
+        "priority": 7, "enabled": true, "config": {}
+    });
+    let binding: Binding = serde_json::from_value(wire).unwrap();
+    assert_eq!(binding.source, source("profile-a"));
+    assert!(!binding.orphan);
+    assert!(binding.disappeared_at.is_none());
+    assert_eq!(
+        serde_json::to_value(Source::Manual).unwrap(),
+        json!({ "kind": "manual" })
+    );
+}
