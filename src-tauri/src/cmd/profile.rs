@@ -159,6 +159,7 @@ pub async fn delete_profile(index: String) -> CmdResult {
         .get_item(&index)
         .ok()
         .is_some_and(|item| item.itype.as_deref() == Some("remote"));
+    let deleted_provider_id = index.to_string();
     let result = profiles
         .with_data_modify(|mut candidate| async move {
             let original = candidate.clone();
@@ -195,9 +196,8 @@ pub async fn delete_profile(index: String) -> CmdResult {
     drop(profile_write_guard);
 
     if deleted_was_remote {
-        let provider_id = index.to_string();
         if let Err(error) =
-            profiles::with_clash5_binding_store(move |store| store.refresh_provider(&provider_id, &[])).await
+            profiles::with_clash5_binding_store(move |store| store.refresh_provider(&deleted_provider_id, &[])).await
         {
             let message = format!("Profile deleted, but clash5 orphan bindings were not synchronized: {error}");
             logging!(warn, Type::Config, "{message}");

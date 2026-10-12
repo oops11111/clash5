@@ -4,7 +4,7 @@ Repository: https://github.com/oops11111/clash5. Baseline: upstream `dev` at `27
 
 The package display name and Tauri identifier are `clash5` and `io.github.oops11111.clash5`. All desktop platform overrides and the application data resolver use that identifier, so this fork keeps its SQLite database and profiles away from Clash Verge Rev's data directory. Existing upstream attribution remains in README and the GPL license is retained.
 
-The updater endpoint list is empty until clash5 has its own signing key and release metadata. This prevents a development build from offering an upstream Clash Verge installer. The original upstream public key is inert without endpoints and must be replaced when clash5 release signing is configured.
+The updater endpoint list is empty and automatic checks default to off until clash5 has its own signing key and release metadata. This prevents a development build from offering an upstream Clash Verge installer or repeatedly checking an unavailable endpoint. The original upstream public key is inert without endpoints and must be replaced when clash5 release signing is configured.
 
 Desktop deep links register the `clash5` scheme, so installing this fork does not take over Clash Verge Rev's `clash` and `clash-verge` links. Linux package metadata and service binary names are still inherited from upstream and must be isolated before distributing installers.
 
