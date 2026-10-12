@@ -1,0 +1,33 @@
+name: clash5 M0 data
+
+on:
+  pull_request:
+    paths:
+      - 'crates/clash5-data/**'
+      - '.github/workflows/clash5-m0.yml'
+  push:
+    branches: [dev, 'feature/m0-*']
+    paths:
+      - 'crates/clash5-data/**'
+      - '.github/workflows/clash5-m0.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Provision locked dependencies
+        run: cargo fetch --manifest-path crates/clash5-data/Cargo.toml --locked
+      - name: Format
+        run: cargo fmt --manifest-path crates/clash5-data/Cargo.toml --check
+      - name: Lint and typecheck
+        run: cargo clippy --manifest-path crates/clash5-data/Cargo.toml --locked --offline --all-targets -- -D warnings
+      - name: Offline acceptance and identity snapshot
+        run: cargo test --manifest-path crates/clash5-data/Cargo.toml --locked --offline
