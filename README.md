@@ -2,7 +2,7 @@
 
 clash5 is a GPL-3.0 desktop client forked from [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev), tracking upstream `dev` through merge (S2).
 
-The initial clash5 change introduces a standalone Rust SQLite data module for stable node identities, source-scoped bindings and orphan recovery. Run `cargo test --manifest-path crates/clash5-data/Cargo.toml --locked --offline` after provisioning its locked dependencies. See [the implementation plan](docs/clash5/implementation.md) for integration boundaries and upstream synchronization.
+The initial clash5 change introduces a standalone Rust SQLite data module for stable node identities, source-scoped bindings and orphan recovery. Run `cargo test --manifest-path crates/clash5-data/Cargo.toml --locked --offline` after provisioning its locked dependencies. See [the implementation notes](docs/clash5/implementation.md), [engineering handbook](docs/clash5-工程手册.md), and [M0 acceptance checklist](docs/M0-执行与验收.md).
 
 The upstream desktop application and attribution below are preserved. This first change does not implement M1, inject processes, or apply new bindings to Mihomo.
 
