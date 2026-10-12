@@ -10,7 +10,9 @@ The library stores node identities and display names, bindings, chain JSON, a qu
 
 Stable IDs are versioned SHA-256 hashes of a structural JSON tuple containing normalized protocol, server, port and sorted credential pairs. UUID spelling is normalized; passwords retain case and whitespace. Protocol aliases are not inferred. Caller-supplied binding and chain JSON must not contain credentials. No real subscription is used in tests.
 
-The data crate has its own lock file and is excluded from the desktop workspace so its offline tests do not resolve the entire Tauri dependency graph. It is not yet connected to desktop subscription persistence or IPC. That follow-up must preserve configuration ownership, serialize provider refreshes, and publish database and profile state only after persistence succeeds. SQLite transaction rollback is not Mihomo hot-reload rollback.
+The data crate has its own lock file and is excluded from the desktop workspace so its offline tests do not resolve the entire Tauri dependency graph. The Tauri backend now links it through a path dependency. On import, refresh and deletion, the existing profile file is persisted first, then the backend reconciles its inline proxies into SQLite using the profile UID as the provider ID. Proxy-provider-only profiles have no inline snapshot and leave these rows untouched. A failed parse or database write raises an existing update-failure notice; the already committed profile and its runtime update remain authoritative. The next successful refresh reconciles the database. These independent stores are not an atomic file/SQLite transaction. SQLite rollback is not Mihomo hot-reload rollback.
+
+Four initial IPC commands register a manual identity, create or update a binding, list bindings, and purge orphan bindings. Their errors expose structured codes without raw SQLite or credential text. The registration command records identity only; the existing profile configuration remains the source of the actual proxy definition. There is no UI for these commands yet.
 
 ## Verification
 
@@ -28,6 +30,6 @@ Targeted tests cover rename and credential changes, credential/server normalizat
 
 `origin` is the owner's fork; `upstream` is `https://github.com/clash-verge-rev/clash-verge-rev.git`. Merge `upstream/dev` into clash5 `dev`, resolve conflicts without discarding source isolation or bindings, and run the affected checks. Do not rewrite shared history. Preserve upstream GPL attribution.
 
-M0 completion still requires desktop adapter and IPC integration, successful desktop checks, and a runnable shell. M1 and subsequent milestones follow only after M0 integration is verified. UI polish, sing-box, injection, Plugin Host, signing/release automation and real Mihomo hot loading are outside this first slice.
+M0 completion still requires successful desktop checks and a runnable shell. M1 and subsequent milestones follow only after M0 integration is verified. UI polish, sing-box, injection, Plugin Host, signing/release automation and real Mihomo hot loading are outside this slice.
 
 The owner authorized implementation without additional routine approval. Issues was initially disabled on the fork; it is now enabled and [issue #1](https://github.com/oops11111/clash5/issues/1) tracks M0 integration. The first data-library slice was validated before enabling issue tracking; desktop integration follows that issue.

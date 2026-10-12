@@ -1,4 +1,4 @@
-use clash5_data::{Binding, BindingStore, DataError, Node, Source};
+use clash5_data::{Binding, BindingStore, DataError, Node, Source, parse_inline_nodes};
 use serde_json::json;
 use std::collections::BTreeMap;
 
@@ -213,4 +213,50 @@ fn malformed_or_duplicate_snapshot_keeps_previous_state() {
     bad.port = 0;
     assert_eq!(db.refresh_provider("a", &[bad]), Err(DataError::InvalidInput));
     assert_eq!(db.nodes(&source("a")).unwrap(), vec![id]);
+}
+
+#[test]
+fn downloaded_inline_profile_drives_provider_diff_without_exposing_credentials() {
+    let uuid = format!(
+        "{}-{}-{}-{}-{}",
+        "a".repeat(8),
+        "a".repeat(4),
+        "a".repeat(4),
+        "a".repeat(4),
+        "a".repeat(12)
+    );
+    let yaml = format!(
+        "proxies:\n  - name: First\n    type: vless\n    server: edge.example.invalid\n    port: 443\n    uuid: {uuid}\n"
+    );
+    let nodes = parse_inline_nodes(&yaml).unwrap().unwrap();
+    let mut db = BindingStore::memory().unwrap();
+    let id = nodes[0].stable_id().unwrap();
+    db.refresh_provider("profile-a", &nodes).unwrap();
+    bind(&mut db, source("profile-a"), &id, true);
+    let renamed = yaml.replace("First", "Renamed");
+    let matched = db
+        .refresh_provider("profile-a", &parse_inline_nodes(&renamed).unwrap().unwrap())
+        .unwrap();
+    assert_eq!(matched.matched, vec![id.clone()]);
+    assert_eq!(db.bindings(None).unwrap()[0].target_id, id);
+    let changed = yaml.replace("port: 443", "port: 8443");
+    db.refresh_provider("profile-a", &parse_inline_nodes(&changed).unwrap().unwrap())
+        .unwrap();
+    assert!(db.bindings(None).unwrap()[0].orphan);
+    db.refresh_provider("profile-a", &nodes).unwrap();
+    assert!(!db.bindings(None).unwrap()[0].orphan);
+}
+
+#[test]
+fn provider_only_profile_does_not_clear_inline_binding_snapshot() {
+    assert!(
+        parse_inline_nodes("proxy-providers:\n  provider: {type: http}\n")
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(parse_inline_nodes("proxies: []\n").unwrap().unwrap().len(), 0);
+    assert!(matches!(
+        parse_inline_nodes("proxies:\n  - {name: x, type: vless, server: a.example, port: 443}\n"),
+        Err(DataError::InvalidInput)
+    ));
 }

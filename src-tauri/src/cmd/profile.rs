@@ -73,6 +73,7 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
             return Err(coded_error("PROFILE_IMPORT_FAILED", profile_import_error(&e)));
         }
     };
+    let inline_snapshot = item.file_data.as_ref().map(std::string::ToString::to_string);
 
     if let Err(e) = profiles_append_item_safe(item).await {
         logging!(error, Type::Cmd, "[导入订阅] 保存配置失败: {e:#}");
@@ -82,6 +83,13 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
     if let Err(e) = profiles_save_file_safe().await {
         logging!(error, Type::Cmd, "[导入订阅] 保存配置文件失败: {e:#}");
         return Err(coded_error("PROFILE_IMPORT_FAILED", e));
+    }
+    if let (Some(uid), Some(yaml)) = (item.uid.as_ref(), inline_snapshot)
+        && let profiles::BindingSync::Failed(error) = profiles::reconcile_clash5_snapshot(uid.to_string(), yaml).await
+    {
+        let message = format!("Subscription saved, but clash5 node bindings were not synchronized: {error}");
+        logging!(warn, Type::Config, "{message}");
+        handle::Handle::notice(NoticeStatus::UpdateFailed, message.as_str());
     }
     logging_error!(Type::Timer, Timer::global().refresh().await);
 
@@ -146,6 +154,11 @@ pub async fn delete_profile(index: String) -> CmdResult {
     let profile_write_guard = PROFILE_WRITE_LOCK.lock().await;
 
     let profiles = Config::profiles().await;
+    let deleted_was_remote = profiles
+        .latest_arc()
+        .get_item(&index)
+        .ok()
+        .is_some_and(|item| item.itype.as_deref() == Some("remote"));
     let result = profiles
         .with_data_modify(|mut candidate| async move {
             let original = candidate.clone();
@@ -180,6 +193,17 @@ pub async fn delete_profile(index: String) -> CmdResult {
     }
     drop(config_update_guard);
     drop(profile_write_guard);
+
+    if deleted_was_remote {
+        let provider_id = index.to_string();
+        if let Err(error) =
+            profiles::with_clash5_binding_store(move |store| store.refresh_provider(&provider_id, &[])).await
+        {
+            let message = format!("Profile deleted, but clash5 orphan bindings were not synchronized: {error}");
+            logging!(warn, Type::Config, "{message}");
+            handle::Handle::notice(NoticeStatus::UpdateFailed, message.as_str());
+        }
+    }
 
     if should_update {
         logging_error!(Type::Config, Config::sync_dns_override().await);
