@@ -195,14 +195,13 @@ pub async fn delete_profile(index: String) -> CmdResult {
     drop(config_update_guard);
     drop(profile_write_guard);
 
-    if deleted_was_remote {
-        if let Err(error) =
+    if deleted_was_remote
+        && let Err(error) =
             profiles::with_clash5_binding_store(move |store| store.refresh_provider(&deleted_provider_id, &[])).await
-        {
-            let message = format!("Profile deleted, but clash5 orphan bindings were not synchronized: {error}");
-            logging!(warn, Type::Config, "{message}");
-            handle::Handle::notice(NoticeStatus::UpdateFailed, message.as_str());
-        }
+    {
+        let message = format!("Profile deleted, but clash5 orphan bindings were not synchronized: {error}");
+        logging!(warn, Type::Config, "{message}");
+        handle::Handle::notice(NoticeStatus::UpdateFailed, message.as_str());
     }
 
     if should_update {
