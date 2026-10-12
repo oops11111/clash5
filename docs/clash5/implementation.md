@@ -2,6 +2,12 @@
 
 Repository: https://github.com/oops11111/clash5. Baseline: upstream `dev` at `27efaf34f457f357bf73daa242df909fef1fa9ee`.
 
+The package display name and Tauri identifier are `clash5` and `io.github.oops11111.clash5`. All desktop platform overrides and the application data resolver use that identifier, so this fork keeps its SQLite database and profiles away from Clash Verge Rev's data directory. Existing upstream attribution remains in README and the GPL license is retained.
+
+The updater endpoint list is empty until clash5 has its own signing key and release metadata. This prevents a development build from offering an upstream Clash Verge installer. The original upstream public key is inert without endpoints and must be replaced when clash5 release signing is configured.
+
+Desktop deep links register the `clash5` scheme, so installing this fork does not take over Clash Verge Rev's `clash` and `clash-verge` links. Linux package metadata and service binary names are still inherited from upstream and must be isolated before distributing installers.
+
 ## First slice: M0 foundation
 
 The fork lacks clash5's persistent, source-scoped identity and binding model. `crates/clash5-data` implements that model as an independent Rust library, preserving the GPL-3.0 license and keeping tests independent of Tauri platform dependencies. The earlier local TypeScript prototype remains outside this checkout as a behavioral reference.
