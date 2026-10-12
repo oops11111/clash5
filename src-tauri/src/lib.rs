@@ -195,6 +195,8 @@ mod app_init {
             cmd::get_network_interfaces_info,
             cmd::get_profiles,
             cmd::clash5_list_bindings,
+            cmd::clash5_list_nodes,
+            cmd::clash5_probe_nodes,
             cmd::clash5_bind_node,
             cmd::clash5_purge_orphans,
             cmd::clash5_register_manual_node,

@@ -4,6 +4,7 @@
       "tabs": {
         "home": "홈",
         "proxies": "프록시",
+        "nodePool": "Node Pool",
         "profiles": "프로필",
         "connections": "연결",
         "rules": "규칙",

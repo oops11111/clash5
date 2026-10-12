@@ -200,15 +200,14 @@ fn database_reopen_and_atomic_failure() {
 }
 
 #[test]
-fn malformed_or_duplicate_snapshot_keeps_previous_state() {
+fn malformed_snapshot_keeps_previous_state_and_duplicate_is_folded() {
     let mut db = BindingStore::memory().unwrap();
     let first = node();
     let id = first.stable_id().unwrap();
     db.refresh_provider("a", std::slice::from_ref(&first)).unwrap();
-    assert_eq!(
-        db.refresh_provider("a", &[first.clone(), first.clone()]),
-        Err(DataError::InvalidInput)
-    );
+    let folded = db.refresh_provider("a", &[first.clone(), first.clone()]).unwrap();
+    assert_eq!(folded.duplicates, 1);
+    assert_eq!(db.node_records(false).unwrap()[0].duplicate_count, 2);
     let mut bad = first;
     bad.port = 0;
     assert_eq!(db.refresh_provider("a", &[bad]), Err(DataError::InvalidInput));

@@ -81,3 +81,27 @@ pub fn parse_inline_nodes(yaml: &str) -> Result<Option<Vec<Node>>, DataError> {
     }
     Ok(Some(nodes))
 }
+
+/// A remote refresh owns only proxy lines. Keep rules, groups and other local
+/// profile customizations from the committed file, including their ordering.
+/// This is a semantic YAML merge; comments in the committed file are not retained.
+pub fn replace_subscription_lines(previous: &str, incoming: &str) -> Result<String, DataError> {
+    let mut old: serde_yaml_ng::Mapping = serde_yaml_ng::from_str(previous).map_err(|_| DataError::InvalidInput)?;
+    let next: serde_yaml_ng::Mapping = serde_yaml_ng::from_str(incoming).map_err(|_| DataError::InvalidInput)?;
+    let proxies = field(&next, "proxies");
+    let providers = field(&next, "proxy-providers");
+    if proxies.is_none() && providers.is_none() {
+        return Err(DataError::InvalidInput);
+    }
+    if proxies.is_some_and(|value| !value.is_sequence()) || providers.is_some_and(|value| !value.is_mapping()) {
+        return Err(DataError::InvalidInput);
+    }
+    for key in ["proxies", "proxy-providers"] {
+        let key = Value::String(key.into());
+        old.remove(&key);
+        if let Some(value) = next.get(&key) {
+            old.insert(key, value.clone());
+        }
+    }
+    serde_yaml_ng::to_string(&old).map_err(|_| DataError::InvalidInput)
+}

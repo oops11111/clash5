@@ -302,6 +302,19 @@ impl IProfiles {
 
                         let path = dirs::app_profiles_dir()?.join(file.as_str());
 
+                        let file_data = if each.itype.as_deref() == Some("remote") {
+                            match fs::read_to_string(&path).await {
+                                Ok(previous) => clash5_data::replace_subscription_lines(&previous, &file_data)
+                                    .map_err(|error| {
+                                        anyhow::anyhow!("failed to preserve local profile sections: {error}")
+                                    })?,
+                                Err(error) if error.kind() == std::io::ErrorKind::NotFound => file_data,
+                                Err(error) => return Err(error).context("failed to read committed remote profile"),
+                            }
+                        } else {
+                            file_data
+                        };
+
                         fs::write(&path, file_data.as_bytes())
                             .await
                             .with_context(|| format!("failed to write to file \"{file}\""))?;

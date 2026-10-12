@@ -4,6 +4,7 @@
       "tabs": {
         "home": "Startseite",
         "proxies": "Proxy",
+        "nodePool": "Node Pool",
         "profiles": "Abonnement",
         "connections": "Verbindungen",
         "rules": "Regeln",
