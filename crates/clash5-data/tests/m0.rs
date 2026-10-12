@@ -277,3 +277,23 @@ fn binding_ipc_source_and_draft_fields_are_stable() {
         json!({ "kind": "manual" })
     );
 }
+
+#[test]
+fn sqlite_and_audit_do_not_contain_node_credentials() {
+    let test_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
+    std::fs::create_dir_all(&test_root).unwrap();
+    let directory = tempfile::tempdir_in(test_root).unwrap();
+    let path = directory.path().join("private.sqlite");
+    let mut first = node();
+    let password = format!("synthetic-{}", "x".repeat(36));
+    first.credentials.insert("password".into(), password.clone());
+    let mut db = BindingStore::open(&path).unwrap();
+    db.refresh_provider("profile-a", &[first]).unwrap();
+    drop(db);
+    let bytes = std::fs::read(path).unwrap();
+    assert!(
+        !bytes
+            .windows(password.len())
+            .any(|window| window == password.as_bytes())
+    );
+}
