@@ -30,4 +30,4 @@ Targeted tests cover rename and credential changes, credential/server normalizat
 
 M0 completion still requires desktop adapter and IPC integration, successful desktop checks, and a runnable shell. M1 and subsequent milestones follow only after M0 integration is verified. UI polish, sing-box, injection, Plugin Host, signing/release automation and real Mihomo hot loading are outside this first slice.
 
-The owner authorized implementation without additional routine approval. GitHub Issues is currently disabled; the draft PR records this slice's problem, scope and verification evidence.
+The owner authorized implementation without additional routine approval. Issues was initially disabled on the fork; it is now enabled and [issue #1](https://github.com/oops11111/clash5/issues/1) tracks M0 integration. The first data-library slice was validated before enabling issue tracking; desktop integration follows that issue.
