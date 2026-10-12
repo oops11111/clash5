@@ -1,0 +1,70 @@
+name: clash5 shell smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/clash5-shell-smoke.yml'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'crates/clash5-data/**'
+      - 'src-tauri/**'
+      - 'src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-shell:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.21.0'
+          cache: pnpm
+      - name: Install locked frontend dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Provision real desktop resources
+        run: pnpm prebuild x86_64-pc-windows-msvc
+      - name: Build frontend
+        run: pnpm web:build
+      - name: Build desktop shell without an installer
+        run: cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --release --locked
+      - name: Launch shell briefly
+        shell: pwsh
+        run: |
+          $binary = 'target/x86_64-pc-windows-msvc/release/clash-verge.exe'
+          $process = Start-Process -FilePath $binary -WindowStyle Hidden -PassThru
+          try {
+            Start-Sleep -Seconds 15
+            $process.Refresh()
+            if ($process.HasExited) {
+              throw "Desktop shell exited during smoke test with code $($process.ExitCode)"
+            }
+          } finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+            }
+          }
+      - name: Upload nightly test shell
+        if: github.event_name == 'schedule'
+        uses: actions/upload-artifact@v7
+        with:
+          name: clash5-windows-shell
+          path: |
+            target/x86_64-pc-windows-msvc/release/clash-verge.exe
+            src-tauri/resources/**
+            src-tauri/sidecar/**
+          if-no-files-found: error

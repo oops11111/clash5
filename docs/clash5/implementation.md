@@ -34,6 +34,8 @@ cargo test --manifest-path crates/clash5-data/Cargo.toml --locked --offline
 
 Targeted tests cover rename and credential changes, credential/server normalization, manual/provider isolation, orphan recovery and both enabled states, filtered purge, SQLite reopen and rollback after an actual SQL write failure. The identity snapshot must match the previous TypeScript identity encoding. The dedicated M0 workflow provisions dependencies, then runs the same offline checks. Existing frontend lint/typecheck and desktop CI are retained. Mihomo configuration snapshots require the later configuration generator; this slice only snapshots node identity.
 
+The Windows shell smoke workflow provisions real upstream desktop resources, builds the frontend and desktop executable, then confirms the process stays alive for 15 seconds. Its scheduled run uploads a test shell artifact. It does not publish or bundle an installer while clash5's service names and release signing remain unfinished.
+
 ## Upstream synchronization
 
 `origin` is the owner's fork; `upstream` is `https://github.com/clash-verge-rev/clash-verge-rev.git`. Merge `upstream/dev` into clash5 `dev`, resolve conflicts without discarding source isolation or bindings, and run the affected checks. Do not rewrite shared history. Preserve upstream GPL attribution.
