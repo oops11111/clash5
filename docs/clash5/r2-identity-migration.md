@@ -21,11 +21,13 @@ The ID is `v2:` followed by lowercase hex HMAC-SHA256. Its payload is a length-d
 | Protocol | Trimmed ASCII lowercase type, using the existing supported-type validation. |
 | Server | Existing `v1` IP/IDNA normalization, including IPv6 brackets and removal of one trailing DNS dot. |
 | Port | Numeric `u16`, nonzero. |
-| Transport | Lowercase Mihomo `network` value. Missing and explicit `tcp` are equivalent for TCP-based protocols; protocol-native transports use an explicit protocol default. Unsupported or conflicting transport aliases fail validation. |
-| SNI | Normalize the single effective `sni`/`servername` value as an IP or IDNA DNS name. Missing is empty; conflicting nonempty aliases fail validation. |
+| Transport | Lowercase Mihomo `network` value. Missing and explicit `tcp` are equivalent for TCP-based protocols; protocol-native transports use the defaults below. A supplied value must be a nonempty ASCII token and pass core configuration validation. |
+| SNI | Normalize the single effective top-level `sni`, top-level `servername`, or nested `tls.servername` value as an IP or IDNA DNS name. Missing is empty; conflicting nonempty aliases fail validation. |
 | Credential fingerprint | HMAC-SHA256 with a distinct domain tag over sorted, length-delimited credential keys and normalized values. UUID normalization preserves the accepted `v1` behavior. |
 
-The outer HMAC uses a distinct `clash5-node-v2` domain tag. Store `stable_id_version = 2` and the key generation with each node, and key identifiers in database metadata; no raw credential or credential fingerprint is stored. Changes to any canonical field or its normalization require a new ID version and migration plan. Protocol-specific defaults and aliases must be fixed in a fixture table before code lands; this document does not treat unspecified transport as `tcp` for every protocol.
+Transport defaults for an absent `network` field are `tcp` for `ss`, `ssr`, `trojan`, `vless`, `vmess`, `anytls`, `socks5`, `http`, `ssh`, `shadowtls`; `quic` for `hysteria`, `hysteria2`, `tuic`; and `wireguard` for `wireguard`. An explicit `network` equal to that default is the same identity. For protocol-native transports, an explicit different `network` is invalid. Network-specific options such as a WebSocket path remain configuration of the same node in `v2`; changing the protocol transport type or effective SNI changes identity. The credential field list is the accepted `v1` list, sorted by UTF-8 bytes for `v2` and encoded with an unambiguous length-delimited format. These choices need fixed-key golden fixtures before implementation is merged.
+
+The outer HMAC uses a distinct `clash5-node-v2` domain tag. Store `stable_id_version = 2` and the key generation with each node, and key identifiers in database metadata; no raw credential or credential fingerprint is stored. Changes to any canonical field or its normalization require a new ID version and migration plan.
 
 ## Database and source migration
 
