@@ -121,7 +121,7 @@ M0 的原验收已完成并合并至 `dev`。以下是本草案新增或收紧�
 | 共存与导入 | app identifier、目录、deep link 已隔离；服务/包名仍有上游遗留 | 同机安装验证；只读迁移向导与源目录校验（R-18/R-19） |
 | 安全与契约 | M0 IPC 已返回结构化错误 | 统一 `C5-*` 码、脱敏测试和所有 command 契约快照；尚无证据证明全面覆盖（R-20） |
 | 上游同步 | M0 文档及仓库基线来自上游 `dev` | 本草案将后续同步改为 release tag 的独立 PR；首次采用前核对目标 tag 与当前基线关系 |
-| M1 节点池 | 草稿 PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；当前 CI 已通过 | Mihomo 延迟接口未暴露机场 HTTP 429；限流 fixture、真实桌面操作及本节 M1 退出证据尚未完成（R-11） |
+| M1 节点池 | 草稿 PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；本地 HTTP 429 fixture 已单独验证 | Mihomo 延迟接口未暴露上游 HTTP 状态及 `Retry-After`；fixture 经真实桌面壳与 Mihomo 的端到端操作及本节 M1 退出证据尚未完成（R-11） |
 
 M0 现有实现见 [`clash5/implementation.md`](clash5/implementation.md)；M1 当前实现及限制见[草稿 PR #4](https://github.com/oops11111/clash5/pull/4)。
 
