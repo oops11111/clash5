@@ -225,8 +225,8 @@ async fn probe_targets<F, Fut>(
     test: F,
 ) -> Vec<(Source, String, NodeQuality)>
 where
-    F: Fn(String) -> Fut + Clone,
-    Fut: Future<Output = (Option<u32>, Option<u32>)>,
+    F: Fn(String) -> Fut + Clone + Send + Sync,
+    Fut: Future<Output = (Option<u32>, Option<u32>)> + Send,
 {
     stream::iter(targets.into_iter().map(|(record, runtime_name)| {
         let test = test.clone();
