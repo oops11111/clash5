@@ -1,0 +1,11 @@
+# M1 desktop demo script
+
+Run this against a built clash5 desktop shell with Mihomo available. Use disposable proxy credentials and keep links out of screenshots and logs. Record the app version, platform, results and any deviation in the M1 issue before accepting the milestone.
+
+1. Start the shell with `pnpm dev`. Open **Nodes** and confirm the inventory comes from the active profile. The empty state must not show sample nodes or fabricated latency.
+2. Copy a valid standalone proxy URI to the clipboard and use **Import from clipboard**. Confirm one manual row appears. Restart the shell and confirm the same row persists. Import the same URI with a different display name; it must update that row rather than create a second identity.
+3. Import a second valid URI whose endpoint is intentionally unreachable. Run **Probe**. The first node should receive a measured result and the unreachable node should be failed; one failure must not hide the other result or abort the batch. Run **Probe** again immediately and confirm both results are reported as cached.
+4. Import a subscription containing an inline proxy and an external `proxy-provider`. Confirm the two source scopes are distinct in the node table. Refresh it with a changed proxy list while retaining a locally customized rule and proxy group. Confirm the new lines appear, removed lines become inactive, and the local rule and group remain. A repeated identity must show a duplicate count without merging records from different sources.
+5. Select the manual, inline and external-provider rows and run **Probe**. Confirm each maps to its intended runtime proxy. An unavailable or ambiguous runtime name must be counted as unavailable, without probing another node. Sort by quality and filter by source, duplicates, high quality and inactive state; compare the layout with `src/ui-hifi/src/pages/Nodes.tsx`.
+
+The automated data test covers persisted cache compatibility and 10/20/40/60-minute retry intervals. The command test covers failure isolation within a probe batch. This desktop script is still required because those tests do not prove the Tauri-to-Mihomo path or UI behavior. Provider HTTP 429 handling needs a separate fixture: the current Mihomo delay API returns a zero delay for a failed test and does not expose the upstream status to this command.

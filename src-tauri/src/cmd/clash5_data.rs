@@ -5,6 +5,7 @@ use serde::Serialize;
 use serde_yaml_ng::Value;
 use std::{
     collections::HashMap,
+    future::Future,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -218,6 +219,28 @@ async fn measure(name: &str, url: &str, timeout_ms: u32) -> Option<u32> {
     .and_then(|result| (result.delay > 0).then_some(result.delay))
 }
 
+async fn probe_targets<F, Fut>(
+    targets: Vec<(NodeRecord, String)>,
+    now_ms: u64,
+    test: F,
+) -> Vec<(Source, String, NodeQuality)>
+where
+    F: Fn(String) -> Fut + Clone,
+    Fut: Future<Output = (Option<u32>, Option<u32>)>,
+{
+    stream::iter(targets.into_iter().map(|(record, runtime_name)| {
+        let test = test.clone();
+        async move {
+            let (short, handshake) = test(runtime_name).await;
+            let quality = NodeQuality::from_probe_after(short, handshake, now_ms, record.quality.as_ref());
+            (record.source, record.stable_id, quality)
+        }
+    }))
+    .buffer_unordered(PROBE_CONCURRENCY)
+    .collect()
+    .await
+}
+
 #[tauri::command]
 pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
     let _guard = PROBE_LOCK
@@ -280,14 +303,11 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
         }
         targets.push((record, runtime_name));
     }
-    let results: Vec<_> = stream::iter(targets.into_iter().map(|(record, runtime_name)| async move {
+    let results = probe_targets(targets, now_ms, |runtime_name| async move {
         let short = measure(&runtime_name, SHORT_PROBE_URL, SHORT_PROBE_MS).await;
         let handshake = measure(&runtime_name, HANDSHAKE_PROBE_URL, HANDSHAKE_PROBE_MS).await;
-        let quality = NodeQuality::from_probe_after(short, handshake, now_ms, record.quality.as_ref());
-        (record.source, record.stable_id, quality)
-    }))
-    .buffer_unordered(PROBE_CONCURRENCY)
-    .collect()
+        (short, handshake)
+    })
     .await;
     batch.probed = results.len();
     batch.failed = results
@@ -310,4 +330,43 @@ pub async fn clash5_purge_orphans(source: Option<Source>) -> CmdResult<usize> {
     crate::config::profiles::with_clash5_binding_store(move |store| store.purge_orphans(source.as_ref()))
         .await
         .map_err(failure)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn node(stable_id: &str) -> NodeRecord {
+        NodeRecord {
+            stable_id: stable_id.into(),
+            source: Source::Manual,
+            display_name: stable_id.into(),
+            kind: "ss".into(),
+            server: "fixture.example.invalid".into(),
+            port: 443,
+            active: true,
+            duplicate_count: 1,
+            quality: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn one_failed_probe_does_not_abort_other_nodes() {
+        let mut results = probe_targets(
+            vec![(node("failed"), "failed".into()), (node("healthy"), "healthy".into())],
+            1_000,
+            |name| async move {
+                if name == "failed" {
+                    (None, None)
+                } else {
+                    (Some(45), Some(120))
+                }
+            },
+        )
+        .await;
+        results.sort_by(|left, right| left.1.cmp(&right.1));
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].2.status, QualityStatus::Failed);
+        assert_eq!(results[1].2.status, QualityStatus::Healthy);
+    }
 }

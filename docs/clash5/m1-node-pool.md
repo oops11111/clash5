@@ -12,6 +12,8 @@ The clipboard action accepts HTTP(S) subscription URLs and standalone proxy URI 
 
 Verification:
 
+The desktop walkthrough is in [`m1-acceptance.md`](m1-acceptance.md). It has not yet been signed off with real runtime nodes.
+
 ```sh
 cargo fmt --manifest-path crates/clash5-data/Cargo.toml --check
 cargo test --manifest-path crates/clash5-data/Cargo.toml --locked --offline
