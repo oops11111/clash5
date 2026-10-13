@@ -262,8 +262,33 @@ const NodePoolPage = () => {
     : []
 
   return (
-    <BasePage title={t('nodePool.title')}>
-      <Stack spacing={1.75} sx={{ p: 2, height: '100%', minHeight: 0 }}>
+    <BasePage
+      title={
+        <>
+          <Box component="span">{t('nodePool.title')}</Box>
+          <Box
+            component="span"
+            sx={{
+              display: 'block',
+              fontSize: 11,
+              fontWeight: 400,
+              color: 'text.secondary',
+            }}
+          >
+            {t('nodePool.subtitle')}
+          </Box>
+        </>
+      }
+    >
+      <Stack
+        spacing={1.75}
+        sx={{
+          p: 2,
+          height: '100%',
+          minHeight: 0,
+          bgcolor: dark ? 'transparent' : '#f1f5fb',
+        }}
+      >
         <Stack
           direction={{ xs: 'column', lg: 'row' }}
           sx={{
