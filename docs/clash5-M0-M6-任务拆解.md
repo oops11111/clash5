@@ -1,7 +1,8 @@
 # clash5 开发任务拆解（M0–M6）
 
-> 基于已锁定决策。上游 merge（S2）。产品名 **clash5**。
-> **模型标注**：`[Opus]` = 架构/高风险/复杂并发与安全，须用 Opus（或同级）Cloud Agent；`[标准]` = Composer/标准编码模型即可；`[人工]` = 需你本机或账号操作。
+> 基于 [`clash5-工程手册.md`](clash5-工程手册.md) r2 草案。后续上游同步拟按 release tag 的独立 merge PR（S2 r2）；产品名 **clash5**。
+> **模型标注**：`[Opus]` = 架构/高风险/复杂并发与安全，使用 Opus-class 或同级高推理模型；`[标准]` = 常规编码模型；`[人工]` = 需账号、设备或真机验收。
+> **进度口径**：M0 已按原版验收并合并至 `dev`；r2 的新增要求是开放差距。M1 已启动，草稿 PR #4 尚未达到退出标准。
 
 ---
 
@@ -11,28 +12,35 @@
 |------|--------|
 | **[Opus]** | 跨模块设计落地、插件沙箱/权限、冲突合并、双内核调度、注入引擎、热更新回滚、数据模型与订阅 diff |
 | **[标准]** | UI 页面、i18n、CI yaml、文档、简单 IPC 接线、样式 |
-| **[人工]** | GitHub fork 授权、代码签名、杀软加白、真机注入验收 |
+| **[人工]** | GitHub fork 授权、发布证书、杀软加白、真机注入验收 |
 
-**调用方式**：`[Opus]` 任务在 Cloud Agent launch 的 prompt 首行写：`Model requirement: use the strongest available coding model (Opus-class).`
-Codex 同理：选 GPT‑5.2 / o 系列高推理档，勿用轻量档硬扛架构题。
+**调用方式**：`[Opus]` brief 明确 `Model requirement: Opus-class`；具体工具按项目负责人指定和可用性选择。协作格式见 [`clash5-AI协作规范.md`](clash5-AI协作规范.md)。
 
 ---
 
 ## M0 · Fork 基建与数据骨架
 
 ### M0.1 仓库与工程
-- [ ] `[人工]` Fork 上游并建 `clash5` 远程仓库，把地址发给协调者
-- [ ] `[标准]` 品牌占位、README、upstream merge 说明（S2）
-- [ ] `[标准]` CI T2：lint + typecheck + cargo test + 快照；nightly 工件
+- [x] `[人工]` Fork 上游并建立 `oops11111/clash5` 仓库
+- [x] `[标准]` 原版 M0 品牌占位、README、上游同步说明
+- [x] `[标准]` 原版 M0 CI 与 shell smoke 基础检查；r2 矩阵扩展见下方差距
 
 ### M0.2 稳定身份与存储
-- [ ] `[Opus]` `stable_id` 指纹与凭证归一化设计+实现+单测
-- [ ] `[Opus]` SQLite：bindings / chains / quality / audit / orphan；手动 vs 订阅（C2）
-- [ ] `[Opus]` 订阅 diff：继承 / 新增 / orphan 重绑（A2）；名称匹配默认关（B）
-- [ ] `[标准]` 导出/导入包、孤儿清理入口（可跟 Opus PR 同开或二期）
+- [x] `[Opus]` 原版 stable_id 指纹与凭证归一化、测试；r2 HMAC 与版本迁移另列
+- [x] `[Opus]` 原版 SQLite bindings / chains / quality / audit / orphan，手动与订阅隔离（C2）
+- [x] `[Opus]` 原版订阅 diff：同身份继承 / 新增 / orphan 恢复（A2），名称匹配默认关（B）
+- [ ] `[标准]` 导出/导入包、孤儿清理入口及 r2 保留期提醒
 
 ### M0.3 验收
-- [ ] `[标准]` 空壳可运行 + 单测绿
+- [x] `[标准]` 原版 M0 空壳与数据层验收，已合并至 `dev`
+
+### M0 r2 增量差距（不能按已完成项勾选）
+- [ ] `[Opus]` R-01/R-02/R-25：先定密钥丢失与轮换恢复方案，再无损迁移至本机密钥 HMAC 并存储 stable_id 版本；凭证轮换仅在同来源按唯一候选自动重绑，多候选人工确认，附迁移 fixture
+- [ ] `[Opus]` SQLite WAL 与版本迁移方案：从现有 `PRAGMA user_version` v2 安全迁移，迁移失败整事务回滚；孤儿默认 30 天、可设 1–365 天与清理前提示
+- [ ] `[标准]` R-18/R-19：服务与包名隔离、同机共存实测；只读导入 verge-rev 数据并比较源目录前后校验和
+- [ ] `[Opus]` R-20：统一日志/诊断脱敏；凭证、完整订阅 URL、controller secret、relay token 的泄露回归测试
+- [ ] `[标准]` 对外 `C5-*` 错误码、IPC 契约快照与 r2 CI 矩阵证据
+- [ ] `[标准]` 首次 release-tag 同步前核对 M0 所用上游 `dev` 基线，单独 PR 记录取舍
 
 **本阶段 Opus 必做**：M0.2 全部核心逻辑。
 
@@ -44,8 +52,10 @@ Codex 同理：选 GPT‑5.2 / o 系列高推理档，勿用轻量档硬扛架�
 - [ ] `[标准]` 节点池 UI、剪贴板导入交互、过滤角标
 - [ ] `[Opus]` 去重指纹 + 短延迟/长握手探测管线与节流（P2）
 - [ ] `[标准]` 探测结果展示着色/排序
+- [ ] `[Opus]` 手动节点加入运行时后可安全探测；限流自动退避及 fixture 验证（R-11）
+- [ ] `[标准]` 对照 `src/ui-hifi` 的已确认 UI 做桌面验收，提供 r2 所需的集成测试与演示步骤
 
-**Opus 必做**：解耦后端、去重与探测管线。
+**当前进度**：草稿 PR #4 已有 SQLite 库存、剪贴板链接导入、外部 provider 缓存与受限探测；独立链接还未进入活动运行时。**Opus 必做**：解耦后端、去重与探测管线及上述补口。
 
 ---
 
