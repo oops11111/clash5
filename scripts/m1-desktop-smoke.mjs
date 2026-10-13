@@ -22,32 +22,42 @@ let browser
 try {
   browser = await startWdioSession(capabilities)
   let inventory
-  await browser.waitUntil(
-    async () => {
-      try {
-        const result = await browser.executeAsync((done) => {
-          const invoke = window.__TAURI_INTERNALS__?.invoke
-          if (!invoke) {
-            done({ error: 'Tauri bridge is unavailable' })
-            return
-          }
-          invoke('clash5_list_nodes', { includeInactive: true }).then(
-            (value) => done({ value }),
-            (error) => done({ error: String(error) }),
-          )
-        })
-        inventory = result.value
-        return Array.isArray(inventory)
-      } catch {
-        return false
-      }
-    },
-    {
-      timeout: 60_000,
-      interval: 1_000,
-      timeoutMsg: 'clash5_list_nodes did not become available',
-    },
-  )
+  let lastError
+  try {
+    await browser.waitUntil(
+      async () => {
+        try {
+          const result = await browser.execute(async () => {
+            const invoke = window.__TAURI_INTERNALS__?.invoke
+            if (!invoke) {
+              return { error: 'Tauri bridge is unavailable' }
+            }
+            try {
+              const value = await invoke('clash5_list_nodes', {
+                includeInactive: true,
+              })
+              return { value }
+            } catch (error) {
+              return { error: String(error) }
+            }
+          })
+          inventory = result.value
+          lastError = result.error
+          return Array.isArray(inventory)
+        } catch (error) {
+          lastError = String(error)
+          return false
+        }
+      },
+      {
+        timeout: 60_000,
+        interval: 1_000,
+        timeoutMsg: 'clash5_list_nodes did not become available',
+      },
+    )
+  } catch (error) {
+    throw new Error(`${String(error)}; last error: ${lastError ?? 'none'}`)
+  }
   if (inventory.length !== 0) {
     throw new Error(`Fresh desktop session contains ${inventory.length} nodes`)
   }
