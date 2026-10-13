@@ -3,7 +3,7 @@
 > 产品名：**clash5**
 > 基线：Fork [clash-verge-rev](https://github.com/clash-verge-rev/clash-verge-rev) · GPL-3.0 · 上游 tag 跟踪（见 §1.2）
 > 配套：[`clash5-M0-M6-任务拆解.md`](clash5-M0-M6-任务拆解.md)、[`clash5-风险登记.md`](clash5-风险登记.md)、[`clash5-AI协作规范.md`](clash5-AI协作规范.md)
-> 状态：r2 设计草案。M0 已按原验收基线合并；新增标准的实现差距见下文，不视为已通过验收。
+> 状态：r2 修订稿，待整体评审冻结。M0 已按原验收基线合并；新增标准的实现差距见下文，不视为已通过验收。身份恢复与迁移方案已在 [PR #8](https://github.com/oops11111/clash5/pull/8) 决定，实现仍待验收。
 
 ## 变更说明（相对 r1）
 
@@ -117,11 +117,11 @@ M0 的原验收已完成并合并至 `dev`。以下是本草案新增或收紧�
 | 范围 | 已核对现状 | r2 待补齐 |
 | --- | --- | --- |
 | 身份与孤儿 | `crates/clash5-data` 使用无密钥的版本前缀 SHA-256，输入为类型、服务器、端口及凭证，未单列 transport/SNI；同一 stable_id 返回时恢复绑定 | §4.1 的本机密钥 HMAC、规范字段与版本迁移、凭证轮换候选重绑、保留期与提醒（R-01/R-02/R-25） |
-| SQLite | 使用 `PRAGMA user_version` 的 v2 迁移，已有失败回滚测试 | WAL 与迁移方案统一；是否改用 `schema_version` 表须先设计无损迁移，不得仅改版本标记 |
+| SQLite | M1 草稿使用 `PRAGMA user_version` 的 v2 迁移，已有失败回滚测试 | r2 身份迁移继续以 `PRAGMA user_version` 为唯一版本标记；WAL、分代元数据与失败回滚仍需实现和验证 |
 | 共存与导入 | app identifier、目录、deep link 已隔离；服务/包名仍有上游遗留 | 同机安装验证；只读迁移向导与源目录校验（R-18/R-19） |
 | 安全与契约 | M0 IPC 已返回结构化错误 | 统一 `C5-*` 码、脱敏测试和所有 command 契约快照；尚无证据证明全面覆盖（R-20） |
 | 上游同步 | M0 文档及仓库基线来自上游 `dev` | 本草案将后续同步改为 release tag 的独立 PR；首次采用前核对目标 tag 与当前基线关系 |
-| M1 节点池 | 草稿 PR #4 已实现库存、导入和受限探测 | 手动节点运行时映射、限流退避、桌面验收及本节 M1 退出证据尚未完成（R-11） |
+| M1 节点池 | 草稿 PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；当前 CI 已通过 | Mihomo 延迟接口未暴露机场 HTTP 429；限流 fixture、真实桌面操作及本节 M1 退出证据尚未完成（R-11） |
 
 M0 现有实现见 [`clash5/implementation.md`](clash5/implementation.md)；M1 当前实现及限制见[草稿 PR #4](https://github.com/oops11111/clash5/pull/4)。
 
@@ -147,9 +147,9 @@ OrphanBinding   = PluginBinding + disappeared_at + last_stable_id + candidates[]
 
 **设计决定**：
 
-- 凭证轮换（UUID/密码变化）导致的 stable_id 变化，视为「同一节点的新身份」，由 `reattach` 在**同一订阅来源内**按「server+port+type」与 transport 一致性做候选匹配，**候选唯一时自动重绑，多候选时进入人工确认**。手动节点与不同 provider 不跨来源自动重绑。
-- 本机密钥丢失或轮换会改变所有 HMAC 身份；实施前须确定密钥备份/恢复或显式重绑方案，并用迁移 fixture 验证（R-25）。
-- r2 采用显式重绑的密钥丢失恢复方案及分代迁移，实施顺序和失败处理见 [`clash5/r2-identity-migration.md`](clash5/r2-identity-migration.md)；代码和验收仍由 [Issue #7](https://github.com/oops11111/clash5/issues/7) 跟踪。
+- 凭证轮换（UUID/密码变化）导致的 stable_id 变化，视为「同一节点的新身份」。`reattach` 仅在**同一订阅来源内**对失活身份按 type、server、port、transport、SNI 匹配：候选唯一时自动重绑，多候选时进入人工确认；手动节点与不同 provider 不跨来源自动重绑。
+- 本机密钥丢失、锁定或不匹配时，保持现有节点与绑定可读，暂停刷新和身份写入；须由用户确认重置后逐项显式重绑，不得生成替代密钥后静默迁移。计划内轮换在旧密钥仍可用时才可精确迁移。
+- r2 的密钥分代、`v1`→`v2` 迁移、规范字段及崩溃恢复顺序以 [`clash5/r2-identity-migration.md`](clash5/r2-identity-migration.md) 为准；代码与 fixture 验收仍由 [Issue #7](https://github.com/oops11111/clash5/issues/7) 跟踪（R-01/R-02/R-25）。
 - 同机同端口不同 transport/SNI 的节点，因 canonical 字段包含 transport 与 sni，不会碰撞；若仍碰撞，diff 阶段报错而非静默合并。
 
 **孤儿策略（A2 补充）**：
@@ -173,7 +173,7 @@ impl BindingStore {
 
 **存储约束**：
 
-- 数据库使用版本化迁移（`schema_version` 表），迁移在单事务内执行，失败整体回滚。
+- 数据库继续使用 `PRAGMA user_version` 作为唯一 schema 版本标记；r2 迁移与版本号推进在单事务内执行，失败整体回滚，不另建第二套版本权威。
 - YAML 配置与 SQLite 为双数据源：SQLite 为绑定关系的唯一事实来源；YAML 为每次生成的派生产物，不回写。
 - 含凭证的字段（如插件 `config` 中的密钥类字段）使用系统密钥库或 AES-GCM 加密后存储，密钥同样存于系统密钥库。
 
@@ -296,7 +296,7 @@ trait ProcessProxyEngine {
 
 ---
 
-## 5. 决策速查（r2 草案）
+## 5. 决策速查（r2 修订稿，待冻结）
 
 每条决策附理由与影响范围，供评审与日后回溯。
 
