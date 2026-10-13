@@ -100,11 +100,17 @@ server.on('connect', (request, client, head) => {
     reject(client, '429 Too Many Requests', 'Retry-After: 1200\r\n')
     return
   }
-  if (request.url !== 'cp.cloudflare.com:443') {
+  if (
+    request.url !== 'cp.cloudflare.com:80' &&
+    request.url !== 'cp.cloudflare.com:443'
+  ) {
     reject(client, '403 Forbidden')
     return
   }
-  const upstream = net.connect(443, 'cp.cloudflare.com')
+  const upstream = net.connect(
+    request.url.endsWith(':80') ? 80 : 443,
+    'cp.cloudflare.com',
+  )
   upstream.once('connect', () => {
     client.write('HTTP/1.1 200 Connection Established\r\n\r\n')
     if (head.length > 0) upstream.write(head)

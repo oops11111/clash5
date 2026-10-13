@@ -9,6 +9,7 @@ on:
       - 'crates/clash5-data/**'
       - 'src-tauri/**'
       - 'src/**'
+      - 'scripts/m1-*.mjs'
       - 'package.json'
       - 'pnpm-lock.yaml'
   schedule:
@@ -38,6 +39,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Provision real desktop resources
         run: pnpm prebuild x86_64-pc-windows-msvc
+      - name: Probe through Mihomo and the local rate-limit fixture
+        run: pnpm m1:mihomo-smoke src-tauri/sidecar/verge-mihomo-x86_64-pc-windows-msvc.exe
       - name: Build frontend
         run: pnpm web:build
       - name: Build desktop shell without an installer
