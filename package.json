@@ -37,6 +37,7 @@
     "test:watch": "vitest",
     "m1:probe-fixture": "node scripts/m1-probe-fixture.mjs",
     "m1:mihomo-smoke": "node scripts/m1-mihomo-smoke.mjs",
+    "m1:desktop-smoke": "node scripts/m1-desktop-smoke.mjs",
     "knip:check": "knip",
     "knip:report": "knip --no-exit-code",
     "perf:build": "node scripts/perf/build.mjs",

@@ -61,6 +61,16 @@ jobs:
               Stop-Process -Id $process.Id -Force
             }
           }
+      - name: Verify native Tauri bridge and node workspace
+        if: github.event_name == 'workflow_dispatch'
+        run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe
+      - name: Upload desktop screenshot
+        if: always() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: clash5-m1-desktop-smoke
+          path: target/m1-desktop-smoke.png
+          if-no-files-found: warn
       - name: Upload test shell
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v7
