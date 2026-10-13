@@ -175,6 +175,7 @@ export const translationKeys = [
   'nodePool.importClipboard',
   'nodePool.importInvalid',
   'nodePool.importSuccess',
+  'nodePool.manualImportSuccess',
   'nodePool.importError',
   'nodePool.probe',
   'nodePool.probing',

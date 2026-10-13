@@ -28,8 +28,10 @@ import {
   importProfile,
   listClash5Nodes,
   probeClash5Nodes,
+  registerClash5ManualNode,
 } from '@/services/cmds'
 import type { Clash5NodeRecord } from '@/types/clash5-node'
+import parseUri from '@/utils/uri-parser'
 
 type Filter =
   | 'all'
@@ -42,6 +44,41 @@ type Sort = 'name' | 'source' | 'quality'
 
 const recordKey = (record: Clash5NodeRecord) =>
   `${record.source.kind}:${record.source.kind === 'subscription' ? record.source.provider_id : ''}:${record.stable_id}`
+
+const identityCredentialFields = [
+  'uuid',
+  'password',
+  'username',
+  'cipher',
+  'alterId',
+  'auth',
+  'auth-str',
+  'token',
+  'private-key',
+  'public-key',
+  'pre-shared-key',
+  'ports',
+  'obfs-password',
+] as const
+
+const isSubscriptionUrl = (value: string) => {
+  try {
+    const url = new URL(value)
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) {
+      return false
+    }
+    const explicitPort =
+      /^https?:\/\/(?:[^/@]+@)?(?:\[[^\]]+\]|[^/:?#]+):\d+(?:[/?#]|$)/i.test(
+        value,
+      )
+    const looksLikeProxyEndpoint =
+      Boolean(url.username || url.password || explicitPort) &&
+      url.pathname === '/'
+    return !looksLikeProxyEndpoint
+  } catch {
+    return false
+  }
+}
 
 const NodePoolPage = () => {
   const { t } = useTranslation()
@@ -107,22 +144,73 @@ const NodePoolPage = () => {
     setImportMessage('')
     try {
       const value = (await readText())?.trim() ?? ''
-      let valid = false
-      try {
-        const url = new URL(value)
-        valid =
-          ['http:', 'https:'].includes(url.protocol) && Boolean(url.hostname)
-      } catch {
-        valid = false
+      if (isSubscriptionUrl(value)) {
+        await importProfile(value)
+        await refresh()
+        setImportMessage(t('nodePool.importSuccess'))
+        return
       }
-      if (!valid) {
+
+      let shareText = value
+      if (!shareText.includes('://')) {
+        try {
+          const decoded = atob(shareText)
+          if (decoded.includes('://')) shareText = decoded
+        } catch {
+          // Plain-text share links are handled below.
+        }
+      }
+      if (isSubscriptionUrl(shareText)) {
+        await importProfile(shareText)
+        await refresh()
+        setImportMessage(t('nodePool.importSuccess'))
+        return
+      }
+      const lines = shareText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+      const nodes: Array<{
+        kind: string
+        server: string
+        port: number
+        credentials: Record<string, string>
+        display_name: string
+      }> = []
+      for (const line of lines) {
+        const proxy = parseUri(line)
+        if (!proxy.server || !proxy.port) {
+          throw new Error('Manual proxy link has no endpoint')
+        }
+        const values = proxy as unknown as Record<string, unknown>
+        const credentials = Object.fromEntries(
+          identityCredentialFields.flatMap((key) => {
+            const value = values[key]
+            return typeof value === 'string' ||
+              typeof value === 'number' ||
+              typeof value === 'boolean'
+              ? [[key, String(value)]]
+              : []
+          }),
+        )
+        nodes.push({
+          kind: proxy.type,
+          server: proxy.server,
+          port: proxy.port,
+          credentials,
+          display_name: proxy.name,
+        })
+      }
+      if (nodes.length === 0) {
         setImportError(true)
         setImportMessage(t('nodePool.importInvalid'))
         return
       }
-      await importProfile(value)
+      for (const node of nodes) await registerClash5ManualNode(node)
       await refresh()
-      setImportMessage(t('nodePool.importSuccess'))
+      setImportMessage(
+        t('nodePool.manualImportSuccess', { count: nodes.length }),
+      )
     } catch {
       setImportError(true)
       setImportMessage(t('nodePool.importError'))

@@ -8,7 +8,7 @@ On a remote profile refresh, only `proxies` and `proxy-providers` are replaced f
 
 The on-demand probe tests only a uniquely named inline node in the active subscription. It sends a short HTTP delay test (1.5 seconds) followed by an HTTPS test with a longer handshake window (10 seconds) through Mihomo. Results are classified as healthy, slow or failed and cached per source and stable identity for 600 seconds. A batch has at most 16 concurrent nodes. The value is an end-to-end Mihomo URL test; it is not a raw TCP handshake measurement. Unloaded or ambiguous names are reported as unavailable, without guessing a runtime target.
 
-The clipboard action currently accepts HTTP(S) subscription URLs and uses the existing import command. Standalone proxy links, external `proxy-providers` maintained solely by Mihomo, and manual-node runtime injection still need their own identity-to-runtime mapping before they can be shown or probed safely. They remain open M1 work.
+The clipboard action accepts HTTP(S) subscription URLs and standalone proxy URI links supported by the existing URI parser. Standalone links are registered in the manual inventory; they are not written into the active runtime profile. External `proxy-providers` maintained solely by Mihomo still need their own source identity and runtime mapping before they can be probed safely. They remain open M1 work.
 
 Verification:
 

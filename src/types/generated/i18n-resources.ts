@@ -283,6 +283,7 @@ export interface TranslationResources {
       inactive: string
       key: string
       manual: string
+      manualImportSuccess: string
       milliseconds: string
       nodeCount: string
       notTested: string

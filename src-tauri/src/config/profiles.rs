@@ -308,7 +308,7 @@ impl IProfiles {
                                     .map_err(|error| {
                                         anyhow::anyhow!("failed to preserve local profile sections: {error}")
                                     })?,
-                                Err(error) if error.kind() == std::io::ErrorKind::NotFound => file_data,
+                                Err(error) if error.kind() == std::io::ErrorKind::NotFound => file_data.to_string(),
                                 Err(error) => return Err(error).context("failed to read committed remote profile"),
                             }
                         } else {
