@@ -149,6 +149,7 @@ OrphanBinding   = PluginBinding + disappeared_at + last_stable_id + candidates[]
 
 - 凭证轮换（UUID/密码变化）导致的 stable_id 变化，视为「同一节点的新身份」，由 `reattach` 在**同一订阅来源内**按「server+port+type」与 transport 一致性做候选匹配，**候选唯一时自动重绑，多候选时进入人工确认**。手动节点与不同 provider 不跨来源自动重绑。
 - 本机密钥丢失或轮换会改变所有 HMAC 身份；实施前须确定密钥备份/恢复或显式重绑方案，并用迁移 fixture 验证（R-25）。
+- r2 采用显式重绑的密钥丢失恢复方案及分代迁移，实施顺序和失败处理见 [`clash5/r2-identity-migration.md`](clash5/r2-identity-migration.md)；代码和验收仍由 [Issue #7](https://github.com/oops11111/clash5/issues/7) 跟踪。
 - 同机同端口不同 transport/SNI 的节点，因 canonical 字段包含 transport 与 sni，不会碰撞；若仍碰撞，diff 阶段报错而非静默合并。
 
 **孤儿策略（A2 补充）**：
