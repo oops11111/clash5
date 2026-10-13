@@ -65,7 +65,7 @@ jobs:
           }
       - name: Verify native Tauri bridge and node workspace
         if: github.event_name == 'workflow_dispatch'
-        run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe
+        run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --full
       - name: Report desktop process state on failure
         if: failure() && github.event_name == 'workflow_dispatch'
         shell: pwsh
