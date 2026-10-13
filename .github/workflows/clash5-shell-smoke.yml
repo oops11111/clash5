@@ -58,8 +58,8 @@ jobs:
               Stop-Process -Id $process.Id -Force
             }
           }
-      - name: Upload nightly test shell
-        if: github.event_name == 'schedule'
+      - name: Upload test shell
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v7
         with:
           name: clash5-windows-shell
