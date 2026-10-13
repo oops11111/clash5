@@ -38,8 +38,8 @@ The Windows shell smoke workflow provisions real upstream desktop resources, bui
 
 ## Upstream synchronization
 
-`origin` is the owner's fork; `upstream` is `https://github.com/clash-verge-rev/clash-verge-rev.git`. Merge `upstream/dev` into clash5 `dev`, resolve conflicts without discarding source isolation or bindings, and run the affected checks. Do not rewrite shared history. Preserve upstream GPL attribution.
+`origin` is the owner's fork; `upstream` is `https://github.com/clash-verge-rev/clash-verge-rev.git`. M0 started from an upstream `dev` commit. The r2 engineering manual proposes following upstream release tags for future synchronization through separate merge PRs; the first such PR must reconcile the existing `dev` baseline with the chosen tag. Do not rewrite shared history. Preserve upstream GPL attribution.
 
-M0 completion still requires successful desktop checks and a runnable shell. M1 and subsequent milestones follow only after M0 integration is verified. UI polish, sing-box, injection, Plugin Host, signing/release automation and real Mihomo hot loading are outside this slice.
+M0 passed its original acceptance and was merged into `dev`. The r2 engineering manual adds identity migration, credential-rotation reattachment, coexistence, read-only import and redaction criteria; these are open follow-up work, not retroactive claims about the merged M0. M1 is in progress under draft PR #4. UI polish, sing-box, injection, Plugin Host, signing/release automation and real Mihomo hot loading remain outside this M0 slice.
 
 The owner authorized implementation without additional routine approval. Issues was initially disabled on the fork; it is now enabled and [issue #1](https://github.com/oops11111/clash5/issues/1) tracks M0 integration. The first data-library slice was validated before enabling issue tracking; desktop integration follows that issue.
