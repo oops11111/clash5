@@ -35,6 +35,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "m1:probe-fixture": "node scripts/m1-probe-fixture.mjs",
     "knip:check": "knip",
     "knip:report": "knip --no-exit-code",
     "perf:build": "node scripts/perf/build.mjs",

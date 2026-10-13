@@ -14,7 +14,24 @@ if (
   )
 }
 
-const counts = { requests: 0, tunnels: 0 }
+const counts = { requests: 0, tunnels: 0, subscriptions: 0, providers: 0 }
+let phase = 1
+const subscription = () => `proxies:
+  - {name: M1-inline, type: http, server: 127.0.0.1, port: ${phase === 1 ? 18080 : 18081}}
+proxy-providers:
+  M1-remote:
+    type: http
+    url: http://127.0.0.1:18080/provider.yaml
+    path: ./proxy_provider/m1-fixture.yaml
+    interval: 3600
+proxy-groups:
+  - {name: M1-selected, type: select, proxies: [M1-inline], use: [M1-remote]}
+rules:
+  - MATCH,M1-selected
+`
+const provider = () => `proxies:
+  - {name: M1-provider, type: http, server: 127.0.0.1, port: 18081}
+`
 const reject = (socket, status, extra = '') => {
   socket.end(
     `HTTP/1.1 ${status}\r\nConnection: close\r\n${extra}Content-Length: 0\r\n\r\n`,
@@ -24,7 +41,24 @@ const reject = (socket, status, extra = '') => {
 const server = http.createServer((request, response) => {
   if (request.url === '/__stats') {
     response.setHeader('Content-Type', 'application/json')
-    response.end(JSON.stringify({ mode, ...counts }))
+    response.end(JSON.stringify({ mode, phase, ...counts }))
+    return
+  }
+  if (request.url === '/__phase/2' && request.method === 'POST') {
+    phase = 2
+    response.writeHead(204).end()
+    return
+  }
+  if (request.url === '/subscription.yaml' && mode === 'forward') {
+    counts.subscriptions += 1
+    response.setHeader('Content-Type', 'text/yaml; charset=utf-8')
+    response.end(subscription())
+    return
+  }
+  if (request.url === '/provider.yaml' && mode === 'forward') {
+    counts.providers += 1
+    response.setHeader('Content-Type', 'text/yaml; charset=utf-8')
+    response.end(provider())
     return
   }
   counts.requests += 1
