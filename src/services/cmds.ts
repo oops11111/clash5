@@ -20,16 +20,6 @@ export async function listClash5Nodes(includeInactive = false) {
   return invoke<Clash5NodeRecord[]>('clash5_list_nodes', { includeInactive })
 }
 
-export async function registerClash5ManualNode(node: {
-  kind: string
-  server: string
-  port: number
-  credentials: Record<string, string>
-  display_name: string
-}) {
-  return invoke<{ stable_id: string }>('clash5_register_manual_node', { node })
-}
-
 export async function importClash5ManualProxies(proxies: IProxyConfig[]) {
   return invoke<{ imported: number }>('clash5_import_manual_proxies', {
     proxies,
