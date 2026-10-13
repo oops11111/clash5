@@ -220,11 +220,14 @@ const NodePoolPage = () => {
   }, [refresh, t])
 
   const sourceName = useCallback(
-    (record: Clash5NodeRecord) =>
-      record.source.kind === 'manual'
-        ? t('nodePool.manual')
-        : (profileNames[record.source.provider_id] ??
-          record.source.provider_id),
+    (record: Clash5NodeRecord) => {
+      if (record.source.kind === 'manual') return t('nodePool.manual')
+      const providerId = record.source.provider_id
+      const providerMatch = /^proxy-provider:[^:]+:(.+)$/.exec(providerId)
+      return providerMatch
+        ? t('nodePool.proxyProvider', { name: providerMatch[1] })
+        : (profileNames[providerId] ?? providerId)
+    },
     [profileNames, t],
   )
   const sourceCounts = useMemo(() => {

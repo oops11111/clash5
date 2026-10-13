@@ -10,6 +10,7 @@
   "all": "All",
   "manual": "Manual",
   "subscription": "Subscription",
+  "proxyProvider": "Mihomo provider: {{name}}",
   "duplicates": "Duplicates",
   "highQuality": "Healthy",
   "inactive": "Removed",

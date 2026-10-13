@@ -10,6 +10,7 @@
   "all": "全部",
   "manual": "手动",
   "subscription": "订阅",
+  "proxyProvider": "外部代理集：{{name}}",
   "duplicates": "重复",
   "highQuality": "高质量",
   "inactive": "已移除",

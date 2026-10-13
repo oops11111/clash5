@@ -294,6 +294,7 @@ export interface TranslationResources {
       probeSummary: string
       probing: string
       protocol: string
+      proxyProvider: string
       quality: string
       refresh: string
       removed: string

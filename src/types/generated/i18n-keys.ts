@@ -168,6 +168,7 @@ export const translationKeys = [
   'nodePool.all',
   'nodePool.manual',
   'nodePool.subscription',
+  'nodePool.proxyProvider',
   'nodePool.duplicates',
   'nodePool.highQuality',
   'nodePool.inactive',

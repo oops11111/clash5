@@ -312,7 +312,7 @@ impl IProfiles {
                                 Err(error) => return Err(error).context("failed to read committed remote profile"),
                             }
                         } else {
-                            file_data
+                            file_data.to_string()
                         };
 
                         fs::write(&path, file_data.as_bytes())
