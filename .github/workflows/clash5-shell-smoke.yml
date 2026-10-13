@@ -74,6 +74,15 @@ jobs:
             Select-Object ProcessName,Id,Path | Format-Table
           $appData = Join-Path $env:APPDATA 'io.github.oops11111.clash5'
           Write-Output "clash5 app data exists: $(Test-Path -LiteralPath $appData)"
+          $startupLog = Join-Path $appData 'logs/startup.log'
+          if (Test-Path -LiteralPath $startupLog) {
+            Write-Output 'Recent startup log (URLs and credential fields redacted):'
+            Get-Content -LiteralPath $startupLog -Tail 80 | ForEach-Object {
+              ($_ -replace '(?i)\b(?:https?|ss|vmess|vless|trojan|hy2|hysteria2)://[^\s''"<>]+', '[redacted-uri]') -replace '(?i)(\b(?:secret|token|password|authorization|api-key)\b\s*[=:]\s*)[^,\s;]+', '$1[redacted]'
+            }
+          } else {
+            Write-Output 'clash5 startup log was not created'
+          }
       - name: Launch shell briefly
         if: github.event_name != 'workflow_dispatch'
         shell: pwsh
