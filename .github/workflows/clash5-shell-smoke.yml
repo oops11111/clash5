@@ -28,6 +28,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: 'v1-rust'
+          key: 'm1-shell-x86_64-pc-windows-msvc'
+          workspaces: |
+            . -> target
+          cache-all-crates: true
+          cache-workspace-crates: true
+          save-if: ${{ github.event_name == 'workflow_dispatch' }}
       - uses: pnpm/action-setup@v6
         with:
           run_install: false
@@ -45,7 +54,19 @@ jobs:
         run: pnpm web:build
       - name: Build desktop shell without an installer
         run: cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --release --locked
+      - name: Verify native Tauri bridge and node workspace
+        if: github.event_name == 'workflow_dispatch'
+        run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe
+      - name: Report desktop process state on failure
+        if: failure() && github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          Get-Process -Name clash-verge,msedgewebview2,msedgedriver,tauri-driver -ErrorAction SilentlyContinue |
+            Select-Object ProcessName,Id,Path | Format-Table
+          $appData = Join-Path $env:APPDATA 'io.github.oops11111.clash5'
+          Write-Output "clash5 app data exists: $(Test-Path -LiteralPath $appData)"
       - name: Launch shell briefly
+        if: github.event_name != 'workflow_dispatch'
         shell: pwsh
         run: |
           $binary = 'target/x86_64-pc-windows-msvc/release/clash-verge.exe'
@@ -61,9 +82,6 @@ jobs:
               Stop-Process -Id $process.Id -Force
             }
           }
-      - name: Verify native Tauri bridge and node workspace
-        if: github.event_name == 'workflow_dispatch'
-        run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe
       - name: Upload desktop screenshot
         if: always() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v7
@@ -72,7 +90,7 @@ jobs:
           path: target/m1-desktop-smoke.png
           if-no-files-found: warn
       - name: Upload test shell
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v7
         with:
           name: clash5-windows-shell
@@ -80,4 +98,4 @@ jobs:
             target/x86_64-pc-windows-msvc/release/clash-verge.exe
             src-tauri/resources/**
             src-tauri/sidecar/**
-          if-no-files-found: error
+          if-no-files-found: warn

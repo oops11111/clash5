@@ -14,10 +14,17 @@ if (!binary)
 const capabilities = createTauriCapabilities(resolve(binary), {
   driverProvider: 'external',
   autoInstallTauriDriver: true,
+  logLevel: 'debug',
   startTimeout: 120_000,
   commandTimeout: 60_000,
 })
 let browser
+const screenshot = resolve('target/m1-desktop-smoke.png')
+
+async function capture() {
+  await mkdir(resolve('target'), { recursive: true })
+  await browser.saveScreenshot(screenshot)
+}
 
 try {
   browser = await startWdioSession(capabilities)
@@ -78,9 +85,25 @@ try {
     },
   )
 
-  await mkdir(resolve('target'), { recursive: true })
-  await browser.saveScreenshot(resolve('target/m1-desktop-smoke.png'))
+  const page = await browser.execute(() => ({
+    title: document.querySelector('.base-page header')?.textContent?.trim(),
+    rows: document.querySelectorAll('.base-page button[aria-pressed]').length,
+  }))
+  if (!page.title || page.title.includes('nodePool.') || page.rows !== 0) {
+    throw new Error(`Unexpected empty node workspace: ${JSON.stringify(page)}`)
+  }
+
+  await capture()
   process.stdout.write('Native Tauri bridge and empty node workspace passed\n')
+} catch (error) {
+  if (browser) {
+    await capture().catch((captureError) => {
+      process.stderr.write(
+        `Desktop screenshot failed: ${String(captureError)}\n`,
+      )
+    })
+  }
+  throw error
 } finally {
   if (browser) await cleanupWdioSession(browser)
 }
