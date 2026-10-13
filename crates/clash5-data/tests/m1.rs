@@ -112,6 +112,7 @@ fn quality_is_source_scoped_and_obeys_ten_minute_throttle() {
         short_delay_ms: None,
         handshake_delay_ms: Some(5100),
         checked_at_ms: 1000,
+        failure_streak: 0,
     };
     db.save_quality(
         &Source::Subscription {
@@ -132,4 +133,34 @@ fn quality_is_source_scoped_and_obeys_ten_minute_throttle() {
     );
     assert_eq!(NodeQuality::from_probe(None, Some(5100), 0).status, QualityStatus::Slow);
     assert_eq!(NodeQuality::from_probe(Some(50), None, 0).status, QualityStatus::Failed);
+}
+
+#[test]
+fn consecutive_probe_failures_back_off_and_success_resets_interval() {
+    let first = NodeQuality::from_probe(None, None, 1_000);
+    assert_eq!(first.failure_streak, 1);
+    assert!(first.is_fresh(1_200_999));
+    assert!(!first.is_fresh(1_201_000));
+
+    let second = NodeQuality::from_probe_after(None, None, 1_201_000, Some(&first));
+    assert_eq!(second.failure_streak, 2);
+    assert!(second.is_fresh(3_600_999));
+    assert!(!second.is_fresh(3_601_000));
+
+    let third = NodeQuality::from_probe_after(None, None, 3_601_000, Some(&second));
+    assert_eq!(third.failure_streak, 3);
+    assert!(third.is_fresh(7_200_999));
+    assert!(!third.is_fresh(7_201_000));
+
+    let recovered = NodeQuality::from_probe_after(Some(42), Some(100), 7_201_000, Some(&third));
+    assert_eq!(recovered.failure_streak, 0);
+    assert!(!recovered.is_fresh(7_801_000));
+}
+
+#[test]
+fn older_quality_cache_without_failure_streak_still_deserializes() {
+    let old = r#"{"status":"failed","short_delay_ms":null,"handshake_delay_ms":null,"checked_at_ms":1000}"#;
+    let quality: NodeQuality = serde_json::from_str(old).unwrap();
+    assert_eq!(quality.failure_streak, 0);
+    assert!(quality.is_fresh(600_999));
 }

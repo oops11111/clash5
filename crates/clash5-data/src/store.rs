@@ -68,26 +68,49 @@ pub struct NodeQuality {
     pub short_delay_ms: Option<u32>,
     pub handshake_delay_ms: Option<u32>,
     pub checked_at_ms: u64,
+    #[serde(default)]
+    pub failure_streak: u8,
 }
 impl NodeQuality {
     pub const MIN_INTERVAL_MS: u64 = 600_000;
+    pub const MAX_INTERVAL_MS: u64 = 3_600_000;
 
     pub fn from_probe(short_delay_ms: Option<u32>, handshake_delay_ms: Option<u32>, checked_at_ms: u64) -> Self {
+        Self::from_probe_after(short_delay_ms, handshake_delay_ms, checked_at_ms, None)
+    }
+
+    pub fn from_probe_after(
+        short_delay_ms: Option<u32>,
+        handshake_delay_ms: Option<u32>,
+        checked_at_ms: u64,
+        previous: Option<&Self>,
+    ) -> Self {
         let status = match (short_delay_ms, handshake_delay_ms) {
             (Some(_), Some(_)) => QualityStatus::Healthy,
             (None, Some(_)) => QualityStatus::Slow,
             _ => QualityStatus::Failed,
+        };
+        let failure_streak = if status == QualityStatus::Failed {
+            previous
+                .filter(|quality| quality.status == QualityStatus::Failed)
+                .map_or(1, |quality| quality.failure_streak.saturating_add(1))
+        } else {
+            0
         };
         Self {
             status,
             short_delay_ms,
             handshake_delay_ms,
             checked_at_ms,
+            failure_streak,
         }
     }
 
     pub fn is_fresh(&self, now_ms: u64) -> bool {
-        now_ms >= self.checked_at_ms && now_ms - self.checked_at_ms < Self::MIN_INTERVAL_MS
+        let interval = Self::MIN_INTERVAL_MS
+            .saturating_mul(1_u64 << self.failure_streak.min(3))
+            .min(Self::MAX_INTERVAL_MS);
+        now_ms >= self.checked_at_ms && now_ms - self.checked_at_ms < interval
     }
 }
 pub struct BindingStore {

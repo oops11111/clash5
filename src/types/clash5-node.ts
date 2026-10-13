@@ -16,5 +16,6 @@ export interface Clash5NodeRecord {
     short_delay_ms: number | null
     handshake_delay_ms: number | null
     checked_at_ms: number
+    failure_streak: number
   } | null
 }

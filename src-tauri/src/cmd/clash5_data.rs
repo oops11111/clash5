@@ -283,7 +283,7 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
     let results: Vec<_> = stream::iter(targets.into_iter().map(|(record, runtime_name)| async move {
         let short = measure(&runtime_name, SHORT_PROBE_URL, SHORT_PROBE_MS).await;
         let handshake = measure(&runtime_name, HANDSHAKE_PROBE_URL, HANDSHAKE_PROBE_MS).await;
-        let quality = NodeQuality::from_probe(short, handshake, now_ms);
+        let quality = NodeQuality::from_probe_after(short, handshake, now_ms, record.quality.as_ref());
         (record.source, record.stable_id, quality)
     }))
     .buffer_unordered(PROBE_CONCURRENCY)
