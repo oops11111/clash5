@@ -2,14 +2,16 @@ use super::{CmdResult, coded_error};
 use clash5_data::{Binding, DataError, Node, NodeQuality, NodeRecord, QualityStatus, Source, parse_inline_nodes};
 use futures::{StreamExt as _, stream};
 use serde::Serialize;
+use serde_yaml_ng::Value;
 use std::{
     collections::HashMap,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
-    config::Config,
-    core::{handle::Handle, proxy_view::ProxyNodeSource, runtime_bundle::remote_providers_of},
+    clash5::manual,
+    config::{Config, profiles::PROFILE_WRITE_LOCK},
+    core::{CoreManager, handle::Handle, proxy_view::ProxyNodeSource, runtime_bundle::remote_providers_of},
     utils::dirs,
 };
 
@@ -37,6 +39,80 @@ pub async fn clash5_register_manual_node(node: Node) -> CmdResult<ManualNodeIden
     })
     .await
     .map_err(failure)
+}
+
+#[derive(Serialize)]
+pub struct ManualImportResult {
+    imported: usize,
+}
+
+async fn restore_manual_file(previous: Option<&str>) -> CmdResult {
+    manual::restore(previous)
+        .await
+        .map_err(|_| coded_error("MANUAL_IMPORT_ROLLBACK_FAILED", "could not restore manual proxy file"))?;
+    let outcome = CoreManager::global().update_config_forced().await.map_err(|_| {
+        coded_error(
+            "MANUAL_IMPORT_ROLLBACK_FAILED",
+            "could not restore running configuration",
+        )
+    })?;
+    if !outcome.is_valid() {
+        return Err(coded_error(
+            "MANUAL_IMPORT_ROLLBACK_FAILED",
+            "running configuration was not restored",
+        ));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clash5_import_manual_proxies(proxies: Vec<Value>) -> CmdResult<ManualImportResult> {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let path = manual::path().map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy path is unavailable"))?;
+    let previous = match tokio::fs::read_to_string(&path).await {
+        Ok(yaml) => Some(yaml),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(_) => return Err(coded_error("MANUAL_IMPORT_FAILED", "manual proxy file is unavailable")),
+    };
+    let mut file = manual::load()
+        .await
+        .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy file is invalid"))?;
+    let nodes = file
+        .add_import(proxies)
+        .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy import is invalid"))?;
+    let imported = nodes.len();
+    manual::save(&file)
+        .await
+        .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy file could not be saved"))?;
+    if manual::load().await.and_then(|saved| saved.runtime_proxies()).is_err() {
+        manual::restore(previous.as_deref())
+            .await
+            .map_err(|_| coded_error("MANUAL_IMPORT_ROLLBACK_FAILED", "could not restore manual proxy file"))?;
+        return Err(coded_error(
+            "MANUAL_IMPORT_FAILED",
+            "manual proxy file could not be read back",
+        ));
+    }
+
+    let applied = CoreManager::global().update_config_forced().await;
+    if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+        restore_manual_file(previous.as_deref()).await?;
+        return Err(coded_error(
+            "MANUAL_IMPORT_FAILED",
+            "manual proxy configuration was rejected",
+        ));
+    }
+
+    let saved =
+        crate::config::profiles::with_clash5_binding_store(move |store| store.upsert_manual_batch(&nodes)).await;
+    if saved.is_err() {
+        restore_manual_file(previous.as_deref()).await?;
+        return Err(coded_error(
+            "MANUAL_IMPORT_FAILED",
+            "manual proxy inventory could not be saved",
+        ));
+    }
+    Ok(ManualImportResult { imported })
 }
 
 #[tauri::command]
@@ -189,16 +265,19 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
                             && matches!(&node.source, ProxyNodeSource::Provider { provider_name: owner, .. } if owner == provider_name)
                     }).then(|| record.display_name.clone())
                 }),
-            Source::Manual => None,
+            Source::Manual => {
+                let name = manual::runtime_name(&record.stable_id);
+                core_names.contains(&name).then_some(name)
+            }
         };
-        if name_count.get(&record.display_name) != Some(&1) {
-            batch.unavailable += 1;
-            continue;
-        }
         let Some(runtime_name) = runtime_name else {
             batch.unavailable += 1;
             continue;
         };
+        if name_count.get(&runtime_name) != Some(&1) {
+            batch.unavailable += 1;
+            continue;
+        }
         targets.push((record, runtime_name));
     }
     let results: Vec<_> = stream::iter(targets.into_iter().map(|(record, runtime_name)| async move {

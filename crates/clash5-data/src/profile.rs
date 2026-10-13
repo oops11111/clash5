@@ -31,6 +31,45 @@ fn field<'a>(mapping: &'a serde_yaml_ng::Mapping, key: &str) -> Option<&'a Value
     mapping.get(Value::String(key.into()))
 }
 
+/// Parse one Mihomo proxy definition into a transient identity input.
+pub fn parse_proxy_node(proxy: &Value) -> Result<Node, DataError> {
+    let mapping = proxy.as_mapping().ok_or(DataError::InvalidInput)?;
+    let required =
+        |key: &str| -> Result<String, DataError> { scalar(field(mapping, key).ok_or(DataError::InvalidInput)?) };
+    let port: u16 = required("port")?.parse().map_err(|_| DataError::InvalidInput)?;
+    let mut credentials = BTreeMap::new();
+    for &key in CREDENTIAL_FIELDS {
+        if let Some(value) = field(mapping, key) {
+            credentials.insert(key.into(), scalar(value)?);
+        }
+    }
+    let node = Node {
+        kind: required("type")?,
+        server: required("server")?,
+        port,
+        credentials,
+        display_name: required("name")?,
+    };
+    let identity_fields: &[&str] = match node.kind.as_str() {
+        "vless" | "vmess" | "tuic" => &["uuid"],
+        "ss" | "ssr" | "trojan" | "hysteria2" | "anytls" => &["password"],
+        "wireguard" => &["private-key"],
+        "ssh" => &["username"],
+        "hysteria" => &["auth", "auth-str"],
+        "socks5" | "http" | "shadowtls" | "naive" => &[],
+        _ => return Err(DataError::InvalidInput),
+    };
+    if !identity_fields.is_empty()
+        && !identity_fields
+            .iter()
+            .any(|key| node.credentials.get(*key).is_some_and(|value| !value.is_empty()))
+    {
+        return Err(DataError::InvalidInput);
+    }
+    node.stable_id()?;
+    Ok(node)
+}
+
 /// Extract inline proxy identities from a downloaded Clash YAML profile.
 /// External proxy-provider contents are managed separately by Mihomo and are not part of this snapshot.
 pub fn parse_inline_nodes(yaml: &str) -> Result<Option<Vec<Node>>, DataError> {
@@ -43,41 +82,7 @@ pub fn parse_inline_nodes(yaml: &str) -> Result<Option<Vec<Node>>, DataError> {
     let proxies = proxies.as_sequence().ok_or(DataError::InvalidInput)?;
     let mut nodes = Vec::with_capacity(proxies.len());
     for proxy in proxies {
-        let mapping = proxy.as_mapping().ok_or(DataError::InvalidInput)?;
-        let required =
-            |key: &str| -> Result<String, DataError> { scalar(field(mapping, key).ok_or(DataError::InvalidInput)?) };
-        let port: u16 = required("port")?.parse().map_err(|_| DataError::InvalidInput)?;
-        let mut credentials = BTreeMap::new();
-        for &key in CREDENTIAL_FIELDS {
-            if let Some(value) = field(mapping, key) {
-                credentials.insert(key.into(), scalar(value)?);
-            }
-        }
-        let node = Node {
-            kind: required("type")?,
-            server: required("server")?,
-            port,
-            credentials,
-            display_name: required("name")?,
-        };
-        let identity_fields: &[&str] = match node.kind.as_str() {
-            "vless" | "vmess" | "tuic" => &["uuid"],
-            "ss" | "ssr" | "trojan" | "hysteria2" | "anytls" => &["password"],
-            "wireguard" => &["private-key"],
-            "ssh" => &["username"],
-            "hysteria" => &["auth", "auth-str"],
-            "socks5" | "http" | "shadowtls" | "naive" => &[],
-            _ => return Err(DataError::InvalidInput),
-        };
-        if !identity_fields.is_empty()
-            && !identity_fields
-                .iter()
-                .any(|key| node.credentials.get(*key).is_some_and(|value| !value.is_empty()))
-        {
-            return Err(DataError::InvalidInput);
-        }
-        node.stable_id()?;
-        nodes.push(node);
+        nodes.push(parse_proxy_node(proxy)?);
     }
     Ok(Some(nodes))
 }

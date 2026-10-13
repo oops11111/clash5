@@ -30,6 +30,12 @@ export async function registerClash5ManualNode(node: {
   return invoke<{ stable_id: string }>('clash5_register_manual_node', { node })
 }
 
+export async function importClash5ManualProxies(proxies: IProxyConfig[]) {
+  return invoke<{ imported: number }>('clash5_import_manual_proxies', {
+    proxies,
+  })
+}
+
 export async function probeClash5Nodes() {
   return invoke<{
     probed: number

@@ -14,6 +14,7 @@ use self::{
     seq::{SeqMap, use_seq},
     tun::use_tun,
 };
+use crate::clash5::manual;
 use crate::config::dns::{DnsOverrideState, dns_override_source};
 use crate::core::handle::Handle;
 use crate::utils::dirs;
@@ -913,7 +914,36 @@ pub async fn enhance(
 
     let result_map = HashMap::new();
 
-    let config = process_seq_items(config, rules_item, proxies_item, groups_item);
+    let mut config = process_seq_items(config, rules_item, proxies_item, groups_item);
+    match manual::load().await.and_then(|file| file.runtime_proxies()) {
+        Ok(mut proxies) => {
+            let existing: HashSet<_> = config
+                .get("proxies")
+                .and_then(Value::as_sequence)
+                .into_iter()
+                .flatten()
+                .filter_map(|proxy| proxy.as_mapping()?.get("name")?.as_str().map(str::to_owned))
+                .collect();
+            proxies.retain(|proxy| {
+                proxy
+                    .as_mapping()
+                    .and_then(|map| map.get("name"))
+                    .and_then(Value::as_str)
+                    .is_some_and(|name| !existing.contains(name))
+            });
+            if !proxies.is_empty() {
+                config = use_seq(
+                    SeqMap {
+                        append: proxies,
+                        ..Default::default()
+                    },
+                    config,
+                    "proxies",
+                );
+            }
+        }
+        Err(_) => logging!(warn, Type::Config, "clash5 manual proxy store is unavailable"),
+    }
     let exists_keys = use_keys(&config).collect::<Vec<_>>();
     let gui_tun_keys = gui_tun_keys(&clash_config);
 

@@ -25,10 +25,10 @@ import { useTranslation } from 'react-i18next'
 import { BasePage } from '@/components/base'
 import {
   getProfiles,
+  importClash5ManualProxies,
   importProfile,
   listClash5Nodes,
   probeClash5Nodes,
-  registerClash5ManualNode,
 } from '@/services/cmds'
 import type { Clash5NodeRecord } from '@/types/clash5-node'
 import parseUri from '@/utils/uri-parser'
@@ -44,22 +44,6 @@ type Sort = 'name' | 'source' | 'quality'
 
 const recordKey = (record: Clash5NodeRecord) =>
   `${record.source.kind}:${record.source.kind === 'subscription' ? record.source.provider_id : ''}:${record.stable_id}`
-
-const identityCredentialFields = [
-  'uuid',
-  'password',
-  'username',
-  'cipher',
-  'alterId',
-  'auth',
-  'auth-str',
-  'token',
-  'private-key',
-  'public-key',
-  'pre-shared-key',
-  'ports',
-  'obfs-password',
-] as const
 
 const isSubscriptionUrl = (value: string) => {
   try {
@@ -170,46 +154,23 @@ const NodePoolPage = () => {
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean)
-      const nodes: Array<{
-        kind: string
-        server: string
-        port: number
-        credentials: Record<string, string>
-        display_name: string
-      }> = []
+      const proxies: IProxyConfig[] = []
       for (const line of lines) {
         const proxy = parseUri(line)
         if (!proxy.server || !proxy.port) {
           throw new Error('Manual proxy link has no endpoint')
         }
-        const values = proxy as unknown as Record<string, unknown>
-        const credentials = Object.fromEntries(
-          identityCredentialFields.flatMap((key) => {
-            const value = values[key]
-            return typeof value === 'string' ||
-              typeof value === 'number' ||
-              typeof value === 'boolean'
-              ? [[key, String(value)]]
-              : []
-          }),
-        )
-        nodes.push({
-          kind: proxy.type,
-          server: proxy.server,
-          port: proxy.port,
-          credentials,
-          display_name: proxy.name,
-        })
+        proxies.push(proxy)
       }
-      if (nodes.length === 0) {
+      if (proxies.length === 0) {
         setImportError(true)
         setImportMessage(t('nodePool.importInvalid'))
         return
       }
-      for (const node of nodes) await registerClash5ManualNode(node)
+      const result = await importClash5ManualProxies(proxies)
       await refresh()
       setImportMessage(
-        t('nodePool.manualImportSuccess', { count: nodes.length }),
+        t('nodePool.manualImportSuccess', { count: result.imported }),
       )
     } catch {
       setImportError(true)

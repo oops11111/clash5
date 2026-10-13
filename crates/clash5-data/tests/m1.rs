@@ -1,4 +1,4 @@
-use clash5_data::{BindingStore, Node, NodeQuality, QualityStatus, Source, replace_subscription_lines};
+use clash5_data::{BindingStore, DataError, Node, NodeQuality, QualityStatus, Source, replace_subscription_lines};
 use std::collections::BTreeMap;
 
 fn node(name: &str) -> Node {
@@ -9,6 +9,24 @@ fn node(name: &str) -> Node {
         credentials: BTreeMap::from([("uuid".into(), "a".repeat(32))]),
         display_name: name.into(),
     }
+}
+
+#[test]
+fn manual_batch_validates_every_identity_before_writing() {
+    let mut db = BindingStore::memory().unwrap();
+    let first = node("First");
+    let mut invalid = node("Invalid");
+    invalid.port = 0;
+    assert_eq!(
+        db.upsert_manual_batch(&[first.clone(), invalid]),
+        Err(DataError::InvalidInput)
+    );
+    assert!(db.node_records(false).unwrap().is_empty());
+
+    let mut second = node("Second");
+    second.credentials.insert("uuid".into(), "b".repeat(32));
+    assert_eq!(db.upsert_manual_batch(&[first, second]).unwrap().len(), 2);
+    assert_eq!(db.node_records(false).unwrap().len(), 2);
 }
 
 #[test]

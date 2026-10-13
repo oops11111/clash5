@@ -187,6 +187,20 @@ PRAGMA user_version=2;
         tx.commit()?;
         Ok(id)
     }
+    pub fn upsert_manual_batch(&mut self, nodes: &[Node]) -> Result<Vec<StableId>, DataError> {
+        let ids = nodes.iter().map(Node::stable_id).collect::<Result<Vec<_>, _>>()?;
+        let tx = self.db.transaction()?;
+        for (node, id) in nodes.iter().zip(&ids) {
+            write_node(&tx, &Source::Manual, id, node, 1)?;
+            tx.execute(
+                "DELETE FROM quality_cache WHERE source_kind='manual' AND provider_id='' AND stable_id=?1",
+                [id],
+            )?;
+        }
+        audit(&tx, "manual.upsert", serde_json::json!({"nodes":ids.len()}))?;
+        tx.commit()?;
+        Ok(ids)
+    }
     pub fn refresh_provider(&mut self, provider_id: &str, nodes: &[Node]) -> Result<ProviderDiff, DataError> {
         text(provider_id)?;
         let source = Source::Subscription {
