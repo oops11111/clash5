@@ -56,5 +56,5 @@
 | 2026-10-13 | R-19、R-20 | 开放 | 只读迁移向导及源目录校验未完成；统一脱敏与诊断出口测试尚无完整证据。 |
 | 2026-10-13 | R-24 | 缓解中 | r2 手册、协作规范、风险登记和任务拆解已同步为草案；冻结前仍需按实现差距复核。 |
 | 2026-10-13 | R-25 | 设计已定、实现开放 | [PR #8](https://github.com/oops11111/clash5/pull/8) 已确定凭证库分代、显式重绑与计划轮换方案；Issue #7 的代码、fixture 和桌面验收尚未完成，不能直接替换现有 SHA-256 身份。 |
-| 2026-10-14 | R-26 | 开放 | [Windows 桌面运行记录](https://github.com/oops11111/clash5/actions/runs/38406024632) 在创建 WebDriver 会话前失败（`DevToolsActivePort file doesn't exist`）；本机目标程序出现启动失败提示，具体根因仍待诊断。Mihomo fixture 和短时进程存活均不能代替应用内验收。 |
+| 2026-10-14 | R-26 | 开放 | [Windows 桌面运行记录](https://github.com/oops11111/clash5/actions/runs/38406024632) 在创建 WebDriver 会话前失败（`DevToolsActivePort file doesn't exist`），CI 根因待诊断。本机独立启动的 stderr 显示无法写入 clash5 的 AppData 目录（OS error 5），属于当前本机执行环境的访问限制，不证明应用本身故障。Mihomo fixture 和短时进程存活均不能代替应用内验收。 |
 | 2026-10-14 | R-24 | 缓解中 | 依据新提供的手册、协作规范与风险登记复核 r2：修正补丁冲突与孤儿清理的验收表述，明确 M1 桌面证据缺口；草案仍待冻结评审。 |
