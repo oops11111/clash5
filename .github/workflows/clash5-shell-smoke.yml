@@ -54,6 +54,15 @@ jobs:
         run: pnpm web:build
       - name: Build desktop shell without an installer
         run: cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --release --locked
+      - name: Assemble portable desktop test shell
+        shell: pwsh
+        run: |
+          $release = 'target/x86_64-pc-windows-msvc/release'
+          Copy-Item -LiteralPath 'src-tauri/resources' -Destination $release -Recurse -Force
+          foreach ($core in @('verge-mihomo', 'verge-mihomo-alpha')) {
+            $source = "src-tauri/sidecar/${core}-x86_64-pc-windows-msvc.exe"
+            Copy-Item -LiteralPath $source -Destination (Join-Path $release "$core.exe") -Force
+          }
       - name: Verify native Tauri bridge and node workspace
         if: github.event_name == 'workflow_dispatch'
         run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe
@@ -96,6 +105,7 @@ jobs:
           name: clash5-windows-shell
           path: |
             target/x86_64-pc-windows-msvc/release/clash-verge.exe
-            src-tauri/resources/**
-            src-tauri/sidecar/**
+            target/x86_64-pc-windows-msvc/release/resources/**
+            target/x86_64-pc-windows-msvc/release/verge-mihomo.exe
+            target/x86_64-pc-windows-msvc/release/verge-mihomo-alpha.exe
           if-no-files-found: warn
