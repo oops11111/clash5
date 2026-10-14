@@ -272,10 +272,6 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
     };
     let mut targets = Vec::new();
     for record in records {
-        if record.quality.as_ref().is_some_and(|quality| quality.is_fresh(now_ms)) {
-            batch.cached += 1;
-            continue;
-        }
         let runtime_name = match &record.source {
             Source::Subscription { provider_id } if current.as_deref() == Some(provider_id.as_str()) => {
                 core_names.contains(&record.display_name).then(|| record.display_name.clone())
@@ -299,6 +295,10 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
         };
         if name_count.get(&runtime_name) != Some(&1) {
             batch.unavailable += 1;
+            continue;
+        }
+        if record.quality.as_ref().is_some_and(|quality| quality.is_fresh(now_ms)) {
+            batch.cached += 1;
             continue;
         }
         targets.push((record, runtime_name));
