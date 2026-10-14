@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -27,6 +27,7 @@ const capabilities = createTauriCapabilities(resolve(binary), {
 })
 let browser
 let originalClipboard
+let testError
 const screenshot = resolve(
   persisted ? 'target/m1-desktop-persisted.png' : 'target/m1-desktop-smoke.png',
 )
@@ -725,6 +726,7 @@ try {
         : 'Native Tauri bridge and empty node workspace passed\n',
   )
 } catch (error) {
+  testError = error
   if (browser) {
     await capture().catch((captureError) => {
       process.stderr.write(
@@ -734,19 +736,55 @@ try {
   }
   throw error
 } finally {
-  phase = 'cleanup'
+  phase = 'WebDriver cleanup'
   if (browser && typeof originalClipboard === 'string') {
     await invoke('plugin:clipboard-manager|write_text', {
       text: originalClipboard,
     }).catch(() => {})
   }
-  if (browser) await cleanupWdioSession(browser)
-  for (const child of fixtures.reverse()) {
-    if (child.exitCode === null) {
-      const closed = once(child, 'close')
-      child.kill()
-      await closed
+  let cleanupIncomplete = false
+  if (browser) {
+    let cleanupTimeout
+    const cleaned = await Promise.race([
+      cleanupWdioSession(browser).then(
+        () => true,
+        (error) => {
+          process.stderr.write(`WebDriver teardown failed: ${String(error)}\n`)
+          return false
+        },
+      ),
+      new Promise((resolve) => {
+        cleanupTimeout = setTimeout(() => resolve(false), 20_000)
+      }),
+    ])
+    clearTimeout(cleanupTimeout)
+    if (!cleaned) {
+      cleanupIncomplete = true
+      process.stderr.write('WebDriver teardown did not complete\n')
+      if (process.platform === 'win32') {
+        spawnSync('taskkill', ['/F', '/IM', 'tauri-driver.exe'], {
+          stdio: 'ignore',
+          timeout: 5_000,
+          windowsHide: true,
+        })
+      }
     }
   }
+  phase = 'fixture cleanup'
+  for (const child of fixtures.reverse()) {
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = once(child, 'exit', {
+        signal: AbortSignal.timeout(5_000),
+      })
+      child.kill()
+      await exited
+    }
+    child.stdout?.destroy()
+    child.stderr?.destroy()
+  }
   clearTimeout(watchdog)
+  if (cleanupIncomplete) {
+    if (testError) process.stderr.write(`${testError.stack ?? testError}\n`)
+    process.exit(testError ? 1 : 0)
+  }
 }
