@@ -139,9 +139,11 @@ async function verifyImportAndProbe() {
   }
   const forward = startFixture(18080, 'forward')
   const limited = startFixture(18081, 'limit')
+  const providerLimited = startFixture(18082, 'limit')
   await Promise.all([
     fixtureReady(18080, forward),
     fixtureReady(18081, limited),
+    fixtureReady(18082, providerLimited),
   ])
 
   await importLink('http://127.0.0.1:18080/#M1-forward', 1, 'M1-forward')
@@ -297,22 +299,50 @@ async function verifySubscriptionRefresh() {
     throw new Error('Subscription refresh discarded a local rule or group edit')
   }
 
-  await browser.waitUntil(
-    async () => {
-      await invoke('clash5_probe_nodes')
-      const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
-      return nodes.some(
-        (node) =>
-          node.source.provider_id === `proxy-provider:${uid}:M1-remote` &&
-          node.display_name === 'M1-provider',
-      )
-    },
-    {
-      timeout: 60_000,
-      interval: 2_000,
-      timeoutMsg: 'External proxy-provider cache did not populate',
-    },
-  )
+  try {
+    await browser.waitUntil(
+      async () => {
+        const nodes = await invoke('clash5_list_nodes', {
+          includeInactive: true,
+        })
+        return nodes.some(
+          (node) =>
+            node.source.provider_id === `proxy-provider:${uid}:M1-remote` &&
+            node.display_name === 'M1-provider',
+        )
+      },
+      {
+        timeout: 60_000,
+        interval: 2_000,
+        timeoutMsg: 'External proxy-provider cache did not populate',
+      },
+    )
+  } catch (error) {
+    const stats = await fixtureStats(18080).catch(() => null)
+    const runtime = await invoke('get_runtime_config').catch(() => null)
+    const view = await invoke('get_proxy_view').catch(() => null)
+    const coreLogs = await invoke('get_clash_logs').catch(() => [])
+    const diagnostics = {
+      fixture: stats,
+      runtimeProvider: runtime?.['proxy-providers']?.['M1-remote']
+        ? {
+            type: runtime['proxy-providers']['M1-remote'].type,
+            path: runtime['proxy-providers']['M1-remote'].path,
+          }
+        : null,
+      runtimeNames: Object.values(view?.records ?? {}).map((node) => ({
+        name: node.name,
+        source: node.source,
+      })),
+      coreProviderLogs: coreLogs
+        .filter((line) => /provider/i.test(line))
+        .slice(-10)
+        .map((line) => line.replace(/https?:\/\/[^\s]+/gi, '[redacted-uri]')),
+    }
+    throw new Error(
+      `${String(error)}; diagnostics: ${JSON.stringify(diagnostics)}`,
+    )
+  }
   const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
   const inline = nodes.filter(
     (node) =>
@@ -331,10 +361,32 @@ async function verifySubscriptionRefresh() {
     !inline.some((node) => node.port === 18080 && !node.active) ||
     !inline.some((node) => node.port === 18081 && node.active) ||
     !provider?.active ||
-    provider.port !== 18081
+    provider.port !== 18082
   ) {
     throw new Error(
       `Subscription refresh lost source isolation or orphan state: ${JSON.stringify(nodes)}`,
+    )
+  }
+  const beforeProviderProbe = await fixtureStats(18082)
+  const providerBatch = await invoke('clash5_probe_nodes')
+  const afterProviderProbe = await fixtureStats(18082)
+  const probedProvider = (
+    await invoke('clash5_list_nodes', {
+      includeInactive: true,
+    })
+  ).find(
+    (node) =>
+      node.source.provider_id === `proxy-provider:${uid}:M1-remote` &&
+      node.display_name === 'M1-provider',
+  )
+  if (
+    providerBatch.probed < 1 ||
+    probedProvider?.quality?.status !== 'failed' ||
+    afterProviderProbe.requests + afterProviderProbe.tunnels <=
+      beforeProviderProbe.requests + beforeProviderProbe.tunnels
+  ) {
+    throw new Error(
+      `Provider node was not probed through its runtime proxy: ${JSON.stringify({ providerBatch, probedProvider, beforeProviderProbe, afterProviderProbe })}`,
     )
   }
   await clickButton(['Refresh list', '刷新列表'])

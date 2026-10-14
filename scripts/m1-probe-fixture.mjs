@@ -24,13 +24,14 @@ proxy-providers:
     url: http://127.0.0.1:18080/provider.yaml
     path: ./proxy_provider/m1-fixture.yaml
     interval: 3600
+    proxy: DIRECT
 proxy-groups:
   - {name: M1-selected, type: select, proxies: [M1-inline], use: [M1-remote]}
 rules:
   - MATCH,M1-selected
 `
 const provider = () => `proxies:
-  - {name: M1-provider, type: http, server: 127.0.0.1, port: 18081}
+  - {name: M1-provider, type: http, server: 127.0.0.1, port: 18082}
 `
 const reject = (socket, status, extra = '') => {
   socket.end(
