@@ -353,6 +353,141 @@ async function verifySubscriptionRefresh() {
   )
 }
 
+async function verifyWorkspaceControls() {
+  const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
+  const active = nodes.filter((node) => node.active)
+  const sourceCounts = new Map()
+  for (const node of active) {
+    sourceCounts.set(
+      node.stable_id,
+      (sourceCounts.get(node.stable_id) ?? 0) + 1,
+    )
+  }
+
+  async function rows() {
+    return browser.execute(() =>
+      [...document.querySelectorAll('.base-page button[aria-pressed]')].map(
+        (button) =>
+          button.querySelector('.MuiTypography-root')?.textContent?.trim(),
+      ),
+    )
+  }
+
+  async function selectFilter(labels, expected) {
+    const clicked = await browser.execute((values) => {
+      const chip = [
+        ...document.querySelectorAll('.base-page .MuiChip-clickable'),
+      ].find((item) => values.includes(item.textContent?.trim()))
+      chip?.click()
+      return Boolean(chip)
+    }, labels)
+    if (!clicked) throw new Error(`${labels[0]} filter is missing`)
+    const names = expected.map((node) => node.display_name).sort()
+    await browser.waitUntil(
+      async () =>
+        JSON.stringify((await rows()).sort()) === JSON.stringify(names),
+      {
+        timeout: 10_000,
+        interval: 250,
+        timeoutMsg: `${labels[0]} filter did not show ${JSON.stringify(names)}`,
+      },
+    )
+  }
+
+  await selectFilter(
+    ['Manual', '手动'],
+    active.filter((node) => node.source.kind === 'manual'),
+  )
+  await selectFilter(
+    ['Subscription', '订阅'],
+    active.filter((node) => node.source.kind === 'subscription'),
+  )
+  await selectFilter(
+    ['Duplicates', '重复'],
+    active.filter(
+      (node) =>
+        node.duplicate_count > 1 || (sourceCounts.get(node.stable_id) ?? 0) > 1,
+    ),
+  )
+  await selectFilter(
+    ['Healthy', '高质量'],
+    active.filter((node) => node.quality?.status === 'healthy'),
+  )
+  await selectFilter(
+    ['Removed', '已移除'],
+    nodes.filter((node) => !node.active),
+  )
+  await selectFilter(['All', '全部'], active)
+
+  const search = await browser.$('.base-page input[placeholder]')
+  await search.setValue('M1-provider')
+  await browser.waitUntil(
+    async () =>
+      JSON.stringify(await rows()) === JSON.stringify(['M1-provider']),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Node search did not isolate the provider row',
+    },
+  )
+  await search.clearValue()
+  await browser.waitUntil(async () => (await rows()).length === active.length, {
+    timeout: 10_000,
+    interval: 250,
+    timeoutMsg: 'Clearing node search did not restore active rows',
+  })
+
+  const opened = await browser.execute(() => {
+    const sort = document.querySelector('.base-page [role="combobox"]')
+    sort?.click()
+    return Boolean(sort)
+  })
+  if (!opened) throw new Error('Node sort control is missing')
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('li[role="option"]')].some((item) =>
+          ['Sort by probe result', '按探测结果排序'].includes(
+            item.textContent?.trim(),
+          ),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Quality sort option is missing',
+    },
+  )
+  await browser.execute(() => {
+    const option = [...document.querySelectorAll('li[role="option"]')].find(
+      (item) =>
+        ['Sort by probe result', '按探测结果排序'].includes(
+          item.textContent?.trim(),
+        ),
+    )
+    option?.click()
+  })
+  const rank = (node) => {
+    if (!node.quality) return 2_000_000
+    if (node.quality.status === 'failed') return 1_000_000
+    return (
+      (node.quality.status === 'slow' ? 100_000 : 0) +
+      (node.quality.handshake_delay_ms ?? 0)
+    )
+  }
+  const rankedNames = [...active]
+    .sort((a, b) => rank(a) - rank(b) || a.stable_id.localeCompare(b.stable_id))
+    .map((node) => node.display_name)
+  await browser.waitUntil(
+    async () => JSON.stringify(await rows()) === JSON.stringify(rankedNames),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: `Quality sort did not show ${JSON.stringify(rankedNames)}`,
+    },
+  )
+}
+
 async function capture() {
   await mkdir(resolve('target'), { recursive: true })
   await browser.saveScreenshot(screenshot)
@@ -428,6 +563,7 @@ try {
   if (full) {
     await verifyImportAndProbe()
     await verifySubscriptionRefresh()
+    await verifyWorkspaceControls()
   }
   await capture()
   process.stdout.write(
