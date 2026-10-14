@@ -21,7 +21,9 @@ permissions:
 
 jobs:
   windows-shell:
-    runs-on: windows-latest
+    # WebView2 WebDriver sessions currently fail on the Server 2025 image:
+    # https://github.com/actions/runner-images/issues/14738
+    runs-on: windows-2022
     timeout-minutes: 60
     env:
       HUSKY: 0
