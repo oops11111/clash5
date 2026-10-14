@@ -1,5 +1,5 @@
 use crate::utils::dirs;
-use anyhow::{Context as _, Result, anyhow};
+use anyhow::{Result, anyhow};
 use clash_verge_logging::{Type, logging};
 use std::fs;
 use std::os::windows::process::CommandExt as _;
@@ -296,7 +296,7 @@ pub fn remove_task(mode: TaskMode) -> Result<()> {
     ))
 }
 
-pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
+pub fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
     let target = if is_admin { TaskMode::Admin } else { TaskMode::User };
     let other = if is_admin { TaskMode::User } else { TaskMode::Admin };
 
