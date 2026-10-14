@@ -16,6 +16,8 @@
 <details>
 <summary><strong> 🚀 优化改进 </strong></summary>
 
+- 统一应用名称为「clash5」，更新窗口、侧栏、安装包与托盘图标
+
 
 **🖥️ Windows**
 
