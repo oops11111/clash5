@@ -9,6 +9,7 @@ import {
   createTauriCapabilities,
   startWdioSession,
 } from '@wdio/tauri-service'
+import { dump, load } from 'js-yaml'
 
 const binary = process.argv[2]
 if (!binary)
@@ -212,6 +213,146 @@ async function verifyImportAndProbe() {
     throw new Error(`Node workspace rendered ${rows} rows after import`)
 }
 
+async function verifySubscriptionRefresh() {
+  const url = 'http://127.0.0.1:18080/subscription.yaml'
+  await invoke('plugin:clipboard-manager|write_text', { text: url })
+  await clickButton(['Import from clipboard', '从剪贴板导入'])
+
+  let profile
+  await browser.waitUntil(
+    async () => {
+      const profiles = await invoke('get_profiles')
+      profile = profiles.items?.find((item) => item.url === url)
+      return Boolean(profile?.uid)
+    },
+    {
+      timeout: 45_000,
+      interval: 500,
+      timeoutMsg: 'Clipboard subscription import did not create a profile',
+    },
+  )
+  const uid = profile.uid
+  await browser.waitUntil(
+    async () => {
+      const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
+      return nodes.some(
+        (node) =>
+          node.source.kind === 'subscription' &&
+          node.source.provider_id === uid &&
+          node.display_name === 'M1-inline' &&
+          node.port === 18080 &&
+          node.active,
+      )
+    },
+    {
+      timeout: 45_000,
+      interval: 500,
+      timeoutMsg: 'Imported subscription did not populate the node inventory',
+    },
+  )
+
+  const original = load(await invoke('read_profile_file', { index: uid }))
+  const group = original['proxy-groups']?.find(
+    (item) => item.name === 'M1-selected',
+  )
+  if (!Array.isArray(original.rules) || !Array.isArray(group?.proxies)) {
+    throw new Error('Fixture subscription is missing its rule or group')
+  }
+  original.rules.unshift('DOMAIN,local.example,DIRECT')
+  group.proxies.push('DIRECT')
+  const saved = await invoke('save_profile_file', {
+    index: uid,
+    fileData: dump(original, { lineWidth: -1 }),
+  })
+  if (saved.status !== 'valid') {
+    throw new Error(
+      `Local subscription edit was rejected: ${JSON.stringify(saved)}`,
+    )
+  }
+
+  const switched = await invoke('patch_profiles_config', {
+    profiles: { current: uid },
+  })
+  if (switched.status !== 'valid') {
+    throw new Error(
+      `Fixture profile switch failed: ${JSON.stringify(switched)}`,
+    )
+  }
+  const phase = await fetch('http://127.0.0.1:18080/__phase/2', {
+    method: 'POST',
+    signal: AbortSignal.timeout(2_000),
+  })
+  if (phase.status !== 204) throw new Error('Fixture phase switch failed')
+  await invoke('update_profile', { index: uid, option: profile.option })
+
+  const refreshed = load(await invoke('read_profile_file', { index: uid }))
+  const refreshedGroup = refreshed['proxy-groups']?.find(
+    (item) => item.name === 'M1-selected',
+  )
+  if (
+    !refreshed.rules?.includes('DOMAIN,local.example,DIRECT') ||
+    !refreshedGroup?.proxies?.includes('DIRECT') ||
+    refreshed.proxies?.find((item) => item.name === 'M1-inline')?.port !== 18081
+  ) {
+    throw new Error('Subscription refresh discarded a local rule or group edit')
+  }
+
+  await browser.waitUntil(
+    async () => {
+      await invoke('clash5_probe_nodes')
+      const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
+      return nodes.some(
+        (node) =>
+          node.source.provider_id === `proxy-provider:${uid}:M1-remote` &&
+          node.display_name === 'M1-provider',
+      )
+    },
+    {
+      timeout: 60_000,
+      interval: 2_000,
+      timeoutMsg: 'External proxy-provider cache did not populate',
+    },
+  )
+  const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
+  const inline = nodes.filter(
+    (node) =>
+      node.source.provider_id === uid && node.display_name === 'M1-inline',
+  )
+  const provider = nodes.find(
+    (node) =>
+      node.source.provider_id === `proxy-provider:${uid}:M1-remote` &&
+      node.display_name === 'M1-provider',
+  )
+  const manual = nodes.filter((node) => node.source.kind === 'manual')
+  if (
+    manual.length !== 2 ||
+    !manual.every((node) => node.active) ||
+    inline.length !== 2 ||
+    !inline.some((node) => node.port === 18080 && !node.active) ||
+    !inline.some((node) => node.port === 18081 && node.active) ||
+    !provider?.active ||
+    provider.port !== 18081
+  ) {
+    throw new Error(
+      `Subscription refresh lost source isolation or orphan state: ${JSON.stringify(nodes)}`,
+    )
+  }
+  await clickButton(['Refresh list', '刷新列表'])
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () =>
+          document.querySelectorAll('.base-page button[aria-pressed]')
+            .length === 4,
+      ),
+    {
+      timeout: 20_000,
+      interval: 500,
+      timeoutMsg: 'Node workspace did not show four active source-scoped rows',
+    },
+  )
+}
+
 async function capture() {
   await mkdir(resolve('target'), { recursive: true })
   await browser.saveScreenshot(screenshot)
@@ -284,11 +425,14 @@ try {
     throw new Error(`Unexpected empty node workspace: ${JSON.stringify(page)}`)
   }
 
-  if (full) await verifyImportAndProbe()
+  if (full) {
+    await verifyImportAndProbe()
+    await verifySubscriptionRefresh()
+  }
   await capture()
   process.stdout.write(
     full
-      ? 'Native Tauri import, deduplication, probe isolation, and cache passed\n'
+      ? 'Native Tauri import, probe cache, subscription refresh, and source isolation passed\n'
       : 'Native Tauri bridge and empty node workspace passed\n',
   )
 } catch (error) {
