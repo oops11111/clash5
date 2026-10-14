@@ -121,7 +121,7 @@ M0 的原验收已完成并合并至 `dev`。以下是本草案新增或收紧�
 | 共存与导入 | app identifier、目录、deep link 已隔离；服务/包名仍有上游遗留 | 同机安装验证；只读迁移向导与源目录校验（R-18/R-19） |
 | 安全与契约 | M0 IPC 已返回结构化错误 | 统一 `C5-*` 码、脱敏测试和所有 command 契约快照；尚无证据证明全面覆盖（R-20） |
 | 上游同步 | M0 文档及仓库基线来自上游 `dev` | 本草案将后续同步改为 release tag 的独立 PR；首次采用前核对目标 tag 与当前基线关系 |
-| M1 节点池 | 草稿 PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；[第三次原生验收](https://github.com/oops11111/clash5/actions/runs/38538057354)已确认外部 provider 缓存、库存加载及 provider 专用健康检查请求到达独立测试代理。来源、重复、高质量和已移除筛选通过 | 第三次验收在 WebDriver 清空 React 搜索框后未恢复列表处失败；截图显示搜索文字仍在，脚本已改为键盘清空，待重跑。质量排序、重启身份与完整视觉证据仍待完成。Mihomo 接口未暴露上游 HTTP 状态及 `Retry-After`（R-11/R-26） |
+| M1 节点池 | 草稿 PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；[第三次原生验收](https://github.com/oops11111/clash5/actions/runs/38538057354)确认外部 provider 健康检查请求到达独立测试代理，来源、重复、高质量和已移除筛选通过。[第四次验收](https://github.com/oops11111/clash5/actions/runs/38542030896)确认键盘清空搜索词后列表恢复 | 第四次验收停在脚本用 DOM `click()` 打开 MUI 排序菜单的步骤；失败截图显示菜单未展开。脚本已改为 WebDriver 指针点击，待重跑。质量排序、重启身份与完整视觉证据仍待完成。Mihomo 接口未暴露上游 HTTP 状态及 `Retry-After`（R-11/R-26） |
 
 M0 现有实现见 [`clash5/implementation.md`](clash5/implementation.md)；M1 当前实现及限制见[草稿 PR #4](https://github.com/oops11111/clash5/pull/4)。
 
