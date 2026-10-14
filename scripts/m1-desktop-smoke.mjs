@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -742,32 +742,24 @@ try {
       text: originalClipboard,
     }).catch(() => {})
   }
-  let cleanupIncomplete = false
+  let forceExit = false
   if (browser) {
-    let cleanupTimeout
-    const cleaned = await Promise.race([
-      cleanupWdioSession(browser).then(
-        () => true,
-        (error) => {
-          process.stderr.write(`WebDriver teardown failed: ${String(error)}\n`)
-          return false
-        },
-      ),
-      new Promise((resolve) => {
-        cleanupTimeout = setTimeout(() => resolve(false), 20_000)
-      }),
-    ])
-    clearTimeout(cleanupTimeout)
-    if (!cleaned) {
-      cleanupIncomplete = true
-      process.stderr.write('WebDriver teardown did not complete\n')
-      if (process.platform === 'win32') {
-        spawnSync('taskkill', ['/F', '/IM', 'tauri-driver.exe'], {
-          stdio: 'ignore',
-          timeout: 5_000,
-          windowsHide: true,
-        })
-      }
+    if (process.platform === 'win32' && process.env.CI) {
+      // The upstream Windows driver stop blocks the Node event loop after DELETE.
+      await browser.deleteSession()
+      const driverKill = spawn(
+        'taskkill',
+        ['/F', '/T', '/IM', 'tauri-driver.exe'],
+        { stdio: 'ignore', windowsHide: true },
+      )
+      await once(driverKill, 'exit', {
+        signal: AbortSignal.timeout(5_000),
+      }).catch((error) => {
+        process.stderr.write(`Driver process cleanup failed: ${error}\n`)
+      })
+      forceExit = true
+    } else {
+      await cleanupWdioSession(browser)
     }
   }
   phase = 'fixture cleanup'
@@ -783,7 +775,7 @@ try {
     child.stderr?.destroy()
   }
   clearTimeout(watchdog)
-  if (cleanupIncomplete) {
+  if (forceExit) {
     if (testError) process.stderr.write(`${testError.stack ?? testError}\n`)
     process.exit(testError ? 1 : 0)
   }
