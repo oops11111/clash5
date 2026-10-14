@@ -55,7 +55,7 @@
 - [ ] `[Opus]` 手动节点加入运行时后可安全探测；限流自动退避及 fixture 验证（R-11）
 - [ ] `[标准]` 对照工作区外层 `src/ui-hifi` 的已确认 UI 做桌面验收，提供 r2 所需的集成测试与演示步骤
 
-**当前进度**：草稿 PR #4 已有 SQLite 库存、剪贴板链接导入、外部 provider 缓存、手动节点运行时映射、受限探测、连续失败退避和本地 HTTP 429 fixture。实际 Mihomo 二进制经该夹具的 HTTP/HTTPS 探测已在本机验证，CI 检查已接入。Windows 桌面自动化尚未建立 WebDriver 会话，Tauri 命令与 UI 端到端验收仍缺（R-26）；启动失败须先定位，再按 [`M1 桌面演示步骤`](clash5/m1-acceptance.md) 操作。当前延迟接口不提供上游 HTTP 状态或 `Retry-After`，因此只能按连续失败通用退避；M1 尚未达到退出标准。
+**当前进度**：草稿 PR #4 已有 SQLite 库存、剪贴板链接导入、外部 provider 缓存、手动节点运行时映射、受限探测、连续失败退避和本地 HTTP 429 fixture。实际 Mihomo 二进制经该夹具的 HTTP/HTTPS 探测已在本机验证，完整原生脚本已覆盖订阅刷新与来源隔离。Windows Server 2025 的 WebDriver 会话失败与[上游 runner 问题](https://github.com/actions/runner-images/issues/14738)症状一致；[Server 2022 验收](https://github.com/oops11111/clash5/actions/runs/38503375472)正在运行。Tauri 命令与 UI 端到端验收仍缺（R-26），须按 [`M1 桌面演示步骤`](clash5/m1-acceptance.md) 取得证据。当前延迟接口不提供上游 HTTP 状态或 `Retry-After`，因此只能按连续失败通用退避；M1 尚未达到退出标准。
 
 ---
 
