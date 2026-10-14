@@ -31,6 +31,11 @@ const screenshot = resolve(
   persisted ? 'target/m1-desktop-persisted.png' : 'target/m1-desktop-smoke.png',
 )
 const fixtures = []
+let phase = 'WebDriver startup'
+const watchdog = setTimeout(() => {
+  process.stderr.write(`Desktop smoke timed out during ${phase}\n`)
+  process.exit(124)
+}, 8 * 60_000)
 
 function startFixture(port, mode) {
   const child = spawn(
@@ -413,6 +418,7 @@ async function verifySubscriptionRefresh() {
 }
 
 async function verifyWorkspaceControls() {
+  phase = 'source filters'
   const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
   const active = nodes.filter((node) => node.active)
   const sourceCounts = new Map()
@@ -478,6 +484,7 @@ async function verifyWorkspaceControls() {
   )
   await selectFilter(['All', '全部'], active)
 
+  phase = 'search controls'
   const search = await browser.$('.base-page input[placeholder]')
   await search.setValue('M1-provider')
   await browser.waitUntil(
@@ -498,6 +505,7 @@ async function verifyWorkspaceControls() {
     timeoutMsg: 'Clearing node search did not restore active rows',
   })
 
+  phase = 'sort menu opening'
   const sortFound = await browser.execute(() => {
     const sort = document.querySelector('.base-page [role="combobox"]')
     if (!sort) return false
@@ -511,6 +519,7 @@ async function verifyWorkspaceControls() {
     return true
   })
   if (!sortFound) throw new Error('Node sort control is missing')
+  phase = 'sort option lookup'
   await browser.waitUntil(
     () =>
       browser.execute(() =>
@@ -535,6 +544,7 @@ async function verifyWorkspaceControls() {
     )
     option?.click()
   })
+  phase = 'sort ranking'
   const rank = (node) => {
     if (!node.quality) return 2_000_000
     if (node.quality.status === 'failed') return 1_000_000
@@ -566,6 +576,7 @@ try {
     await startFixtures()
   }
   browser = await startWdioSession(capabilities)
+  phase = 'Tauri bridge'
   let inventory
   let lastError
   try {
@@ -654,10 +665,13 @@ try {
   }
 
   if (full) {
+    phase = 'manual import and probe'
     await verifyImportAndProbe()
+    phase = 'subscription refresh and provider probe'
     await verifySubscriptionRefresh()
     await verifyWorkspaceControls()
   } else if (persisted) {
+    phase = 'manual node persistence'
     originalClipboard = await invoke(
       'plugin:clipboard-manager|read_text',
     ).catch(() => null)
@@ -701,6 +715,7 @@ try {
       )
     }
   }
+  phase = 'screenshot capture'
   await capture()
   process.stdout.write(
     persisted
@@ -719,6 +734,7 @@ try {
   }
   throw error
 } finally {
+  phase = 'cleanup'
   if (browser && typeof originalClipboard === 'string') {
     await invoke('plugin:clipboard-manager|write_text', {
       text: originalClipboard,
@@ -732,4 +748,5 @@ try {
       await closed
     }
   }
+  clearTimeout(watchdog)
 }
