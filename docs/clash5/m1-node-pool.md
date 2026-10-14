@@ -12,7 +12,7 @@ The clipboard action accepts HTTP(S) subscription URLs and standalone proxy URI 
 
 Verification:
 
-The desktop walkthrough is in [`m1-acceptance.md`](m1-acceptance.md). It has not yet been signed off with real runtime nodes.
+The desktop walkthrough is in [`m1-acceptance.md`](m1-acceptance.md). The [Windows Server 2022 native run](https://github.com/oops11111/clash5/actions/runs/38647386824) passed import, real Mihomo fixture probes, source isolation, filtering, sorting, and manual-identity persistence after restart. The tested proxies use disposable localhost fixtures rather than a user's subscription.
 
 ```sh
 cargo fmt --manifest-path crates/clash5-data/Cargo.toml --check
