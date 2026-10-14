@@ -215,31 +215,45 @@ pub struct ProbeBatch {
     pub failed: usize,
 }
 
-async fn measure(name: &str, url: &str, timeout_ms: u32) -> Option<u32> {
+enum RuntimeProbeTarget {
+    Core(String),
+    Provider { provider_name: String, proxy_name: String },
+}
+
+async fn measure(target: &RuntimeProbeTarget, url: &str, timeout_ms: u32) -> Option<u32> {
     let api = Handle::mihomo();
-    tokio::time::timeout(
-        Duration::from_millis(u64::from(timeout_ms) + 1_500),
-        api.delay_proxy_by_name(name, url, timeout_ms),
-    )
-    .await
-    .ok()?
-    .ok()
-    .and_then(|result| (result.delay > 0).then_some(result.delay))
+    let request = async {
+        match target {
+            RuntimeProbeTarget::Core(name) => api.delay_proxy_by_name(name, url, timeout_ms).await,
+            RuntimeProbeTarget::Provider {
+                provider_name,
+                proxy_name,
+            } => {
+                api.healthcheck_node_in_provider(provider_name, proxy_name, url, timeout_ms)
+                    .await
+            }
+        }
+    };
+    tokio::time::timeout(Duration::from_millis(u64::from(timeout_ms) + 1_500), request)
+        .await
+        .ok()?
+        .ok()
+        .and_then(|result| (result.delay > 0).then_some(result.delay))
 }
 
 async fn probe_targets<F, Fut>(
-    targets: Vec<(NodeRecord, String)>,
+    targets: Vec<(NodeRecord, RuntimeProbeTarget)>,
     now_ms: u64,
     test: F,
 ) -> Vec<(Source, String, NodeQuality)>
 where
-    F: Fn(String) -> Fut + Clone + Send + Sync,
+    F: Fn(RuntimeProbeTarget) -> Fut + Clone + Send + Sync,
     Fut: Future<Output = (Option<u32>, Option<u32>)> + Send,
 {
-    stream::iter(targets.into_iter().map(|(record, runtime_name)| {
+    stream::iter(targets.into_iter().map(|(record, target)| {
         let test = test.clone();
         async move {
-            let (short, handshake) = test(runtime_name).await;
+            let (short, handshake) = test(target).await;
             let quality = NodeQuality::from_probe_after(short, handshake, now_ms, record.quality.as_ref());
             (record.source, record.stable_id, quality)
         }
@@ -279,29 +293,38 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
         failed: 0,
     };
     let mut targets = Vec::new();
+    let provider_prefix = format!("proxy-provider:{}:", current.as_deref().unwrap_or_default());
     for record in records {
-        let runtime_name = match &record.source {
-            Source::Subscription { provider_id } if current.as_deref() == Some(provider_id.as_str()) => {
-                core_names.contains(&record.display_name).then(|| record.display_name.clone())
+        let target = match &record.source {
+            Source::Subscription { provider_id } if current.as_deref() == Some(provider_id.as_str()) => core_names
+                .contains(&record.display_name)
+                .then(|| RuntimeProbeTarget::Core(record.display_name.clone())),
+            Source::Subscription { provider_id } => {
+                provider_id.strip_prefix(&provider_prefix).and_then(|provider_name| {
+                    let matches = view
+                        .records
+                        .values()
+                        .filter(|node| {
+                            matches!(&node.source, ProxyNodeSource::Provider { provider_name: owner, proxy_name }
+                            if owner == provider_name && proxy_name == &record.display_name)
+                        })
+                        .count();
+                    (matches == 1).then(|| RuntimeProbeTarget::Provider {
+                        provider_name: provider_name.to_string(),
+                        proxy_name: record.display_name.clone(),
+                    })
+                })
             }
-            Source::Subscription { provider_id } => provider_id
-                .strip_prefix(&format!("proxy-provider:{}:", current.as_deref().unwrap_or_default()))
-                .and_then(|provider_name| {
-                    view.records.values().any(|node| {
-                        node.name == record.display_name
-                            && matches!(&node.source, ProxyNodeSource::Provider { provider_name: owner, .. } if owner == provider_name)
-                    }).then(|| record.display_name.clone())
-                }),
             Source::Manual => {
                 let name = manual::runtime_name(&record.stable_id);
-                core_names.contains(&name).then_some(name)
+                core_names.contains(&name).then_some(RuntimeProbeTarget::Core(name))
             }
         };
-        let Some(runtime_name) = runtime_name else {
+        let Some(target) = target else {
             batch.unavailable += 1;
             continue;
         };
-        if name_count.get(&runtime_name) != Some(&1) {
+        if matches!(&target, RuntimeProbeTarget::Core(name) if name_count.get(name) != Some(&1)) {
             batch.unavailable += 1;
             continue;
         }
@@ -309,11 +332,11 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
             batch.cached += 1;
             continue;
         }
-        targets.push((record, runtime_name));
+        targets.push((record, target));
     }
-    let results = probe_targets(targets, now_ms, |runtime_name| async move {
-        let short = measure(&runtime_name, SHORT_PROBE_URL, SHORT_PROBE_MS).await;
-        let handshake = measure(&runtime_name, HANDSHAKE_PROBE_URL, HANDSHAKE_PROBE_MS).await;
+    let results = probe_targets(targets, now_ms, |target| async move {
+        let short = measure(&target, SHORT_PROBE_URL, SHORT_PROBE_MS).await;
+        let handshake = measure(&target, HANDSHAKE_PROBE_URL, HANDSHAKE_PROBE_MS).await;
         (short, handshake)
     })
     .await;
@@ -388,10 +411,13 @@ mod tests {
     #[tokio::test]
     async fn one_failed_probe_does_not_abort_other_nodes() {
         let mut results = probe_targets(
-            vec![(node("failed"), "failed".into()), (node("healthy"), "healthy".into())],
+            vec![
+                (node("failed"), RuntimeProbeTarget::Core("failed".into())),
+                (node("healthy"), RuntimeProbeTarget::Core("healthy".into())),
+            ],
             1_000,
-            |name| async move {
-                if name == "failed" {
+            |target| async move {
+                if matches!(target, RuntimeProbeTarget::Core(name) if name == "failed") {
                     (None, None)
                 } else {
                     (Some(45), Some(120))
@@ -410,7 +436,12 @@ mod tests {
         let active = Arc::new(AtomicUsize::new(0));
         let peak = Arc::new(AtomicUsize::new(0));
         let targets = (0..PROBE_CONCURRENCY * 3)
-            .map(|index| (node(&format!("node-{index}")), format!("runtime-{index}")))
+            .map(|index| {
+                (
+                    node(&format!("node-{index}")),
+                    RuntimeProbeTarget::Core(format!("runtime-{index}")),
+                )
+            })
             .collect();
         let results = probe_targets(targets, 1_000, {
             let active = Arc::clone(&active);
