@@ -4,7 +4,7 @@ use futures::{StreamExt as _, stream};
 use serde::Serialize;
 use serde_yaml_ng::Value;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     future::Future,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -144,6 +144,25 @@ fn proxy_provider_source_id(profile_id: &str, provider_name: &str) -> String {
     format!("proxy-provider:{profile_id}:{provider_name}")
 }
 
+fn stale_runtime_provider_sources(
+    records: Vec<NodeRecord>,
+    profile_id: &str,
+    declared: &HashSet<String>,
+) -> HashSet<String> {
+    let current_prefix = format!("proxy-provider:{profile_id}:");
+    records
+        .into_iter()
+        .filter_map(|record| match record.source {
+            Source::Subscription { provider_id }
+                if provider_id.starts_with(&current_prefix) && !declared.contains(&provider_id) =>
+            {
+                Some(provider_id)
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 async fn refresh_runtime_proxy_providers() -> CmdResult {
     let Some(profile_id) = Config::profiles().await.latest_arc().current.clone() else {
         return Ok(());
@@ -155,7 +174,7 @@ async fn refresh_runtime_proxy_providers() -> CmdResult {
     };
     let app_dir = dirs::app_home_dir().map_err(super::CommandFailure::plain)?;
     let providers = remote_providers_of(config, &app_dir).map_err(super::CommandFailure::plain)?;
-    let declared: std::collections::HashSet<_> = providers
+    let declared: HashSet<_> = providers
         .iter()
         .filter(|provider| provider.section == "proxy-providers")
         .map(|provider| proxy_provider_source_id(&profile_id, &provider.name))
@@ -175,18 +194,7 @@ async fn refresh_runtime_proxy_providers() -> CmdResult {
         snapshots.push((proxy_provider_source_id(&profile_id, &provider.name), nodes));
     }
     crate::config::profiles::with_clash5_binding_store(move |store| {
-        let stale: std::collections::HashSet<_> = store
-            .node_records(true)?
-            .into_iter()
-            .filter_map(|record| match record.source {
-                Source::Subscription { provider_id }
-                    if provider_id.starts_with("proxy-provider:") && !declared.contains(&provider_id) =>
-                {
-                    Some(provider_id)
-                }
-                _ => None,
-            })
-            .collect();
+        let stale = stale_runtime_provider_sources(store.node_records(true)?, &profile_id, &declared);
         for source_id in stale {
             store.refresh_provider(&source_id, &[])?;
         }
@@ -352,6 +360,29 @@ mod tests {
             duplicate_count: 1,
             quality: None,
         }
+    }
+
+    #[test]
+    fn switching_profiles_only_retires_provider_sources_owned_by_the_current_profile() {
+        let source = |provider_id: &str| {
+            let mut record = node(provider_id);
+            record.source = Source::Subscription {
+                provider_id: provider_id.into(),
+            };
+            record
+        };
+        let declared = HashSet::from(["proxy-provider:profile-b:still-present".into()]);
+        let stale = stale_runtime_provider_sources(
+            vec![
+                source("proxy-provider:profile-a:old"),
+                source("proxy-provider:profile-b:still-present"),
+                source("proxy-provider:profile-b:removed"),
+                node("manual"),
+            ],
+            "profile-b",
+            &declared,
+        );
+        assert_eq!(stale, HashSet::from(["proxy-provider:profile-b:removed".into()]));
     }
 
     #[tokio::test]
