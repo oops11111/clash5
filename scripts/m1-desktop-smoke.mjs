@@ -498,10 +498,19 @@ async function verifyWorkspaceControls() {
     timeoutMsg: 'Clearing node search did not restore active rows',
   })
 
-  const sort = await browser.$('.base-page [role="combobox"]')
-  if (!(await sort.isExisting()))
-    throw new Error('Node sort control is missing')
-  await sort.click()
+  const sortFound = await browser.execute(() => {
+    const sort = document.querySelector('.base-page [role="combobox"]')
+    if (!sort) return false
+    sort.dispatchEvent(
+      new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    )
+    return true
+  })
+  if (!sortFound) throw new Error('Node sort control is missing')
   await browser.waitUntil(
     () =>
       browser.execute(() =>
