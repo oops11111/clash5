@@ -489,7 +489,9 @@ async function verifyWorkspaceControls() {
       timeoutMsg: 'Node search did not isolate the provider row',
     },
   )
-  await search.clearValue()
+  await search.click()
+  await browser.keys(['Control', 'a'])
+  await browser.keys('Backspace')
   await browser.waitUntil(async () => (await rows()).length === active.length, {
     timeout: 10_000,
     interval: 250,
