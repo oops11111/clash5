@@ -1,15 +1,15 @@
-use crate::utils::dirs::{self, PathBufExec as _};
-use anyhow::{Context as _, Result, anyhow};
+use crate::utils::dirs;
+use anyhow::{Result, anyhow};
 use clash_verge_logging::{Type, logging};
 use std::fs;
 use std::os::windows::process::CommandExt as _;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, Output};
 use windows::Win32::Globalization::{GetACP, GetOEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar};
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-const TASK_NAME_USER: &str = "Clash Verge";
-const TASK_NAME_ADMIN: &str = "Clash Verge (Admin)";
+const TASK_NAME_USER: &str = "clash5";
+const TASK_NAME_ADMIN: &str = "clash5 (Admin)";
 const TASK_XML_DIR: &str = "tasks";
 const TASK_XML_USER: &str = "clash-verge-task-user.xml";
 const TASK_XML_ADMIN: &str = "clash-verge-task-admin.xml";
@@ -77,38 +77,6 @@ fn get_task_user_id() -> Result<String> {
     }
 
     Ok(username.to_string())
-}
-
-fn get_startup_dir() -> Result<PathBuf> {
-    let appdata = std::env::var("APPDATA").map_err(|_| anyhow!("failed to read APPDATA env var"))?;
-    let startup_dir = Path::new(&appdata)
-        .join("Microsoft")
-        .join("Windows")
-        .join("Start Menu")
-        .join("Programs")
-        .join("Startup");
-
-    if !startup_dir.exists() {
-        return Err(anyhow!("startup folder does not exist: {:?}", startup_dir));
-    }
-
-    Ok(startup_dir)
-}
-
-async fn cleanup_legacy_shortcuts() -> Result<()> {
-    let startup_dir = get_startup_dir()?;
-    let old_shortcut = startup_dir.join("Clash-Verge.lnk");
-    let new_shortcut = startup_dir.join("Clash Verge.lnk");
-
-    old_shortcut
-        .remove_if_exists()
-        .await
-        .with_context(|| format!("failed to remove startup shortcut {}", old_shortcut.display()))?;
-    new_shortcut
-        .remove_if_exists()
-        .await
-        .with_context(|| format!("failed to remove startup shortcut {}", new_shortcut.display()))?;
-    Ok(())
 }
 
 fn task_xml_path(mode: TaskMode) -> Result<PathBuf> {
@@ -328,13 +296,9 @@ pub fn remove_task(mode: TaskMode) -> Result<()> {
     ))
 }
 
-pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
+pub fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
     let target = if is_admin { TaskMode::Admin } else { TaskMode::User };
     let other = if is_admin { TaskMode::User } else { TaskMode::Admin };
-
-    if let Err(err) = cleanup_legacy_shortcuts().await {
-        logging!(warn, Type::Setup, "Failed to cleanup legacy startup shortcuts: {err:#}");
-    }
 
     if is_enable {
         if is_admin {
