@@ -499,7 +499,8 @@ async function verifyWorkspaceControls() {
   })
 
   const sort = await browser.$('.base-page [role="combobox"]')
-  if (!(await sort.isExisting())) throw new Error('Node sort control is missing')
+  if (!(await sort.isExisting()))
+    throw new Error('Node sort control is missing')
   await sort.click()
   await browser.waitUntil(
     () =>
