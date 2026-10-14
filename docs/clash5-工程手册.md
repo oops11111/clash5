@@ -121,7 +121,7 @@ M0 的原验收已完成并合并至 `dev`。以下是本草案新增或收紧�
 | 共存与导入 | app identifier、目录、deep link 已隔离；服务/包名仍有上游遗留 | 同机安装验证；只读迁移向导与源目录校验（R-18/R-19） |
 | 安全与契约 | M0 IPC 已返回结构化错误 | 统一 `C5-*` 码、脱敏测试和所有 command 契约快照；尚无证据证明全面覆盖（R-20） |
 | 上游同步 | M0 文档及仓库基线来自上游 `dev` | 本草案将后续同步改为 release tag 的独立 PR；首次采用前核对目标 tag 与当前基线关系 |
-| M1 节点池 | 草稿 PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；实际 Mihomo 经本地 HTTP 429 fixture 的探测已在本机验证；完整原生脚本已覆盖订阅刷新与来源隔离 | Mihomo 延迟接口未暴露上游 HTTP 状态及 `Retry-After`；Windows Server 2025 的 WebDriver 会话失败与已知上游问题一致。Server 2022 已建立会话，测试服务版本不兼容已修正并重跑；Tauri 命令、UI 操作和 M1 退出证据尚未完成（R-11/R-26） |
+| M1 节点池 | 草稿 PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；Server 2022 原生运行已验证剪贴板导入、前向/429 探测、缓存命中、订阅刷新与孤儿节点 | Mihomo 延迟接口未暴露上游 HTTP 状态及 `Retry-After`。首次完整原生验收在外部 provider 缓存处失败：夹具下载请求误走受限代理；已用 `proxy: DIRECT` 和独立 429 端口修正，并[重跑](https://github.com/oops11111/clash5/actions/runs/38533082801)。外部 provider、筛选排序及视觉/重启证据仍待完成（R-11/R-26） |
 
 M0 现有实现见 [`clash5/implementation.md`](clash5/implementation.md)；M1 当前实现及限制见[草稿 PR #4](https://github.com/oops11111/clash5/pull/4)。
 

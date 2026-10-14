@@ -31,7 +31,7 @@
 | R-23 | 测试通道用户误将其当作稳定版使用 | 低 | M6 | W1 默认关；安装时明确提示；通道在界面常驻标识 | 安装流程走查 | 待定 |
 | R-24 | 手册、任务拆解与决策表不同步 | 低 | 持续 | 评审流程检查；决策变更须在 §5 注明原因 | 每次里程碑评审前核对 | 待定 |
 | R-25 | 本机 HMAC 密钥丢失或轮换后所有 stable_id 失配 | 高 | M0 r2 增量 | 按 [身份迁移决定](clash5/r2-identity-migration.md) 分代存钥；丢失时暂停身份写入并经用户确认显式重绑，计划轮换保留旧密钥直至迁移结束 | 密钥丢失、锁定、错配、重置取消和轮换 fixture；迁移前后绑定数量及目标核对 | 待定 |
-| R-26 | 桌面壳启动或 WebDriver 会话失败，掩盖 M1 页面与 Tauri 命令问题 | 高 | M1 | 收集启动错误与进程状态，修复启动或驱动环境；在真实桌面壳中执行节点导入、探测和刷新走查 | 原生桥接调用成功，加上 [`M1 桌面演示步骤`](clash5/m1-acceptance.md) 的操作记录 | 待定 |
+| R-26 | 桌面壳、WebDriver 或集成夹具失败，掩盖 M1 页面与 Tauri 命令问题 | 高 | M1 | 收集启动错误、进程状态与夹具计数；在真实桌面壳中执行节点导入、探测、刷新和筛选走查 | 原生桥接调用成功，加上 [`M1 桌面演示步骤`](clash5/m1-acceptance.md) 的操作记录 | 待定 |
 
 ## 高风险项处理顺序
 
@@ -56,5 +56,5 @@
 | 2026-10-13 | R-19、R-20 | 开放 | 只读迁移向导及源目录校验未完成；统一脱敏与诊断出口测试尚无完整证据。 |
 | 2026-10-13 | R-24 | 缓解中 | r2 手册、协作规范、风险登记和任务拆解已同步为草案；冻结前仍需按实现差距复核。 |
 | 2026-10-13 | R-25 | 设计已定、实现开放 | [PR #8](https://github.com/oops11111/clash5/pull/8) 已确定凭证库分代、显式重绑与计划轮换方案；Issue #7 的代码、fixture 和桌面验收尚未完成，不能直接替换现有 SHA-256 身份。 |
-| 2026-10-14 | R-26 | 追踪中 | [Windows Server 2025 诊断](https://github.com/oops11111/clash5/actions/runs/38502726281) 在创建 WebDriver 会话前反复失败（`DevToolsActivePort file doesn't exist`），且没有启动日志，与 [runner-images 上游问题](https://github.com/actions/runner-images/issues/14738) 症状一致。[Server 2022 首轮](https://github.com/oops11111/clash5/actions/runs/38503375472) 已建立会话，但测试服务因 WebdriverIO 10 与其 9.x 依赖要求不符而在页面断言前失败；版本已对齐，[完整验收重跑](https://github.com/oops11111/clash5/actions/runs/38506389720)中。本机独立启动的 AppData OS error 5 属于本机执行环境限制。Mihomo fixture 和短时进程存活均不能代替应用内验收。 |
+| 2026-10-14 | R-26 | 追踪中 | [Windows Server 2025 诊断](https://github.com/oops11111/clash5/actions/runs/38502726281) 的 `DevToolsActivePort` 失败与 [runner-images 上游问题](https://github.com/actions/runner-images/issues/14738) 症状一致。Server 2022 对齐 WebdriverIO 9 后，[原生验收](https://github.com/oops11111/clash5/actions/runs/38506389720)已走通导入、探测缓存和订阅 diff/orphan，随后发现测试夹具的 provider 下载被当前受限代理拦截。夹具设为 `proxy: DIRECT` 后，独立 Mihomo 实验确认一次请求即可生成 provider 缓存；[完整重跑](https://github.com/oops11111/clash5/actions/runs/38533082801)中。外部 provider 与页面筛选、视觉、重启证据尚未齐全；本机 AppData OS error 5 是单独的本机执行限制。 |
 | 2026-10-14 | R-24 | 缓解中 | 依据新提供的手册、协作规范与风险登记复核 r2：修正补丁冲突与孤儿清理的验收表述，明确 M1 桌面证据缺口；草案仍待冻结评审。 |

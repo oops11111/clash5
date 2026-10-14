@@ -55,7 +55,7 @@
 - [ ] `[Opus]` 手动节点加入运行时后可安全探测；限流自动退避及 fixture 验证（R-11）
 - [ ] `[标准]` 对照工作区外层 `src/ui-hifi` 的已确认 UI 做桌面验收，提供 r2 所需的集成测试与演示步骤
 
-**当前进度**：草稿 PR #4 已有 SQLite 库存、剪贴板链接导入、外部 provider 缓存、手动节点运行时映射、受限探测、连续失败退避和本地 HTTP 429 fixture。实际 Mihomo 二进制经该夹具的 HTTP/HTTPS 探测已在本机验证，完整原生脚本已覆盖订阅刷新与来源隔离。Windows Server 2025 的 WebDriver 会话失败与[上游 runner 问题](https://github.com/actions/runner-images/issues/14738)症状一致；[Server 2022 首轮](https://github.com/oops11111/clash5/actions/runs/38503375472)已建立会话，测试服务与 WebdriverIO 版本不兼容已修正，[完整验收重跑](https://github.com/oops11111/clash5/actions/runs/38506389720)中。Tauri 命令与 UI 端到端验收仍缺（R-26），须按 [`M1 桌面演示步骤`](clash5/m1-acceptance.md) 取得证据。当前延迟接口不提供上游 HTTP 状态或 `Retry-After`，因此只能按连续失败通用退避；M1 尚未达到退出标准。
+**当前进度**：草稿 PR #4 已有 SQLite 库存、剪贴板链接导入、外部 provider 缓存、手动节点运行时映射、受限探测、连续失败退避和本地 HTTP 429 fixture。实际 Mihomo 二进制的 HTTP/HTTPS 探测及最多 16 并发已验证。[Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38506389720)走通 Tauri 剪贴板导入、前向/429 探测、立即缓存命中、订阅刷新、规则与组编辑保留及旧 inline 孤儿状态，在外部 provider 读取处失败；独立复现发现夹具下载默认绕到拒绝该地址的受限节点。夹具已明确 `proxy: DIRECT`，外部 provider 改用独立 429 端口，[完整重跑](https://github.com/oops11111/clash5/actions/runs/38533082801)中。外部 provider、筛选排序、视觉与重启证据仍待按 [`M1 桌面演示步骤`](clash5/m1-acceptance.md) 核验（R-26）。Windows Server 2025 的 WebDriver 问题仍由[上游 runner 问题](https://github.com/actions/runner-images/issues/14738)追踪。当前延迟接口不提供上游 HTTP 状态或 `Retry-After`，因此只能按连续失败通用退避；M1 尚未达到退出标准。
 
 ---
 

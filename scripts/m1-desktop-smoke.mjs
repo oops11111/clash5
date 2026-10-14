@@ -15,6 +15,8 @@ const binary = process.argv[2]
 if (!binary)
   throw new Error('Usage: node scripts/m1-desktop-smoke.mjs <app-binary>')
 const full = process.argv.includes('--full')
+const persisted = process.argv.includes('--persisted')
+if (full && persisted) throw new Error('Choose either --full or --persisted')
 
 const capabilities = createTauriCapabilities(resolve(binary), {
   driverProvider: 'external',
@@ -25,7 +27,9 @@ const capabilities = createTauriCapabilities(resolve(binary), {
 })
 let browser
 let originalClipboard
-const screenshot = resolve('target/m1-desktop-smoke.png')
+const screenshot = resolve(
+  persisted ? 'target/m1-desktop-persisted.png' : 'target/m1-desktop-smoke.png',
+)
 const fixtures = []
 
 function startFixture(port, mode) {
@@ -584,8 +588,26 @@ try {
   } catch (error) {
     throw new Error(`${String(error)}; last error: ${lastError ?? 'none'}`)
   }
-  if (inventory.length !== 0) {
+  if (!persisted && inventory.length !== 0) {
     throw new Error(`Fresh desktop session contains ${inventory.length} nodes`)
+  }
+  const persistedManual = inventory.filter(
+    (node) => node.source.kind === 'manual',
+  )
+  if (
+    persisted &&
+    (persistedManual.length !== 2 ||
+      !persistedManual.every((node) => node.active) ||
+      !persistedManual.some(
+        (node) => node.display_name === 'M1-renamed' && node.port === 18080,
+      ) ||
+      !persistedManual.some(
+        (node) => node.display_name === 'M1-limit' && node.port === 18081,
+      ))
+  ) {
+    throw new Error(
+      `Manual nodes did not survive restart: ${JSON.stringify(persistedManual)}`,
+    )
   }
 
   await browser.execute(() => {
@@ -608,20 +630,69 @@ try {
     title: document.querySelector('.base-page header')?.textContent?.trim(),
     rows: document.querySelectorAll('.base-page button[aria-pressed]').length,
   }))
-  if (!page.title || page.title.includes('nodePool.') || page.rows !== 0) {
-    throw new Error(`Unexpected empty node workspace: ${JSON.stringify(page)}`)
+  if (
+    !page.title ||
+    page.title.includes('nodePool.') ||
+    (!persisted && page.rows !== 0)
+  ) {
+    throw new Error(`Unexpected node workspace: ${JSON.stringify(page)}`)
   }
 
   if (full) {
     await verifyImportAndProbe()
     await verifySubscriptionRefresh()
     await verifyWorkspaceControls()
+  } else if (persisted) {
+    originalClipboard = await invoke(
+      'plugin:clipboard-manager|read_text',
+    ).catch(() => null)
+    await importLink(
+      'http://127.0.0.1:18080/#M1-renamed',
+      inventory.length,
+      'M1-renamed',
+    )
+    await browser.waitUntil(
+      () =>
+        browser.execute(() =>
+          [...document.querySelectorAll('.base-page .MuiAlert-root')].some(
+            (alert) =>
+              /Imported 1 standalone proxy link|已导入 1 个独立节点链接/.test(
+                alert.textContent ?? '',
+              ),
+          ),
+        ),
+      {
+        timeout: 30_000,
+        interval: 250,
+        timeoutMsg: 'Persisted manual link was not reimported through the page',
+      },
+    )
+    const reimported = (
+      await invoke('clash5_list_nodes', { includeInactive: true })
+    ).filter((node) => node.source.kind === 'manual')
+    if (
+      reimported.length !== 2 ||
+      persistedManual.some(
+        (before) =>
+          !reimported.some(
+            (after) =>
+              after.stable_id === before.stable_id &&
+              after.display_name === before.display_name,
+          ),
+      )
+    ) {
+      throw new Error(
+        `Manual identity changed after restart: ${JSON.stringify(reimported)}`,
+      )
+    }
   }
   await capture()
   process.stdout.write(
-    full
-      ? 'Native Tauri import, probe cache, subscription refresh, and source isolation passed\n'
-      : 'Native Tauri bridge and empty node workspace passed\n',
+    persisted
+      ? 'Manual nodes and their stable identities survived a desktop restart\n'
+      : full
+        ? 'Native Tauri import, probe cache, subscription refresh, and source isolation passed\n'
+        : 'Native Tauri bridge and empty node workspace passed\n',
   )
 } catch (error) {
   if (browser) {
