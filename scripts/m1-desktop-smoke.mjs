@@ -69,6 +69,16 @@ async function fixtureStats(port) {
   ).json()
 }
 
+async function startFixtures() {
+  await Promise.all(
+    [
+      [18080, 'forward'],
+      [18081, 'limit'],
+      [18082, 'limit'],
+    ].map(([port, mode]) => fixtureReady(port, startFixture(port, mode))),
+  )
+}
+
 async function invoke(command, args) {
   const result = await browser.execute(
     async (name, input) => {
@@ -141,14 +151,7 @@ async function verifyImportAndProbe() {
   } catch {
     originalClipboard = null
   }
-  const forward = startFixture(18080, 'forward')
-  const limited = startFixture(18081, 'limit')
-  const providerLimited = startFixture(18082, 'limit')
-  await Promise.all([
-    fixtureReady(18080, forward),
-    fixtureReady(18081, limited),
-    fixtureReady(18082, providerLimited),
-  ])
+  await startFixtures()
 
   await importLink('http://127.0.0.1:18080/#M1-forward', 1, 'M1-forward')
   await importLink('http://127.0.0.1:18080/#M1-renamed', 1, 'M1-renamed')
@@ -550,6 +553,9 @@ async function capture() {
 }
 
 try {
+  if (persisted) {
+    await startFixtures()
+  }
   browser = await startWdioSession(capabilities)
   let inventory
   let lastError
