@@ -335,6 +335,10 @@ pub async fn clash5_purge_orphans(source: Option<Source>) -> CmdResult<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     fn node(stable_id: &str) -> NodeRecord {
         NodeRecord {
@@ -368,5 +372,33 @@ mod tests {
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].2.status, QualityStatus::Failed);
         assert_eq!(results[1].2.status, QualityStatus::Healthy);
+    }
+
+    #[tokio::test]
+    async fn probe_batch_never_exceeds_the_parallel_limit() {
+        let active = Arc::new(AtomicUsize::new(0));
+        let peak = Arc::new(AtomicUsize::new(0));
+        let targets = (0..PROBE_CONCURRENCY * 3)
+            .map(|index| (node(&format!("node-{index}")), format!("runtime-{index}")))
+            .collect();
+        let results = probe_targets(targets, 1_000, {
+            let active = Arc::clone(&active);
+            let peak = Arc::clone(&peak);
+            move |_| {
+                let active = Arc::clone(&active);
+                let peak = Arc::clone(&peak);
+                async move {
+                    let current = active.fetch_add(1, Ordering::SeqCst) + 1;
+                    peak.fetch_max(current, Ordering::SeqCst);
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                    active.fetch_sub(1, Ordering::SeqCst);
+                    (Some(45), Some(120))
+                }
+            }
+        })
+        .await;
+        assert_eq!(results.len(), PROBE_CONCURRENCY * 3);
+        assert!(peak.load(Ordering::SeqCst) > 1);
+        assert!(peak.load(Ordering::SeqCst) <= PROBE_CONCURRENCY);
     }
 }
