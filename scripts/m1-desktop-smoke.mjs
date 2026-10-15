@@ -173,8 +173,8 @@ async function importLink(link, count, expectedName) {
           alert.textContent?.trim(),
         ),
       ),
-      invoke('plugin:clipboard-manager|read_text').catch((readError) =>
-        `read failed: ${String(readError)}`,
+      invoke('plugin:clipboard-manager|read_text').catch(
+        (readError) => `read failed: ${String(readError)}`,
       ),
     ])
     const details = {
