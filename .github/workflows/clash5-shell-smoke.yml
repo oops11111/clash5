@@ -59,7 +59,7 @@ jobs:
       - name: Build desktop shell without an installer
         run: cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --release --locked
       - name: Run Windows identity credential-store tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --release --locked --lib identity_store_ -- --nocapture
+        run: cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --locked --lib identity_store_ -- --nocapture
       - name: Assemble portable desktop test shell
         shell: pwsh
         run: |
