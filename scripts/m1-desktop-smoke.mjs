@@ -16,7 +16,10 @@ if (!binary)
   throw new Error('Usage: node scripts/m1-desktop-smoke.mjs <app-binary>')
 const full = process.argv.includes('--full')
 const persisted = process.argv.includes('--persisted')
-if (full && persisted) throw new Error('Choose either --full or --persisted')
+const recoveryCancel = process.argv.includes('--recovery-cancel')
+if ([full, persisted, recoveryCancel].filter(Boolean).length > 1) {
+  throw new Error('Choose only one desktop smoke mode')
+}
 
 const capabilities = createTauriCapabilities(resolve(binary), {
   driverProvider: 'external',
@@ -29,7 +32,11 @@ let browser
 let originalClipboard
 let testError
 const screenshot = resolve(
-  persisted ? 'target/m1-desktop-persisted.png' : 'target/m1-desktop-smoke.png',
+  persisted
+    ? 'target/m1-desktop-persisted.png'
+    : recoveryCancel
+      ? 'target/m1-recovery-cancel.png'
+      : 'target/m1-desktop-smoke.png',
 )
 const fixtures = []
 let phase = 'WebDriver startup'
@@ -266,6 +273,28 @@ async function verifySubscriptionRefresh() {
     },
   )
 
+  const originalNode = (
+    await invoke('clash5_list_nodes', { includeInactive: true })
+  ).find(
+    (node) =>
+      node.source.kind === 'subscription' &&
+      node.source.provider_id === uid &&
+      node.display_name === 'M1-inline' &&
+      node.active,
+  )
+  if (!originalNode) throw new Error('Initial subscription node is missing')
+  await invoke('clash5_bind_node', {
+    binding: {
+      id: 'm1-ambiguous-rebind',
+      plugin_id: 'desktop-smoke',
+      target_id: originalNode.stable_id,
+      source: { kind: 'subscription', provider_id: uid },
+      priority: 10,
+      enabled: true,
+      config: {},
+    },
+  })
+
   const original = load(await invoke('read_profile_file', { index: uid }))
   const group = original['proxy-groups']?.find(
     (item) => item.name === 'M1-selected',
@@ -408,12 +437,12 @@ async function verifySubscriptionRefresh() {
       browser.execute(
         () =>
           document.querySelectorAll('.base-page button[aria-pressed]')
-            .length === 4,
+            .length === 6,
       ),
     {
       timeout: 20_000,
       interval: 500,
-      timeoutMsg: 'Node workspace did not show four active source-scoped rows',
+      timeoutMsg: 'Node workspace did not show six active source-scoped rows',
     },
   )
 }
@@ -680,6 +709,324 @@ async function verifyNavigation() {
   await browser.saveScreenshot(resolve('target/nav-plugins-binding.png'))
 }
 
+async function verifyIdentityRotationAndAmbiguousRebind() {
+  phase = 'identity rotation cancellation'
+  const beforeCancel = {
+    status: await invoke('clash5_identity_status'),
+    nodes: (await invoke('clash5_list_nodes', { includeInactive: true })).map(
+      (node) => [node.source, node.stable_id, node.active],
+    ),
+    bindings: await invoke('clash5_list_bindings', { source: null }),
+  }
+  const clickButtonIn = async (labels, selector = '.base-page') => {
+    const clicked = await browser.execute(
+      (values, rootSelector) => {
+        const button = [
+          ...document.querySelectorAll(`${rootSelector} button`),
+        ].find((item) => values.includes(item.textContent?.trim()))
+        button?.click()
+        return Boolean(button)
+      },
+      labels,
+      selector,
+    )
+    if (!clicked) throw new Error(`Button is missing: ${labels[0]}`)
+  }
+  const rotateLabels = ['Rotate identity key', '轮换身份密钥', '輪替身分金鑰']
+  const cancelLabels = ['Cancel', '取消']
+  await clickButtonIn(rotateLabels)
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.MuiDialogTitle-root')].some((title) =>
+          [
+            'Rotate the node identity key?',
+            '轮换节点身份密钥？',
+            '輪替節點身分金鑰？',
+          ].includes(title.textContent?.trim()),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity rotation confirmation did not open',
+    },
+  )
+  await clickButtonIn(cancelLabels, '.MuiDialog-root')
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () => document.querySelectorAll('.MuiDialog-root').length === 0,
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity rotation dialog did not close after cancellation',
+    },
+  )
+  const afterCancel = {
+    status: await invoke('clash5_identity_status'),
+    nodes: (await invoke('clash5_list_nodes', { includeInactive: true })).map(
+      (node) => [node.source, node.stable_id, node.active],
+    ),
+    bindings: await invoke('clash5_list_bindings', { source: null }),
+  }
+  if (JSON.stringify(beforeCancel) !== JSON.stringify(afterCancel)) {
+    throw new Error('Cancelling identity rotation changed persisted data')
+  }
+
+  phase = 'ambiguous manual rebind'
+  const pending = await invoke('clash5_list_pending_identity_rebinds', {
+    source: null,
+  })
+  const item = pending.find((candidate) => candidate.candidate_ids.length === 2)
+  if (!item)
+    throw new Error('Subscription refresh did not create two rebind candidates')
+  const oldBinding = (
+    await invoke('clash5_list_bindings', { source: null })
+  ).find((binding) => binding.id === 'm1-ambiguous-rebind')
+  if (!oldBinding?.orphan || oldBinding.target_id !== item.old_stable_id) {
+    throw new Error('Rotation did not preserve the old binding as an orphan')
+  }
+  const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
+  const candidateNames = item.candidate_ids.map(
+    (id) => nodes.find((node) => node.stable_id === id)?.display_name,
+  )
+  if (
+    candidateNames.length !== 2 ||
+    candidateNames.some((name) => !name?.startsWith('M1-candidate-'))
+  ) {
+    throw new Error(
+      `Unexpected rebind candidates: ${JSON.stringify(candidateNames)}`,
+    )
+  }
+
+  const oldId = item.old_stable_id
+  const opened = await browser.execute((id) => {
+    const card = [
+      ...document.querySelectorAll('.base-page .MuiPaper-root'),
+    ].find(
+      (paper) =>
+        paper.textContent?.includes(id) &&
+        paper.querySelector('[role="combobox"]'),
+    )
+    const select = card?.querySelector('[role="combobox"]')
+    select?.click()
+    return Boolean(select)
+  }, oldId)
+  if (!opened) throw new Error('Ambiguous rebind candidate selector is missing')
+  const rebindInitiallyDisabled = await browser.execute((id) => {
+    const card = [
+      ...document.querySelectorAll('.base-page .MuiPaper-root'),
+    ].find(
+      (paper) =>
+        paper.textContent?.includes(id) &&
+        paper.querySelector('[role="combobox"]'),
+    )
+    return [...(card?.querySelectorAll('button') ?? [])].some(
+      (button) =>
+        button.disabled &&
+        ['Rebind', '重新绑定', '重新綁定'].includes(button.textContent?.trim()),
+    )
+  }, oldId)
+  if (!rebindInitiallyDisabled) {
+    throw new Error('Ambiguous rebind was enabled without an explicit choice')
+  }
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        (id) =>
+          [...document.querySelectorAll('[role="option"]')].some(
+            (option) => option.textContent?.trim() === id,
+          ),
+        item.candidate_ids[0],
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Ambiguous candidate options did not open',
+    },
+  )
+  await browser.execute((id) => {
+    ;[...document.querySelectorAll('[role="option"]')]
+      .find((option) => option.textContent?.trim() === id)
+      ?.click()
+  }, item.candidate_ids[0])
+  const rebindEnabled = await browser.execute((id) => {
+    const card = [
+      ...document.querySelectorAll('.base-page .MuiPaper-root'),
+    ].find(
+      (paper) =>
+        paper.textContent?.includes(id) &&
+        paper.querySelector('[role="combobox"]'),
+    )
+    return [...(card?.querySelectorAll('button') ?? [])].some(
+      (button) =>
+        !button.disabled &&
+        ['Rebind', '重新绑定', '重新綁定'].includes(button.textContent?.trim()),
+    )
+  }, oldId)
+  if (!rebindEnabled) throw new Error('Rebind stayed disabled after selection')
+  await browser.execute((id) => {
+    const card = [
+      ...document.querySelectorAll('.base-page .MuiPaper-root'),
+    ].find(
+      (paper) =>
+        paper.textContent?.includes(id) &&
+        paper.querySelector('[role="combobox"]'),
+    )
+    ;[...(card?.querySelectorAll('button') ?? [])]
+      .find((button) =>
+        ['Rebind', '重新绑定', '重新綁定'].includes(button.textContent?.trim()),
+      )
+      ?.click()
+  }, oldId)
+  await browser.waitUntil(
+    async () => (await invoke('clash5_identity_status')).pending_rebinds === 0,
+    {
+      timeout: 30_000,
+      interval: 250,
+      timeoutMsg: 'Explicit rebind choice was not saved',
+    },
+  )
+  const selectedBinding = (
+    await invoke('clash5_list_bindings', { source: null })
+  ).find((binding) => binding.id === 'm1-ambiguous-rebind')
+  if (
+    selectedBinding?.target_id !== item.candidate_ids[0] ||
+    selectedBinding.orphan
+  ) {
+    throw new Error(
+      `Explicit rebind was not applied: ${JSON.stringify(selectedBinding)}`,
+    )
+  }
+  const selectedNode = nodes.find(
+    (node) => node.stable_id === item.candidate_ids[0],
+  )
+  if (!selectedNode) throw new Error('Selected rebind target is missing')
+
+  phase = 'identity rotation'
+  await clickButtonIn(rotateLabels)
+  await clickButtonIn(rotateLabels, '.MuiDialog-root')
+  let rotatedTarget
+  await browser.waitUntil(
+    async () => {
+      const currentNodes = await invoke('clash5_list_nodes', {
+        includeInactive: true,
+      })
+      rotatedTarget = currentNodes.find(
+        (node) =>
+          node.source.kind === selectedNode.source.kind &&
+          node.source.provider_id === selectedNode.source.provider_id &&
+          node.display_name === selectedNode.display_name &&
+          node.active,
+      )
+      return Boolean(
+        rotatedTarget && rotatedTarget.stable_id !== selectedNode.stable_id,
+      )
+    },
+    {
+      timeout: 60_000,
+      interval: 500,
+      timeoutMsg: 'Identity rotation did not finish',
+    },
+  )
+  const rotatedNodes = await invoke('clash5_list_nodes', {
+    includeInactive: true,
+  })
+  rotatedTarget = rotatedNodes.find(
+    (node) =>
+      node.source.kind === selectedNode.source.kind &&
+      node.source.provider_id === selectedNode.source.provider_id &&
+      node.display_name === selectedNode.display_name &&
+      node.active,
+  )
+  const rotatedBinding = (
+    await invoke('clash5_list_bindings', { source: null })
+  ).find((binding) => binding.id === 'm1-ambiguous-rebind')
+  if (
+    !rotatedTarget ||
+    rotatedTarget.stable_id === selectedNode.stable_id ||
+    rotatedBinding?.target_id !== rotatedTarget.stable_id ||
+    rotatedBinding.orphan
+  ) {
+    throw new Error(
+      `Identity rotation did not preserve the explicit binding: ${JSON.stringify({ rotatedTarget, rotatedBinding })}`,
+    )
+  }
+}
+
+async function verifyRecoveryResetCancellation() {
+  phase = 'identity recovery reset cancellation'
+  const before = {
+    status: await invoke('clash5_identity_status'),
+    nodes: await invoke('clash5_list_nodes', { includeInactive: true }),
+    bindings: await invoke('clash5_list_bindings', { source: null }),
+  }
+  if (!before.status.recovery_mode) {
+    throw new Error('Desktop smoke did not start in identity recovery mode')
+  }
+  const clicked = await browser.execute(() => {
+    const button = [...document.querySelectorAll('.base-page button')].find(
+      (item) =>
+        ['Reset identity key', '重置身份密钥', '重設身分金鑰'].includes(
+          item.textContent?.trim(),
+        ),
+    )
+    button?.click()
+    return Boolean(button)
+  })
+  if (!clicked) throw new Error('Identity recovery reset action is missing')
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.MuiDialogTitle-root')].some((title) =>
+          [
+            'Reset node identity key?',
+            '重置节点身份密钥？',
+            '重設節點身分金鑰？',
+          ].includes(title.textContent?.trim()),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity reset confirmation did not open',
+    },
+  )
+  const cancelled = await browser.execute(() => {
+    const button = [
+      ...document.querySelectorAll('.MuiDialog-root button'),
+    ].find((item) => ['Cancel', '取消'].includes(item.textContent?.trim()))
+    button?.click()
+    return Boolean(button)
+  })
+  if (!cancelled)
+    throw new Error('Identity reset cancellation action is missing')
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () => document.querySelectorAll('.MuiDialog-root').length === 0,
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity reset dialog did not close after cancellation',
+    },
+  )
+  const after = {
+    status: await invoke('clash5_identity_status'),
+    nodes: await invoke('clash5_list_nodes', { includeInactive: true }),
+    bindings: await invoke('clash5_list_bindings', { source: null }),
+  }
+  if (
+    !after.status.recovery_mode ||
+    JSON.stringify(before) !== JSON.stringify(after)
+  ) {
+    throw new Error('Cancelling identity reset changed persisted data')
+  }
+}
+
 try {
   if (persisted) {
     await startFixtures()
@@ -723,7 +1070,7 @@ try {
   } catch (error) {
     throw new Error(`${String(error)}; last error: ${lastError ?? 'none'}`)
   }
-  if (!persisted && inventory.length !== 0) {
+  if (!persisted && !recoveryCancel && inventory.length !== 0) {
     throw new Error(`Fresh desktop session contains ${inventory.length} nodes`)
   }
   const persistedManual = inventory.filter(
@@ -772,7 +1119,7 @@ try {
   if (
     !page.title ||
     page.title.includes('nodePool.') ||
-    (!persisted && page.rows !== 0)
+    (!persisted && !recoveryCancel && page.rows !== 0)
   ) {
     throw new Error(`Unexpected node workspace: ${JSON.stringify(page)}`)
   }
@@ -783,6 +1130,9 @@ try {
     phase = 'subscription refresh and provider probe'
     await verifySubscriptionRefresh()
     await verifyWorkspaceControls()
+  } else if (recoveryCancel) {
+    await verifyNavigation()
+    await verifyRecoveryResetCancellation()
   } else if (persisted) {
     phase = 'manual node persistence'
     originalClipboard = await invoke(
@@ -835,13 +1185,16 @@ try {
   if (full) {
     phase = 'sidebar and plugin binding navigation'
     await verifyNavigation()
+    await verifyIdentityRotationAndAmbiguousRebind()
   }
   process.stdout.write(
     persisted
       ? 'Manual nodes and their stable identities survived a desktop restart\n'
-      : full
-        ? 'Native Tauri import, probe cache, subscription refresh, and source isolation passed\n'
-        : 'Native Tauri bridge and empty node workspace passed\n',
+      : recoveryCancel
+        ? 'Identity reset cancellation preserved recovery state and data\n'
+        : full
+          ? 'Native Tauri import, probe cache, subscription refresh, and source isolation passed\n'
+          : 'Native Tauri bridge and empty node workspace passed\n',
   )
 } catch (error) {
   testError = error

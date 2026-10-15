@@ -22,10 +22,10 @@ permissions:
 jobs:
   windows-shell:
     # WebView2 WebDriver sessions currently fail on the Server 2025 image.
-    # Keep PR build/launch coverage on the current Windows image while the
-    # manually dispatched native WebDriver acceptance uses Server 2022:
+    # Run native desktop acceptance for every PR on Server 2022 so the key
+    # recovery and rebind UI remains an enforced review gate:
     # https://github.com/actions/runner-images/issues/14738
-    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'windows-2022' || 'windows-latest' }}
+    runs-on: windows-2022
     timeout-minutes: 60
     env:
       HUSKY: 0
@@ -40,7 +40,7 @@ jobs:
             . -> target
           cache-all-crates: true
           cache-workspace-crates: true
-          save-if: ${{ github.event_name == 'workflow_dispatch' }}
+          save-if: true
       - uses: pnpm/action-setup@v6
         with:
           run_install: false
@@ -48,6 +48,9 @@ jobs:
         with:
           node-version: '24.21.0'
           cache: pnpm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
       - name: Install locked frontend dependencies
         run: pnpm install --frozen-lockfile
       - name: Provision real desktop resources
@@ -68,10 +71,47 @@ jobs:
             Copy-Item -LiteralPath $source -Destination (Join-Path $release "$core.exe") -Force
           }
       - name: Verify native Tauri bridge and node workspace
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'schedule'
         run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --full
+      - name: Verify reset cancellation in identity recovery mode
+        if: github.event_name != 'schedule'
+        shell: pwsh
+        run: |
+          $appData = Join-Path $env:APPDATA 'io.github.oops11111.clash5'
+          $database = Join-Path $appData 'clash5-nodes.sqlite'
+          $backup = Join-Path $env:RUNNER_TEMP 'clash5-nodes.sqlite'
+          $prepareDatabase = @'
+          import sqlite3, sys
+
+          database, backup = sys.argv[1:]
+          with sqlite3.connect(database) as live:
+              with sqlite3.connect(backup) as snapshot:
+                  live.backup(snapshot)
+              changed = live.execute(
+                  "UPDATE identity_keys SET key_id='desktop-smoke-mismatch' WHERE active=1"
+              ).rowcount
+              if changed != 1:
+                  raise RuntimeError(f'Expected one active identity key, got {changed}')
+              live.commit()
+          '@
+          try {
+            $prepareDatabase | python - $database $backup
+            if ($LASTEXITCODE -ne 0) { throw 'Could not prepare identity recovery fixture' }
+            pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --recovery-cancel
+            if ($LASTEXITCODE -ne 0) { throw 'Identity recovery reset-cancellation smoke failed' }
+          } finally {
+            Get-Process -Name clash-verge -ErrorAction SilentlyContinue | Stop-Process -Force
+            Start-Sleep -Seconds 2
+            foreach ($suffix in @('-wal', '-shm')) {
+              Remove-Item -LiteralPath "$database$suffix" -Force -ErrorAction SilentlyContinue
+            }
+            if (Test-Path -LiteralPath $backup) {
+              Copy-Item -LiteralPath $backup -Destination $database -Force
+            }
+            Remove-Item -LiteralPath $backup -Force
+          }
       - name: Verify manual node persistence after desktop restart
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'schedule'
         shell: pwsh
         run: |
           if (Get-Process -Name clash-verge -ErrorAction SilentlyContinue) {
@@ -79,7 +119,7 @@ jobs:
           }
           pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --persisted
       - name: Report desktop process state on failure
-        if: failure() && github.event_name == 'workflow_dispatch'
+        if: failure() && github.event_name != 'schedule'
         shell: pwsh
         run: |
           Get-Process -Name clash-verge,msedgewebview2,msedgedriver,tauri-driver -ErrorAction SilentlyContinue |
@@ -96,7 +136,7 @@ jobs:
             Write-Output 'clash5 startup log was not created'
           }
       - name: Launch shell briefly
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name == 'schedule'
         shell: pwsh
         run: |
           $binary = 'target/x86_64-pc-windows-msvc/release/clash-verge.exe'
@@ -113,12 +153,13 @@ jobs:
             }
           }
       - name: Upload desktop screenshot
-        if: always() && github.event_name == 'workflow_dispatch'
+        if: always() && github.event_name != 'schedule'
         uses: actions/upload-artifact@v7
         with:
           name: clash5-m1-desktop-smoke
           path: |
             target/m1-desktop-smoke.png
+            target/m1-recovery-cancel.png
             target/m1-desktop-persisted.png
             target/nav-plugins-binding.png
           if-no-files-found: warn
