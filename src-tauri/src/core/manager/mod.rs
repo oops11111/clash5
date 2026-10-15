@@ -5,7 +5,7 @@ mod state;
 
 use crate::{
     config::Config,
-    core::{handle::Handle, singbox_config, singbox_runtime::SingboxRoute},
+    core::{handle::Handle, singbox_binary, singbox_config, singbox_runtime::SingboxRoute},
 };
 use anyhow::{Context as _, Result};
 use arc_swap::{ArcSwap, ArcSwapOption};
@@ -272,7 +272,8 @@ impl CoreManager {
             return Ok(());
         }
         let yaml = serde_yaml_ng::to_string(config).context("failed to serialize the generated Mihomo config")?;
-        let route = SingboxRoute::start(mihomo, Command::new("sing-box"), yaml, landing_name).await?;
+        let command = Command::new(singbox_binary::resolve()?);
+        let route = SingboxRoute::start(mihomo, command, yaml, landing_name).await?;
         *active = Some(route);
         self.singbox_degraded.store(false, Ordering::Release);
         drop(active);
