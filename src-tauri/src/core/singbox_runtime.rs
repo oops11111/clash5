@@ -109,7 +109,7 @@ impl SingboxRoute {
         }
     }
 
-    pub const fn landing_name(&self) -> &str {
+    pub fn landing_name(&self) -> &str {
         &self.landing_name
     }
 
