@@ -139,6 +139,45 @@ async function clickButton(labels) {
   if (!clicked) throw new Error(`${labels[0]} button disappeared`)
 }
 
+async function captureManualImportFailures() {
+  await browser.execute(() => {
+    const internals = window.__TAURI_INTERNALS__
+    if (!internals || window.__clash5SmokeCapture) return
+
+    const invoke = internals.invoke
+    const failures = []
+    try {
+      Object.defineProperty(internals, 'invoke', {
+        configurable: true,
+        writable: true,
+        value: async function (...args) {
+          try {
+            return await invoke.apply(this, args)
+          } catch (error) {
+            if (args[0] === 'clash5_import_manual_proxies') {
+              let detail = error?.detail
+              if (typeof error === 'string') {
+                try {
+                  detail = JSON.parse(error)?.detail ?? error
+                } catch {
+                  detail = error
+                }
+              }
+              failures.push({
+                code: error?.code,
+                detail:
+                  typeof detail === 'string' ? detail.slice(0, 240) : null,
+              })
+            }
+            throw error
+          }
+        },
+      })
+      window.__clash5SmokeCapture = failures
+    } catch {}
+  })
+}
+
 async function importLink(link, count, expectedName) {
   await invoke('plugin:clipboard-manager|write_text', { text: link })
   const clipboard = await invoke('plugin:clipboard-manager|read_text')
@@ -147,6 +186,7 @@ async function importLink(link, count, expectedName) {
       `Clipboard fixture did not round-trip: ${JSON.stringify(clipboard)}`,
     )
   }
+  await captureManualImportFailures()
   await clickButton(['Import from clipboard', '从剪贴板导入'])
   try {
     await browser.waitUntil(
@@ -166,22 +206,25 @@ async function importLink(link, count, expectedName) {
       },
     )
   } catch (error) {
-    const [nodes, alerts, currentClipboard] = await Promise.all([
-      invoke('clash5_list_nodes', { includeInactive: true }),
-      browser.execute(() =>
-        [...document.querySelectorAll('.MuiAlert-root')].map((alert) =>
-          alert.textContent?.trim(),
+    const [nodes, alerts, commandFailures, currentClipboard] =
+      await Promise.all([
+        invoke('clash5_list_nodes', { includeInactive: true }),
+        browser.execute(() =>
+          [...document.querySelectorAll('.MuiAlert-root')].map((alert) =>
+            alert.textContent?.trim(),
+          ),
         ),
-      ),
-      invoke('plugin:clipboard-manager|read_text').catch(
-        (readError) => `read failed: ${String(readError)}`,
-      ),
-    ])
+        browser.execute(() => window.__clash5SmokeCapture ?? []),
+        invoke('plugin:clipboard-manager|read_text').catch(
+          (readError) => `read failed: ${String(readError)}`,
+        ),
+      ])
     const details = {
       error: String(error),
       nodes,
       alerts,
       clipboard: currentClipboard,
+      commandFailures,
     }
     throw new Error(
       `Manual import acceptance failed: ${JSON.stringify(details)}`,
