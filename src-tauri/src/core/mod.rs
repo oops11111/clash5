@@ -15,6 +15,7 @@ pub mod proxy_view;
 pub mod runstate;
 pub(crate) mod runtime_bundle;
 pub mod service;
+pub mod singbox_config;
 pub mod singbox_relay;
 pub mod sysopt;
 pub mod timer;
