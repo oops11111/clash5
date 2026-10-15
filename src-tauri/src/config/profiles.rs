@@ -531,20 +531,54 @@ where
     .map_err(|_| clash5_data::DataError::Database)?
 }
 
+trait IdentityCredentialStore {
+    fn get(&self, generation: i64) -> Result<Option<Vec<u8>>, IdentityCredentialError>;
+    fn set(&self, generation: i64, key: &[u8]) -> Result<(), IdentityCredentialError>;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum IdentityCredentialError {
+    Unavailable,
+}
+
+struct OsIdentityCredentialStore;
+
+impl IdentityCredentialStore for OsIdentityCredentialStore {
+    fn get(&self, generation: i64) -> Result<Option<Vec<u8>>, IdentityCredentialError> {
+        const SERVICE: &str = "io.github.oops11111.clash5";
+        let entry = keyring::Entry::new(SERVICE, &format!("identity-key-{generation}"))
+            .map_err(|_| IdentityCredentialError::Unavailable)?;
+        match entry.get_secret() {
+            Ok(bytes) => Ok(Some(bytes)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(_) => Err(IdentityCredentialError::Unavailable),
+        }
+    }
+
+    fn set(&self, generation: i64, key: &[u8]) -> Result<(), IdentityCredentialError> {
+        const SERVICE: &str = "io.github.oops11111.clash5";
+        keyring::Entry::new(SERVICE, &format!("identity-key-{generation}"))
+            .map_err(|_| IdentityCredentialError::Unavailable)?
+            .set_secret(key)
+            .map_err(|_| IdentityCredentialError::Unavailable)
+    }
+}
+
 fn open_clash5_identity_store(path: std::path::PathBuf) -> Result<clash5_data::BindingStore, clash5_data::DataError> {
+    open_clash5_identity_store_with(path, &OsIdentityCredentialStore)
+}
+
+fn open_clash5_identity_store_with(
+    path: std::path::PathBuf,
+    credentials: &impl IdentityCredentialStore,
+) -> Result<clash5_data::BindingStore, clash5_data::DataError> {
     use clash5_data::IdentityKey;
 
-    const SERVICE: &str = "io.github.oops11111.clash5";
     let _identity_init = CLASH5_IDENTITY_INIT_LOCK.lock();
     let store = clash5_data::BindingStore::open(&path)?;
     let active = store.active_identity_key()?;
     if let Some((generation, expected_key_id)) = active {
-        let Ok(entry) = keyring::Entry::new(SERVICE, &format!("identity-key-{generation}")) else {
-            let mut store = store;
-            store.enter_identity_recovery();
-            return Ok(store);
-        };
-        let Ok(bytes) = entry.get_secret() else {
+        let Ok(Some(bytes)) = credentials.get(generation) else {
             let mut store = store;
             store.enter_identity_recovery();
             return Ok(store);
@@ -577,25 +611,27 @@ fn open_clash5_identity_store(path: std::path::PathBuf) -> Result<clash5_data::B
         return Ok(store);
     }
     let generation = store.next_identity_generation()?;
-    let Ok(entry) = keyring::Entry::new(SERVICE, &format!("identity-key-{generation}")) else {
-        let mut store = store;
-        store.enter_identity_recovery();
-        return Ok(store);
-    };
-    let key_result = match entry.get_secret() {
-        Ok(bytes) => IdentityKey::from_bytes(&bytes),
-        Err(keyring::Error::NoEntry) => {
+    let key_result = match credentials.get(generation) {
+        Ok(Some(bytes)) => IdentityKey::from_bytes(&bytes),
+        Ok(None) => {
             let mut bytes = [0_u8; 32];
-            if getrandom::fill(&mut bytes).is_err() || entry.set_secret(&bytes).is_err() {
+            if getrandom::fill(&mut bytes).is_err() || credentials.set(generation, &bytes).is_err() {
                 Err(clash5_data::DataError::IdentityRecovery)
             } else {
-                entry
-                    .get_secret()
+                credentials
+                    .get(generation)
                     .map_err(|_| clash5_data::DataError::IdentityRecovery)
-                    .and_then(|stored| IdentityKey::from_bytes(&stored))
+                    .and_then(|stored| stored.ok_or(clash5_data::DataError::IdentityRecovery))
+                    .and_then(|stored| {
+                        if stored != bytes {
+                            Err(clash5_data::DataError::IdentityRecovery)
+                        } else {
+                            IdentityKey::from_bytes(&stored)
+                        }
+                    })
             }
         }
-        Err(_) => {
+        Err(IdentityCredentialError::Unavailable) => {
             let mut store = store;
             store.enter_identity_recovery();
             return Ok(store);
@@ -1335,7 +1371,148 @@ fn activate_selected_nodes_with(repair: SelectionRepair) -> tokio::sync::oneshot
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clash5_data::{DataError, IdentityKey, Node};
     use tauri_plugin_mihomo::models::Proxy;
+
+    struct FakeIdentityCredentials {
+        values: Mutex<HashMap<i64, Vec<u8>>>,
+        unavailable: bool,
+    }
+
+    impl FakeIdentityCredentials {
+        fn available() -> Self {
+            Self {
+                values: Mutex::new(HashMap::new()),
+                unavailable: false,
+            }
+        }
+
+        fn locked() -> Self {
+            Self {
+                values: Mutex::new(HashMap::new()),
+                unavailable: true,
+            }
+        }
+    }
+
+    impl IdentityCredentialStore for FakeIdentityCredentials {
+        fn get(&self, generation: i64) -> Result<Option<Vec<u8>>, IdentityCredentialError> {
+            if self.unavailable {
+                return Err(IdentityCredentialError::Unavailable);
+            }
+            Ok(self.values.lock().get(&generation).cloned())
+        }
+
+        fn set(&self, generation: i64, key: &[u8]) -> Result<(), IdentityCredentialError> {
+            if self.unavailable {
+                return Err(IdentityCredentialError::Unavailable);
+            }
+            self.values.lock().insert(generation, key.to_vec());
+            Ok(())
+        }
+    }
+
+    fn identity_fixture_path() -> std::path::PathBuf {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        std::env::temp_dir().join(format!(
+            "clash5-identity-key-{}-{}.sqlite",
+            std::process::id(),
+            NEXT_ID.fetch_add(1, Ordering::Relaxed)
+        ))
+    }
+
+    fn identity_fixture_node() -> Node {
+        Node {
+            kind: "ss".into(),
+            server: "identity.example.test".into(),
+            port: 443,
+            credentials: std::collections::BTreeMap::from([("password".into(), "fixture-secret".into())]),
+            display_name: "Identity fixture".into(),
+            transport: "tcp".into(),
+            sni: std::string::String::new(),
+        }
+    }
+
+    fn remove_identity_fixture(path: &std::path::Path) {
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(path.with_extension("sqlite-wal"));
+        let _ = std::fs::remove_file(path.with_extension("sqlite-shm"));
+    }
+
+    fn seeded_identity_fixture(path: &std::path::Path, key: IdentityKey) {
+        let mut store = clash5_data::BindingStore::open_with_identity(path, key).unwrap();
+        store.upsert_manual(&identity_fixture_node()).unwrap();
+    }
+
+    #[test]
+    fn identity_store_enters_read_only_recovery_when_key_is_missing_or_mismatched() {
+        for supplied_key in [None, Some(vec![9_u8; 32])] {
+            let path = identity_fixture_path();
+            let expected_key = IdentityKey::from_bytes(&[7_u8; 32]).unwrap();
+            seeded_identity_fixture(&path, expected_key.clone());
+
+            let credentials = FakeIdentityCredentials::available();
+            if let Some(key) = supplied_key {
+                credentials.values.lock().insert(1, key);
+            }
+            let mut store = open_clash5_identity_store_with(path.clone(), &credentials).unwrap();
+
+            assert!(store.identity_recovery());
+            assert_eq!(store.active_identity_key().unwrap().unwrap().1, expected_key.key_id());
+            assert!(store.node_records(true).unwrap().len() >= 1);
+            assert_eq!(
+                store.upsert_manual(&identity_fixture_node()),
+                Err(DataError::IdentityRecovery)
+            );
+            drop(store);
+            remove_identity_fixture(&path);
+        }
+    }
+
+    #[test]
+    fn identity_store_enters_read_only_recovery_when_credential_store_is_locked() {
+        let path = identity_fixture_path();
+        seeded_identity_fixture(&path, IdentityKey::from_bytes(&[7_u8; 32]).unwrap());
+
+        let mut store = open_clash5_identity_store_with(path.clone(), &FakeIdentityCredentials::locked()).unwrap();
+
+        assert!(store.identity_recovery());
+        assert_eq!(store.active_identity_key().unwrap().unwrap().0, 1);
+        assert_eq!(
+            store.upsert_manual(&identity_fixture_node()),
+            Err(DataError::IdentityRecovery)
+        );
+        drop(store);
+        remove_identity_fixture(&path);
+    }
+
+    #[test]
+    fn fresh_identity_store_requires_writable_keyring_and_verifies_persisted_key() {
+        let path = identity_fixture_path();
+        let mut unavailable =
+            open_clash5_identity_store_with(path.clone(), &FakeIdentityCredentials::locked()).unwrap();
+        assert!(unavailable.identity_recovery());
+        assert_eq!(unavailable.active_identity_key().unwrap(), None);
+        drop(unavailable);
+        remove_identity_fixture(&path);
+
+        let path = identity_fixture_path();
+        let credentials = FakeIdentityCredentials::available();
+        let mut store = open_clash5_identity_store_with(path.clone(), &credentials).unwrap();
+        assert!(!store.identity_recovery());
+        let (generation, key_id) = store.active_identity_key().unwrap().unwrap();
+        assert_eq!(generation, 1);
+        assert_eq!(credentials.values.lock().get(&generation).unwrap().len(), 32);
+        assert_eq!(
+            IdentityKey::from_bytes(credentials.values.lock().get(&generation).unwrap())
+                .unwrap()
+                .key_id(),
+            key_id
+        );
+        store.upsert_manual(&identity_fixture_node()).unwrap();
+        drop(store);
+        remove_identity_fixture(&path);
+    }
 
     fn deletion_item(uid: &str, kind: &str, file: &str, merge: Option<&str>) -> PrfItem {
         PrfItem {
