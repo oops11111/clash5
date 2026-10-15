@@ -683,12 +683,21 @@ async function prepareM3PluginFixture() {
 }
 
 async function clickBindingAction(bindingId, labels) {
+  const priority = bindingId.endsWith('-high') ? '80' : '20'
+  const priorityLabels = [
+    `Priority ${priority}`,
+    `优先级 ${priority}`,
+    `優先級 ${priority}`,
+  ]
   const clicked = await browser.execute(
-    ({ id, buttonLabels }) => {
+    ({ buttonLabels, bindingPriorityLabels }) => {
       const cards = [...document.querySelectorAll('.base-page .MuiPaper-root')]
         .filter(
           (card) =>
-            card.textContent?.includes(id) &&
+            card.textContent?.includes('m3.smoke.plugin') &&
+            [...card.querySelectorAll('.MuiChip-root')].some((chip) =>
+              bindingPriorityLabels.includes(chip.textContent?.trim()),
+            ) &&
             [...card.querySelectorAll('button')].some((button) =>
               buttonLabels.includes(button.textContent?.trim()),
             ),
@@ -702,7 +711,7 @@ async function clickBindingAction(bindingId, labels) {
       button?.click()
       return Boolean(button)
     },
-    { id: bindingId, buttonLabels: labels },
+    { bindingPriorityLabels: priorityLabels, buttonLabels: labels },
   )
   if (!clicked) throw new Error(`Could not find ${labels[0]} for ${bindingId}`)
 }
@@ -710,10 +719,23 @@ async function clickBindingAction(bindingId, labels) {
 async function verifyM3PluginUi() {
   await browser.waitUntil(
     () =>
-      browser.execute((bindingId) => {
+      browser.execute(() => {
         const text = document.querySelector('.base-page')?.textContent ?? ''
-        return text.includes(bindingId) && text.includes('/tun/mtu')
-      }, m3BindingIds[0]),
+        const priorities = [
+          ...document.querySelectorAll('.base-page .MuiChip-root'),
+        ].map((chip) => chip.textContent?.trim())
+        return (
+          text.includes('m3.smoke.plugin') &&
+          text.includes('/tun/mtu') &&
+          text.includes('1360') &&
+          ['Priority 80', '优先级 80', '優先級 80'].some((label) =>
+            priorities.includes(label),
+          ) &&
+          ['Priority 20', '优先级 20', '優先級 20'].some((label) =>
+            priorities.includes(label),
+          )
+        )
+      }),
     {
       timeout: 30_000,
       interval: 250,
@@ -724,8 +746,7 @@ async function verifyM3PluginUi() {
     () => document.querySelector('.base-page')?.textContent ?? '',
   )
   if (
-    !pageText.includes(m3BindingIds[0]) ||
-    !pageText.includes(m3BindingIds[1]) ||
+    !pageText.includes('m3.smoke.plugin') ||
     !pageText.includes('/tun/mtu') ||
     !pageText.includes('1360')
   ) {
