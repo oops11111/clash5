@@ -23,11 +23,10 @@ permissions:
 
 jobs:
   windows-shell:
-    # WebView2 WebDriver sessions currently fail on the Server 2025 image.
-    # Keep PR build/launch coverage on the current Windows image while the
-    # manually dispatched native WebDriver acceptance uses Server 2022:
+    # WebView2 WebDriver acceptance uses Server 2022; external fork PRs keep
+    # lightweight build/launch coverage on the current Windows image:
     # https://github.com/actions/runner-images/issues/14738
-    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'windows-2022' || 'windows-latest' }}
+    runs-on: ${{ (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && 'windows-2022' || 'windows-latest' }}
     timeout-minutes: 60
     env:
       HUSKY: 0
