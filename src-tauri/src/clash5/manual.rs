@@ -204,10 +204,10 @@ mod tests {
         let changed = file.add_import(vec![proxy("Renamed", "ws")], &key).unwrap();
         assert_eq!(changed.changed_ids.len(), 1);
 
-        assert!(
-            file.add_import(vec![proxy("One", "tcp"), proxy("Two", "ws")], &key)
-                .is_err()
-        );
+        let one = proxy("One", "tcp");
+        let mut conflicting = proxy("Two", "tcp");
+        conflicting.as_mapping_mut().unwrap().insert("udp".into(), true.into());
+        assert!(file.add_import(vec![one, conflicting], &key).is_err());
         assert_eq!(entry_node(&file.entries[0], &key).unwrap().display_name, "Renamed");
     }
 
