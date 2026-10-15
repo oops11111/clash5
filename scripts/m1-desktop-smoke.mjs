@@ -742,8 +742,7 @@ async function clickBindingAction(bindingId, labels) {
     },
     args,
   )
-  if (!clicked)
-    throw new Error(`Could not find ${labels[0]} for ${bindingId}`)
+  if (!clicked) throw new Error(`Could not find ${labels[0]} for ${bindingId}`)
 }
 
 async function verifyM3PluginUi() {
