@@ -918,6 +918,17 @@ async function verifyM2Chains() {
     throw new Error('Verified fallback was not selected')
   if (!chainFixture.frontStats.length || !chainFixture.landingStats.length)
     throw new Error('Desktop exit-IP request bypassed a hop')
+  const layout = await browser.execute(() => {
+    const content = document.querySelector('.base-content')
+    return {
+      clientWidth: content?.clientWidth ?? 0,
+      scrollWidth: content?.scrollWidth ?? 0,
+    }
+  })
+  if (layout.scrollWidth > layout.clientWidth + 1)
+    throw new Error(
+      `Chains page overflows its content area: ${JSON.stringify(layout)}`,
+    )
   await browser.saveScreenshot(resolve('target/m2-desktop-chains.png'))
   process.stdout.write(
     'M2 desktop save, provider chain, exit-IP, warning, rollback and verified fallback passed\n',

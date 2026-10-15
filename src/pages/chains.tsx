@@ -153,7 +153,7 @@ const ChainsPage = () => {
         borderRadius: 3,
         flex: 1,
         minWidth: 0,
-        width: '100%',
+        width: { xs: '100%', lg: 'auto' },
         bgcolor: 'action.hover',
       }}
     >
@@ -298,7 +298,7 @@ const ChainsPage = () => {
                     label={t('chains.name')}
                     value={draft.name}
                     size="small"
-                    fullWidth
+                    sx={{ flex: 1, minWidth: 0 }}
                     disabled={busy}
                     onChange={(event) =>
                       setDraft({ ...draft, name: event.target.value })
@@ -313,11 +313,14 @@ const ChainsPage = () => {
                   />
                 </Stack>
                 <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  sx={{ py: 3, gap: 2, alignItems: 'center' }}
+                  direction={{ xs: 'column', lg: 'row' }}
+                  sx={{ py: 3, gap: 2, alignItems: 'center', minWidth: 0 }}
                 >
                   {renderNode('front', front)}
-                  <ArrowForwardIcon color="primary" />
+                  <ArrowForwardIcon
+                    color="primary"
+                    sx={{ transform: { xs: 'rotate(90deg)', lg: 'none' } }}
+                  />
                   {renderNode('landing', landing)}
                 </Stack>
                 <Typography color="text.secondary" variant="body2">
@@ -334,7 +337,7 @@ const ChainsPage = () => {
                   display: 'grid',
                   gridTemplateColumns: {
                     xs: '1fr',
-                    md: 'repeat(3, minmax(0, 1fr))',
+                    lg: 'repeat(3, minmax(0, 1fr))',
                   },
                   gap: 2,
                 }}
