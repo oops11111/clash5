@@ -214,8 +214,7 @@ pub struct PluginEffectiveConfig {
 pub async fn clash5_get_plugin_effective_config() -> CmdResult<PluginEffectiveConfig> {
     let runtime = Config::runtime().await.latest_arc();
     let mut config = serde_json::to_value(runtime.config.as_ref())
-        .map_err(|_| coded_error("C5-PLUGIN-004", "effective configuration could not be read"))?
-        .unwrap_or(serde_json::Value::Null);
+        .map_err(|_| coded_error("C5-PLUGIN-004", "effective configuration could not be read"))?;
     redact_plugin_config(&mut config, None);
     Ok(PluginEffectiveConfig {
         config,
@@ -428,8 +427,7 @@ async fn save_plugin_bindings(mut bindings: Vec<PluginBinding>) -> CmdResult {
         }
         store.upsert_plugin_bindings(&bindings)
     })
-    .await
-    .map_err(failure);
+    .await;
     saved.map_err(failure)?;
     apply_plugin_change_with_rollback(
         || CoreManager::global().update_config_forced(),

@@ -67,7 +67,9 @@ export const saveClash5PluginBinding = (binding: Clash5PluginBindingInput) =>
   mutate(() => invoke<void>('clash5_save_plugin_binding', { binding }), {
     id: `clash5.plugin.binding.${JSON.stringify(binding.target)}`,
   })
-export const saveClash5PluginBindings = (bindings: Clash5PluginBindingBatchInput) =>
+export const saveClash5PluginBindings = (
+  bindings: Clash5PluginBindingBatchInput,
+) =>
   mutate(() => invoke<void>('clash5_save_plugin_bindings', { bindings }), {
     id: 'clash5.plugin.bindings.batch',
   })
@@ -75,16 +77,24 @@ export const deleteClash5PluginBinding = (
   target: Clash5PluginBinding['target'],
   bindingId: string,
 ) =>
-  mutate(() => invoke<void>('clash5_delete_plugin_binding', { target, bindingId }), {
-    id: `clash5.plugin.binding.delete.${bindingId}`,
-  })
+  mutate(
+    () => invoke<void>('clash5_delete_plugin_binding', { target, bindingId }),
+    {
+      id: `clash5.plugin.binding.delete.${bindingId}`,
+    },
+  )
 export const setClash5PluginBindingEnabled = (
   target: Clash5PluginBinding['target'],
   bindingId: string,
   enabled: boolean,
 ) =>
   mutate(
-    () => invoke<void>('clash5_set_plugin_binding_enabled', { target, bindingId, enabled }),
+    () =>
+      invoke<void>('clash5_set_plugin_binding_enabled', {
+        target,
+        bindingId,
+        enabled,
+      }),
     { id: `clash5.plugin.binding.enabled.${bindingId}` },
   )
 export const getClash5PluginEffectiveConfig = () =>

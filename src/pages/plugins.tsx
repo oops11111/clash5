@@ -51,7 +51,10 @@ type PluginTab = 'installed' | 'market' | 'binding' | 'settings'
 
 const tabs: PluginTab[] = ['installed', 'market', 'binding', 'settings']
 
-const valueAtPointer = (config: Record<string, unknown> | null, pointer: string) => {
+const valueAtPointer = (
+  config: Record<string, unknown> | null,
+  pointer: string,
+) => {
   if (!config) return undefined
   return pointer
     .split('/')
@@ -77,7 +80,9 @@ const PluginsPage = () => {
   const [effectiveConfig, setEffectiveConfig] =
     useState<Clash5PluginEffectiveConfig | null>(null)
   const [plugins, setPlugins] = useState<Clash5PluginSummary[] | null>(null)
-  const [auditEvents, setAuditEvents] = useState<Clash5PluginAuditEvent[] | null>(null)
+  const [auditEvents, setAuditEvents] = useState<
+    Clash5PluginAuditEvent[] | null
+  >(null)
   const [auditError, setAuditError] = useState(false)
   const [pluginError, setPluginError] = useState(false)
   const [packagePreview, setPackagePreview] =
@@ -110,21 +115,42 @@ const PluginsPage = () => {
       .catch(() => {
         if (!cancelled) setBindingError(true)
       })
-    Promise.all([getClash5ChainWorkspace(), listClash5Nodes(true), listClash5Plugins()])
+    Promise.all([
+      getClash5ChainWorkspace(),
+      listClash5Nodes(true),
+      listClash5Plugins(),
+    ])
       .then(([workspace, nodes, installed]) => {
         if (cancelled) return
         setPlugins(installed)
         setTargetOptions([
           ...workspace.chains.map((chain) => ({
             key: JSON.stringify({ kind: 'chain', chain_id: chain.id }),
-            label: t('layout.components.navigation.empty.bindingTargetChain', { id: chain.name }),
-            target: { kind: 'chain', chain_id: chain.id } as Clash5PluginBindingTarget,
+            label: t('layout.components.navigation.empty.bindingTargetChain', {
+              id: chain.name,
+            }),
+            target: {
+              kind: 'chain',
+              chain_id: chain.id,
+            } as Clash5PluginBindingTarget,
           })),
-          ...nodes.filter((node) => node.active).map((node) => ({
-            key: JSON.stringify({ kind: 'node', source: node.source, stable_id: node.stable_id }),
-            label: t('layout.components.navigation.empty.bindingTargetNode', { id: node.display_name }),
-            target: { kind: 'node', source: node.source, stable_id: node.stable_id } as Clash5PluginBindingTarget,
-          })),
+          ...nodes
+            .filter((node) => node.active)
+            .map((node) => ({
+              key: JSON.stringify({
+                kind: 'node',
+                source: node.source,
+                stable_id: node.stable_id,
+              }),
+              label: t('layout.components.navigation.empty.bindingTargetNode', {
+                id: node.display_name,
+              }),
+              target: {
+                kind: 'node',
+                source: node.source,
+                stable_id: node.stable_id,
+              } as Clash5PluginBindingTarget,
+            })),
         ])
       })
       .catch(() => {
@@ -177,9 +203,15 @@ const PluginsPage = () => {
   }
 
   const saveBinding = async () => {
-    const targets = targetOptions.filter((option) => bindingTargetKeys.includes(option.key))
+    const targets = targetOptions.filter((option) =>
+      bindingTargetKeys.includes(option.key),
+    )
     const priority = Number(bindingPriority)
-    if (!targets.length || !bindingPluginId || !Number.isSafeInteger(priority)) {
+    if (
+      !targets.length ||
+      !bindingPluginId ||
+      !Number.isSafeInteger(priority)
+    ) {
       setBindingFormError(true)
       return
     }
@@ -236,14 +268,20 @@ const PluginsPage = () => {
   }
 
   const editBinding = async (binding: Clash5PluginBinding) => {
-    const targetOption = targetOptions.find((option) => JSON.stringify(option.target) === JSON.stringify(binding.target))
+    const targetOption = targetOptions.find(
+      (option) =>
+        JSON.stringify(option.target) === JSON.stringify(binding.target),
+    )
     if (!targetOption) {
       setBindingError(true)
       return
     }
     setBusy(true)
     try {
-      const config = await getClash5PluginBindingConfig(binding.target, binding.id)
+      const config = await getClash5PluginBindingConfig(
+        binding.target,
+        binding.id,
+      )
       setBindingEditId(binding.id)
       setBindingEditEnabled(binding.enabled)
       setBindingPluginId(binding.plugin_id)
@@ -275,7 +313,11 @@ const PluginsPage = () => {
   const setBindingEnabled = async (binding: Clash5PluginBinding) => {
     setBusy(true)
     try {
-      await setClash5PluginBindingEnabled(binding.target, binding.id, !binding.enabled)
+      await setClash5PluginBindingEnabled(
+        binding.target,
+        binding.id,
+        !binding.enabled,
+      )
       setBindings(await listClash5PluginBindings())
       setEffectiveConfig(await getClash5PluginEffectiveConfig())
     } catch {
@@ -361,12 +403,22 @@ const PluginsPage = () => {
                     fingerprint: plugin.signer_fingerprint,
                   })}
                 </Typography>
-                <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  useFlexGap
+                  sx={{ flexWrap: 'wrap' }}
+                >
                   {plugin.permissions.map((permission) => (
                     <Chip key={permission} size="small" label={permission} />
                   ))}
                   {plugin.writable_paths.map((path) => (
-                    <Chip key={path} size="small" variant="outlined" label={path} />
+                    <Chip
+                      key={path}
+                      size="small"
+                      variant="outlined"
+                      label={path}
+                    />
                   ))}
                 </Stack>
               </Stack>
@@ -381,39 +433,92 @@ const PluginsPage = () => {
     const auditPanel = (
       <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
         <Stack spacing={1}>
-          <Typography sx={{ fontWeight: 600 }}>{t('layout.components.navigation.pluginAuditTitle')}</Typography>
+          <Typography sx={{ fontWeight: 600 }}>
+            {t('layout.components.navigation.pluginAuditTitle')}
+          </Typography>
           {auditError ? (
-            <Alert severity="error">{t('layout.components.navigation.pluginAuditError')}</Alert>
+            <Alert severity="error">
+              {t('layout.components.navigation.pluginAuditError')}
+            </Alert>
           ) : auditEvents === null ? (
-            <Typography color="text.secondary">{t('layout.components.navigation.empty.pluginLoading')}</Typography>
+            <Typography color="text.secondary">
+              {t('layout.components.navigation.empty.pluginLoading')}
+            </Typography>
           ) : auditEvents.length === 0 ? (
-            <Typography color="text.secondary">{t('layout.components.navigation.pluginAuditEmpty')}</Typography>
-          ) : auditEvents.map((event) => (
-            <Stack key={event.id} direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
-              <Typography variant="caption" color="text.secondary">{new Date(event.created_at).toLocaleString()}</Typography>
-              <Chip size="small" label={event.event} />
-              <Typography variant="body2">{String(event.details.plugin_id ?? '')}</Typography>
-              {typeof event.details.binding_id === 'string' && <Typography variant="caption" color="text.secondary">{event.details.binding_id}</Typography>}
-              {typeof event.details.result === 'string' && <Chip size="small" color={event.details.result === 'success' ? 'success' : 'error'} label={event.details.result} />}
-            </Stack>
-          ))}
+            <Typography color="text.secondary">
+              {t('layout.components.navigation.pluginAuditEmpty')}
+            </Typography>
+          ) : (
+            auditEvents.map((event) => (
+              <Stack
+                key={event.id}
+                direction="row"
+                spacing={1}
+                useFlexGap
+                sx={{ flexWrap: 'wrap', alignItems: 'center' }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  {new Date(event.created_at).toLocaleString()}
+                </Typography>
+                <Chip size="small" label={event.event} />
+                <Typography variant="body2">
+                  {String(event.details.plugin_id ?? '')}
+                </Typography>
+                {typeof event.details.binding_id === 'string' && (
+                  <Typography variant="caption" color="text.secondary">
+                    {event.details.binding_id}
+                  </Typography>
+                )}
+                {typeof event.details.result === 'string' && (
+                  <Chip
+                    size="small"
+                    color={
+                      event.details.result === 'success' ? 'success' : 'error'
+                    }
+                    label={event.details.result}
+                  />
+                )}
+              </Stack>
+            ))
+          )}
         </Stack>
       </Paper>
     )
     if (pluginError) {
-      return <Stack spacing={2}><Alert severity="error">{t('layout.components.navigation.empty.pluginError')}</Alert>{auditPanel}</Stack>
+      return (
+        <Stack spacing={2}>
+          <Alert severity="error">
+            {t('layout.components.navigation.empty.pluginError')}
+          </Alert>
+          {auditPanel}
+        </Stack>
+      )
     }
     if (plugins === null) {
-      return <Stack spacing={2}><Typography color="text.secondary">{t('layout.components.navigation.empty.pluginLoading')}</Typography>{auditPanel}</Stack>
+      return (
+        <Stack spacing={2}>
+          <Typography color="text.secondary">
+            {t('layout.components.navigation.empty.pluginLoading')}
+          </Typography>
+          {auditPanel}
+        </Stack>
+      )
     }
     if (plugins.length === 0) {
       return (
         <Stack spacing={2}>
           <Paper variant="outlined" sx={{ p: 4, borderRadius: 3 }}>
-            <Stack spacing={1} sx={{ alignItems: 'center', textAlign: 'center' }}>
+            <Stack
+              spacing={1}
+              sx={{ alignItems: 'center', textAlign: 'center' }}
+            >
               <ExtensionOutlinedIcon color="primary" fontSize="large" />
-              <Typography variant="h6">{t('layout.components.navigation.empty.settingsTitle')}</Typography>
-              <Typography color="text.secondary">{t('layout.components.navigation.empty.settingsDescription')}</Typography>
+              <Typography variant="h6">
+                {t('layout.components.navigation.empty.settingsTitle')}
+              </Typography>
+              <Typography color="text.secondary">
+                {t('layout.components.navigation.empty.settingsDescription')}
+              </Typography>
             </Stack>
           </Paper>
           {auditPanel}
@@ -422,23 +527,50 @@ const PluginsPage = () => {
     }
     return (
       <Stack spacing={2}>
-        <Typography color="text.secondary">{t('layout.components.navigation.pluginSettingsHint')}</Typography>
+        <Typography color="text.secondary">
+          {t('layout.components.navigation.pluginSettingsHint')}
+        </Typography>
         {plugins.map((plugin) => (
-          <Paper key={plugin.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          <Paper
+            key={plugin.id}
+            variant="outlined"
+            sx={{ p: 2, borderRadius: 2 }}
+          >
             <Stack spacing={1}>
               <Typography sx={{ fontWeight: 600 }}>{plugin.name}</Typography>
-              <Typography variant="body2" color="text.secondary">{plugin.description}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                {t('layout.components.navigation.pluginSigner', { fingerprint: plugin.signer_fingerprint })}
+              <Typography variant="body2" color="text.secondary">
+                {plugin.description}
               </Typography>
-              <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                {plugin.permissions.map((permission) => <Chip key={permission} size="small" label={permission} />)}
-                {plugin.writable_paths.map((path) => <Chip key={path} size="small" variant="outlined" label={path} />)}
+              <Typography variant="caption" color="text.secondary">
+                {t('layout.components.navigation.pluginSigner', {
+                  fingerprint: plugin.signer_fingerprint,
+                })}
+              </Typography>
+              <Stack
+                direction="row"
+                spacing={0.75}
+                useFlexGap
+                sx={{ flexWrap: 'wrap' }}
+              >
+                {plugin.permissions.map((permission) => (
+                  <Chip key={permission} size="small" label={permission} />
+                ))}
+                {plugin.writable_paths.map((path) => (
+                  <Chip
+                    key={path}
+                    size="small"
+                    variant="outlined"
+                    label={path}
+                  />
+                ))}
               </Stack>
             </Stack>
           </Paper>
         ))}
-        <Button sx={{ alignSelf: 'flex-start' }} onClick={() => setTab('binding')}>
+        <Button
+          sx={{ alignSelf: 'flex-start' }}
+          onClick={() => setTab('binding')}
+        >
           {t('layout.components.navigation.pluginTabs.binding')}
         </Button>
         {auditPanel}
@@ -471,7 +603,10 @@ const PluginsPage = () => {
           <Typography color="text.secondary">
             {t('layout.components.navigation.empty.bindingDescription')}
           </Typography>
-          <Button onClick={openNewBinding} disabled={!plugins?.length || !targetOptions.length}>
+          <Button
+            onClick={openNewBinding}
+            disabled={!plugins?.length || !targetOptions.length}
+          >
             {t('layout.components.navigation.pluginAddBinding')}
           </Button>
         </Stack>
@@ -480,7 +615,10 @@ const PluginsPage = () => {
     return (
       <Stack spacing={1.5}>
         <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
-          <Button onClick={openNewBinding} disabled={!plugins?.length || !targetOptions.length}>
+          <Button
+            onClick={openNewBinding}
+            disabled={!plugins?.length || !targetOptions.length}
+          >
             {t('layout.components.navigation.pluginAddBinding')}
           </Button>
         </Stack>
@@ -493,7 +631,10 @@ const PluginsPage = () => {
             <Stack
               direction={{ xs: 'column', sm: 'row' }}
               spacing={2}
-              sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
+              sx={{
+                alignItems: { sm: 'center' },
+                justifyContent: 'space-between',
+              }}
             >
               <Stack spacing={0.5}>
                 <Typography sx={{ fontWeight: 600 }}>
@@ -540,51 +681,107 @@ const PluginsPage = () => {
                         : 'layout.components.navigation.empty.bindingDisabled',
                   )}
                 />
-                <Button size="small" color="error" disabled={busy} onClick={() => void removeBinding(binding)}>
+                <Button
+                  size="small"
+                  color="error"
+                  disabled={busy}
+                  onClick={() => void removeBinding(binding)}
+                >
                   {t('layout.components.navigation.pluginRemoveBinding')}
                 </Button>
-                <Button size="small" disabled={busy || binding.orphan} onClick={() => void setBindingEnabled(binding)}>
-                  {t(binding.enabled ? 'layout.components.navigation.pluginDisableBinding' : 'layout.components.navigation.pluginEnableBinding')}
+                <Button
+                  size="small"
+                  disabled={busy || binding.orphan}
+                  onClick={() => void setBindingEnabled(binding)}
+                >
+                  {t(
+                    binding.enabled
+                      ? 'layout.components.navigation.pluginDisableBinding'
+                      : 'layout.components.navigation.pluginEnableBinding',
+                  )}
                 </Button>
-                <Button size="small" disabled={busy || binding.orphan} onClick={() => void editBinding(binding)}>
+                <Button
+                  size="small"
+                  disabled={busy || binding.orphan}
+                  onClick={() => void editBinding(binding)}
+                >
                   {t('layout.components.navigation.pluginEditBinding')}
                 </Button>
               </Stack>
             </Stack>
           </Paper>
         ))}
-        {effectiveConfig && Object.keys(effectiveConfig.provenance).length > 0 && (
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-            <Stack spacing={1}>
-              <Typography sx={{ fontWeight: 600 }}>
-                {t('layout.components.navigation.pluginProvenanceTitle')}
-              </Typography>
-              {Object.entries(effectiveConfig.provenance).map(([path, source]) => {
-                const value = valueAtPointer(effectiveConfig.config, path)
-                const conflicts = effectiveConfig.conflicts.filter((conflict) => conflict.path === path)
-                return (
-                  <Stack key={path} direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
-                    <Typography variant="body2" sx={{ minWidth: 180, overflowWrap: 'anywhere' }}>{path}</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ flex: 1, overflowWrap: 'anywhere' }}>
-                      {t('layout.components.navigation.pluginEffectiveValue')}: {JSON.stringify(value) ?? '—'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {source.kind === 'plugin'
-                        ? `${source.plugin_id} · ${t('layout.components.navigation.empty.bindingPriority', { priority: source.priority })}`
-                        : t('layout.components.navigation.pluginProvenanceProfile')}
-                    </Typography>
-                    {conflicts.length > 0 && <Chip size="small" color="warning" label={t('layout.components.navigation.pluginConflictTitle')} />}
-                  </Stack>
-                )
-              })}
-              {effectiveConfig.conflicts.map((conflict) => (
-                <Typography key={`${conflict.path}:${conflict.loser_binding_id}`} variant="caption" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
-                  {conflict.path} · {conflict.winner_plugin_id} ({conflict.winner_priority}) → {conflict.loser_plugin_id} ({conflict.loser_priority})
+        {effectiveConfig &&
+          Object.keys(effectiveConfig.provenance).length > 0 && (
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Stack spacing={1}>
+                <Typography sx={{ fontWeight: 600 }}>
+                  {t('layout.components.navigation.pluginProvenanceTitle')}
                 </Typography>
-              ))}
-            </Stack>
-          </Paper>
-        )}
+                {Object.entries(effectiveConfig.provenance).map(
+                  ([path, source]) => {
+                    const value = valueAtPointer(effectiveConfig.config, path)
+                    const conflicts = effectiveConfig.conflicts.filter(
+                      (conflict) => conflict.path === path,
+                    )
+                    return (
+                      <Stack
+                        key={path}
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        sx={{ alignItems: { sm: 'center' } }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{ minWidth: 180, overflowWrap: 'anywhere' }}
+                        >
+                          {path}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ flex: 1, overflowWrap: 'anywhere' }}
+                        >
+                          {t(
+                            'layout.components.navigation.pluginEffectiveValue',
+                          )}
+                          : {JSON.stringify(value) ?? '—'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {source.kind === 'plugin'
+                            ? `${source.plugin_id} · ${t('layout.components.navigation.empty.bindingPriority', { priority: source.priority })}`
+                            : t(
+                                'layout.components.navigation.pluginProvenanceProfile',
+                              )}
+                        </Typography>
+                        {conflicts.length > 0 && (
+                          <Chip
+                            size="small"
+                            color="warning"
+                            label={t(
+                              'layout.components.navigation.pluginConflictTitle',
+                            )}
+                          />
+                        )}
+                      </Stack>
+                    )
+                  },
+                )}
+                {effectiveConfig.conflicts.map((conflict) => (
+                  <Typography
+                    key={`${conflict.path}:${conflict.loser_binding_id}`}
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ overflowWrap: 'anywhere' }}
+                  >
+                    {conflict.path} · {conflict.winner_plugin_id} (
+                    {conflict.winner_priority}) → {conflict.loser_plugin_id} (
+                    {conflict.loser_priority})
+                  </Typography>
+                ))}
+              </Stack>
+            </Paper>
+          )}
       </Stack>
     )
   }
@@ -673,30 +870,96 @@ const PluginsPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      <Dialog open={bindingDialogOpen} onClose={() => !busy && setBindingDialogOpen(false)}>
-        <DialogTitle>{t(bindingEditId ? 'layout.components.navigation.pluginEditBinding' : 'layout.components.navigation.pluginAddBinding')}</DialogTitle>
+      <Dialog
+        open={bindingDialogOpen}
+        onClose={() => !busy && setBindingDialogOpen(false)}
+      >
+        <DialogTitle>
+          {t(
+            bindingEditId
+              ? 'layout.components.navigation.pluginEditBinding'
+              : 'layout.components.navigation.pluginAddBinding',
+          )}
+        </DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1, minWidth: 360 }}>
-            {bindingFormError && <Alert severity="error">{t('layout.components.navigation.pluginBindingSaveError')}</Alert>}
+            {bindingFormError && (
+              <Alert severity="error">
+                {t('layout.components.navigation.pluginBindingSaveError')}
+              </Alert>
+            )}
             <FormControl fullWidth>
-              <InputLabel>{t('layout.components.navigation.pluginSelect')}</InputLabel>
-              <Select label={t('layout.components.navigation.pluginSelect')} value={bindingPluginId} onChange={(event) => setBindingPluginId(event.target.value)}>
-                {(plugins ?? []).map((plugin) => <MenuItem key={plugin.id} value={plugin.id}>{plugin.name}</MenuItem>)}
+              <InputLabel>
+                {t('layout.components.navigation.pluginSelect')}
+              </InputLabel>
+              <Select
+                label={t('layout.components.navigation.pluginSelect')}
+                value={bindingPluginId}
+                onChange={(event) => setBindingPluginId(event.target.value)}
+              >
+                {(plugins ?? []).map((plugin) => (
+                  <MenuItem key={plugin.id} value={plugin.id}>
+                    {plugin.name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
             <FormControl fullWidth>
-              <InputLabel>{t('layout.components.navigation.pluginTarget')}</InputLabel>
-              <Select multiple disabled={Boolean(bindingEditId)} label={t('layout.components.navigation.pluginTarget')} value={bindingTargetKeys} onChange={(event) => setBindingTargetKeys(typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value)}>
-                {targetOptions.map((option) => <MenuItem key={option.key} value={option.key}>{option.label}</MenuItem>)}
+              <InputLabel>
+                {t('layout.components.navigation.pluginTarget')}
+              </InputLabel>
+              <Select
+                multiple
+                disabled={Boolean(bindingEditId)}
+                label={t('layout.components.navigation.pluginTarget')}
+                value={bindingTargetKeys}
+                onChange={(event) =>
+                  setBindingTargetKeys(
+                    typeof event.target.value === 'string'
+                      ? event.target.value.split(',')
+                      : event.target.value,
+                  )
+                }
+              >
+                {targetOptions.map((option) => (
+                  <MenuItem key={option.key} value={option.key}>
+                    {option.label}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
-            <TextField label={t('layout.components.navigation.pluginPriority')} type="number" value={bindingPriority} onChange={(event) => setBindingPriority(event.target.value)} />
-            <TextField label={t('layout.components.navigation.pluginConfig')} value={bindingConfigText} onChange={(event) => setBindingConfigText(event.target.value)} multiline minRows={3} />
+            <TextField
+              label={t('layout.components.navigation.pluginPriority')}
+              type="number"
+              value={bindingPriority}
+              onChange={(event) => setBindingPriority(event.target.value)}
+            />
+            <TextField
+              label={t('layout.components.navigation.pluginConfig')}
+              value={bindingConfigText}
+              onChange={(event) => setBindingConfigText(event.target.value)}
+              multiline
+              minRows={3}
+            />
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setBindingDialogOpen(false); setBindingEditId(null) }} disabled={busy}>{t('layout.components.navigation.pluginCancel')}</Button>
-          <Button onClick={() => void saveBinding()} disabled={busy || !bindingPluginId || !bindingTargetKeys.length} variant="contained">{t('layout.components.navigation.pluginSaveBinding')}</Button>
+          <Button
+            onClick={() => {
+              setBindingDialogOpen(false)
+              setBindingEditId(null)
+            }}
+            disabled={busy}
+          >
+            {t('layout.components.navigation.pluginCancel')}
+          </Button>
+          <Button
+            onClick={() => void saveBinding()}
+            disabled={busy || !bindingPluginId || !bindingTargetKeys.length}
+            variant="contained"
+          >
+            {t('layout.components.navigation.pluginSaveBinding')}
+          </Button>
         </DialogActions>
       </Dialog>
     </BasePage>
