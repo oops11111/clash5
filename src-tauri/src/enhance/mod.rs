@@ -916,10 +916,11 @@ pub async fn enhance(
 
     let mut config = process_seq_items(config, rules_item, proxies_item, groups_item);
     let manual_identity_key = crate::config::profiles::clash5_identity_key().await;
-    match manual_identity_key
-        .map_err(anyhow::Error::from)
-        .and_then(|key| manual::load().await.and_then(|file| file.runtime_proxies(&key)))
-    {
+    let manual_proxies = match manual_identity_key {
+        Ok(key) => manual::load().await.and_then(|file| file.runtime_proxies(&key)),
+        Err(error) => Err(anyhow::Error::from(error)),
+    };
+    match manual_proxies {
         Ok(mut proxies) => {
             let existing: HashSet<_> = config
                 .get("proxies")

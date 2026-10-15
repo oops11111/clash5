@@ -213,7 +213,7 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         })? {
             snapshots.push(clash5_data::IdentitySourceSnapshot {
                 source: Source::Subscription {
-                    provider_id: profile_id.clone(),
+                    provider_id: profile_id.to_string(),
                 },
                 nodes,
             });

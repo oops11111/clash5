@@ -44,7 +44,9 @@ const PluginsPage = () => {
     recovery_mode: boolean
     pending_rebinds: number
   } | null>(null)
-  const [pendingRebinds, setPendingRebinds] = useState<Clash5PendingIdentityRebind[]>([])
+  const [pendingRebinds, setPendingRebinds] = useState<
+    Clash5PendingIdentityRebind[]
+  >([])
   const [bindings, setBindings] = useState<Clash5Binding[]>([])
   const [nodes, setNodes] = useState<Clash5NodeRecord[]>([])
   const [selections, setSelections] = useState<Record<string, string>>({})
@@ -102,7 +104,11 @@ const PluginsPage = () => {
     const candidate = selections[item.old_stable_id]
     if (!candidate) return
     try {
-      await resolveClash5IdentityRebind(item.source, item.old_stable_id, candidate)
+      await resolveClash5IdentityRebind(
+        item.source,
+        item.old_stable_id,
+        candidate,
+      )
       await refreshIdentity()
     } catch {
       setIdentityError(true)
@@ -113,9 +119,15 @@ const PluginsPage = () => {
     const targetId = selections[`binding:${binding.id}`]
     if (!targetId) return
     try {
-      const target = nodes.find((node) => node.stable_id === targetId && node.active)
+      const target = nodes.find(
+        (node) => node.stable_id === targetId && node.active,
+      )
       if (!target) return
-      await bindClash5Node({ ...binding, target_id: targetId, source: target.source })
+      await bindClash5Node({
+        ...binding,
+        target_id: targetId,
+        source: target.source,
+      })
       await refreshIdentity()
     } catch {
       setIdentityError(true)
@@ -124,7 +136,10 @@ const PluginsPage = () => {
 
   const sourceMatches = (binding: Clash5Binding, node: Clash5NodeRecord) => {
     if (binding.source.kind === 'manual') return node.source.kind === 'manual'
-    return node.source.kind === 'subscription' && binding.source.provider_id === node.source.provider_id
+    return (
+      node.source.kind === 'subscription' &&
+      binding.source.provider_id === node.source.provider_id
+    )
   }
 
   return (
@@ -147,87 +162,231 @@ const PluginsPage = () => {
         </Tabs>
         {tab === 'binding' ? (
           <Stack spacing={2}>
-            {identityError && <Alert severity="error">{t('layout.components.navigation.identityError')}</Alert>}
+            {identityError && (
+              <Alert severity="error">
+                {t('layout.components.navigation.identityError')}
+              </Alert>
+            )}
             {identityStatus?.recovery_mode && (
-              <Alert severity="warning" action={<Button color="inherit" onClick={() => setResetOpen(true)}>{t('layout.components.navigation.resetIdentity')}</Button>}>
+              <Alert
+                severity="warning"
+                action={
+                  <Button color="inherit" onClick={() => setResetOpen(true)}>
+                    {t('layout.components.navigation.resetIdentity')}
+                  </Button>
+                }
+              >
                 {t('layout.components.navigation.identityRecovery')}
               </Alert>
             )}
             {identityStatus && !identityStatus.recovery_mode && (
-              <Alert severity="info" action={<Button color="inherit" onClick={() => setRotationOpen(true)}>{t('layout.components.navigation.rotateIdentity')}</Button>}>
+              <Alert
+                severity="info"
+                action={
+                  <Button color="inherit" onClick={() => setRotationOpen(true)}>
+                    {t('layout.components.navigation.rotateIdentity')}
+                  </Button>
+                }
+              >
                 {t('layout.components.navigation.rotateIdentityDescription')}
               </Alert>
             )}
             {pendingRebinds.map((item) => (
-              <Paper key={`${item.source.provider_id}:${item.old_stable_id}`} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Paper
+                key={`${item.source.provider_id}:${item.old_stable_id}`}
+                variant="outlined"
+                sx={{ p: 2, borderRadius: 2 }}
+              >
                 <Stack spacing={1.5}>
-                  <Typography>{t('layout.components.navigation.pendingRebind', { id: item.old_stable_id })}</Typography>
+                  <Typography>
+                    {t('layout.components.navigation.pendingRebind', {
+                      id: item.old_stable_id,
+                    })}
+                  </Typography>
                   <Stack direction="row" spacing={1}>
                     <FormControl fullWidth size="small">
-                      <Select<string> value={selections[item.old_stable_id] ?? ''} displayEmpty onChange={(event) => setSelections((current) => ({ ...current, [item.old_stable_id]: event.target.value }))}>
-                        <MenuItem value="" disabled>{t('layout.components.navigation.chooseCandidate')}</MenuItem>
-                        {item.candidate_ids.map((candidate) => <MenuItem key={candidate} value={candidate}>{candidate}</MenuItem>)}
+                      <Select<string>
+                        value={selections[item.old_stable_id] ?? ''}
+                        displayEmpty
+                        onChange={(event) =>
+                          setSelections((current) => ({
+                            ...current,
+                            [item.old_stable_id]: event.target.value,
+                          }))
+                        }
+                      >
+                        <MenuItem value="" disabled>
+                          {t('layout.components.navigation.chooseCandidate')}
+                        </MenuItem>
+                        {item.candidate_ids.map((candidate) => (
+                          <MenuItem key={candidate} value={candidate}>
+                            {candidate}
+                          </MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
-                    <Button variant="contained" disabled={!selections[item.old_stable_id]} onClick={() => void chooseRebind(item)}>{t('layout.components.navigation.rebind')}</Button>
+                    <Button
+                      variant="contained"
+                      disabled={!selections[item.old_stable_id]}
+                      onClick={() => void chooseRebind(item)}
+                    >
+                      {t('layout.components.navigation.rebind')}
+                    </Button>
                   </Stack>
                 </Stack>
               </Paper>
             ))}
-            {bindings.filter((binding) => binding.orphan && !pendingRebinds.some((item) => item.old_stable_id === binding.target_id && item.source.kind === binding.source.kind && (item.source.kind === 'manual' || (binding.source.kind === 'subscription' && item.source.provider_id === binding.source.provider_id)))).map((binding) => {
-              const key = `binding:${binding.id}`
-              const candidates = nodes.filter((node) => node.active && node.stable_id.startsWith('v2:') && sourceMatches(binding, node))
-              return (
-                <Paper key={key} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                  <Stack spacing={1.5}>
-                    <Typography>{t('layout.components.navigation.orphanBinding', { id: binding.id, target: binding.target_id })}</Typography>
-                    <Stack direction="row" spacing={1}>
-                      <FormControl fullWidth size="small">
-                        <Select<string> value={selections[key] ?? ''} displayEmpty onChange={(event) => setSelections((current) => ({ ...current, [key]: event.target.value }))}>
-                          <MenuItem value="" disabled>{t('layout.components.navigation.chooseCandidate')}</MenuItem>
-                          {candidates.map((node) => <MenuItem key={node.stable_id} value={node.stable_id}>{node.display_name}</MenuItem>)}
-                        </Select>
-                      </FormControl>
-                      <Button variant="contained" disabled={!selections[key]} onClick={() => void chooseOrphanTarget(binding)}>{t('layout.components.navigation.rebind')}</Button>
+            {bindings
+              .filter(
+                (binding) =>
+                  binding.orphan &&
+                  !pendingRebinds.some(
+                    (item) =>
+                      binding.source.kind === 'subscription' &&
+                      item.old_stable_id === binding.target_id &&
+                      item.source.provider_id === binding.source.provider_id,
+                  ),
+              )
+              .map((binding) => {
+                const key = `binding:${binding.id}`
+                const candidates = nodes.filter(
+                  (node) =>
+                    node.active &&
+                    node.stable_id.startsWith('v2:') &&
+                    sourceMatches(binding, node),
+                )
+                return (
+                  <Paper
+                    key={key}
+                    variant="outlined"
+                    sx={{ p: 2, borderRadius: 2 }}
+                  >
+                    <Stack spacing={1.5}>
+                      <Typography>
+                        {t('layout.components.navigation.orphanBinding', {
+                          id: binding.id,
+                          target: binding.target_id,
+                        })}
+                      </Typography>
+                      <Stack direction="row" spacing={1}>
+                        <FormControl fullWidth size="small">
+                          <Select<string>
+                            value={selections[key] ?? ''}
+                            displayEmpty
+                            onChange={(event) =>
+                              setSelections((current) => ({
+                                ...current,
+                                [key]: event.target.value,
+                              }))
+                            }
+                          >
+                            <MenuItem value="" disabled>
+                              {t(
+                                'layout.components.navigation.chooseCandidate',
+                              )}
+                            </MenuItem>
+                            {candidates.map((node) => (
+                              <MenuItem
+                                key={node.stable_id}
+                                value={node.stable_id}
+                              >
+                                {node.display_name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <Button
+                          variant="contained"
+                          disabled={!selections[key]}
+                          onClick={() => void chooseOrphanTarget(binding)}
+                        >
+                          {t('layout.components.navigation.rebind')}
+                        </Button>
+                      </Stack>
                     </Stack>
+                  </Paper>
+                )
+              })}
+            {pendingRebinds.length === 0 &&
+              !bindings.some((binding) => binding.orphan) &&
+              !identityStatus?.recovery_mode && (
+                <Paper variant="outlined" sx={{ p: 4, borderRadius: 3 }}>
+                  <Stack
+                    spacing={1}
+                    sx={{ alignItems: 'center', textAlign: 'center' }}
+                  >
+                    <ExtensionOutlinedIcon color="primary" fontSize="large" />
+                    <Typography variant="h6">
+                      {t('layout.components.navigation.empty.bindingTitle')}
+                    </Typography>
+                    <Typography color="text.secondary">
+                      {t(
+                        'layout.components.navigation.empty.bindingDescription',
+                      )}
+                    </Typography>
                   </Stack>
                 </Paper>
-              )
-            })}
-            {pendingRebinds.length === 0 && !bindings.some((binding) => binding.orphan) && !identityStatus?.recovery_mode && (
-              <Paper variant="outlined" sx={{ p: 4, borderRadius: 3 }}>
-                <Stack spacing={1} sx={{ alignItems: 'center', textAlign: 'center' }}>
-                  <ExtensionOutlinedIcon color="primary" fontSize="large" />
-                  <Typography variant="h6">{t('layout.components.navigation.empty.bindingTitle')}</Typography>
-                  <Typography color="text.secondary">{t('layout.components.navigation.empty.bindingDescription')}</Typography>
-                </Stack>
-              </Paper>
-            )}
+              )}
           </Stack>
         ) : (
           <Paper variant="outlined" sx={{ p: 4, borderRadius: 3 }}>
-            <Stack spacing={1} sx={{ alignItems: 'center', textAlign: 'center' }}>
+            <Stack
+              spacing={1}
+              sx={{ alignItems: 'center', textAlign: 'center' }}
+            >
               <ExtensionOutlinedIcon color="primary" fontSize="large" />
-              <Typography variant="h6">{t(`layout.components.navigation.empty.${tab}Title`)}</Typography>
-              <Typography color="text.secondary">{t(`layout.components.navigation.empty.${tab}Description`)}</Typography>
+              <Typography variant="h6">
+                {t(`layout.components.navigation.empty.${tab}Title`)}
+              </Typography>
+              <Typography color="text.secondary">
+                {t(`layout.components.navigation.empty.${tab}Description`)}
+              </Typography>
             </Stack>
           </Paper>
         )}
       </Stack>
       <Dialog open={resetOpen} onClose={() => setResetOpen(false)}>
-        <DialogTitle>{t('layout.components.navigation.resetIdentityTitle')}</DialogTitle>
-        <DialogContent><Typography>{t('layout.components.navigation.resetIdentityConfirm')}</Typography></DialogContent>
+        <DialogTitle>
+          {t('layout.components.navigation.resetIdentityTitle')}
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            {t('layout.components.navigation.resetIdentityConfirm')}
+          </Typography>
+        </DialogContent>
         <DialogActions>
-          <Button onClick={() => setResetOpen(false)}>{t('layout.components.navigation.cancel')}</Button>
-          <Button color="warning" variant="contained" onClick={() => void confirmReset()}>{t('layout.components.navigation.resetIdentity')}</Button>
+          <Button onClick={() => setResetOpen(false)}>
+            {t('layout.components.navigation.cancel')}
+          </Button>
+          <Button
+            color="warning"
+            variant="contained"
+            onClick={() => void confirmReset()}
+          >
+            {t('layout.components.navigation.resetIdentity')}
+          </Button>
         </DialogActions>
       </Dialog>
       <Dialog open={rotationOpen} onClose={() => setRotationOpen(false)}>
-        <DialogTitle>{t('layout.components.navigation.rotateIdentityTitle')}</DialogTitle>
-        <DialogContent><Typography>{t('layout.components.navigation.rotateIdentityConfirm')}</Typography></DialogContent>
+        <DialogTitle>
+          {t('layout.components.navigation.rotateIdentityTitle')}
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            {t('layout.components.navigation.rotateIdentityConfirm')}
+          </Typography>
+        </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRotationOpen(false)}>{t('layout.components.navigation.cancel')}</Button>
-          <Button color="warning" variant="contained" onClick={() => void confirmRotation()}>{t('layout.components.navigation.rotateIdentity')}</Button>
+          <Button onClick={() => setRotationOpen(false)}>
+            {t('layout.components.navigation.cancel')}
+          </Button>
+          <Button
+            color="warning"
+            variant="contained"
+            onClick={() => void confirmRotation()}
+          >
+            {t('layout.components.navigation.rotateIdentity')}
+          </Button>
         </DialogActions>
       </Dialog>
     </BasePage>
