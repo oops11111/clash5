@@ -33,7 +33,7 @@ export const LayoutItem = (props: Props) => {
     <ListItem
       ref={sortable?.ref}
       style={sortable?.style}
-      sx={{ py: 0.5, maxWidth: 250, mx: 'auto', padding: '4px 0px' }}
+      sx={{ py: 0.125, maxWidth: 250, mx: 'auto' }}
     >
       <ListItemButton
         ref={sortable?.handleRef}
@@ -72,6 +72,7 @@ export const LayoutItem = (props: Props) => {
           <ListItemIcon
             sx={{
               color: 'text.primary',
+              minWidth: '44px',
               marginLeft: '6px',
               cursor: 'inherit',
             }}
@@ -80,12 +81,15 @@ export const LayoutItem = (props: Props) => {
           </ListItemIcon>
         )}
         {effectiveMenuIcon === 'colorful' && (
-          <ListItemIcon sx={{ cursor: 'inherit' }}>{icon[1]}</ListItemIcon>
+          <ListItemIcon
+            sx={{ minWidth: '44px', marginLeft: '6px', cursor: 'inherit' }}
+          >
+            {icon[1]}
+          </ListItemIcon>
         )}
         <ListItemText
           sx={{
-            textAlign: 'center',
-            marginLeft: effectiveMenuIcon === 'disable' ? '' : '-35px',
+            textAlign: effectiveMenuIcon === 'disable' ? 'center' : 'left',
           }}
           primary={children}
         />

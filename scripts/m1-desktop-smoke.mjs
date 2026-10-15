@@ -572,6 +572,92 @@ async function capture() {
   await browser.saveScreenshot(screenshot)
 }
 
+async function verifyNavigation() {
+  const sidebar = await browser.execute(() => {
+    const menu = document.querySelector('.the-menu')
+    const items = [...menu.querySelectorAll('.MuiListItemButton-root')]
+    const last = items.at(-1)?.getBoundingClientRect()
+    const viewport = menu.getBoundingClientRect()
+    return {
+      labels: items.map((item) => item.textContent?.trim()),
+      lastVisible: Boolean(
+        last && last.top >= viewport.top && last.bottom <= viewport.bottom + 1,
+      ),
+      logoVisible: Boolean(
+        document.querySelector('.the-logo .MuiSvgIcon-root'),
+      ),
+    }
+  })
+  const expected = [
+    [
+      'Home',
+      'Nodes',
+      'Subscriptions',
+      'Chains',
+      'Rules',
+      'Plugins',
+      'Connections',
+      'Logs',
+      'Settings',
+    ],
+    ['首页', '节点', '订阅', '链路', '规则', '插件', '连接', '日志', '设置'],
+    ['首頁', '節點', '訂閱', '鏈路', '規則', '插件', '連線', '日誌', '設定'],
+  ]
+  if (
+    !sidebar.logoVisible ||
+    !sidebar.lastVisible ||
+    !expected.some(
+      (labels) => JSON.stringify(labels) === JSON.stringify(sidebar.labels),
+    )
+  ) {
+    throw new Error(`Unexpected clash5 sidebar: ${JSON.stringify(sidebar)}`)
+  }
+
+  await browser.execute(() => {
+    const plugins = [
+      ...document.querySelectorAll('.the-menu .MuiListItemButton-root'),
+    ].find((item) => ['Plugins', '插件'].includes(item.textContent?.trim()))
+    plugins?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.base-page [role="tab"]')].some((tab) =>
+          ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Plugin binding tab did not render',
+    },
+  )
+  await browser.execute(() => {
+    const binding = [
+      ...document.querySelectorAll('.base-page [role="tab"]'),
+    ].find((tab) =>
+      ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+    )
+    binding?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.base-page [role="tab"]')].some(
+          (tab) =>
+            tab.getAttribute('aria-selected') === 'true' &&
+            ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Plugin binding tab did not activate',
+    },
+  )
+  await browser.saveScreenshot(resolve('target/nav-plugins-binding.png'))
+}
+
 try {
   if (persisted) {
     await startFixtures()
@@ -724,6 +810,10 @@ try {
   }
   phase = 'screenshot capture'
   await capture()
+  if (full) {
+    phase = 'sidebar and plugin binding navigation'
+    await verifyNavigation()
+  }
   process.stdout.write(
     persisted
       ? 'Manual nodes and their stable identities survived a desktop restart\n'
