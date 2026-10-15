@@ -1369,6 +1369,7 @@ fn activate_selected_nodes_with(repair: SelectionRepair) -> tokio::sync::oneshot
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use clash5_data::{DataError, IdentityKey, Node};
@@ -1459,7 +1460,7 @@ mod tests {
 
             assert!(store.identity_recovery());
             assert_eq!(store.active_identity_key().unwrap().unwrap().1, expected_key.key_id());
-            assert!(store.node_records(true).unwrap().len() >= 1);
+            assert!(!store.node_records(true).unwrap().is_empty());
             assert_eq!(
                 store.upsert_manual(&identity_fixture_node()),
                 Err(DataError::IdentityRecovery)
