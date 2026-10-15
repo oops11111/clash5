@@ -236,6 +236,12 @@ async function importLink(link, count, expectedName) {
     )
   }
   await captureClipboardImportFlow()
+  const clipboardAfterCapture = await invoke(
+    'plugin:clipboard-manager|read_text',
+  )
+  if (clipboardAfterCapture !== link) {
+    throw new Error('Clipboard fixture changed before the UI import click')
+  }
   await clickButton(['Import from clipboard', '从剪贴板导入'])
   try {
     await browser.waitUntil(
@@ -255,27 +261,34 @@ async function importLink(link, count, expectedName) {
       },
     )
   } catch (error) {
-    const [nodes, alerts, importFlow, currentClipboard] = await Promise.all([
-      invoke('clash5_list_nodes', { includeInactive: true }),
-      browser.execute(() =>
-        [...document.querySelectorAll('.MuiAlert-root')].map((alert) =>
-          alert.textContent?.trim(),
+    const [nodes, alerts, importFlow, importFailure, currentClipboard] =
+      await Promise.all([
+        invoke('clash5_list_nodes', { includeInactive: true }),
+        browser.execute(() =>
+          [...document.querySelectorAll('.MuiAlert-root')].map((alert) =>
+            alert.textContent?.trim(),
+          ),
         ),
-      ),
-      browser.execute(() => {
-        const flow = document.documentElement.dataset.clash5SmokeImportFlow
-        return flow ? JSON.parse(flow) : null
-      }),
-      invoke('plugin:clipboard-manager|read_text').catch(
-        (readError) => `read failed: ${String(readError)}`,
-      ),
-    ])
+        browser.execute(() => {
+          const flow = document.documentElement.dataset.clash5SmokeImportFlow
+          return flow ? JSON.parse(flow) : null
+        }),
+        browser.execute(() => {
+          const failure =
+            document.documentElement.dataset.clash5ClipboardImportFailure
+          return failure ? JSON.parse(failure) : null
+        }),
+        invoke('plugin:clipboard-manager|read_text').catch(
+          (readError) => `read failed: ${String(readError)}`,
+        ),
+      ])
     const details = {
       error: String(error),
       nodes,
       alerts,
       clipboard: currentClipboard,
       importFlow,
+      importFailure,
     }
     throw new Error(
       `Manual import acceptance failed: ${JSON.stringify(details)}`,

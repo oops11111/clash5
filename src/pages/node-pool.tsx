@@ -128,6 +128,7 @@ const NodePoolPage = () => {
     setImportBusy(true)
     setImportError(false)
     setImportMessage('')
+    delete document.documentElement.dataset.clash5ClipboardImportFailure
     let importStage = 'clipboard-read'
     try {
       const value = (await readText())?.trim() ?? ''
@@ -189,6 +190,8 @@ const NodePoolPage = () => {
       const errorMessage = rawMessage
         .replace(/[a-z][a-z\d+.-]*:\/\/[^\s"'<>]+/gi, '[redacted-uri]')
         .slice(0, 200)
+      document.documentElement.dataset.clash5ClipboardImportFailure =
+        JSON.stringify({ stage: importStage, errorName })
       console.error('[NodePool] Clipboard import failed', {
         stage: importStage,
         errorName,
