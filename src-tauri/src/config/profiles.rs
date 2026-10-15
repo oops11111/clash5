@@ -1490,8 +1490,7 @@ mod tests {
     #[test]
     fn fresh_identity_store_requires_writable_keyring_and_verifies_persisted_key() {
         let path = identity_fixture_path();
-        let mut unavailable =
-            open_clash5_identity_store_with(path.clone(), &FakeIdentityCredentials::locked()).unwrap();
+        let unavailable = open_clash5_identity_store_with(path.clone(), &FakeIdentityCredentials::locked()).unwrap();
         assert!(unavailable.identity_recovery());
         assert_eq!(unavailable.active_identity_key().unwrap(), None);
         drop(unavailable);
