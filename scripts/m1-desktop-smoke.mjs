@@ -748,9 +748,9 @@ async function verifyM2Chains() {
     [0, 'M2-front'],
     [1, 'M2-landing'],
   ]) {
-    const control = await browser.$$(
-      '[data-testid="chains-workspace"] [role="combobox"]',
-    ).then((controls) => controls[index])
+    const control = await browser
+      .$$('[data-testid="chains-workspace"] [role="combobox"]')
+      .then((controls) => controls[index])
     await control.click()
     await browser.waitUntil(
       () =>
