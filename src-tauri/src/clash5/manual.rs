@@ -1,9 +1,13 @@
 use crate::utils::{dirs, help};
 use anyhow::{Result, anyhow, bail};
-use clash5_data::{Node, parse_proxy_node};
+use clash5_data::{Node, StableId, parse_proxy_node};
 use serde::{Deserialize, Serialize};
 use serde_yaml_ng::{Mapping, Sequence, Value};
-use std::{collections::HashMap, io::ErrorKind, path::PathBuf};
+use std::{
+    collections::{BTreeSet, HashMap},
+    io::ErrorKind,
+    path::PathBuf,
+};
 
 const FILE_NAME: &str = "clash5-manual-proxies.yaml";
 const MAX_IMPORT: usize = 256;
@@ -24,6 +28,11 @@ pub(crate) struct ManualProxyFile {
     entries: Vec<ManualProxyEntry>,
 }
 
+pub(crate) struct ManualImport {
+    pub nodes: Vec<Node>,
+    pub changed_ids: Vec<StableId>,
+}
+
 pub(crate) fn runtime_name(stable_id: &str) -> String {
     format!("clash5-{}", stable_id.replace(':', "-"))
 }
@@ -41,7 +50,7 @@ fn entry_node(entry: &ManualProxyEntry) -> Result<Node> {
 }
 
 impl ManualProxyFile {
-    pub(crate) fn add_import(&mut self, proxies: Vec<Value>) -> Result<Vec<Node>> {
+    pub(crate) fn add_import(&mut self, proxies: Vec<Value>) -> Result<ManualImport> {
         if proxies.is_empty() || proxies.len() > MAX_IMPORT {
             bail!("manual proxy import size is out of range");
         }
@@ -52,6 +61,7 @@ impl ManualProxyFile {
         }
         let mut imported = Vec::with_capacity(proxies.len());
         let mut batch = HashMap::new();
+        let mut changed_ids = BTreeSet::new();
         for proxy in proxies {
             let mut mapping = proxy
                 .as_mapping()
@@ -74,8 +84,12 @@ impl ManualProxyFile {
                 bail!("ambiguous manual proxy identity in import");
             }
             if let Some(&index) = positions.get(&stable_id) {
+                if entries[index].proxy != entry.proxy {
+                    changed_ids.insert(stable_id.clone());
+                }
                 entries[index] = entry;
             } else {
+                changed_ids.insert(stable_id.clone());
                 positions.insert(stable_id, entries.len());
                 entries.push(entry);
             }
@@ -85,7 +99,10 @@ impl ManualProxyFile {
             bail!("manual proxy inventory is full");
         }
         self.entries = entries;
-        Ok(imported)
+        Ok(ManualImport {
+            nodes: imported,
+            changed_ids: changed_ids.into_iter().collect(),
+        })
     }
 
     pub(crate) fn runtime_proxies(&self) -> Result<Sequence> {
@@ -145,13 +162,17 @@ mod tests {
     #[test]
     fn manual_import_uses_stable_runtime_names_and_rejects_ambiguous_batch() {
         let mut file = ManualProxyFile::default();
-        let node = file.add_import(vec![proxy("Original", "tcp")]).unwrap().remove(0);
+        let node = file.add_import(vec![proxy("Original", "tcp")]).unwrap().nodes.remove(0);
         let name = runtime_name(&node.stable_id().unwrap());
         assert_eq!(file.runtime_proxies().unwrap()[0]["name"], name);
 
-        file.add_import(vec![proxy("Renamed", "tcp")]).unwrap();
+        let renamed = file.add_import(vec![proxy("Renamed", "tcp")]).unwrap();
+        assert!(renamed.changed_ids.is_empty());
         assert_eq!(file.entries.len(), 1);
         assert_eq!(entry_node(&file.entries[0]).unwrap().display_name, "Renamed");
+
+        let changed = file.add_import(vec![proxy("Renamed", "ws")]).unwrap();
+        assert_eq!(changed.changed_ids, vec![node.stable_id().unwrap()]);
 
         assert!(file.add_import(vec![proxy("One", "tcp"), proxy("Two", "ws")]).is_err());
         assert_eq!(entry_node(&file.entries[0]).unwrap().display_name, "Renamed");

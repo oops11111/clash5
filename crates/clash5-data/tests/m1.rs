@@ -18,15 +18,36 @@ fn manual_batch_validates_every_identity_before_writing() {
     let mut invalid = node("Invalid");
     invalid.port = 0;
     assert_eq!(
-        db.upsert_manual_batch(&[first.clone(), invalid]),
+        db.upsert_manual_batch(&[first.clone(), invalid], &[]),
         Err(DataError::InvalidInput)
     );
     assert!(db.node_records(false).unwrap().is_empty());
 
     let mut second = node("Second");
     second.credentials.insert("uuid".into(), "b".repeat(32));
-    assert_eq!(db.upsert_manual_batch(&[first, second]).unwrap().len(), 2);
+    assert_eq!(db.upsert_manual_batch(&[first, second], &[]).unwrap().len(), 2);
     assert_eq!(db.node_records(false).unwrap().len(), 2);
+}
+
+#[test]
+fn manual_rename_keeps_probe_cache_but_runtime_change_invalidates_it() {
+    let mut db = BindingStore::memory().unwrap();
+    let id = node("Original").stable_id().unwrap();
+    db.upsert_manual_batch(&[node("Original")], &[id.clone()]).unwrap();
+    db.save_quality(
+        &Source::Manual,
+        &id,
+        &NodeQuality::from_probe(Some(10), Some(20), 1_000),
+    )
+    .unwrap();
+
+    db.upsert_manual_batch(&[node("Renamed")], &[]).unwrap();
+    let renamed = db.node_records(false).unwrap().remove(0);
+    assert_eq!(renamed.display_name, "Renamed");
+    assert_eq!(renamed.quality.unwrap().handshake_delay_ms, Some(20));
+
+    db.upsert_manual_batch(&[node("Renamed")], &[id]).unwrap();
+    assert!(db.node_records(false).unwrap().remove(0).quality.is_none());
 }
 
 #[test]

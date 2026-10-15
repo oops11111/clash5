@@ -78,10 +78,10 @@ pub async fn clash5_import_manual_proxies(proxies: Vec<Value>) -> CmdResult<Manu
     let mut file = manual::load()
         .await
         .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy file is invalid"))?;
-    let nodes = file
+    let import = file
         .add_import(proxies)
         .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy import is invalid"))?;
-    let imported = nodes.len();
+    let imported = import.nodes.len();
     manual::save(&file)
         .await
         .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy file could not be saved"))?;
@@ -104,8 +104,10 @@ pub async fn clash5_import_manual_proxies(proxies: Vec<Value>) -> CmdResult<Manu
         ));
     }
 
-    let saved =
-        crate::config::profiles::with_clash5_binding_store(move |store| store.upsert_manual_batch(&nodes)).await;
+    let saved = crate::config::profiles::with_clash5_binding_store(move |store| {
+        store.upsert_manual_batch(&import.nodes, &import.changed_ids)
+    })
+    .await;
     if saved.is_err() {
         restore_manual_file(previous.as_deref()).await?;
         return Err(coded_error(

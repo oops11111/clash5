@@ -621,9 +621,13 @@ try {
   const persistedManual = inventory.filter(
     (node) => node.source.kind === 'manual',
   )
+  const persistedQuality = persistedManual.find(
+    (node) => node.display_name === 'M1-renamed',
+  )?.quality
   if (
     persisted &&
     (persistedManual.length !== 2 ||
+      !persistedQuality ||
       !persistedManual.every((node) => node.active) ||
       !persistedManual.some(
         (node) => node.display_name === 'M1-renamed' && node.port === 18080,
@@ -702,6 +706,8 @@ try {
     ).filter((node) => node.source.kind === 'manual')
     if (
       reimported.length !== 2 ||
+      reimported.find((node) => node.display_name === 'M1-renamed')?.quality
+        ?.checked_at_ms !== persistedQuality.checked_at_ms ||
       persistedManual.some(
         (before) =>
           !reimported.some(
