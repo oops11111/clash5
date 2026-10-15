@@ -67,7 +67,7 @@ impl SingboxRoute {
                 .filter(|proxy| proxy.get("name").and_then(YamlValue::as_str) == Some(landing_name));
             let landing = matches.next().context("generated landing proxy is missing")?;
             anyhow::ensure!(matches.next().is_none(), "generated landing proxy is ambiguous");
-            let singbox_config = singbox_config::singbox_config(landing, inbound_port, "exit")?;
+            let singbox_config = singbox_config::singbox_config(landing, inbound_port, "exit", relay.endpoint())?;
             let config_bytes = serde_json::to_vec(&singbox_config)?;
 
             command.args(["run", "-c", "stdin"]);

@@ -201,15 +201,23 @@ pub fn map_landing_outbound(proxy: &YamlValue, tag: &str) -> Result<JsonValue> {
 }
 
 /// Produces an isolated sing-box configuration with only a loopback SOCKS inbound and one exit.
-pub fn singbox_config(proxy: &YamlValue, inbound_port: u16, tag: &str) -> Result<JsonValue> {
+pub fn singbox_config(proxy: &YamlValue, inbound_port: u16, tag: &str, endpoint: &RelayEndpoint) -> Result<JsonValue> {
     anyhow::ensure!(inbound_port != 0, "sing-box inbound port must be nonzero");
+    anyhow::ensure!(
+        !endpoint.username.is_empty()
+            && endpoint.username.len() <= u8::MAX as usize
+            && !endpoint.password.is_empty()
+            && endpoint.password.len() <= u8::MAX as usize,
+        "invalid sing-box inbound credentials"
+    );
     Ok(json!({
         "log": {"disabled": true},
         "inbounds": [{
             "type": "socks",
             "tag": "clash5-local",
             "listen": "127.0.0.1",
-            "listen_port": inbound_port
+            "listen_port": inbound_port,
+            "users": [{"username": endpoint.username, "password": endpoint.password}]
         }],
         "outbounds": [map_landing_outbound(proxy, tag)?, {"type": "direct", "tag": "direct"}],
         "route": {"final": tag}
@@ -296,8 +304,15 @@ mod tests {
         assert_eq!(outbound["tls"]["reality"]["public_key"], "public");
         assert_eq!(outbound["transport"]["path"], "/tunnel");
         assert_eq!(outbound["transport"]["headers"]["Host"], "cdn.example");
-        let config = singbox_config(&proxy, 18080, "exit")?;
+        let endpoint = RelayEndpoint {
+            host: "127.0.0.1".into(),
+            port: 49152,
+            username: "clash5".into(),
+            password: "session-token".into(),
+        };
+        let config = singbox_config(&proxy, 18080, "exit", &endpoint)?;
         assert_eq!(config["inbounds"][0]["listen"], "127.0.0.1");
+        assert_eq!(config["inbounds"][0]["users"][0]["password"], "session-token");
         assert!(config["inbounds"][0].get("tun").is_none());
         assert_eq!(config["route"]["final"], "exit");
         Ok(())

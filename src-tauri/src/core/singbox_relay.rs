@@ -57,7 +57,7 @@ impl AuthenticatedRelay {
                             let password = expected_password.clone();
                             clients.spawn(async move {
                                 let _permit = permit;
-                                let _ = serve_client(stream, upstream, password.as_bytes()).await;
+                                let _ = serve_client(stream, upstream, b"clash5", password.as_bytes()).await;
                             });
                         }
                         Err(_) => break,
@@ -104,10 +104,19 @@ fn session_token() -> Result<String> {
     Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
-async fn serve_client(mut client: TcpStream, upstream: SocketAddr, password: &[u8]) -> Result<()> {
+async fn serve_client(mut client: TcpStream, upstream: SocketAddr, username: &[u8], password: &[u8]) -> Result<()> {
     authenticate_client(&mut client, password).await?;
     let (request, address, domain_length) = read_connect_request(&mut client).await?;
-    forward_connect(&mut client, upstream, &request, &address, domain_length).await
+    forward_connect(
+        &mut client,
+        upstream,
+        username,
+        password,
+        &request,
+        &address,
+        domain_length,
+    )
+    .await
 }
 
 async fn authenticate_client(client: &mut TcpStream, password: &[u8]) -> Result<()> {
@@ -172,6 +181,8 @@ async fn read_connect_request(client: &mut TcpStream) -> Result<([u8; 4], Vec<u8
 async fn forward_connect(
     client: &mut TcpStream,
     upstream: SocketAddr,
+    username: &[u8],
+    password: &[u8],
     request: &[u8; 4],
     address: &[u8],
     domain_length: Option<u8>,
@@ -179,12 +190,22 @@ async fn forward_connect(
     let mut upstream_stream = tokio::time::timeout(Duration::from_secs(3), TcpStream::connect(upstream))
         .await
         .context("sing-box relay connection timed out")??;
-    upstream_stream.write_all(&[SOCKS_VERSION, 1, 0]).await?;
+    upstream_stream.write_all(&[SOCKS_VERSION, 1, 2]).await?;
     let mut upstream_method = [0_u8; 2];
     read_handshake(&mut upstream_stream, &mut upstream_method).await?;
-    if upstream_method != [SOCKS_VERSION, 0] {
+    if upstream_method != [SOCKS_VERSION, 2] {
         client.write_all(&[SOCKS_VERSION, 5, 0, 1, 0, 0, 0, 0, 0, 0]).await?;
         anyhow::bail!("sing-box SOCKS inbound rejected negotiation");
+    }
+    upstream_stream.write_all(&[AUTH_VERSION, username.len() as u8]).await?;
+    upstream_stream.write_all(username).await?;
+    upstream_stream.write_all(&[password.len() as u8]).await?;
+    upstream_stream.write_all(password).await?;
+    let mut upstream_auth = [0_u8; 2];
+    read_handshake(&mut upstream_stream, &mut upstream_auth).await?;
+    if upstream_auth != [AUTH_VERSION, 0] {
+        client.write_all(&[SOCKS_VERSION, 5, 0, 1, 0, 0, 0, 0, 0, 0]).await?;
+        anyhow::bail!("sing-box SOCKS inbound rejected authentication");
     }
     upstream_stream.write_all(request).await?;
     if let Some(length) = domain_length {
@@ -258,8 +279,20 @@ mod tests {
             let (mut stream, _) = upstream.accept().await?;
             let mut greeting = [0_u8; 3];
             stream.read_exact(&mut greeting).await?;
-            anyhow::ensure!(greeting == [SOCKS_VERSION, 1, 0]);
-            stream.write_all(&[SOCKS_VERSION, 0]).await?;
+            anyhow::ensure!(greeting == [SOCKS_VERSION, 1, 2]);
+            stream.write_all(&[SOCKS_VERSION, 2]).await?;
+            let mut username_length = [0_u8; 2];
+            stream.read_exact(&mut username_length).await?;
+            anyhow::ensure!(username_length == [AUTH_VERSION, 6]);
+            let mut username = [0_u8; 6];
+            stream.read_exact(&mut username).await?;
+            anyhow::ensure!(&username == b"clash5");
+            let mut password_length = [0_u8; 1];
+            stream.read_exact(&mut password_length).await?;
+            let mut password = vec![0_u8; password_length[0] as usize];
+            stream.read_exact(&mut password).await?;
+            anyhow::ensure!(!password.is_empty());
+            stream.write_all(&[AUTH_VERSION, 0]).await?;
             let mut request = [0_u8; 10];
             stream.read_exact(&mut request).await?;
             anyhow::ensure!(request == [SOCKS_VERSION, CONNECT, 0, 1, 8, 8, 8, 8, 1, 187]);
