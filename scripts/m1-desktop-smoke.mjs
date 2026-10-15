@@ -142,51 +142,72 @@ async function clickButton(labels) {
 async function captureClipboardImportFlow() {
   await browser.execute(() => {
     const internals = window.__TAURI_INTERNALS__
-    if (!internals || window.__clash5SmokeCapture) return
+    const flow = {
+      installed: false,
+      installError: null,
+      clipboardReads: [],
+      importCalls: [],
+      importErrors: [],
+    }
+    const publish = () => {
+      document.documentElement.dataset.clash5SmokeImportFlow =
+        JSON.stringify(flow)
+    }
+    publish()
+    if (!internals) {
+      flow.installError = 'Tauri internals are unavailable'
+      publish()
+      return
+    }
 
     const invoke = internals.invoke
-    const flow = { clipboardReads: [], importCalls: [], importErrors: [] }
+    const wrappedInvoke = async function (...args) {
+      try {
+        const result = await invoke.apply(this, args)
+        if (args[0] === 'plugin:clipboard-manager|read_text') {
+          flow.clipboardReads.push(
+            typeof result === 'string' ? result.slice(0, 240) : result,
+          )
+        }
+        if (args[0] === 'clash5_import_manual_proxies') {
+          flow.importCalls.push({
+            proxyCount: args[1]?.proxies?.length ?? null,
+            imported: result?.imported ?? null,
+          })
+        }
+        return result
+      } catch (error) {
+        if (args[0] === 'clash5_import_manual_proxies') {
+          let detail = error?.detail
+          if (typeof error === 'string') {
+            try {
+              detail = JSON.parse(error)?.detail ?? error
+            } catch {
+              detail = error
+            }
+          }
+          flow.importErrors.push({
+            code: error?.code,
+            detail: typeof detail === 'string' ? detail.slice(0, 240) : null,
+          })
+        }
+        throw error
+      } finally {
+        publish()
+      }
+    }
+
     try {
       Object.defineProperty(internals, 'invoke', {
         configurable: true,
         writable: true,
-        value: async function (...args) {
-          try {
-            const result = await invoke.apply(this, args)
-            if (args[0] === 'plugin:clipboard-manager|read_text') {
-              flow.clipboardReads.push(
-                typeof result === 'string' ? result.slice(0, 240) : result,
-              )
-            }
-            if (args[0] === 'clash5_import_manual_proxies') {
-              flow.importCalls.push({
-                proxyCount: args[1]?.proxies?.length ?? null,
-                imported: result?.imported ?? null,
-              })
-            }
-            return result
-          } catch (error) {
-            if (args[0] === 'clash5_import_manual_proxies') {
-              let detail = error?.detail
-              if (typeof error === 'string') {
-                try {
-                  detail = JSON.parse(error)?.detail ?? error
-                } catch {
-                  detail = error
-                }
-              }
-              flow.importErrors.push({
-                code: error?.code,
-                detail:
-                  typeof detail === 'string' ? detail.slice(0, 240) : null,
-              })
-            }
-            throw error
-          }
-        },
+        value: wrappedInvoke,
       })
-      window.__clash5SmokeCapture = flow
-    } catch {}
+      flow.installed = internals.invoke === wrappedInvoke
+    } catch (error) {
+      flow.installError = String(error).slice(0, 240)
+    }
+    publish()
   })
 }
 
@@ -225,7 +246,10 @@ async function importLink(link, count, expectedName) {
           alert.textContent?.trim(),
         ),
       ),
-      browser.execute(() => window.__clash5SmokeCapture ?? null),
+      browser.execute(() => {
+        const flow = document.documentElement.dataset.clash5SmokeImportFlow
+        return flow ? JSON.parse(flow) : null
+      }),
       invoke('plugin:clipboard-manager|read_text').catch(
         (readError) => `read failed: ${String(readError)}`,
       ),
