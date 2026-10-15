@@ -552,6 +552,27 @@ pub async fn clash5_purge_orphans(source: Option<Source>) -> CmdResult<usize> {
         .map_err(failure)
 }
 
+#[tauri::command]
+pub async fn clash5_orphan_cleanup_preview() -> CmdResult<clash5_data::OrphanCleanupPreview> {
+    crate::config::profiles::with_clash5_binding_store(|store| store.orphan_cleanup_preview())
+        .await
+        .map_err(failure)
+}
+
+#[tauri::command]
+pub async fn clash5_set_orphan_retention_days(days: u16) -> CmdResult<()> {
+    crate::config::profiles::with_clash5_binding_store(move |store| store.set_orphan_retention_days(days))
+        .await
+        .map_err(failure)
+}
+
+#[tauri::command]
+pub async fn clash5_purge_expired_orphans() -> CmdResult<usize> {
+    crate::config::profiles::with_clash5_binding_store(|store| store.purge_expired_orphans(None))
+        .await
+        .map_err(failure)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

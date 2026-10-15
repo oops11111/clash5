@@ -13,6 +13,7 @@ import {
   Stack,
   Tab,
   Tabs,
+  TextField,
   Typography,
 } from '@mui/material'
 import { useCallback, useEffect, useState } from 'react'
@@ -28,8 +29,12 @@ import {
   resolveClash5IdentityRebind,
   rotateClash5Identity,
   resetClash5Identity,
+  getClash5OrphanCleanupPreview,
+  setClash5OrphanRetentionDays,
+  purgeExpiredClash5Orphans,
   type Clash5PendingIdentityRebind,
   type Clash5Binding,
+  type Clash5OrphanCleanupPreview,
 } from '@/services/cmds'
 import type { Clash5NodeRecord } from '@/types/clash5-node'
 
@@ -53,19 +58,27 @@ const PluginsPage = () => {
   const [resetOpen, setResetOpen] = useState(false)
   const [rotationOpen, setRotationOpen] = useState(false)
   const [identityError, setIdentityError] = useState(false)
+  const [orphanCleanup, setOrphanCleanup] =
+    useState<Clash5OrphanCleanupPreview | null>(null)
+  const [retentionDraft, setRetentionDraft] = useState('30')
+  const [cleanupOpen, setCleanupOpen] = useState(false)
 
   const refreshIdentity = useCallback(async () => {
     try {
-      const [status, pending, savedBindings, savedNodes] = await Promise.all([
-        getClash5IdentityStatus(),
-        listClash5PendingIdentityRebinds(),
-        listClash5Bindings(),
-        listClash5Nodes(),
-      ])
+      const [status, pending, savedBindings, savedNodes, cleanup] =
+        await Promise.all([
+          getClash5IdentityStatus(),
+          listClash5PendingIdentityRebinds(),
+          listClash5Bindings(),
+          listClash5Nodes(),
+          getClash5OrphanCleanupPreview(),
+        ])
       setIdentityStatus(status)
       setPendingRebinds(pending)
       setBindings(savedBindings)
       setNodes(savedNodes)
+      setOrphanCleanup(cleanup)
+      setRetentionDraft(String(cleanup.retention_days))
       setIdentityError(false)
       return status
     } catch {
@@ -94,6 +107,27 @@ const PluginsPage = () => {
     try {
       await rotateClash5Identity()
       setRotationOpen(false)
+      await refreshIdentity()
+    } catch {
+      setIdentityError(true)
+    }
+  }
+
+  const saveOrphanRetention = async () => {
+    const days = Number(retentionDraft)
+    if (!Number.isInteger(days) || days < 1 || days > 365) return
+    try {
+      await setClash5OrphanRetentionDays(days)
+      await refreshIdentity()
+    } catch {
+      setIdentityError(true)
+    }
+  }
+
+  const confirmExpiredPurge = async () => {
+    try {
+      await purgeExpiredClash5Orphans()
+      setCleanupOpen(false)
       await refreshIdentity()
     } catch {
       setIdentityError(true)
@@ -166,6 +200,68 @@ const PluginsPage = () => {
               <Alert severity="error">
                 {t('layout.components.navigation.identityError')}
               </Alert>
+            )}
+            {orphanCleanup && (
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Stack spacing={1.5}>
+                  <Alert
+                    severity={
+                      orphanCleanup.eligible_orphans > 0 ? 'warning' : 'info'
+                    }
+                    action={
+                      orphanCleanup.eligible_orphans > 0 ? (
+                        <Button
+                          color="inherit"
+                          disabled={identityStatus?.recovery_mode}
+                          onClick={() => setCleanupOpen(true)}
+                        >
+                          {t(
+                            'layout.components.navigation.reviewOrphanCleanup',
+                          )}
+                        </Button>
+                      ) : undefined
+                    }
+                  >
+                    {t('layout.components.navigation.orphanRetentionSummary', {
+                      total: orphanCleanup.total_orphans,
+                      eligible: orphanCleanup.eligible_orphans,
+                      days: orphanCleanup.retention_days,
+                    })}
+                  </Alert>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: 'center' }}
+                  >
+                    <TextField
+                      label={t(
+                        'layout.components.navigation.orphanRetentionDays',
+                      )}
+                      type="number"
+                      size="small"
+                      value={retentionDraft}
+                      slotProps={{ htmlInput: { min: 1, max: 365 } }}
+                      onChange={(event) =>
+                        setRetentionDraft(event.target.value)
+                      }
+                      sx={{ maxWidth: 240 }}
+                    />
+                    <Button
+                      variant="outlined"
+                      disabled={
+                        identityStatus?.recovery_mode ||
+                        !Number.isInteger(Number(retentionDraft)) ||
+                        Number(retentionDraft) < 1 ||
+                        Number(retentionDraft) > 365 ||
+                        Number(retentionDraft) === orphanCleanup.retention_days
+                      }
+                      onClick={() => void saveOrphanRetention()}
+                    >
+                      {t('layout.components.navigation.saveOrphanRetention')}
+                    </Button>
+                  </Stack>
+                </Stack>
+              </Paper>
             )}
             {identityStatus?.recovery_mode && (
               <Alert
@@ -386,6 +482,34 @@ const PluginsPage = () => {
             onClick={() => void confirmRotation()}
           >
             {t('layout.components.navigation.rotateIdentity')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={cleanupOpen} onClose={() => setCleanupOpen(false)}>
+        <DialogTitle>
+          {t('layout.components.navigation.purgeExpiredOrphansTitle')}
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            {t('layout.components.navigation.purgeExpiredOrphansConfirm', {
+              count: orphanCleanup?.eligible_orphans ?? 0,
+              days: orphanCleanup?.retention_days ?? 30,
+            })}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCleanupOpen(false)}>
+            {t('layout.components.navigation.cancel')}
+          </Button>
+          <Button
+            color="warning"
+            variant="contained"
+            disabled={
+              !orphanCleanup?.eligible_orphans || identityStatus?.recovery_mode
+            }
+            onClick={() => void confirmExpiredPurge()}
+          >
+            {t('layout.components.navigation.purgeExpiredOrphans')}
           </Button>
         </DialogActions>
       </Dialog>

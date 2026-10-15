@@ -61,6 +61,12 @@ pub struct PendingIdentityRebind {
     pub old_stable_id: StableId,
     pub candidate_ids: Vec<StableId>,
 }
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OrphanCleanupPreview {
+    pub retention_days: u16,
+    pub total_orphans: usize,
+    pub eligible_orphans: usize,
+}
 
 /// Complete raw definitions for one source during a planned identity-key rotation.
 /// Callers must only provide a source snapshot after parsing it successfully.
@@ -283,6 +289,9 @@ fn reconcile_rotated_credentials(
 
 impl BindingStore {
     pub const NAME_MATCHING_ENABLED: bool = false;
+    pub const DEFAULT_ORPHAN_RETENTION_DAYS: u16 = 30;
+    pub const MIN_ORPHAN_RETENTION_DAYS: u16 = 1;
+    pub const MAX_ORPHAN_RETENTION_DAYS: u16 = 365;
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self, DataError> {
         Self::initialize(Connection::open(path)?)
@@ -609,10 +618,11 @@ impl BindingStore {
         self.identity_key.as_ref().ok_or(DataError::IdentityRecovery)
     }
     fn initialize(mut db: Connection) -> Result<Self, DataError> {
+        db.pragma_update(None, "journal_mode", "WAL")?;
         db.pragma_update(None, "foreign_keys", true)?;
         db.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if !(0..=3).contains(&version) {
+        if !(0..=4).contains(&version) {
             return Err(DataError::SchemaVersion);
         }
         if version == 0 {
@@ -704,6 +714,15 @@ CREATE TABLE pending_identity_rebinds (
 ) STRICT;
 PRAGMA user_version=3;
 "#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 4 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                "CREATE TABLE app_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL) STRICT;\
+                 INSERT INTO app_settings(setting_key,setting_value) VALUES('orphan_retention_days','30');\
+                 PRAGMA user_version=4;",
             )?;
             tx.commit()?;
         }
@@ -961,6 +980,61 @@ PRAGMA user_version=3;
             params![kind, provider],
         )?;
         audit(&tx, "orphan.purge", serde_json::json!({"bindings":count}))?;
+        tx.commit()?;
+        Ok(count)
+    }
+    pub fn orphan_retention_days(&self) -> Result<u16, DataError> {
+        let value: String = self.db.query_row(
+            "SELECT setting_value FROM app_settings WHERE setting_key='orphan_retention_days'",
+            [],
+            |row| row.get(0),
+        )?;
+        let days = value.parse::<u16>().map_err(|_| DataError::Database)?;
+        if !(Self::MIN_ORPHAN_RETENTION_DAYS..=Self::MAX_ORPHAN_RETENTION_DAYS).contains(&days) {
+            return Err(DataError::Database);
+        }
+        Ok(days)
+    }
+    pub fn set_orphan_retention_days(&mut self, days: u16) -> Result<(), DataError> {
+        self.ensure_writable()?;
+        if !(Self::MIN_ORPHAN_RETENTION_DAYS..=Self::MAX_ORPHAN_RETENTION_DAYS).contains(&days) {
+            return Err(DataError::InvalidInput);
+        }
+        let tx = self.db.transaction()?;
+        tx.execute(
+            "UPDATE app_settings SET setting_value=?1 WHERE setting_key='orphan_retention_days'",
+            [days.to_string()],
+        )?;
+        audit(&tx, "orphan.retention.update", serde_json::json!({"days":days}))?;
+        tx.commit()?;
+        Ok(())
+    }
+    pub fn orphan_cleanup_preview(&self) -> Result<OrphanCleanupPreview, DataError> {
+        let retention_days = self.orphan_retention_days()?;
+        let total_orphans: i64 = self
+            .db
+            .query_row("SELECT count(*) FROM bindings WHERE orphan=1", [], |row| row.get(0))?;
+        let eligible_orphans: i64 = self.db.query_row(
+            "SELECT count(*) FROM bindings WHERE orphan=1 AND julianday(disappeared_at)<=julianday('now',printf('-%d days',?1))",
+            [retention_days],
+            |row| row.get(0),
+        )?;
+        Ok(OrphanCleanupPreview {
+            retention_days,
+            total_orphans: total_orphans.try_into().map_err(|_| DataError::Database)?,
+            eligible_orphans: eligible_orphans.try_into().map_err(|_| DataError::Database)?,
+        })
+    }
+    pub fn purge_expired_orphans(&mut self, source: Option<&Source>) -> Result<usize, DataError> {
+        self.ensure_writable()?;
+        let retention_days = self.orphan_retention_days()?;
+        let (kind, provider) = source.map(Source::scope).transpose()?.unwrap_or(("", ""));
+        let tx = self.db.transaction()?;
+        let count = tx.execute(
+            "DELETE FROM bindings WHERE orphan=1 AND julianday(disappeared_at)<=julianday('now',printf('-%d days',?1)) AND (?2='' OR (source_kind=?2 AND provider_id=?3))",
+            params![retention_days, kind, provider],
+        )?;
+        audit(&tx, "orphan.purge_expired", serde_json::json!({"bindings":count,"retention_days":retention_days}))?;
         tx.commit()?;
         Ok(count)
     }

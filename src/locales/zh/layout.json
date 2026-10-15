@@ -30,6 +30,13 @@
       "orphanBinding": "绑定 {{id}} 需要新目标（旧节点：{{target}}）",
       "chooseCandidate": "选择匹配的节点",
       "rebind": "重新绑定",
+      "orphanRetentionSummary": "共保留 {{total}} 条孤儿绑定，其中 {{eligible}} 条已超过 {{days}} 天保留期。",
+      "orphanRetentionDays": "孤儿绑定保留天数",
+      "saveOrphanRetention": "保存期限",
+      "reviewOrphanCleanup": "查看清理内容",
+      "purgeExpiredOrphansTitle": "清理已过期的孤儿绑定？",
+      "purgeExpiredOrphansConfirm": "将永久删除已消失至少 {{days}} 天的 {{count}} 条孤儿绑定。删除后无法恢复。",
+      "purgeExpiredOrphans": "清理过期绑定",
       "pluginTabs": {
         "installed": "已安装",
         "market": "市场",

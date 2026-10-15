@@ -655,6 +655,28 @@ async function verifyNavigation() {
       timeoutMsg: 'Plugin binding tab did not activate',
     },
   )
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.base-page label')].some((label) =>
+          ['Keep orphan bindings (days)', '孤儿绑定保留天数'].includes(
+            label.textContent?.trim(),
+          ),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Orphan retention controls did not render',
+    },
+  )
+  const retentionSummaryVisible = await browser.execute(() => {
+    const text = document.querySelector('.base-page')?.textContent ?? ''
+    return /orphan bindings|孤儿绑定/.test(text)
+  })
+  if (!retentionSummaryVisible) {
+    throw new Error('Orphan retention summary did not render')
+  }
   await browser.saveScreenshot(resolve('target/nav-plugins-binding.png'))
 }
 

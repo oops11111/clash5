@@ -30,6 +30,13 @@
       "orphanBinding": "Binding {{id}} needs a new target (previous: {{target}})",
       "chooseCandidate": "Choose a matching node",
       "rebind": "Rebind",
+      "orphanRetentionSummary": "{{total}} orphan bindings are retained. {{eligible}} have passed the {{days}}-day retention period.",
+      "orphanRetentionDays": "Keep orphan bindings (days)",
+      "saveOrphanRetention": "Save retention",
+      "reviewOrphanCleanup": "Review cleanup",
+      "purgeExpiredOrphansTitle": "Remove expired orphan bindings?",
+      "purgeExpiredOrphansConfirm": "Permanently remove {{count}} orphan bindings that have been missing for at least {{days}} days? They cannot be restored after removal.",
+      "purgeExpiredOrphans": "Remove expired bindings",
       "pluginTabs": {
         "installed": "Installed",
         "market": "Market",

@@ -38,6 +38,12 @@ export interface Clash5Binding {
   disappeared_at: string | null
 }
 
+export interface Clash5OrphanCleanupPreview {
+  retention_days: number
+  total_orphans: number
+  eligible_orphans: number
+}
+
 export async function getClash5IdentityStatus() {
   return invoke<{ recovery_mode: boolean; pending_rebinds: number }>(
     'clash5_identity_status',
@@ -61,6 +67,18 @@ export async function listClash5PendingIdentityRebinds() {
 
 export async function listClash5Bindings() {
   return invoke<Clash5Binding[]>('clash5_list_bindings', { source: null })
+}
+
+export async function getClash5OrphanCleanupPreview() {
+  return invoke<Clash5OrphanCleanupPreview>('clash5_orphan_cleanup_preview')
+}
+
+export async function setClash5OrphanRetentionDays(days: number) {
+  return invoke<void>('clash5_set_orphan_retention_days', { days })
+}
+
+export async function purgeExpiredClash5Orphans() {
+  return invoke<number>('clash5_purge_expired_orphans')
 }
 
 export async function bindClash5Node(binding: Clash5Binding) {
