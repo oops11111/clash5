@@ -120,6 +120,7 @@ jobs:
           path: |
             target/m1-desktop-smoke.png
             target/m1-desktop-persisted.png
+            target/nav-plugins-binding.png
           if-no-files-found: warn
       - name: Upload test shell
         if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

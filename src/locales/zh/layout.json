@@ -2,15 +2,37 @@
   "components": {
     "navigation": {
       "tabs": {
-        "home": "首 页",
+        "home": "首页",
         "proxies": "代 理",
-        "nodePool": "节点池",
-        "profiles": "订 阅",
-        "connections": "连 接",
-        "rules": "规 则",
-        "logs": "日 志",
+        "nodePool": "节点",
+        "profiles": "订阅",
+        "chains": "链路",
+        "rules": "规则",
+        "plugins": "插件",
+        "connections": "连接",
+        "logs": "日志",
         "unlock": "测 试",
-        "settings": "设 置"
+        "settings": "设置"
+      },
+      "proxyGroups": "代理组",
+      "diagnostics": "解锁测试",
+      "pluginTabs": {
+        "installed": "已安装",
+        "market": "市场",
+        "binding": "绑定",
+        "settings": "设置"
+      },
+      "empty": {
+        "chainsTitle": "暂无链路",
+        "chainsDescription": "链路编排功能即将推出。",
+        "installedTitle": "暂无已安装插件",
+        "installedDescription": "插件安装功能即将推出。",
+        "marketTitle": "插件市场暂不可用",
+        "marketDescription": "插件市场开放后，可在这里浏览可用插件。",
+        "bindingTitle": "暂无插件绑定",
+        "bindingDescription": "插件绑定功能开放后，可在这里管理节点与链路绑定。",
+        "settingsTitle": "暂无插件设置",
+        "settingsDescription": "安装插件后，可在这里管理插件设置。"
       },
       "menu": {
         "reorderMode": "菜单排序模式",

@@ -2,15 +2,37 @@
   "components": {
     "navigation": {
       "tabs": {
-        "home": "首 頁",
+        "home": "首頁",
         "proxies": "代 理",
-        "nodePool": "Node Pool",
-        "profiles": "訂 閱",
-        "connections": "連 線",
-        "rules": "規 則",
-        "logs": "日 誌",
+        "nodePool": "節點",
+        "profiles": "訂閱",
+        "chains": "鏈路",
+        "rules": "規則",
+        "plugins": "插件",
+        "connections": "連線",
+        "logs": "日誌",
         "unlock": "解 鎖",
-        "settings": "設 定"
+        "settings": "設定"
+      },
+      "proxyGroups": "代理群組",
+      "diagnostics": "解鎖測試",
+      "pluginTabs": {
+        "installed": "已安裝",
+        "market": "市場",
+        "binding": "綁定",
+        "settings": "設定"
+      },
+      "empty": {
+        "chainsTitle": "尚無鏈路",
+        "chainsDescription": "鏈路編排功能即將推出。",
+        "installedTitle": "尚無已安裝插件",
+        "installedDescription": "插件安裝功能即將推出。",
+        "marketTitle": "插件市場暫不可用",
+        "marketDescription": "插件市場開放後，可在這裡瀏覽可用插件。",
+        "bindingTitle": "尚無插件綁定",
+        "bindingDescription": "插件綁定功能開放後，可在這裡管理節點與鏈路綁定。",
+        "settingsTitle": "尚無插件設定",
+        "settingsDescription": "安裝插件後，可在這裡管理插件設定。"
       },
       "menu": {
         "reorderMode": "選單排序模式",

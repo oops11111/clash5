@@ -4,13 +4,35 @@
       "tabs": {
         "home": "Home",
         "proxies": "Proxies",
-        "nodePool": "Node Pool",
-        "profiles": "Profiles",
+        "nodePool": "Nodes",
+        "profiles": "Subscriptions",
+        "chains": "Chains",
+        "plugins": "Plugins",
         "connections": "Connections",
         "rules": "Rules",
         "logs": "Logs",
         "unlock": "Test",
         "settings": "Settings"
+      },
+      "proxyGroups": "Proxy groups",
+      "diagnostics": "Unlock tests",
+      "pluginTabs": {
+        "installed": "Installed",
+        "market": "Market",
+        "binding": "Binding",
+        "settings": "Settings"
+      },
+      "empty": {
+        "chainsTitle": "No chains yet",
+        "chainsDescription": "Chain configuration is coming soon.",
+        "installedTitle": "No installed plugins",
+        "installedDescription": "Plugin installation is coming soon.",
+        "marketTitle": "Plugin market unavailable",
+        "marketDescription": "Browse available plugins here when the market opens.",
+        "bindingTitle": "No plugin bindings",
+        "bindingDescription": "Manage node and chain bindings here when this feature is available.",
+        "settingsTitle": "No plugin settings",
+        "settingsDescription": "Plugin settings will appear here after plugins are installed."
       },
       "menu": {
         "reorderMode": "Menu reorder mode",
