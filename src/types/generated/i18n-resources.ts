@@ -244,6 +244,14 @@ export interface TranslationResources {
           diagnostics: string
           empty: {
             bindingDescription: string
+            bindingDisabled: string
+            bindingEnabled: string
+            bindingError: string
+            bindingLoading: string
+            bindingOrphan: string
+            bindingPriority: string
+            bindingTargetChain: string
+            bindingTargetNode: string
             bindingTitle: string
             chainsDescription: string
             chainsTitle: string
@@ -251,6 +259,8 @@ export interface TranslationResources {
             installedTitle: string
             marketDescription: string
             marketTitle: string
+            pluginError: string
+            pluginLoading: string
             settingsDescription: string
             settingsTitle: string
           }
@@ -262,12 +272,37 @@ export interface TranslationResources {
             restoreDefaultOrder: string
             unlock: string
           }
+          pluginAddBinding: string
+          pluginAuditEmpty: string
+          pluginAuditError: string
+          pluginAuditTitle: string
+          pluginBindingSaveError: string
+          pluginCancel: string
+          pluginConfig: string
+          pluginConflictTitle: string
+          pluginDisableBinding: string
+          pluginEditBinding: string
+          pluginEffectiveValue: string
+          pluginEnableBinding: string
+          pluginInstall: string
+          pluginInstallTitle: string
+          pluginPriority: string
+          pluginProvenanceProfile: string
+          pluginProvenanceTitle: string
+          pluginRemoveBinding: string
+          pluginSaveBinding: string
+          pluginSelect: string
+          pluginSettingsHint: string
+          pluginSigner: string
           pluginTabs: {
             binding: string
             installed: string
             market: string
             settings: string
           }
+          pluginTarget: string
+          pluginTrustInstall: string
+          pluginTrustWarning: string
           proxyGroups: string
           tabs: {
             chains: string

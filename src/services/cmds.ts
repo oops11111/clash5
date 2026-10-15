@@ -2,6 +2,7 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 import type { DownloadEvent } from '@tauri-apps/plugin-updater'
 import dayjs from 'dayjs'
 
+import { mutate } from '@/services/mutate'
 import type { CommandFailure } from '@/services/notice-service'
 import { showNotice } from '@/services/notice-service'
 import type {
@@ -10,6 +11,15 @@ import type {
   ExitIpResult,
 } from '@/types/clash5-chain'
 import type { Clash5NodeRecord } from '@/types/clash5-node'
+import type {
+  Clash5PluginBinding,
+  Clash5PluginBindingInput,
+  Clash5PluginBindingBatchInput,
+  Clash5PluginAuditEvent,
+  Clash5PluginEffectiveConfig,
+  Clash5PluginPackagePreview,
+  Clash5PluginSummary,
+} from '@/types/clash5-plugin'
 import type { ProxyViewV1 } from '@/types/proxy-view'
 import { debugLog } from '@/utils/debug'
 
@@ -40,6 +50,57 @@ export const detectClash5ExitIp = (id: string, serviceUrl: string | null) =>
 export async function listClash5Nodes(includeInactive = false) {
   return invoke<Clash5NodeRecord[]>('clash5_list_nodes', { includeInactive })
 }
+
+export const listClash5PluginBindings = () =>
+  invoke<Clash5PluginBinding[]>('clash5_list_plugin_bindings')
+export const listClash5PluginAuditEvents = (limit = 50) =>
+  invoke<Clash5PluginAuditEvent[]>('clash5_list_plugin_audit_events', { limit })
+export const getClash5PluginBindingConfig = (
+  target: Clash5PluginBinding['target'],
+  bindingId: string,
+) =>
+  invoke<Record<string, unknown>>('clash5_get_plugin_binding_config', {
+    target,
+    bindingId,
+  })
+export const saveClash5PluginBinding = (binding: Clash5PluginBindingInput) =>
+  mutate(() => invoke<void>('clash5_save_plugin_binding', { binding }), {
+    id: `clash5.plugin.binding.${JSON.stringify(binding.target)}`,
+  })
+export const saveClash5PluginBindings = (bindings: Clash5PluginBindingBatchInput) =>
+  mutate(() => invoke<void>('clash5_save_plugin_bindings', { bindings }), {
+    id: 'clash5.plugin.bindings.batch',
+  })
+export const deleteClash5PluginBinding = (
+  target: Clash5PluginBinding['target'],
+  bindingId: string,
+) =>
+  mutate(() => invoke<void>('clash5_delete_plugin_binding', { target, bindingId }), {
+    id: `clash5.plugin.binding.delete.${bindingId}`,
+  })
+export const setClash5PluginBindingEnabled = (
+  target: Clash5PluginBinding['target'],
+  bindingId: string,
+  enabled: boolean,
+) =>
+  mutate(
+    () => invoke<void>('clash5_set_plugin_binding_enabled', { target, bindingId, enabled }),
+    { id: `clash5.plugin.binding.enabled.${bindingId}` },
+  )
+export const getClash5PluginEffectiveConfig = () =>
+  invoke<Clash5PluginEffectiveConfig>('clash5_get_plugin_effective_config')
+export const listClash5Plugins = () =>
+  invoke<Clash5PluginSummary[]>('clash5_list_plugins')
+export const stageClash5PluginPackage = () =>
+  invoke<Clash5PluginPackagePreview | null>('clash5_stage_plugin_package')
+export const installStagedClash5Plugin = (
+  stagingId: string,
+  confirmedSigner: string,
+) =>
+  invoke<Clash5PluginSummary>('clash5_install_staged_plugin', {
+    stagingId,
+    confirmedSigner,
+  })
 
 export async function importClash5ManualProxies(proxies: IProxyConfig[]) {
   return invoke<{ imported: number }>('clash5_import_manual_proxies', {

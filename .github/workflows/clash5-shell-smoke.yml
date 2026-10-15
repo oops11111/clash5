@@ -11,6 +11,7 @@ on:
       - 'src/**'
       - 'scripts/m1-*.mjs'
       - 'scripts/m2-*.mjs'
+      - 'scripts/fixtures/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
   schedule:
@@ -70,7 +71,7 @@ jobs:
             $source = "src-tauri/sidecar/${core}-x86_64-pc-windows-msvc.exe"
             Copy-Item -LiteralPath $source -Destination (Join-Path $release "$core.exe") -Force
           }
-      - name: Verify native Tauri bridge and node workspace
+      - name: Verify native Tauri bridge, node workspace, and M3 plugins
         if: github.event_name == 'workflow_dispatch'
         run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --full
       - name: Verify manual node persistence after desktop restart
@@ -125,6 +126,7 @@ jobs:
             target/m1-desktop-persisted.png
             target/nav-plugins-binding.png
             target/m2-desktop-chains.png
+            target/m3-desktop-plugin-binding.png
           if-no-files-found: warn
       - name: Upload test shell
         if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

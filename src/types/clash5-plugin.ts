@@ -1,0 +1,85 @@
+import type { Clash5NodeRecord } from './clash5-node'
+
+export type Clash5PluginBindingTarget =
+  | {
+      kind: 'node'
+      source: Clash5NodeRecord['source']
+      stable_id: string
+    }
+  | { kind: 'chain'; chain_id: string }
+
+export interface Clash5PluginBinding {
+  id: string
+  plugin_id: string
+  target: Clash5PluginBindingTarget
+  priority: number
+  enabled: boolean
+  orphan: boolean
+  disappeared_at: string | null
+}
+
+export interface Clash5PluginBindingInput {
+  id: string
+  plugin_id: string
+  target: Clash5PluginBindingTarget
+  priority: number
+  enabled: boolean
+  config: Record<string, unknown>
+}
+
+export type Clash5PluginBindingBatchInput = Clash5PluginBindingInput[]
+
+export type Clash5PluginProvenance = Record<
+  string,
+  | { kind: 'profile' }
+  | {
+      kind: 'plugin'
+      plugin_id: string
+      binding_id: string
+      priority: number
+    }
+>
+
+export interface Clash5PluginConflict {
+  path: string
+  winner_plugin_id: string
+  winner_binding_id: string
+  winner_priority: number
+  loser_plugin_id: string
+  loser_binding_id: string
+  loser_priority: number
+}
+
+export interface Clash5PluginEffectiveConfig {
+  config: Record<string, unknown> | null
+  provenance: Clash5PluginProvenance
+  conflicts: Clash5PluginConflict[]
+}
+
+export interface Clash5PluginSummary {
+  id: string
+  version: string
+  name: string
+  description: string
+  permissions: string[]
+  writable_paths: string[]
+  signer_fingerprint: string
+}
+
+export interface Clash5PluginAuditEvent {
+  id: number
+  event: string
+  created_at: string
+  details: Record<string, unknown>
+}
+
+export interface Clash5PluginPackagePreview {
+  staging_id: string
+  id: string
+  version: string
+  name: string
+  description: string
+  permissions: string[]
+  signer_fingerprint: string
+  signer: string
+}
