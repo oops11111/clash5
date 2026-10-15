@@ -47,7 +47,7 @@ pub(crate) fn parse_ip(bytes: &[u8]) -> Result<IpAddr> {
 }
 
 async fn request(url: Url, port: u16) -> Result<ExitObservation> {
-    let proxy = Proxy::http(format!("http://127.0.0.1:{port}"))?;
+    let proxy = Proxy::all(format!("http://127.0.0.1:{port}"))?;
     let client = Client::builder()
         .no_proxy()
         .proxy(proxy)
@@ -132,6 +132,7 @@ pub(crate) async fn detect(proxy_name: &str, url: Url) -> Result<ExitObservation
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
     #[test]
     fn service_accepts_https_and_loopback_fixtures_without_url_credentials() {
@@ -154,5 +155,45 @@ mod tests {
         assert_eq!(parse_ip(br#"{"ip":"2001:db8::1"}"#).ok(), "2001:db8::1".parse().ok());
         assert!(parse_ip(b"secret or upstream error").is_err());
         assert!(parse_ip(br#"{"ip":"not-an-ip"}"#).is_err());
+    }
+
+    #[tokio::test]
+    async fn https_detection_uses_connect_through_the_pinned_local_proxy() -> Result<()> {
+        let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+        let port = listener.local_addr()?.port();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(5), listener.accept()).await??;
+            let mut bytes = [0_u8; 2_048];
+            let count = tokio::time::timeout(Duration::from_secs(5), socket.read(&mut bytes)).await??;
+            socket
+                .write_all(b"HTTP/1.1 502 Fixture termination\r\nContent-Length: 0\r\n\r\n")
+                .await?;
+            Ok::<_, anyhow::Error>(String::from_utf8_lossy(&bytes[..count]).into_owned())
+        });
+        let result = request(service_url("https://exit.example.invalid/ip")?, port).await;
+        let headers = server.await??;
+        assert!(headers.starts_with("CONNECT exit.example.invalid:443 HTTP/1.1"));
+        assert!(!headers.to_lowercase().contains("authorization:"));
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn http_detection_reads_the_exit_ip_from_the_pinned_proxy_response() -> Result<()> {
+        let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+        let port = listener.local_addr()?.port();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(5), listener.accept()).await??;
+            let mut bytes = [0_u8; 2_048];
+            let count = tokio::time::timeout(Duration::from_secs(5), socket.read(&mut bytes)).await??;
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 12\r\nConnection: close\r\n\r\n203.0.113.27")
+                .await?;
+            Ok::<_, anyhow::Error>(String::from_utf8_lossy(&bytes[..count]).into_owned())
+        });
+        let result = request(service_url("http://127.0.0.1:1/ip")?, port).await?;
+        assert_eq!(result.ip, IpAddr::from([203, 0, 113, 27]));
+        assert!(server.await??.starts_with("GET http://127.0.0.1:1/ip HTTP/1.1"));
+        Ok(())
     }
 }

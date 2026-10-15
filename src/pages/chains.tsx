@@ -181,7 +181,8 @@ const ChainsPage = () => {
             key={nodeKey(entry.reference)}
             value={nodeKey(entry.reference)}
           >
-            {entry.display_name} · {entry.kind}
+            {entry.display_name} · {entry.kind} ·{' '}
+            {entry.source_name ?? t('chains.manual')}
           </MenuItem>
         ))}
       </TextField>
@@ -499,6 +500,7 @@ const ChainsPage = () => {
                   control={
                     <Switch
                       checked={exitEnabled}
+                      disabled={busy}
                       onChange={(_, enabled) => {
                         setExitEnabled(enabled)
                         localStorage.setItem(

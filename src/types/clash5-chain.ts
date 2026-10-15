@@ -22,6 +22,7 @@ export interface ChainNodeOption {
   kind: string
   server: string
   port: number
+  source_name: string | null
 }
 
 export interface ChainWorkspace {
@@ -31,7 +32,7 @@ export interface ChainWorkspace {
   policy_groups: string[]
 }
 
-export interface ExitObservation {
+interface ExitObservation {
   ip: string
   elapsed_ms: number
 }

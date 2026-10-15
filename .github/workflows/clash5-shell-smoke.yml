@@ -10,6 +10,7 @@ on:
       - 'src-tauri/**'
       - 'src/**'
       - 'scripts/m1-*.mjs'
+      - 'scripts/m2-*.mjs'
       - 'package.json'
       - 'pnpm-lock.yaml'
   schedule:
@@ -54,6 +55,8 @@ jobs:
         run: pnpm prebuild x86_64-pc-windows-msvc
       - name: Probe through Mihomo and the local rate-limit fixture
         run: pnpm m1:mihomo-smoke src-tauri/sidecar/verge-mihomo-x86_64-pc-windows-msvc.exe
+      - name: Verify generated two-hop routing and exit IP through local proxies
+        run: node scripts/m2-mihomo-smoke.mjs src-tauri/sidecar/verge-mihomo-x86_64-pc-windows-msvc.exe
       - name: Build frontend
         run: pnpm web:build
       - name: Build desktop shell without an installer
@@ -121,6 +124,7 @@ jobs:
             target/m1-desktop-smoke.png
             target/m1-desktop-persisted.png
             target/nav-plugins-binding.png
+            target/m2-desktop-chains.png
           if-no-files-found: warn
       - name: Upload test shell
         if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

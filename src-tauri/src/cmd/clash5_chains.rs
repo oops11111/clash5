@@ -22,6 +22,7 @@ pub struct ChainNodeOption {
     kind: String,
     server: String,
     port: u16,
+    source_name: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -34,12 +35,8 @@ pub struct ChainWorkspace {
 
 #[tauri::command]
 pub async fn clash5_chain_workspace() -> CmdResult<ChainWorkspace> {
-    let profile_id = Config::profiles()
-        .await
-        .latest_arc()
-        .current
-        .as_ref()
-        .map(ToString::to_string);
+    let profiles = Config::profiles().await.latest_arc();
+    let profile_id = profiles.current.as_ref().map(ToString::to_string);
     let definitions = chains::definitions().await.map_err(|_| storage_failure())?;
     let runtime = Config::runtime().await.data_arc();
     let config = runtime
@@ -64,12 +61,31 @@ pub async fn clash5_chain_workspace() -> CmdResult<ChainWorkspace> {
             .iter()
             .find(|record| record.source == entry.reference.source && record.stable_id == entry.reference.stable_id)
             .map_or(node.display_name, |record| record.display_name.clone());
+        let source_name = match &entry.reference.source {
+            clash5_data::Source::Manual => None,
+            clash5_data::Source::Subscription { provider_id } => {
+                let prefix = format!("proxy-provider:{}:", profile_id.as_deref().unwrap_or_default());
+                provider_id.strip_prefix(&prefix).map(str::to_owned).or_else(|| {
+                    profiles
+                        .items
+                        .as_ref()
+                        .and_then(|items| {
+                            items
+                                .iter()
+                                .find(|item| item.uid.as_deref() == Some(provider_id.as_str()))
+                        })
+                        .and_then(|item| item.name.as_ref())
+                        .map(ToString::to_string)
+                })
+            }
+        };
         nodes.push(ChainNodeOption {
             reference: entry.reference,
             display_name,
             kind: node.kind,
             server: node.server,
             port: node.port,
+            source_name,
         });
     }
     nodes.sort_by(|left, right| left.display_name.cmp(&right.display_name));
@@ -206,7 +222,9 @@ pub struct ChainTestResult {
 }
 
 #[tauri::command]
-pub async fn clash5_test_chain(id: String) -> CmdResult<ChainTestResult> {
+pub async fn clash5_test_chain(id: String, test_url: Option<String>) -> CmdResult<ChainTestResult> {
+    let url = exit_ip::service_url(test_url.as_deref().unwrap_or("https://cp.cloudflare.com/generate_204"))
+        .map_err(|_| coded_error("C5-CHAIN-001", "connectivity test URL is invalid"))?;
     let _guard = PROFILE_WRITE_LOCK.lock().await;
     let chain = chains::definitions()
         .await
@@ -228,12 +246,9 @@ pub async fn clash5_test_chain(id: String) -> CmdResult<ChainTestResult> {
         ));
     }
     let result = Handle::mihomo()
-        .delay_proxy_by_name(&group_name, "https://cp.cloudflare.com/generate_204", 10_000)
+        .delay_proxy_by_name(&group_name, url.as_str(), 10_000)
         .await
         .map_err(|_| coded_error("C5-CHAIN-011", "chain connectivity test failed"))?;
-    if result.delay == 0 {
-        return Err(coded_error("C5-CHAIN-011", "chain connectivity test failed"));
-    }
     Ok(ChainTestResult {
         delay_ms: result.delay,
         group_name,
@@ -357,4 +372,65 @@ pub async fn clash5_detect_exit_ip(id: String, service_url: Option<String>) -> C
         observation,
         selection_persisted,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn chain_command_response_contracts_keep_the_frontend_wire_shapes() -> anyhow::Result<()> {
+        assert_eq!(
+            serde_json::to_value(ChainWorkspace {
+                profile_id: None,
+                chains: vec![],
+                nodes: vec![],
+                policy_groups: vec!["PROXY".into()],
+            })?,
+            json!({"profile_id":null,"chains":[],"nodes":[],"policy_groups":["PROXY"]})
+        );
+        assert_eq!(
+            serde_json::to_value(ChainTestResult {
+                delay_ms: 0,
+                group_name: "chain".into()
+            })?,
+            json!({"delay_ms":0,"group_name":"chain"})
+        );
+        assert_eq!(
+            serde_json::to_value(ChainActivation {
+                selection_persisted: true
+            })?,
+            json!({"selection_persisted":true})
+        );
+        assert_eq!(
+            serde_json::to_value(ExitIpResult::Disabled)?,
+            json!({"status":"disabled"})
+        );
+        assert_eq!(
+            serde_json::to_value(ExitIpResult::Warning {
+                code: "C5-EXIT-003".into()
+            })?,
+            json!({"status":"warning","code":"C5-EXIT-003"})
+        );
+        let observation = exit_ip::ExitObservation {
+            ip: "203.0.113.27".parse()?,
+            elapsed_ms: 20,
+        };
+        assert_eq!(
+            serde_json::to_value(ExitIpResult::Healthy {
+                observation: observation.clone()
+            })?,
+            json!({"status":"healthy","observation":{"ip":"203.0.113.27","elapsed_ms":20}})
+        );
+        assert_eq!(
+            serde_json::to_value(ExitIpResult::Switched {
+                fallback_chain_id: "fallback".into(),
+                observation,
+                selection_persisted: false
+            })?,
+            json!({"status":"switched","fallback_chain_id":"fallback","observation":{"ip":"203.0.113.27","elapsed_ms":20},"selection_persisted":false})
+        );
+        Ok(())
+    }
 }

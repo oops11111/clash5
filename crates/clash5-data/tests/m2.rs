@@ -48,7 +48,7 @@ fn fixture() -> (ProxyChain, Vec<ScopedProxy>, Mapping) {
         exit_policy: ExitPolicy::Warn,
     };
     let config = serde_yaml_ng::from_str(
-        "proxies:\n  - {name: original, type: http, server: 127.0.0.1, port: 18083, dialer-proxy: user-override}\nproxy-groups:\n  - {name: user-override, type: select, proxies: [DIRECT]}\nrules: [MATCH,original]\n",
+        "proxies:\n  - {name: original, type: http, server: 127.0.0.1, port: 18083, dialer-proxy: user-override}\nproxy-groups:\n  - {name: user-override, type: select, proxies: [DIRECT]}\nrules: ['MATCH,original']\n",
     )
     .unwrap();
     (chain, catalog, config)
