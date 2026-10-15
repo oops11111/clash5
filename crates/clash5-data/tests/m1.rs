@@ -1,4 +1,6 @@
-use clash5_data::{Binding, BindingStore, DataError, Node, NodeQuality, QualityStatus, Source, replace_subscription_lines};
+use clash5_data::{
+    Binding, BindingStore, DataError, Node, NodeQuality, QualityStatus, Source, replace_subscription_lines,
+};
 use std::collections::BTreeMap;
 
 fn node(name: &str) -> Node {

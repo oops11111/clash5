@@ -1034,7 +1034,11 @@ PRAGMA user_version=3;
             "DELETE FROM bindings WHERE orphan=1 AND julianday(disappeared_at)<=julianday('now',printf('-%d days',?1)) AND (?2='' OR (source_kind=?2 AND provider_id=?3))",
             params![retention_days, kind, provider],
         )?;
-        audit(&tx, "orphan.purge_expired", serde_json::json!({"bindings":count,"retention_days":retention_days}))?;
+        audit(
+            &tx,
+            "orphan.purge_expired",
+            serde_json::json!({"bindings":count,"retention_days":retention_days}),
+        )?;
         tx.commit()?;
         Ok(count)
     }
