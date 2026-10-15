@@ -52,7 +52,7 @@ fn tls_config(proxy: &YamlValue) -> Result<Option<JsonValue>> {
     let mut tls = Map::new();
     tls.insert("enabled".into(), JsonValue::Bool(true));
     put_text(&mut tls, proxy, "servername", "server_name");
-    if let Some(true) = field(proxy, "skip-cert-verify").and_then(YamlValue::as_bool) {
+    if field(proxy, "skip-cert-verify").and_then(YamlValue::as_bool) == Some(true) {
         tls.insert("insecure".into(), JsonValue::Bool(true));
     }
     if let Some(YamlValue::Sequence(alpn)) = field(proxy, "alpn") {
@@ -355,14 +355,18 @@ mod tests {
 
         let unsupported: YamlValue =
             serde_yaml_ng::from_str("type: ssr\nserver: edge.example\nport: 8388\npassword: do-not-leak\n")?;
-        let error = map_landing_outbound(&unsupported, "exit").unwrap_err().to_string();
+        let error = match map_landing_outbound(&unsupported, "exit") {
+            Ok(_) => anyhow::bail!("unsupported proxy unexpectedly mapped"),
+            Err(error) => error.to_string(),
+        };
         assert!(!error.contains("do-not-leak"));
 
         let trojan_without_tls: YamlValue =
             serde_yaml_ng::from_str("type: trojan\nserver: edge.example\nport: 443\npassword: do-not-leak\n")?;
-        let error = map_landing_outbound(&trojan_without_tls, "exit")
-            .unwrap_err()
-            .to_string();
+        let error = match map_landing_outbound(&trojan_without_tls, "exit") {
+            Ok(_) => anyhow::bail!("TLS-less Trojan unexpectedly mapped"),
+            Err(error) => error.to_string(),
+        };
         assert!(error.contains("requires TLS"));
         assert!(!error.contains("do-not-leak"));
 

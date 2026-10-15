@@ -72,7 +72,7 @@ impl AuthenticatedRelay {
         })
     }
 
-    pub fn endpoint(&self) -> &RelayEndpoint {
+    pub const fn endpoint(&self) -> &RelayEndpoint {
         &self.endpoint
     }
 
@@ -105,13 +105,19 @@ fn session_token() -> Result<String> {
 }
 
 async fn serve_client(mut client: TcpStream, upstream: SocketAddr, password: &[u8]) -> Result<()> {
+    authenticate_client(&mut client, password).await?;
+    let (request, address, domain_length) = read_connect_request(&mut client).await?;
+    forward_connect(&mut client, upstream, &request, &address, domain_length).await
+}
+
+async fn authenticate_client(client: &mut TcpStream, password: &[u8]) -> Result<()> {
     let mut greeting = [0_u8; 2];
-    read_handshake(&mut client, &mut greeting).await?;
+    read_handshake(client, &mut greeting).await?;
     if greeting[0] != SOCKS_VERSION {
         anyhow::bail!("unsupported relay protocol");
     }
     let mut methods = vec![0_u8; greeting[1] as usize];
-    read_handshake(&mut client, &mut methods).await?;
+    read_handshake(client, &mut methods).await?;
     if !methods.contains(&2) {
         client.write_all(&[SOCKS_VERSION, 0xff]).await?;
         anyhow::bail!("relay authentication is required");
@@ -119,17 +125,17 @@ async fn serve_client(mut client: TcpStream, upstream: SocketAddr, password: &[u
     client.write_all(&[SOCKS_VERSION, 2]).await?;
 
     let mut auth = [0_u8; 2];
-    read_handshake(&mut client, &mut auth).await?;
+    read_handshake(client, &mut auth).await?;
     if auth[0] != AUTH_VERSION {
         client.write_all(&[AUTH_VERSION, 1]).await?;
         anyhow::bail!("invalid relay authentication");
     }
     let mut username = vec![0_u8; auth[1] as usize];
-    read_handshake(&mut client, &mut username).await?;
+    read_handshake(client, &mut username).await?;
     let mut password_length = [0_u8; 1];
-    read_handshake(&mut client, &mut password_length).await?;
+    read_handshake(client, &mut password_length).await?;
     let mut candidate = vec![0_u8; password_length[0] as usize];
-    read_handshake(&mut client, &mut candidate).await?;
+    read_handshake(client, &mut candidate).await?;
     let accepted = constant_time_eq(&username, b"clash5") && constant_time_eq(&candidate, password);
     candidate.fill(0);
     if !accepted {
@@ -138,8 +144,12 @@ async fn serve_client(mut client: TcpStream, upstream: SocketAddr, password: &[u
     }
     client.write_all(&[AUTH_VERSION, 0]).await?;
 
+    Ok(())
+}
+
+async fn read_connect_request(client: &mut TcpStream) -> Result<([u8; 4], Vec<u8>, Option<u8>)> {
     let mut request = [0_u8; 4];
-    read_handshake(&mut client, &mut request).await?;
+    read_handshake(client, &mut request).await?;
     if request[0] != SOCKS_VERSION || request[1] != CONNECT || request[2] != 0 {
         anyhow::bail!("unsupported relay request");
     }
@@ -148,14 +158,24 @@ async fn serve_client(mut client: TcpStream, upstream: SocketAddr, password: &[u
         4 => (None, 16),
         3 => {
             let mut length = [0_u8; 1];
-            read_handshake(&mut client, &mut length).await?;
+            read_handshake(client, &mut length).await?;
             (Some(length[0]), length[0] as usize)
         }
         _ => anyhow::bail!("invalid relay address type"),
     };
     let mut address = vec![0_u8; address_length + 2];
-    read_handshake(&mut client, &mut address).await?;
+    read_handshake(client, &mut address).await?;
 
+    Ok((request, address, domain_length))
+}
+
+async fn forward_connect(
+    client: &mut TcpStream,
+    upstream: SocketAddr,
+    request: &[u8; 4],
+    address: &[u8],
+    domain_length: Option<u8>,
+) -> Result<()> {
     let mut upstream_stream = tokio::time::timeout(Duration::from_secs(3), TcpStream::connect(upstream))
         .await
         .context("sing-box relay connection timed out")??;
@@ -166,11 +186,11 @@ async fn serve_client(mut client: TcpStream, upstream: SocketAddr, password: &[u
         client.write_all(&[SOCKS_VERSION, 5, 0, 1, 0, 0, 0, 0, 0, 0]).await?;
         anyhow::bail!("sing-box SOCKS inbound rejected negotiation");
     }
-    upstream_stream.write_all(&request).await?;
+    upstream_stream.write_all(request).await?;
     if let Some(length) = domain_length {
         upstream_stream.write_all(&[length]).await?;
     }
-    upstream_stream.write_all(&address).await?;
+    upstream_stream.write_all(address).await?;
     let mut response = [0_u8; 4];
     read_handshake(&mut upstream_stream, &mut response).await?;
     let reply_address_length = match response[3] {
@@ -194,7 +214,7 @@ async fn serve_client(mut client: TcpStream, upstream: SocketAddr, password: &[u
     if response[1] != 0 {
         anyhow::bail!("sing-box CONNECT request failed");
     }
-    let _ = tokio::io::copy_bidirectional(&mut client, &mut upstream_stream).await?;
+    let _ = tokio::io::copy_bidirectional(client, &mut upstream_stream).await?;
     Ok(())
 }
 
