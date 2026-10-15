@@ -21,6 +21,7 @@ import { useTheme } from '@mui/material/styles'
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router'
 
 import { BasePage } from '@/components/base'
 import {
@@ -66,6 +67,7 @@ const isSubscriptionUrl = (value: string) => {
 
 const NodePoolPage = () => {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const dark = useTheme().palette.mode === 'dark'
   const [records, setRecords] = useState<Clash5NodeRecord[]>([])
   const [profileNames, setProfileNames] = useState<Record<string, string>>({})
@@ -263,6 +265,11 @@ const NodePoolPage = () => {
 
   return (
     <BasePage
+      header={
+        <Button onClick={() => navigate('/proxies')}>
+          {t('layout.components.navigation.proxyGroups')}
+        </Button>
+      }
       title={
         <>
           <Box component="span">{t('nodePool.title')}</Box>

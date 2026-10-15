@@ -1,9 +1,5 @@
 export const navigationItems = {
   home: { label: 'layout.components.navigation.tabs.home', path: '/' },
-  proxies: {
-    label: 'layout.components.navigation.tabs.proxies',
-    path: '/proxies',
-  },
   nodePool: {
     label: 'layout.components.navigation.tabs.nodePool',
     path: '/nodes',
@@ -12,16 +8,20 @@ export const navigationItems = {
     label: 'layout.components.navigation.tabs.profiles',
     path: '/profile',
   },
+  chains: {
+    label: 'layout.components.navigation.tabs.chains',
+    path: '/chains',
+  },
+  rules: { label: 'layout.components.navigation.tabs.rules', path: '/rules' },
+  plugins: {
+    label: 'layout.components.navigation.tabs.plugins',
+    path: '/plugins',
+  },
   connections: {
     label: 'layout.components.navigation.tabs.connections',
     path: '/connections',
   },
-  rules: { label: 'layout.components.navigation.tabs.rules', path: '/rules' },
   logs: { label: 'layout.components.navigation.tabs.logs', path: '/logs' },
-  unlock: {
-    label: 'layout.components.navigation.tabs.unlock',
-    path: '/unlock',
-  },
   settings: {
     label: 'layout.components.navigation.tabs.settings',
     path: '/settings',

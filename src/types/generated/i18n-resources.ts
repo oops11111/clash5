@@ -196,6 +196,19 @@ export interface TranslationResources {
     layout: {
       components: {
         navigation: {
+          diagnostics: string
+          empty: {
+            bindingDescription: string
+            bindingTitle: string
+            chainsDescription: string
+            chainsTitle: string
+            installedDescription: string
+            installedTitle: string
+            marketDescription: string
+            marketTitle: string
+            settingsDescription: string
+            settingsTitle: string
+          }
           menu: {
             collapseNavBar: string
             expandNavBar: string
@@ -204,11 +217,20 @@ export interface TranslationResources {
             restoreDefaultOrder: string
             unlock: string
           }
+          pluginTabs: {
+            binding: string
+            installed: string
+            market: string
+            settings: string
+          }
+          proxyGroups: string
           tabs: {
+            chains: string
             connections: string
             home: string
             logs: string
             nodePool: string
+            plugins: string
             profiles: string
             proxies: string
             rules: string
