@@ -1,3 +1,4 @@
+use crate::core::singbox_relay::RelayEndpoint;
 use anyhow::{Context as _, Result};
 use serde_json::{Map, Value as JsonValue, json};
 use serde_yaml_ng::{Mapping, Value as YamlValue};
@@ -215,6 +216,72 @@ pub fn singbox_config(proxy: &YamlValue, inbound_port: u16, tag: &str) -> Result
     }))
 }
 
+/// Replaces one compiled Mihomo landing proxy with the authenticated loopback relay.
+/// The caller passes the generated copy's unique name, leaving the profile node untouched.
+/// The token-bearing result must only travel over the in-memory config path.
+pub fn replace_landing_with_relay(config: &mut Mapping, landing_name: &str, endpoint: &RelayEndpoint) -> Result<()> {
+    anyhow::ensure!(
+        endpoint.host == "127.0.0.1"
+            && endpoint.port != 0
+            && !endpoint.username.is_empty()
+            && endpoint.username.len() <= u8::MAX as usize
+            && !endpoint.password.is_empty()
+            && endpoint.password.len() <= u8::MAX as usize,
+        "invalid sing-box relay endpoint"
+    );
+    let mut candidate = config.clone();
+    let proxies = candidate
+        .get_mut("proxies")
+        .and_then(YamlValue::as_sequence_mut)
+        .context("runtime config has no proxy list")?;
+    let matched_indices: Vec<usize> = proxies
+        .iter()
+        .enumerate()
+        .filter_map(|(index, proxy)| {
+            (field(proxy, "name").and_then(YamlValue::as_str) == Some(landing_name)).then_some(index)
+        })
+        .collect();
+    anyhow::ensure!(
+        !matched_indices.is_empty(),
+        "compiled sing-box landing proxy is missing"
+    );
+    anyhow::ensure!(
+        matched_indices.len() == 1,
+        "compiled sing-box landing proxy is ambiguous"
+    );
+    let index = matched_indices[0];
+    let original = proxies
+        .get(index)
+        .and_then(YamlValue::as_mapping)
+        .context("compiled sing-box landing proxy is invalid")?;
+    let mut relay = Mapping::new();
+    relay.insert("name".into(), YamlValue::String(landing_name.to_owned()));
+    relay.insert("type".into(), YamlValue::String("socks5".into()));
+    relay.insert("server".into(), YamlValue::String(endpoint.host.clone()));
+    relay.insert("port".into(), YamlValue::Number(endpoint.port.into()));
+    relay.insert("username".into(), YamlValue::String(endpoint.username.clone()));
+    relay.insert("password".into(), YamlValue::String(endpoint.password.clone()));
+    for key in ["dialer-proxy", "udp", "ip-version", "interface-name"] {
+        if let Some(value) = original.get(YamlValue::String(key.into())) {
+            relay.insert(YamlValue::String(key.into()), value.clone());
+        }
+    }
+    proxies[index] = YamlValue::Mapping(relay);
+    *config = candidate;
+    Ok(())
+}
+
+/// Builds the token-bearing Mihomo JSON that a child core must receive through stdin.
+/// Callers must not persist or log the returned bytes.
+pub fn relay_config_json(yaml: &str, landing_name: &str, endpoint: &RelayEndpoint) -> Result<Vec<u8>> {
+    let mut config: YamlValue = serde_yaml_ng::from_str(yaml).context("failed to parse runtime config")?;
+    let mapping = config
+        .as_mapping_mut()
+        .context("runtime config root is not a mapping")?;
+    replace_landing_with_relay(mapping, landing_name, endpoint)?;
+    serde_json::to_vec(&config).context("failed to encode in-memory relay config")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,6 +300,46 @@ mod tests {
         assert_eq!(config["inbounds"][0]["listen"], "127.0.0.1");
         assert!(config["inbounds"][0].get("tun").is_none());
         assert_eq!(config["route"]["final"], "exit");
+        Ok(())
+    }
+
+    #[test]
+    fn replaces_only_the_compiled_landing_copy_and_discards_remote_credentials() -> Result<()> {
+        let original: YamlValue = serde_yaml_ng::from_str(
+            "name: copy-landing\ntype: ss\nserver: edge.example\nport: 8388\ncipher: aes-128-gcm\npassword: remote-secret\ndialer-proxy: copy-front\n",
+        )?;
+        let mut config = Mapping::new();
+        config.insert("proxies".into(), YamlValue::Sequence(vec![original]));
+        let endpoint = RelayEndpoint {
+            host: "127.0.0.1".into(),
+            port: 49152,
+            username: "clash5".into(),
+            password: "session-token".into(),
+        };
+        replace_landing_with_relay(&mut config, "copy-landing", &endpoint)?;
+        let proxy = &config["proxies"][0];
+        assert_eq!(proxy["type"], "socks5");
+        assert_eq!(proxy["port"].as_u64(), Some(49152));
+        assert_eq!(proxy["password"], "session-token");
+        assert_eq!(proxy["dialer-proxy"], "copy-front");
+        assert!(proxy.get("cipher").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn relay_config_json_keeps_session_secrets_out_of_the_yaml_file_representation() -> Result<()> {
+        let yaml = "proxies:\n  - name: copy-landing\n    type: ss\n    server: edge.example\n    port: 8388\n    cipher: aes-128-gcm\n    password: remote-secret\n";
+        let endpoint = RelayEndpoint {
+            host: "127.0.0.1".into(),
+            port: 49152,
+            username: "clash5".into(),
+            password: "session-token".into(),
+        };
+        let json = String::from_utf8(relay_config_json(yaml, "copy-landing", &endpoint)?)?;
+        let value: JsonValue = serde_json::from_str(&json)?;
+        assert_eq!(value["proxies"][0]["password"], "session-token");
+        assert!(json.contains("session-token"));
+        assert!(!json.contains("remote-secret"));
         Ok(())
     }
 
