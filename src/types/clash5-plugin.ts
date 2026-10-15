@@ -29,7 +29,7 @@ export interface Clash5PluginBindingInput {
 
 export type Clash5PluginBindingBatchInput = Clash5PluginBindingInput[]
 
-export type Clash5PluginProvenance = Record<
+type Clash5PluginProvenance = Record<
   string,
   | { kind: 'profile' }
   | {
@@ -40,7 +40,7 @@ export type Clash5PluginProvenance = Record<
     }
 >
 
-export interface Clash5PluginConflict {
+interface Clash5PluginConflict {
   path: string
   winner_plugin_id: string
   winner_binding_id: string
