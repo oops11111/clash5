@@ -714,6 +714,19 @@ async function verifyM2Chains() {
   })
   if (switched.status !== 'valid')
     throw new Error('M2 fixture profile was rejected')
+  const activeProfiles = await invoke('get_profiles')
+  const activeRuntime = await invoke('get_runtime_config')
+  if (activeProfiles.current !== profile.uid)
+    throw new Error('M2 fixture profile did not become active')
+  if (!activeRuntime.proxies?.some((proxy) => proxy.name === 'M2-front'))
+    throw new Error(
+      `M2 fixture proxy was not generated: ${activeRuntime.proxies?.map((proxy) => proxy.name).join(', ')}`,
+    )
+  const backendWorkspace = await invoke('clash5_chain_workspace')
+  if (!backendWorkspace.nodes.some((node) => node.display_name === 'M2-front'))
+    throw new Error(
+      `M2 front node was absent from workspace: ${backendWorkspace.nodes.map((node) => node.display_name).join(', ')}`,
+    )
   await browser.execute(() => {
     localStorage.setItem('clash5-exit-ip-url', 'http://127.0.0.1:18090/ip')
     window.history.pushState({}, '', '/chains')
@@ -735,12 +748,10 @@ async function verifyM2Chains() {
     [0, 'M2-front'],
     [1, 'M2-landing'],
   ]) {
-    await browser.execute((position) => {
-      const controls = document.querySelectorAll(
-        '[data-testid="chains-workspace"] [role="combobox"]',
-      )
-      controls[position]?.click()
-    }, index)
+    const control = await browser.$$(
+      '[data-testid="chains-workspace"] [role="combobox"]',
+    ).then((controls) => controls[index])
+    await control.click()
     await browser.waitUntil(
       () =>
         browser.execute(
