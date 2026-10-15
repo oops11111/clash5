@@ -145,6 +145,7 @@ async function captureClipboardImportFlow() {
     const flow = {
       installed: false,
       installError: null,
+      invokeDescriptor: null,
       clipboardReads: [],
       importCalls: [],
       importErrors: [],
@@ -161,6 +162,15 @@ async function captureClipboardImportFlow() {
     }
 
     const invoke = internals.invoke
+    const descriptor = Object.getOwnPropertyDescriptor(internals, 'invoke')
+    flow.invokeDescriptor = descriptor
+      ? {
+          configurable: descriptor.configurable,
+          writable: descriptor.writable ?? null,
+          hasGetter: typeof descriptor.get === 'function',
+          hasSetter: typeof descriptor.set === 'function',
+        }
+      : null
     const wrappedInvoke = async function (...args) {
       try {
         const result = await invoke.apply(this, args)
@@ -198,12 +208,18 @@ async function captureClipboardImportFlow() {
     }
 
     try {
-      Object.defineProperty(internals, 'invoke', {
-        configurable: true,
-        writable: true,
-        value: wrappedInvoke,
-      })
+      try {
+        Object.defineProperty(internals, 'invoke', {
+          configurable: true,
+          writable: true,
+          value: wrappedInvoke,
+        })
+      } catch {
+        internals.invoke = wrappedInvoke
+      }
       flow.installed = internals.invoke === wrappedInvoke
+      if (!flow.installed)
+        flow.installError = 'Tauri invoke hook was not installed'
     } catch (error) {
       flow.installError = String(error).slice(0, 240)
     }

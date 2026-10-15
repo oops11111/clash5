@@ -128,10 +128,14 @@ const NodePoolPage = () => {
     setImportBusy(true)
     setImportError(false)
     setImportMessage('')
+    let importStage = 'clipboard-read'
     try {
       const value = (await readText())?.trim() ?? ''
+      importStage = 'subscription-detection'
       if (isSubscriptionUrl(value)) {
+        importStage = 'subscription-import'
         await importProfile(value)
+        importStage = 'refresh-after-subscription-import'
         await refresh()
         setImportMessage(t('nodePool.importSuccess'))
         return
@@ -147,7 +151,9 @@ const NodePoolPage = () => {
         }
       }
       if (isSubscriptionUrl(shareText)) {
+        importStage = 'subscription-import'
         await importProfile(shareText)
+        importStage = 'refresh-after-subscription-import'
         await refresh()
         setImportMessage(t('nodePool.importSuccess'))
         return
@@ -157,6 +163,7 @@ const NodePoolPage = () => {
         .map((line) => line.trim())
         .filter(Boolean)
       const proxies: IProxyConfig[] = []
+      importStage = 'share-link-parse'
       for (const line of lines) {
         const proxy = parseUri(line)
         if (!proxy.server || !proxy.port) {
@@ -169,12 +176,24 @@ const NodePoolPage = () => {
         setImportMessage(t('nodePool.importInvalid'))
         return
       }
+      importStage = 'manual-proxy-import'
       const result = await importClash5ManualProxies(proxies)
+      importStage = 'refresh-after-manual-import'
       await refresh()
       setImportMessage(
         t('nodePool.manualImportSuccess', { count: result.imported }),
       )
-    } catch {
+    } catch (error) {
+      const errorName = error instanceof Error ? error.name : typeof error
+      const rawMessage = error instanceof Error ? error.message : ''
+      const errorMessage = rawMessage
+        .replace(/[a-z][a-z\d+.-]*:\/\/[^\s"'<>]+/gi, '[redacted-uri]')
+        .slice(0, 200)
+      console.error('[NodePool] Clipboard import failed', {
+        stage: importStage,
+        errorName,
+        errorMessage,
+      })
       setImportError(true)
       setImportMessage(t('nodePool.importError'))
     } finally {
