@@ -595,7 +595,13 @@ fn execute_blocking(
     let memory = instance
         .get_memory(&mut store, "memory")
         .ok_or(PluginFailure::InvalidPackage)?;
-    let required_pages = input.len().div_ceil(65_536);
+    // Keep the host-owned invocation buffer past all statically allocated module data.
+    let input_pointer = memory.data_size(&store);
+    let required_bytes = input_pointer
+        .checked_add(input.len())
+        .filter(|end| *end <= MAX_MEMORY_BYTES)
+        .ok_or(PluginFailure::InvalidPackage)?;
+    let required_pages = required_bytes.div_ceil(65_536);
     let current_pages = memory.data_size(&store).div_ceil(65_536);
     if required_pages > current_pages {
         memory
@@ -603,13 +609,13 @@ fn execute_blocking(
             .map_err(|_| PluginFailure::InvalidPackage)?;
     }
     memory
-        .write(&mut store, 0, &input)
+        .write(&mut store, input_pointer, &input)
         .map_err(|_| PluginFailure::InvalidPackage)?;
     let apply = instance
         .get_typed_func::<(i32, i32), i64>(&mut store, "apply")
         .map_err(|_| PluginFailure::InvalidPackage)?;
     let packed = apply
-        .call(&mut store, (0, input.len() as i32))
+        .call(&mut store, (input_pointer as i32, input.len() as i32))
         .map_err(|error| classify_execution_error(&error))? as u64;
     if start.elapsed() > EPOCH_INTERVAL * EPOCH_DEADLINE_TICKS as u32 {
         return Err(PluginFailure::TimedOut);
@@ -680,11 +686,14 @@ mod tests {
             Err(PluginFailure::PermissionDenied)
         ));
         assert!(verify_package(package, &[inspected.signer]).is_ok());
-        let patch = execute_blocking(
-            inspected.module,
-            br#"{"configuration":{},"binding":{"acceptance":true}}"#.to_vec(),
-            inspected.manifest.writable_paths,
-        );
+        let invocation = serde_json::json!({
+            "configuration": {"long_runtime_config": "x".repeat(1024)},
+            "binding": {"acceptance": true},
+        });
+        let Ok(input) = serde_json::to_vec(&invocation) else {
+            return;
+        };
+        let patch = execute_blocking(inspected.module, input, inspected.manifest.writable_paths);
         assert_eq!(patch, Ok(serde_json::json!({"tun":{"mtu":1360}})));
     }
 

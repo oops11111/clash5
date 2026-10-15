@@ -2,7 +2,7 @@
 
 第三方插件以 `.c5p` ZIP 包安装，包内必须且只能包含 `manifest.json`、`module.wasm`、`manifest.minisig` 和 `signer.pub`。签名覆盖 manifest 原始字节，manifest 中的 SHA-256 覆盖 WASM 字节。安装对话框展示签名者指纹与权限；用户确认的公钥随插件保存在应用数据目录。指纹用于复核同一签名者，签名本身不会证明发布者真实身份。
 
-WASM ABI 导出一页或多页线性内存 `memory` 和函数 `apply(ptr, len) -> i64`。Host 在内存偏移 0 写入 JSON `{ "configuration": ..., "binding": ... }`；返回值低 32 位是补丁指针，高 32 位是补丁长度。未声明 `config.read` 时，Host 传入空配置对象；每个绑定必须声明 `config.patch`。Host 校验返回 JSON 对象中的每条路径都落在 manifest 的 `writable_paths` 前缀内。第三方 WASM 不得声明导入项；Host 不提供网络或文件系统接口，并限制单次最多 32 个启用绑定、线性内存 32 MiB、fuel 和 epoch 执行时间 3 秒。
+WASM ABI 导出一页或多页线性内存 `memory` 和函数 `apply(ptr, len) -> i64`。Host 在模块初始线性内存之后追加 JSON `{ "configuration": ..., "binding": ... }`，并将其指针和长度传给 `apply`，避免覆盖模块静态数据；返回值低 32 位是补丁指针，高 32 位是补丁长度。未声明 `config.read` 时，Host 传入空配置对象；每个绑定必须声明 `config.patch`。Host 校验返回 JSON 对象中的每条路径都落在 manifest 的 `writable_paths` 前缀内。第三方 WASM 不得声明导入项；Host 不提供网络或文件系统接口，并限制单次最多 32 个启用绑定、线性内存 32 MiB、fuel 和 epoch 执行时间 3 秒。
 
 `sample-plugin.wat` 返回一个 `/tun/mtu` 补丁。以 WAT 编译为 WASM 后，将模块 SHA-256 写入 manifest，以 minisign 对 manifest 原始字节签名，再按上述四个固定文件名打包。示例不包含签名密钥；插件作者应自行保管私钥。
 
