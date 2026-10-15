@@ -680,6 +680,12 @@ mod tests {
             Err(PluginFailure::PermissionDenied)
         ));
         assert!(verify_package(package, &[inspected.signer]).is_ok());
+        let patch = execute_blocking(
+            inspected.module,
+            br#"{"configuration":{},"binding":{"acceptance":true}}"#.to_vec(),
+            inspected.manifest.writable_paths,
+        );
+        assert_eq!(patch, Ok(serde_json::json!({"tun":{"mtu":1360}})));
     }
 
     #[test]
