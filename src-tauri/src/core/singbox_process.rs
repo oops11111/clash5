@@ -58,18 +58,24 @@ impl SingboxProcess {
 
     pub async fn stop(&self) -> Result<()> {
         let mut child = self.child.lock().await;
-        if child
-            .try_wait()
-            .context("failed to inspect the sing-box process before shutdown")?
-            .is_some()
-        {
-            return Ok(());
+        let result = async {
+            if child
+                .try_wait()
+                .context("failed to inspect the sing-box process before shutdown")?
+                .is_some()
+            {
+                return Ok(());
+            }
+            child.start_kill().context("failed to signal the sing-box process")?;
+            tokio::time::timeout(SHUTDOWN_TIMEOUT, child.wait())
+                .await
+                .context("sing-box did not exit after shutdown")?
+                .context("failed to wait for the sing-box process")
+                .map(|_| ())
         }
-        child.start_kill().context("failed to signal the sing-box process")?;
-        tokio::time::timeout(SHUTDOWN_TIMEOUT, child.wait())
-            .await
-            .context("sing-box did not exit after shutdown")?
-            .context("failed to wait for the sing-box process")?;
+        .await;
+        drop(child);
+        result?;
         Ok(())
     }
 }

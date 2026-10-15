@@ -39,6 +39,16 @@ pub struct SingboxRoute {
     relay: Option<AuthenticatedRelay>,
 }
 
+impl std::fmt::Debug for SingboxRoute {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SingboxRoute")
+            .field("landing_name", &self.landing_name)
+            .field("running", &self.process.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
 impl SingboxRoute {
     /// Starts a sing-box outbound for one generated landing proxy, then replaces only that
     /// compiled copy in Mihomo. The source profile and persisted runtime file stay credential-free.
@@ -111,6 +121,10 @@ impl SingboxRoute {
 
     pub fn landing_name(&self) -> &str {
         &self.landing_name
+    }
+
+    pub const fn is_stopped(&self) -> bool {
+        self.process.is_none() && self.relay.is_none()
     }
 
     pub async fn is_running(&self) -> Result<bool> {

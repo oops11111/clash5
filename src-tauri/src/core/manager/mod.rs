@@ -3,11 +3,16 @@ pub(crate) use config::ConfigUpdateGuard;
 mod lifecycle;
 mod state;
 
-use anyhow::Result;
+use crate::{
+    config::Config,
+    core::{handle::Handle, singbox_config, singbox_runtime::SingboxRoute},
+};
+use anyhow::{Context as _, Result};
 use arc_swap::{ArcSwap, ArcSwapOption};
 use clash_verge_logging::{LogRing, Type, logging};
 use std::{
     fmt,
+    process::Command,
     sync::{
         Arc, LazyLock,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -97,6 +102,8 @@ pub struct CoreManager {
     core_readiness_state: AtomicU64,
     startup_error: parking_lot::Mutex<Option<CoreFailure>>,
     sidecar_exit: tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
+    /// The optional sing-box route currently replacing one selected generated landing node.
+    singbox_route: tokio::sync::Mutex<Option<SingboxRoute>>,
     // 串行化 start/stop/restart 和 sidecar→service 交接。
     // 锁序固定为 config_update_in_progress → lifecycle_lock。
     pub(crate) lifecycle_lock: tokio::sync::Mutex<()>,
@@ -126,6 +133,7 @@ impl Default for CoreManager {
             core_readiness_state: AtomicU64::new(0),
             startup_error: parking_lot::Mutex::new(None),
             sidecar_exit: tokio::sync::Mutex::new(None),
+            singbox_route: tokio::sync::Mutex::new(None),
             lifecycle_lock: tokio::sync::Mutex::new(()),
             #[cfg(target_os = "windows")]
             handoff_watcher_running: AtomicBool::new(false),
@@ -216,6 +224,51 @@ impl CoreManager {
     /// The start attempt is over: PAC goes back to following the Running Mode.
     pub fn core_start_settled(&self) {
         self.run_state.core_start_settled();
+    }
+
+    /// Selects a sing-box landing route when the generated proxy can be mapped, or restores
+    /// Mihomo's generated config when the selection should use Mihomo directly.
+    pub async fn set_singbox_landing(&self, landing_name: Option<&str>) -> Result<()> {
+        let mihomo = Handle::mihomo();
+        let mut active = self.singbox_route.lock().await;
+        if active
+            .as_ref()
+            .is_some_and(|route| Some(route.landing_name()) == landing_name)
+        {
+            return Ok(());
+        }
+        if let Some(route) = active.as_mut() {
+            let result = route.stop(mihomo).await;
+            if route.is_stopped() {
+                *active = None;
+            }
+            result?;
+        }
+        let Some(landing_name) = landing_name else {
+            return Ok(());
+        };
+
+        let runtime = Config::runtime().await.latest_arc();
+        let config = runtime
+            .config
+            .as_ref()
+            .context("generated Mihomo runtime config is unavailable")?;
+        let landing = config
+            .get("proxies")
+            .and_then(serde_yaml_ng::Value::as_sequence)
+            .into_iter()
+            .flatten()
+            .find(|proxy| proxy.get("name").and_then(serde_yaml_ng::Value::as_str) == Some(landing_name))
+            .context("generated chain landing proxy is missing")?;
+        if singbox_config::map_landing_outbound(landing, "clash5-exit").is_err() {
+            // Unsupported protocols retain the ordinary Mihomo route.
+            return Ok(());
+        }
+        let yaml = serde_yaml_ng::to_string(config).context("failed to serialize the generated Mihomo config")?;
+        let route = SingboxRoute::start(mihomo, Command::new("sing-box"), yaml, landing_name).await?;
+        *active = Some(route);
+        drop(active);
+        Ok(())
     }
 
     pub fn set_running_child_sidecar(&self, child: CommandChild) {
