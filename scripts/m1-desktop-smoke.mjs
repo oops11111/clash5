@@ -689,7 +689,10 @@ async function clickBindingAction(bindingId, labels) {
     `优先级 ${priority}`,
     `優先級 ${priority}`,
   ]
-  const findEnabledBindingAction = ({ buttonLabels, bindingPriorityLabels }) => {
+  const findEnabledBindingAction = ({
+    buttonLabels,
+    bindingPriorityLabels,
+  }) => {
     const cards = [...document.querySelectorAll('.base-page .MuiPaper-root')]
       .filter(
         (card) =>
@@ -703,7 +706,8 @@ async function clickBindingAction(bindingId, labels) {
       )
       .sort((left, right) => left.textContent.length - right.textContent.length)
     const button = [...(cards[0]?.querySelectorAll('button') ?? [])].find(
-      (item) => buttonLabels.includes(item.textContent?.trim()) && !item.disabled,
+      (item) =>
+        buttonLabels.includes(item.textContent?.trim()) && !item.disabled,
     )
     return Boolean(button)
   }
@@ -716,24 +720,30 @@ async function clickBindingAction(bindingId, labels) {
       timeoutMsg: `${labels[0]} did not become enabled for ${bindingId}`,
     },
   )
-  const clicked = await browser.execute(({ buttonLabels, bindingPriorityLabels }) => {
-    const cards = [...document.querySelectorAll('.base-page .MuiPaper-root')]
-      .filter(
-        (card) =>
-          card.textContent?.includes('m3.smoke.plugin') &&
-          [...card.querySelectorAll('.MuiChip-root')].some((chip) =>
-            bindingPriorityLabels.includes(chip.textContent?.trim()),
-          ),
+  const clicked = await browser.execute(
+    ({ buttonLabels, bindingPriorityLabels }) => {
+      const cards = [...document.querySelectorAll('.base-page .MuiPaper-root')]
+        .filter(
+          (card) =>
+            card.textContent?.includes('m3.smoke.plugin') &&
+            [...card.querySelectorAll('.MuiChip-root')].some((chip) =>
+              bindingPriorityLabels.includes(chip.textContent?.trim()),
+            ),
+        )
+        .sort(
+          (left, right) => left.textContent.length - right.textContent.length,
+        )
+      const button = [...(cards[0]?.querySelectorAll('button') ?? [])].find(
+        (item) =>
+          buttonLabels.includes(item.textContent?.trim()) && !item.disabled,
       )
-      .sort((left, right) => left.textContent.length - right.textContent.length)
-    const button = [...(cards[0]?.querySelectorAll('button') ?? [])].find(
-      (item) =>
-        buttonLabels.includes(item.textContent?.trim()) && !item.disabled,
-    )
-    button?.click()
-    return Boolean(button)
-  }, args)
-  if (!clicked) throw new Error(`Could not find ${labels[0]} for ${bindingId}`)
+      button?.click()
+      return Boolean(button)
+    },
+    args,
+  )
+  if (!clicked)
+    throw new Error(`Could not find ${labels[0]} for ${bindingId}`)
 }
 
 async function verifyM3PluginUi() {
