@@ -759,6 +759,10 @@ async function verifyM2Chains() {
           ?.click(),
       name,
     )
+    await browser.waitUntil(
+      () => browser.execute(() => !document.querySelector('[role="listbox"]')),
+      { timeout: 5_000 },
+    )
   }
   await clickButton(['Save chain', '保存链路', '儲存鏈路'])
   let workspace
@@ -814,6 +818,18 @@ async function verifyM2Chains() {
   )
     throw new Error(
       'Generated chain changed the original or reversed hop direction',
+    )
+  let legacyRejected = false
+  try {
+    await invoke('update_proxy_chain_config_in_runtime', {
+      proxyChainConfig: null,
+    })
+  } catch {
+    legacyRejected = true
+  }
+  if (!legacyRejected)
+    throw new Error(
+      'Legacy chain mutation was allowed to overwrite a managed chain',
     )
   if (
     runtime.listeners?.some((listener) =>
@@ -1073,6 +1089,20 @@ try {
       )
     )
       throw new Error('Saved M2 chains were not regenerated after restart')
+    const view = await invoke('get_proxy_view')
+    const original = workspace.chains.find(
+      (chain) => chain.name === 'M2 desktop chain',
+    )
+    const fallback = workspace.chains.find(
+      (chain) => chain.id === '28dc0b8a-7485-49bc-8a91-f48bdc736846',
+    )
+    if (
+      view.groups.find((group) => group.name === `clash5-chain-${fallback.id}`)
+        ?.now !== `clash5-chain-${original.id}`
+    )
+      throw new Error(
+        'Verified fallback selection did not survive desktop restart',
+      )
     process.stdout.write(
       'M2 stable chains survived restart and regenerated their runtime groups\n',
     )

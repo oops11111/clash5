@@ -88,6 +88,22 @@ pub async fn get_runtime_proxy_chain_config(proxy_chain_exit_node: String) -> Cm
 
 #[tauri::command]
 pub async fn update_proxy_chain_config_in_runtime(proxy_chain_config: Option<serde_yaml_ng::Value>) -> CmdResult<()> {
+    let _guard = crate::config::profiles::PROFILE_WRITE_LOCK.lock().await;
+    let current = Config::profiles()
+        .await
+        .latest_arc()
+        .current
+        .as_ref()
+        .map(ToString::to_string);
+    let managed = crate::clash5::chains::definitions()
+        .await
+        .map_err(|_| super::coded_error("C5-CHAIN-006", "chain storage is unavailable"))?;
+    if managed.iter().any(|chain| chain.enabled && chain.profile_id == current) {
+        return Err(super::coded_error(
+            "C5-CHAIN-013",
+            "manage saved chains on the Chains page",
+        ));
+    }
     match CoreManager::global()
         .update_runtime_config(|d| d.update_proxy_chain_config(proxy_chain_config))
         .await

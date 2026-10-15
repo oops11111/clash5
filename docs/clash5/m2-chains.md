@@ -10,6 +10,8 @@ Provider identities are calculated from their raw definitions before supported p
 
 Saving and deleting a chain rebuilds and validates the runtime. Rejection restores the previous SQLite definition and confirms the previous runtime. Changing the selected policy group uses the existing backend selection persistence path.
 
+The proxy-groups page opens the new Chains editor instead of its inherited name-based chain toggle. The legacy mutation command refuses to change a runtime with enabled managed chains, so older callers cannot strip their dialer links.
+
 Exit-IP detection creates a temporary HTTP listener bound to `127.0.0.1` on an available port and pins it to the chain selector. It then requests the configured service through that listener and removes that listener. The request sends no node credentials or subscription URL to the service, rejects redirects, has a 12-second timeout and limits the response to 4 KiB. Plain IP and JSON `ip` responses are supported. The default endpoint is [ipify's IPv4/IPv6 service](https://www.ipify.org/). Detection can be disabled or pointed at another HTTPS service; HTTP is accepted only for loopback fixtures.
 
 The default L2 policy warns and keeps the selected route. An explicitly selected fallback is probed first and selected only on success. Detection is user-triggered; no background polling is installed. Failure to remove a temporary listener is a distinct error and does not trigger a fallback switch.
