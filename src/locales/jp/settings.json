@@ -411,6 +411,8 @@
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
         "autoCloseConnections": "接続を自動的に閉じる",
+        "singboxPersistent": "sing-box を常駐させる",
+        "singboxDegraded": "sing-box は複数回の起動失敗後に停止しました。通信は Mihomo に戻りました。",
         "autoCheckUpdate": "自動更新チェック",
         "enableBuiltinEnhanced": "組み込み拡張機能を有効にする",
         "proxyLayoutColumns": "プロキシページのレイアウト列数",
@@ -422,6 +424,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "プロキシグループで選択されたノードまたはプロキシモードが変更されたときに、既存の接続を閉じます。",
+        "singboxPersistent": "リレーがアイドル状態でもサイドカープロセスを実行し続けます",
         "enableBuiltinEnhanced": "設定ファイルの互換性処理",
         "autoDelayDetection": "バックグラウンドで現在のノードのレイテンシーを定期的にテストします",
         "defaultLatencyTest": "HTTPクライアントリクエストテストにのみ使用され、設定ファイルには影響しません。"

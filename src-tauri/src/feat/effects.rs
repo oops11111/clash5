@@ -90,6 +90,7 @@ verge_registry! {
     enable_global_hotkey => NoEffect;
     home_cards => NoEffect;
     auto_close_connection => NoEffect;
+    singbox_persistent => NoEffect;
     auto_check_update => NoEffect;
     default_latency_test => NoEffect;
     default_latency_timeout => NoEffect;

@@ -928,6 +928,7 @@ interface IVergeConfig {
     background_opacity?: number
   }
   auto_close_connection?: boolean
+  singbox_persistent?: boolean
   auto_check_update?: boolean
   default_latency_test?: string
   default_latency_timeout?: number

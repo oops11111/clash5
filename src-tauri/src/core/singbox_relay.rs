@@ -1,10 +1,18 @@
 use anyhow::{Context as _, Result};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    net::SocketAddr,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
 use tokio::{
     io::{AsyncReadExt as _, AsyncWriteExt as _},
     net::{TcpListener, TcpStream},
     sync::oneshot,
     task::{JoinHandle, JoinSet},
+    time::Instant,
 };
 
 const SOCKS_VERSION: u8 = 5;
@@ -23,8 +31,40 @@ pub struct RelayEndpoint {
 
 pub struct AuthenticatedRelay {
     endpoint: RelayEndpoint,
+    activity: RelayActivity,
     stop: Option<oneshot::Sender<()>>,
     task: Option<JoinHandle<()>>,
+}
+
+#[derive(Clone)]
+pub struct RelayActivity {
+    active_connections: Arc<AtomicUsize>,
+    last_activity: Arc<tokio::sync::Mutex<Instant>>,
+}
+
+struct ActiveConnection(Arc<AtomicUsize>);
+
+impl Drop for ActiveConnection {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+impl RelayActivity {
+    fn new() -> Self {
+        Self {
+            active_connections: Arc::new(AtomicUsize::new(0)),
+            last_activity: Arc::new(tokio::sync::Mutex::new(Instant::now())),
+        }
+    }
+
+    pub async fn idle_for(&self, duration: Duration) -> bool {
+        self.active_connections.load(Ordering::Acquire) == 0 && self.last_activity.lock().await.elapsed() >= duration
+    }
+
+    async fn touched(&self) {
+        *self.last_activity.lock().await = Instant::now();
+    }
 }
 
 impl AuthenticatedRelay {
@@ -41,6 +81,8 @@ impl AuthenticatedRelay {
             password,
         };
         let expected_password = endpoint.password.clone();
+        let activity = RelayActivity::new();
+        let task_activity = activity.clone();
         let (stop, mut stopped) = oneshot::channel();
         let permits = Arc::new(tokio::sync::Semaphore::new(MAX_RELAY_CONNECTIONS));
         let task = tokio::spawn(async move {
@@ -55,9 +97,14 @@ impl AuthenticatedRelay {
                                 continue;
                             };
                             let password = expected_password.clone();
+                            task_activity.active_connections.fetch_add(1, Ordering::AcqRel);
+                            task_activity.touched().await;
+                            let activity = task_activity.clone();
                             clients.spawn(async move {
                                 let _permit = permit;
+                                let _active = ActiveConnection(Arc::clone(&activity.active_connections));
                                 let _ = serve_client(stream, upstream, b"clash5", password.as_bytes()).await;
+                                activity.touched().await;
                             });
                         }
                         Err(_) => break,
@@ -67,6 +114,7 @@ impl AuthenticatedRelay {
         });
         Ok(Self {
             endpoint,
+            activity,
             stop: Some(stop),
             task: Some(task),
         })
@@ -74,6 +122,10 @@ impl AuthenticatedRelay {
 
     pub const fn endpoint(&self) -> &RelayEndpoint {
         &self.endpoint
+    }
+
+    pub fn activity(&self) -> RelayActivity {
+        self.activity.clone()
     }
 
     pub async fn stop(mut self) {
@@ -267,6 +319,26 @@ mod tests {
         let mut response = [0_u8; 2];
         client.read_exact(&mut response).await?;
         assert_eq!(response, [SOCKS_VERSION, 0xff]);
+        relay.stop().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn relay_activity_prevents_idle_exit_while_a_client_is_connected() -> Result<()> {
+        let upstream = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await?;
+        let relay = AuthenticatedRelay::start(upstream.local_addr()?).await?;
+        let activity = relay.activity();
+        let client = TcpStream::connect((relay.endpoint.host.as_str(), relay.endpoint.port)).await?;
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert!(!activity.idle_for(Duration::from_millis(10)).await);
+        drop(client);
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while !activity.idle_for(Duration::from_millis(30)).await {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("relay activity did not become idle after the client disconnected")?;
         relay.stop().await;
         Ok(())
     }

@@ -17,7 +17,7 @@ use std::{
         Arc, LazyLock,
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tauri_plugin_shell::process::CommandChild;
 
@@ -27,6 +27,9 @@ use crate::singleton;
 use std::os::windows::io::OwnedHandle;
 
 pub(crate) static CLASH_LOGGER: LazyLock<Arc<LogRing>> = LazyLock::new(|| Arc::new(LogRing::new()));
+
+const SINGBOX_IDLE_SHUTDOWN: Duration = Duration::from_secs(120);
+const SINGBOX_SUPERVISION_INTERVAL: Duration = Duration::from_secs(1);
 
 tokio::task_local! {
     static PROFILE_SELECTIONS_PENDING_COMMIT: bool;
@@ -100,6 +103,7 @@ pub struct CoreManager {
     job_handle: ArcSwapOption<OwnedHandle>,
     config_update_in_progress: AtomicBool,
     core_readiness_state: AtomicU64,
+    singbox_degraded: AtomicBool,
     startup_error: parking_lot::Mutex<Option<CoreFailure>>,
     sidecar_exit: tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
     /// The optional sing-box route currently replacing one selected generated landing node.
@@ -131,6 +135,7 @@ impl Default for CoreManager {
             job_handle: ArcSwapOption::new(None),
             config_update_in_progress: AtomicBool::new(false),
             core_readiness_state: AtomicU64::new(0),
+            singbox_degraded: AtomicBool::new(false),
             startup_error: parking_lot::Mutex::new(None),
             sidecar_exit: tokio::sync::Mutex::new(None),
             singbox_route: tokio::sync::Mutex::new(None),
@@ -245,6 +250,7 @@ impl CoreManager {
             result?;
         }
         let Some(landing_name) = landing_name else {
+            self.singbox_degraded.store(false, Ordering::Release);
             return Ok(());
         };
 
@@ -262,13 +268,100 @@ impl CoreManager {
             .context("generated chain landing proxy is missing")?;
         if singbox_config::map_landing_outbound(landing, "clash5-exit").is_err() {
             // Unsupported protocols retain the ordinary Mihomo route.
+            self.singbox_degraded.store(false, Ordering::Release);
             return Ok(());
         }
         let yaml = serde_yaml_ng::to_string(config).context("failed to serialize the generated Mihomo config")?;
         let route = SingboxRoute::start(mihomo, Command::new("sing-box"), yaml, landing_name).await?;
         *active = Some(route);
+        self.singbox_degraded.store(false, Ordering::Release);
         drop(active);
+        Self::spawn_singbox_supervisor(landing_name.to_owned());
         Ok(())
+    }
+
+    pub fn singbox_degraded(&self) -> bool {
+        self.singbox_degraded.load(Ordering::Acquire)
+    }
+
+    fn spawn_singbox_supervisor(landing_name: String) {
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(SINGBOX_SUPERVISION_INTERVAL).await;
+                if !Self::global().supervise_singbox_route_once(&landing_name).await {
+                    break;
+                }
+            }
+        });
+    }
+
+    async fn supervise_singbox_route_once(&self, landing_name: &str) -> bool {
+        let mut active = self.singbox_route.lock().await;
+        let Some(route) = active.as_mut() else {
+            drop(active);
+            return false;
+        };
+        if route.landing_name() != landing_name {
+            drop(active);
+            return false;
+        }
+
+        match route.restart_if_exited().await {
+            Ok(true) => logging!(warn, Type::Core, "sing-box sidecar restarted after exiting"),
+            Ok(false) => {}
+            Err(error) if error.to_string() == "sing-box restart limit reached" => {
+                logging!(
+                    error,
+                    Type::Core,
+                    "sing-box restart limit reached; restoring Mihomo route"
+                );
+                self.singbox_degraded.store(true, Ordering::Release);
+                let result = route.stop(Handle::mihomo()).await;
+                if route.is_stopped() {
+                    *active = None;
+                    Handle::refresh_clash();
+                    if let Err(error) = result {
+                        logging!(error, Type::Core, "sing-box degraded-route cleanup failed: {error:#}");
+                    }
+                    drop(active);
+                    return false;
+                }
+                if let Err(error) = result {
+                    logging!(error, Type::Core, "sing-box degraded-route rollback failed: {error:#}");
+                }
+                drop(active);
+                return true;
+            }
+            Err(error) => logging!(warn, Type::Core, "sing-box sidecar restart attempt failed: {error:#}"),
+        }
+
+        let persistent = Config::verge().await.latest_arc().singbox_persistent.unwrap_or(false);
+        if !persistent && route.idle_for(SINGBOX_IDLE_SHUTDOWN).await {
+            logging!(
+                info,
+                Type::Core,
+                "sing-box relay idle timeout reached; stopping sidecar"
+            );
+            let result = route.stop(Handle::mihomo()).await;
+            if route.is_stopped() {
+                *active = None;
+                Handle::refresh_clash();
+                if let Err(error) = result {
+                    logging!(error, Type::Core, "sing-box idle cleanup failed: {error:#}");
+                }
+                drop(active);
+                return false;
+            }
+            if let Err(error) = result {
+                logging!(
+                    error,
+                    Type::Core,
+                    "sing-box idle rollback failed; keeping route resources alive: {error:#}"
+                );
+            }
+        }
+        drop(active);
+        true
     }
 
     pub fn set_running_child_sidecar(&self, child: CommandChild) {

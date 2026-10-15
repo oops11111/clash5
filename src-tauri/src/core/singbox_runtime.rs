@@ -2,12 +2,20 @@ use crate::core::{singbox_config, singbox_process::SingboxProcess, singbox_relay
 use anyhow::{Context as _, Result};
 use reqwest::Method;
 use serde_yaml_ng::Value as YamlValue;
-use std::{net::SocketAddr, process::Command, time::Duration};
+use std::{
+    collections::VecDeque,
+    ffi::OsString,
+    net::SocketAddr,
+    process::Command,
+    time::{Duration, Instant},
+};
 use tauri_plugin_mihomo::Mihomo;
 use tokio::{net::TcpListener, time::sleep};
 
 const SINGBOX_READY_TIMEOUT: Duration = Duration::from_secs(10);
 const SINGBOX_READY_INTERVAL: Duration = Duration::from_millis(50);
+const MAX_RESTARTS_PER_WINDOW: usize = 3;
+const RESTART_WINDOW: Duration = Duration::from_secs(10 * 60);
 
 /// Applies a runtime config from memory so relay credentials never need a config file.
 /// Mihomo accepts the complete YAML config in `PUT /configs`'s `payload` field.
@@ -35,8 +43,34 @@ pub async fn apply_config_payload(mihomo: &Mihomo, yaml: &str) -> Result<()> {
 pub struct SingboxRoute {
     landing_name: String,
     original_yaml: String,
+    command_program: OsString,
+    singbox_config: Vec<u8>,
+    inbound_port: u16,
+    restart_budget: RestartBudget,
     process: Option<SingboxProcess>,
     relay: Option<AuthenticatedRelay>,
+}
+
+#[derive(Default)]
+struct RestartBudget {
+    attempts: VecDeque<Instant>,
+}
+
+impl RestartBudget {
+    fn try_start(&mut self, now: Instant) -> bool {
+        while self
+            .attempts
+            .front()
+            .is_some_and(|attempt| now.duration_since(*attempt) >= RESTART_WINDOW)
+        {
+            self.attempts.pop_front();
+        }
+        if self.attempts.len() >= MAX_RESTARTS_PER_WINDOW {
+            return false;
+        }
+        self.attempts.push_back(now);
+        true
+    }
 }
 
 impl std::fmt::Debug for SingboxRoute {
@@ -45,6 +79,7 @@ impl std::fmt::Debug for SingboxRoute {
             .debug_struct("SingboxRoute")
             .field("landing_name", &self.landing_name)
             .field("running", &self.process.is_some())
+            .field("restart_count", &self.restart_budget.attempts.len())
             .finish_non_exhaustive()
     }
 }
@@ -58,6 +93,7 @@ impl SingboxRoute {
         runtime_yaml: String,
         landing_name: &str,
     ) -> Result<Self> {
+        let command_program = command.get_program().to_os_string();
         let inbound = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
             .await
             .context("failed to reserve a loopback sing-box inbound")?;
@@ -100,14 +136,18 @@ impl SingboxRoute {
             let relay_config = singbox_config::relay_config_json(&runtime_yaml, landing_name, relay.endpoint())?;
             let relay_yaml = String::from_utf8(relay_config).context("in-memory relay config was not UTF-8")?;
             apply_config_payload(mihomo, &relay_yaml).await?;
-            Ok::<_, anyhow::Error>(process)
+            Ok::<_, anyhow::Error>((process, config_bytes))
         }
         .await;
 
         match launch {
-            Ok(process) => Ok(Self {
+            Ok((process, config_bytes)) => Ok(Self {
                 landing_name: landing_name.to_owned(),
                 original_yaml: runtime_yaml,
+                command_program,
+                singbox_config: config_bytes,
+                inbound_port,
+                restart_budget: RestartBudget::default(),
                 process: Some(process),
                 relay: Some(relay),
             }),
@@ -125,6 +165,29 @@ impl SingboxRoute {
 
     pub const fn is_stopped(&self) -> bool {
         self.process.is_none() && self.relay.is_none()
+    }
+
+    pub async fn idle_for(&self, duration: Duration) -> bool {
+        match &self.relay {
+            Some(relay) => relay.activity().idle_for(duration).await,
+            None => false,
+        }
+    }
+
+    /// Restarts a dead child at most three times in any rolling ten-minute window.
+    pub async fn restart_if_exited(&mut self) -> Result<bool> {
+        if self.is_running().await? {
+            return Ok(false);
+        }
+        let now = Instant::now();
+        anyhow::ensure!(self.restart_budget.try_start(now), "sing-box restart limit reached");
+
+        let mut command = Command::new(&self.command_program);
+        command.args(["run", "-c", "stdin"]);
+        let process = SingboxProcess::start(command, &self.singbox_config).await?;
+        wait_for_inbound(self.inbound_port, &process).await?;
+        self.process = Some(process);
+        Ok(true)
     }
 
     pub async fn is_running(&self) -> Result<bool> {
@@ -177,6 +240,17 @@ mod tests {
     use std::{net::SocketAddr, time::Duration};
     use tauri_plugin_mihomo::{MihomoContext, models::Protocol};
     use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+    #[test]
+    fn restart_budget_allows_three_attempts_per_rolling_ten_minutes() {
+        let start = Instant::now();
+        let mut budget = RestartBudget::default();
+        assert!(budget.try_start(start));
+        assert!(budget.try_start(start + Duration::from_secs(1)));
+        assert!(budget.try_start(start + Duration::from_secs(2)));
+        assert!(!budget.try_start(start + Duration::from_secs(3)));
+        assert!(budget.try_start(start + RESTART_WINDOW));
+    }
 
     async fn read_request(stream: &mut tokio::net::TcpStream) -> Result<(String, Vec<u8>)> {
         let mut bytes = Vec::new();

@@ -1280,6 +1280,8 @@ export interface TranslationResources {
             defaultLatencyTimeout: string
             enableBuiltinEnhanced: string
             proxyLayoutColumns: string
+            singboxDegraded: string
+            singboxPersistent: string
           }
           options: {
             autoLogClean: {
@@ -1296,6 +1298,7 @@ export interface TranslationResources {
             autoDelayDetection: string
             defaultLatencyTest: string
             enableBuiltinEnhanced: string
+            singboxPersistent: string
           }
         }
         networkInterface: {

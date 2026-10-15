@@ -411,6 +411,8 @@
         "appLogMaxSize": "Uygulama Günlüğü En Büyük Boyutu",
         "appLogMaxCount": "Uygulama Günlüğü En Fazla Dosya Sayısı",
         "autoCloseConnections": "Bağlantıları Otomatik Kapat",
+        "singboxPersistent": "sing-box çalışmaya devam etsin",
+        "singboxDegraded": "sing-box art arda başarısız olduktan sonra durduruldu; trafik Mihomo'ya döndü.",
         "autoCheckUpdate": "Otomatik Güncelleme Kontrolü",
         "enableBuiltinEnhanced": "Yerleşik Geliştirilmiş Modu Etkinleştir",
         "proxyLayoutColumns": "Vekil Düzeni Sütunları",
@@ -422,6 +424,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "Vekil grup seçimi veya vekil modu değiştiğinde kurulan bağlantıları sonlandır",
+        "singboxPersistent": "Aktarma boşta olsa da yardımcı süreci çalışır durumda tut",
         "enableBuiltinEnhanced": "Yapılandırma dosyası için uyumluluk işleme",
         "autoDelayDetection": "Arka planda mevcut düğümün gecikmesini periyodik olarak test eder",
         "defaultLatencyTest": "Yalnızca HTTP istemci isteği testi için kullanılır ve yapılandırma dosyasında bir fark yaratmaz"

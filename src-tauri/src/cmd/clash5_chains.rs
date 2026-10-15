@@ -261,6 +261,11 @@ pub struct ChainActivation {
 }
 
 #[tauri::command]
+pub fn clash5_singbox_degraded() -> bool {
+    CoreManager::global().singbox_degraded()
+}
+
+#[tauri::command]
 pub async fn clash5_activate_chain(id: String, policy_group: String) -> CmdResult<ChainActivation> {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
     let profile_id = Config::profiles()
