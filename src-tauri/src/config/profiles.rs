@@ -1442,7 +1442,20 @@ mod tests {
 
     fn seeded_identity_fixture(path: &std::path::Path, key: IdentityKey) {
         let mut store = clash5_data::BindingStore::open_with_identity(path, key).unwrap();
-        store.upsert_manual(&identity_fixture_node()).unwrap();
+        let target_id = store.upsert_manual(&identity_fixture_node()).unwrap();
+        store
+            .upsert_binding(&clash5_data::Binding {
+                id: "identity-fixture-binding".into(),
+                plugin_id: "identity-fixture-plugin".into(),
+                target_id,
+                source: clash5_data::Source::Manual,
+                priority: 0,
+                enabled: true,
+                config: serde_json::json!({}),
+                orphan: false,
+                disappeared_at: None,
+            })
+            .unwrap();
     }
 
     #[test]
@@ -1461,6 +1474,9 @@ mod tests {
             assert!(store.identity_recovery());
             assert_eq!(store.active_identity_key().unwrap().unwrap().1, expected_key.key_id());
             assert!(!store.node_records(true).unwrap().is_empty());
+            let bindings = store.bindings(None).unwrap();
+            assert_eq!(bindings.len(), 1);
+            assert!(bindings[0].enabled && !bindings[0].orphan);
             assert_eq!(
                 store.upsert_manual(&identity_fixture_node()),
                 Err(DataError::IdentityRecovery)
