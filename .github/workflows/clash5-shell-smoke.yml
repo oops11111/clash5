@@ -72,10 +72,10 @@ jobs:
             Copy-Item -LiteralPath $source -Destination (Join-Path $release "$core.exe") -Force
           }
       - name: Verify native Tauri bridge, node workspace, and M3 plugins
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
         run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --full
       - name: Verify manual node persistence after desktop restart
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
         shell: pwsh
         run: |
           if (Get-Process -Name clash-verge -ErrorAction SilentlyContinue) {
@@ -83,7 +83,7 @@ jobs:
           }
           pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --persisted
       - name: Report desktop process state on failure
-        if: failure() && github.event_name == 'workflow_dispatch'
+        if: failure() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
         shell: pwsh
         run: |
           Get-Process -Name clash-verge,msedgewebview2,msedgedriver,tauri-driver -ErrorAction SilentlyContinue |
@@ -100,7 +100,7 @@ jobs:
             Write-Output 'clash5 startup log was not created'
           }
       - name: Launch shell briefly
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name != 'workflow_dispatch' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
         shell: pwsh
         run: |
           $binary = 'target/x86_64-pc-windows-msvc/release/clash-verge.exe'
@@ -117,7 +117,7 @@ jobs:
             }
           }
       - name: Upload desktop screenshot
-        if: always() && github.event_name == 'workflow_dispatch'
+        if: always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
         uses: actions/upload-artifact@v7
         with:
           name: clash5-m1-desktop-smoke
