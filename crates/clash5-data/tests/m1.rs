@@ -8,6 +8,8 @@ fn node(name: &str) -> Node {
         port: 443,
         credentials: BTreeMap::from([("uuid".into(), "a".repeat(32))]),
         display_name: name.into(),
+        transport: String::new(),
+        sni: String::new(),
     }
 }
 
@@ -121,6 +123,52 @@ fn v1_database_migrates_without_discarding_nodes() {
     assert_eq!(record.stable_id, "v1:old");
     assert_eq!(record.display_name, "Old");
     assert_eq!(record.duplicate_count, 1);
+    let migrated = rusqlite::Connection::open(&path).unwrap();
+    let version: i64 = migrated
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, 3);
+    let columns: Vec<String> = migrated
+        .prepare("PRAGMA table_info(nodes)")
+        .unwrap()
+        .query_map([], |row| row.get(1))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert!(columns.iter().any(|column| column == "stable_id_version"));
+    assert!(columns.iter().any(|column| column == "key_generation"));
+    assert!(columns.iter().any(|column| column == "transport"));
+    assert!(columns.iter().any(|column| column == "sni"));
+}
+
+#[test]
+fn v2_identity_schema_migration_rolls_back_all_ddl_on_failure() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("rollback.sqlite");
+    let db = rusqlite::Connection::open(&path).unwrap();
+    db.execute_batch(
+        "CREATE TABLE nodes(source_kind TEXT, provider_id TEXT, stable_id TEXT, display_name TEXT, kind TEXT, server TEXT, port INTEGER, duplicate_count INTEGER, active INTEGER);
+         CREATE TABLE identity_keys(generation INTEGER);
+         INSERT INTO nodes VALUES('manual','','v1:old','Old','ss','edge.example',443,1,1);
+         PRAGMA user_version=2;",
+    ).unwrap();
+    drop(db);
+    assert!(BindingStore::open(&path).is_err());
+    let db = rusqlite::Connection::open(&path).unwrap();
+    let version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
+    assert_eq!(version, 2);
+    let columns: Vec<String> = db
+        .prepare("PRAGMA table_info(nodes)")
+        .unwrap()
+        .query_map([], |row| row.get(1))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert!(!columns.iter().any(|column| column == "stable_id_version"));
+    let id: String = db
+        .query_row("SELECT stable_id FROM nodes", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(id, "v1:old");
 }
 
 #[test]

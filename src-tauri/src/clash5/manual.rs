@@ -1,6 +1,6 @@
 use crate::utils::{dirs, help};
 use anyhow::{Result, anyhow, bail};
-use clash5_data::{Node, StableId, parse_proxy_node};
+use clash5_data::{IdentityKey, Node, StableId, parse_proxy_node};
 use serde::{Deserialize, Serialize};
 use serde_yaml_ng::{Mapping, Sequence, Value};
 use std::{
@@ -37,27 +37,49 @@ pub(crate) fn runtime_name(stable_id: &str) -> String {
     format!("clash5-{}", stable_id.replace(':', "-"))
 }
 
-fn entry_node(entry: &ManualProxyEntry) -> Result<Node> {
+fn entry_node(entry: &ManualProxyEntry, key: &IdentityKey) -> Result<Node> {
     let mut display_proxy = entry.proxy.clone();
     display_proxy.insert("name".into(), entry.display_name.clone().into());
     let node =
         parse_proxy_node(&Value::Mapping(display_proxy)).map_err(|_| anyhow!("invalid manual proxy identity"))?;
-    let expected_name = runtime_name(&node.stable_id()?);
-    if entry.proxy.get("name").and_then(Value::as_str) != Some(expected_name.as_str()) {
+    let expected_v2_name = runtime_name(&node.stable_id_v2(key)?);
+    let legacy_v1_name = runtime_name(&node.stable_id()?);
+    let stored_name = entry.proxy.get("name").and_then(Value::as_str);
+    let preserved_v2_name = stored_name.is_some_and(|name| {
+        name.strip_prefix("clash5-v2-")
+            .is_some_and(|digest| digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit()))
+    });
+    if stored_name != Some(expected_v2_name.as_str())
+        && stored_name != Some(legacy_v1_name.as_str())
+        && !preserved_v2_name
+    {
         bail!("manual proxy runtime name does not match its identity");
     }
     Ok(node)
 }
 
 impl ManualProxyFile {
-    pub(crate) fn add_import(&mut self, proxies: Vec<Value>) -> Result<ManualImport> {
+    pub(crate) fn identity_nodes(&self, key: &IdentityKey) -> Result<Vec<Node>> {
+        self.entries.iter().map(|entry| entry_node(entry, key)).collect()
+    }
+
+    pub(crate) fn rekey_identity(&mut self, old_key: &IdentityKey, new_key: &IdentityKey) -> Result<()> {
+        for entry in &mut self.entries {
+            let node = entry_node(entry, old_key)?;
+            let new_name = runtime_name(&node.stable_id_v2(new_key)?);
+            entry.proxy.insert("name".into(), new_name.into());
+        }
+        Ok(())
+    }
+
+    pub(crate) fn add_import(&mut self, proxies: Vec<Value>, key: &IdentityKey) -> Result<ManualImport> {
         if proxies.is_empty() || proxies.len() > MAX_IMPORT {
             bail!("manual proxy import size is out of range");
         }
         let mut entries = self.entries.clone();
         let mut positions = HashMap::new();
         for (index, entry) in entries.iter().enumerate() {
-            positions.insert(entry_node(entry)?.stable_id()?, index);
+            positions.insert(entry_node(entry, key)?.stable_id_v2(key)?, index);
         }
         let mut imported = Vec::with_capacity(proxies.len());
         let mut batch = HashMap::new();
@@ -72,7 +94,7 @@ impl ManualProxyFile {
             if node.display_name.trim().is_empty() || node.display_name.contains('\0') {
                 bail!("invalid manual proxy name");
             }
-            let stable_id = node.stable_id()?;
+            let stable_id = node.stable_id_v2(key)?;
             mapping.insert("name".into(), runtime_name(&stable_id).into());
             let entry = ManualProxyEntry {
                 display_name: node.display_name.clone(),
@@ -105,15 +127,18 @@ impl ManualProxyFile {
         })
     }
 
-    pub(crate) fn runtime_proxies(&self) -> Result<Sequence> {
+    pub(crate) fn runtime_proxies(&self, key: &IdentityKey) -> Result<Sequence> {
         let mut names = std::collections::HashSet::new();
         let mut proxies = Sequence::new();
         for entry in &self.entries {
-            let node = entry_node(entry)?;
-            if !names.insert(node.stable_id()?) {
+            let node = entry_node(entry, key)?;
+            let stable_id = node.stable_id_v2(key)?;
+            if !names.insert(stable_id.clone()) {
                 bail!("duplicate manual proxy identity");
             }
-            proxies.push(Value::Mapping(entry.proxy.clone()));
+            let mut proxy = entry.proxy.clone();
+            proxy.insert("name".into(), runtime_name(&stable_id).into());
+            proxies.push(Value::Mapping(proxy));
         }
         Ok(proxies)
     }
@@ -162,19 +187,44 @@ mod tests {
     #[test]
     fn manual_import_uses_stable_runtime_names_and_rejects_ambiguous_batch() {
         let mut file = ManualProxyFile::default();
-        let node = file.add_import(vec![proxy("Original", "tcp")]).unwrap().nodes.remove(0);
-        let name = runtime_name(&node.stable_id().unwrap());
-        assert_eq!(file.runtime_proxies().unwrap()[0]["name"], name);
+        let key = IdentityKey::from_bytes(&[9; 32]).unwrap();
+        let node = file
+            .add_import(vec![proxy("Original", "tcp")], &key)
+            .unwrap()
+            .nodes
+            .remove(0);
+        let name = runtime_name(&node.stable_id_v2(&key).unwrap());
+        assert_eq!(file.runtime_proxies(&key).unwrap()[0]["name"], name);
 
-        let renamed = file.add_import(vec![proxy("Renamed", "tcp")]).unwrap();
+        let renamed = file.add_import(vec![proxy("Renamed", "tcp")], &key).unwrap();
         assert!(renamed.changed_ids.is_empty());
         assert_eq!(file.entries.len(), 1);
-        assert_eq!(entry_node(&file.entries[0]).unwrap().display_name, "Renamed");
+        assert_eq!(entry_node(&file.entries[0], &key).unwrap().display_name, "Renamed");
 
-        let changed = file.add_import(vec![proxy("Renamed", "ws")]).unwrap();
-        assert_eq!(changed.changed_ids, vec![node.stable_id().unwrap()]);
+        let changed = file.add_import(vec![proxy("Renamed", "ws")], &key).unwrap();
+        assert_eq!(changed.changed_ids.len(), 1);
 
-        assert!(file.add_import(vec![proxy("One", "tcp"), proxy("Two", "ws")]).is_err());
-        assert_eq!(entry_node(&file.entries[0]).unwrap().display_name, "Renamed");
+        assert!(
+            file.add_import(vec![proxy("One", "tcp"), proxy("Two", "ws")], &key)
+                .is_err()
+        );
+        assert_eq!(entry_node(&file.entries[0], &key).unwrap().display_name, "Renamed");
+    }
+
+    #[test]
+    fn manual_definitions_survive_identity_reset_and_runtime_names_follow_new_key() {
+        let mut file = ManualProxyFile::default();
+        let old_key = IdentityKey::from_bytes(&[20; 32]).unwrap();
+        let new_key = IdentityKey::from_bytes(&[21; 32]).unwrap();
+        let node = file
+            .add_import(vec![proxy("Saved", "tcp")], &old_key)
+            .unwrap()
+            .nodes
+            .remove(0);
+        assert_eq!(file.identity_nodes(&new_key).unwrap().len(), 1);
+        assert_eq!(
+            file.runtime_proxies(&new_key).unwrap()[0]["name"],
+            runtime_name(&node.stable_id_v2(&new_key).unwrap())
+        );
     }
 }

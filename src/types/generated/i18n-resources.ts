@@ -196,6 +196,8 @@ export interface TranslationResources {
     layout: {
       components: {
         navigation: {
+          cancel: string
+          chooseCandidate: string
           diagnostics: string
           empty: {
             bindingDescription: string
@@ -209,6 +211,8 @@ export interface TranslationResources {
             settingsDescription: string
             settingsTitle: string
           }
+          identityError: string
+          identityRecovery: string
           menu: {
             collapseNavBar: string
             expandNavBar: string
@@ -217,6 +221,8 @@ export interface TranslationResources {
             restoreDefaultOrder: string
             unlock: string
           }
+          orphanBinding: string
+          pendingRebind: string
           pluginTabs: {
             binding: string
             installed: string
@@ -224,6 +230,14 @@ export interface TranslationResources {
             settings: string
           }
           proxyGroups: string
+          rebind: string
+          resetIdentity: string
+          resetIdentityConfirm: string
+          resetIdentityTitle: string
+          rotateIdentity: string
+          rotateIdentityConfirm: string
+          rotateIdentityDescription: string
+          rotateIdentityTitle: string
           tabs: {
             chains: string
             connections: string

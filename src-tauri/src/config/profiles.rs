@@ -35,6 +35,7 @@ pub(crate) static PROFILE_WRITE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mute
 
 static ACTIVATE_SELECTED_TASK: LazyLock<Mutex<Option<JoinHandle<()>>>> = LazyLock::new(|| Mutex::new(None));
 static ACTIVATE_SELECTED_GENERATION: AtomicU64 = AtomicU64::new(0);
+static CLASH5_IDENTITY_INIT_LOCK: Mutex<()> = Mutex::new(());
 
 // The plugin already limits the request/response phase to 5 seconds. This outer timeout also covers
 // lock acquisition, connection-pool waiting, and local-socket connection establishment.
@@ -523,8 +524,217 @@ where
     tokio::task::spawn_blocking(move || {
         let root = dirs::app_home_dir().map_err(|_| clash5_data::DataError::Database)?;
         std::fs::create_dir_all(&root).map_err(|_| clash5_data::DataError::Database)?;
-        let mut store = clash5_data::BindingStore::open(root.join("clash5-nodes.sqlite"))?;
+        let mut store = open_clash5_identity_store(root.join("clash5-nodes.sqlite"))?;
         operation(&mut store)
+    })
+    .await
+    .map_err(|_| clash5_data::DataError::Database)?
+}
+
+fn open_clash5_identity_store(path: std::path::PathBuf) -> Result<clash5_data::BindingStore, clash5_data::DataError> {
+    use clash5_data::IdentityKey;
+
+    const SERVICE: &str = "io.github.oops11111.clash5";
+    let _identity_init = CLASH5_IDENTITY_INIT_LOCK.lock();
+    let store = clash5_data::BindingStore::open(&path)?;
+    let active = store.active_identity_key()?;
+    if let Some((generation, expected_key_id)) = active {
+        let Ok(entry) = keyring::Entry::new(SERVICE, &format!("identity-key-{generation}")) else {
+            let mut store = store;
+            store.enter_identity_recovery();
+            return Ok(store);
+        };
+        let Ok(bytes) = entry.get_secret() else {
+            let mut store = store;
+            store.enter_identity_recovery();
+            return Ok(store);
+        };
+        let Ok(key) = IdentityKey::from_bytes(&bytes) else {
+            let mut store = store;
+            store.enter_identity_recovery();
+            return Ok(store);
+        };
+        if key.key_id() != expected_key_id {
+            let mut store = store;
+            store.enter_identity_recovery();
+            return Ok(store);
+        }
+        drop(store);
+        return match clash5_data::BindingStore::open_with_identity(&path, key) {
+            Ok(store) => Ok(store),
+            Err(clash5_data::DataError::IdentityRecovery) => {
+                let mut store = clash5_data::BindingStore::open(path)?;
+                store.enter_identity_recovery();
+                Ok(store)
+            }
+            Err(error) => Err(error),
+        };
+    }
+
+    if store.has_v2_identities()? {
+        let mut store = store;
+        store.enter_identity_recovery();
+        return Ok(store);
+    }
+    let generation = store.next_identity_generation()?;
+    let Ok(entry) = keyring::Entry::new(SERVICE, &format!("identity-key-{generation}")) else {
+        let mut store = store;
+        store.enter_identity_recovery();
+        return Ok(store);
+    };
+    let key_result = match entry.get_secret() {
+        Ok(bytes) => IdentityKey::from_bytes(&bytes),
+        Err(keyring::Error::NoEntry) => {
+            let mut bytes = [0_u8; 32];
+            if getrandom::fill(&mut bytes).is_err() || entry.set_secret(&bytes).is_err() {
+                Err(clash5_data::DataError::IdentityRecovery)
+            } else {
+                entry
+                    .get_secret()
+                    .map_err(|_| clash5_data::DataError::IdentityRecovery)
+                    .and_then(|stored| IdentityKey::from_bytes(&stored))
+            }
+        }
+        Err(_) => {
+            let mut store = store;
+            store.enter_identity_recovery();
+            return Ok(store);
+        }
+    };
+    let key = match key_result {
+        Ok(key) => key,
+        Err(_) => {
+            let mut store = store;
+            store.enter_identity_recovery();
+            return Ok(store);
+        }
+    };
+    drop(store);
+    clash5_data::BindingStore::open_with_identity(path, key)
+}
+
+pub(crate) async fn clash5_identity_key() -> Result<clash5_data::IdentityKey, clash5_data::DataError> {
+    tokio::task::spawn_blocking(|| {
+        let root = dirs::app_home_dir().map_err(|_| clash5_data::DataError::Database)?;
+        std::fs::create_dir_all(&root).map_err(|_| clash5_data::DataError::Database)?;
+        let store = open_clash5_identity_store(root.join("clash5-nodes.sqlite"))?;
+        Ok(store.identity_key()?.clone())
+    })
+    .await
+    .map_err(|_| clash5_data::DataError::Database)?
+}
+
+pub(crate) async fn reset_clash5_identity() -> Result<(), clash5_data::DataError> {
+    tokio::task::spawn_blocking(|| {
+        use clash5_data::IdentityKey;
+        const SERVICE: &str = "io.github.oops11111.clash5";
+        let _identity_init = CLASH5_IDENTITY_INIT_LOCK.lock();
+        let root = dirs::app_home_dir().map_err(|_| clash5_data::DataError::Database)?;
+        std::fs::create_dir_all(&root).map_err(|_| clash5_data::DataError::Database)?;
+        let path = root.join("clash5-nodes.sqlite");
+        let mut store = clash5_data::BindingStore::open(&path)?;
+        if !store.identity_recovery() {
+            return Err(clash5_data::DataError::InvalidInput);
+        }
+        let generation = store.next_identity_generation()?;
+        let entry = keyring::Entry::new(SERVICE, &format!("identity-key-{generation}"))
+            .map_err(|_| clash5_data::DataError::IdentityRecovery)?;
+        let key = match entry.get_secret() {
+            Ok(bytes) => IdentityKey::from_bytes(&bytes)?,
+            Err(keyring::Error::NoEntry) => {
+                let mut bytes = [0_u8; 32];
+                getrandom::fill(&mut bytes).map_err(|_| clash5_data::DataError::IdentityRecovery)?;
+                entry
+                    .set_secret(&bytes)
+                    .map_err(|_| clash5_data::DataError::IdentityRecovery)?;
+                let read_back = entry
+                    .get_secret()
+                    .map_err(|_| clash5_data::DataError::IdentityRecovery)?;
+                IdentityKey::from_bytes(&read_back)?
+            }
+            Err(_) => return Err(clash5_data::DataError::IdentityRecovery),
+        };
+        store.reset_identity_key(key)?;
+        Ok(())
+    })
+    .await
+    .map_err(|_| clash5_data::DataError::Database)?
+}
+
+pub(crate) async fn stage_clash5_identity_rotation_key()
+-> Result<(i64, clash5_data::IdentityKey), clash5_data::DataError> {
+    tokio::task::spawn_blocking(move || {
+        const SERVICE: &str = "io.github.oops11111.clash5";
+        let _identity_init = CLASH5_IDENTITY_INIT_LOCK.lock();
+        let root = dirs::app_home_dir().map_err(|_| clash5_data::DataError::Database)?;
+        std::fs::create_dir_all(&root).map_err(|_| clash5_data::DataError::Database)?;
+        let path = root.join("clash5-nodes.sqlite");
+        let store = clash5_data::BindingStore::open(&path)?;
+        let generation = store.next_identity_generation()?;
+
+        let entry = keyring::Entry::new(SERVICE, &format!("identity-key-{generation}"))
+            .map_err(|_| clash5_data::DataError::IdentityRecovery)?;
+        let key = match entry.get_secret() {
+            Ok(bytes) => clash5_data::IdentityKey::from_bytes(&bytes)?,
+            Err(keyring::Error::NoEntry) => {
+                let mut bytes = [0_u8; 32];
+                getrandom::fill(&mut bytes).map_err(|_| clash5_data::DataError::IdentityRecovery)?;
+                entry
+                    .set_secret(&bytes)
+                    .map_err(|_| clash5_data::DataError::IdentityRecovery)?;
+                let read_back = entry
+                    .get_secret()
+                    .map_err(|_| clash5_data::DataError::IdentityRecovery)?;
+                if read_back != bytes {
+                    return Err(clash5_data::DataError::IdentityRecovery);
+                }
+                clash5_data::IdentityKey::from_bytes(&read_back)?
+            }
+            Err(_) => return Err(clash5_data::DataError::IdentityRecovery),
+        };
+        Ok((generation, key))
+    })
+    .await
+    .map_err(|_| clash5_data::DataError::Database)?
+}
+
+pub(crate) async fn commit_clash5_identity_rotation(
+    old_key: clash5_data::IdentityKey,
+    generation: i64,
+    new_key: clash5_data::IdentityKey,
+    snapshots: Vec<clash5_data::IdentitySourceSnapshot>,
+) -> Result<(), clash5_data::DataError> {
+    tokio::task::spawn_blocking(move || {
+        const SERVICE: &str = "io.github.oops11111.clash5";
+        let _identity_init = CLASH5_IDENTITY_INIT_LOCK.lock();
+        let root = dirs::app_home_dir().map_err(|_| clash5_data::DataError::Database)?;
+        std::fs::create_dir_all(&root).map_err(|_| clash5_data::DataError::Database)?;
+        let path = root.join("clash5-nodes.sqlite");
+        let store = clash5_data::BindingStore::open(&path)?;
+        let active = store
+            .active_identity_key()?
+            .ok_or(clash5_data::DataError::IdentityRecovery)?;
+        if active.1 != old_key.key_id() || store.next_identity_generation()? != generation {
+            return Err(clash5_data::DataError::IdentityRecovery);
+        }
+        drop(store);
+
+        let entry = keyring::Entry::new(SERVICE, &format!("identity-key-{generation}"))
+            .map_err(|_| clash5_data::DataError::IdentityRecovery)?;
+        let stored = entry
+            .get_secret()
+            .map_err(|_| clash5_data::DataError::IdentityRecovery)?;
+        let staged = clash5_data::IdentityKey::from_bytes(&stored)?;
+        if staged.key_id() != new_key.key_id() {
+            return Err(clash5_data::DataError::IdentityRecovery);
+        }
+
+        let mut store = clash5_data::BindingStore::open_with_identity(&path, old_key)?;
+        let committed = store.rotate_identity_key(staged, &snapshots)?;
+        if committed != generation {
+            return Err(clash5_data::DataError::IdentityRecovery);
+        }
+        Ok(())
     })
     .await
     .map_err(|_| clash5_data::DataError::Database)?

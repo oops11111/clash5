@@ -1124,6 +1124,7 @@ dependencies = [
  "futures",
  "gethostname",
  "getrandom 0.4.3",
+ "keyring",
  "libc",
  "log",
  "minisign-verify 0.3.0",
@@ -1242,12 +1243,13 @@ dependencies = [
 name = "clash5-data"
 version = "0.1.0"
 dependencies = [
+ "hmac",
  "idna",
  "rusqlite",
  "serde",
  "serde_json",
  "serde_yaml_ng",
- "sha2 0.10.9",
+ "sha2 0.11.0",
 ]
 
 [[package]]
@@ -3900,6 +3902,16 @@ checksum = "0fbe853b403ae61a04233030ae8a79d94975281ed9770a1f9e246732b534b28d"
 dependencies = [
  "bitflags 2.13.2",
  "serde",
+]
+
+[[package]]
+name = "keyring"
+version = "3.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eebcc3aff044e5944a8fbaf69eb277d11986064cba30c468730e8b9909fb551c"
+dependencies = [
+ "log",
+ "zeroize",
 ]
 
 [[package]]
@@ -7057,7 +7069,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "url",
- "which 8.0.5",
+ "which 8.0.6",
  "windows 0.62.2",
  "winreg 0.55.0",
  "xdg",
@@ -9159,9 +9171,9 @@ dependencies = [
 
 [[package]]
 name = "which"
-version = "8.0.5"
+version = "8.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3ef584124b911bcc3875c2f1472e80f24361ceb789bd1c62b3e9a3df9ff43c"
+checksum = "bae2f2b2b816647a1cab1acc91f5bd20812d53cb344382635ec2181940c8034f"
 dependencies = [
  "libc",
 ]

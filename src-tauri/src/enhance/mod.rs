@@ -915,7 +915,11 @@ pub async fn enhance(
     let result_map = HashMap::new();
 
     let mut config = process_seq_items(config, rules_item, proxies_item, groups_item);
-    match manual::load().await.and_then(|file| file.runtime_proxies()) {
+    let manual_identity_key = crate::config::profiles::clash5_identity_key().await;
+    match manual_identity_key
+        .map_err(anyhow::Error::from)
+        .and_then(|key| manual::load().await.and_then(|file| file.runtime_proxies(&key)))
+    {
         Ok(mut proxies) => {
             let existing: HashSet<_> = config
                 .get("proxies")

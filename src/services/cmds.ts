@@ -20,6 +20,65 @@ export async function listClash5Nodes(includeInactive = false) {
   return invoke<Clash5NodeRecord[]>('clash5_list_nodes', { includeInactive })
 }
 
+export interface Clash5PendingIdentityRebind {
+  source: { kind: 'subscription'; provider_id: string }
+  old_stable_id: string
+  candidate_ids: string[]
+}
+
+export interface Clash5Binding {
+  id: string
+  plugin_id: string
+  target_id: string
+  source: { kind: 'manual' } | { kind: 'subscription'; provider_id: string }
+  priority: number
+  enabled: boolean
+  config: unknown
+  orphan: boolean
+  disappeared_at: string | null
+}
+
+export async function getClash5IdentityStatus() {
+  return invoke<{ recovery_mode: boolean; pending_rebinds: number }>(
+    'clash5_identity_status',
+  )
+}
+
+export async function resetClash5Identity() {
+  return invoke<void>('clash5_reset_identity')
+}
+
+export async function rotateClash5Identity() {
+  return invoke<void>('clash5_rotate_identity')
+}
+
+export async function listClash5PendingIdentityRebinds() {
+  return invoke<Clash5PendingIdentityRebind[]>(
+    'clash5_list_pending_identity_rebinds',
+    { source: null },
+  )
+}
+
+export async function listClash5Bindings() {
+  return invoke<Clash5Binding[]>('clash5_list_bindings', { source: null })
+}
+
+export async function bindClash5Node(binding: Clash5Binding) {
+  return invoke<void>('clash5_bind_node', { binding })
+}
+
+export async function resolveClash5IdentityRebind(
+  source: Clash5PendingIdentityRebind['source'],
+  oldId: string,
+  newId: string,
+) {
+  return invoke<void>('clash5_resolve_identity_rebind', {
+    source,
+    oldId,
+    newId,
+  })
+}
+
 export async function importClash5ManualProxies(proxies: IProxyConfig[]) {
   return invoke<{ imported: number }>('clash5_import_manual_proxies', {
     proxies,
