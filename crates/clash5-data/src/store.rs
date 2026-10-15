@@ -1,4 +1,4 @@
-use crate::{DataError, Node, StableId, identity::text};
+use crate::{DataError, Node, ProxyChain, StableId, identity::text};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -11,7 +11,7 @@ pub enum Source {
     Subscription { provider_id: String },
 }
 impl Source {
-    fn scope(&self) -> Result<(&str, &str), DataError> {
+    pub(crate) fn scope(&self) -> Result<(&str, &str), DataError> {
         match self {
             Self::Manual => Ok(("manual", "")),
             Self::Subscription { provider_id } => {
@@ -419,5 +419,37 @@ PRAGMA user_version=2;
             .optional()?;
         raw.map(|s| serde_json::from_str(&s).map_err(|_| DataError::Database))
             .transpose()
+    }
+    /// Save a validated M2 definition without storing proxy credentials.
+    pub fn save_proxy_chain(&mut self, chain: &ProxyChain) -> Result<(), DataError> {
+        chain.validate()?;
+        self.save_chain(
+            &chain.id,
+            &serde_json::to_value(chain).map_err(|_| DataError::InvalidInput)?,
+        )
+    }
+    /// Return versioned M2 definitions; legacy opaque M0 records remain available through `chain`.
+    pub fn proxy_chains(&self) -> Result<Vec<ProxyChain>, DataError> {
+        let mut statement = self.db.prepare(
+            "SELECT definition FROM chains WHERE json_extract(definition,'$.schema_version') IS NOT NULL ORDER BY id",
+        )?;
+        let raw = statement.query_map([], |row| row.get::<_, String>(0))?;
+        raw.map(|raw| {
+            let chain: ProxyChain = serde_json::from_str(&raw?).map_err(|_| DataError::Database)?;
+            chain.validate()?;
+            Ok(chain)
+        })
+        .collect()
+    }
+    pub fn delete_proxy_chain(&mut self, id: &str) -> Result<(), DataError> {
+        text(id)?;
+        let tx = self.db.transaction()?;
+        let deleted = tx.execute("DELETE FROM chains WHERE id=?1", [id])?;
+        if deleted == 0 {
+            return Err(DataError::NotFound);
+        }
+        audit(&tx, "chain.delete", serde_json::json!({"chains":deleted}))?;
+        tx.commit()?;
+        Ok(())
     }
 }
