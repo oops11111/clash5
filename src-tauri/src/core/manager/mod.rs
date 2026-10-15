@@ -29,7 +29,7 @@ use std::os::windows::io::OwnedHandle;
 pub(crate) static CLASH_LOGGER: LazyLock<Arc<LogRing>> = LazyLock::new(|| Arc::new(LogRing::new()));
 
 const SINGBOX_IDLE_SHUTDOWN: Duration = Duration::from_secs(120);
-const SINGBOX_SUPERVISION_INTERVAL: Duration = Duration::from_secs(1);
+const SINGBOX_SUPERVISION_INTERVAL: Duration = Duration::from_secs(30);
 
 tokio::task_local! {
     static PROFILE_SELECTIONS_PENDING_COMMIT: bool;

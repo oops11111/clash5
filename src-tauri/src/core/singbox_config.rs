@@ -244,6 +244,7 @@ pub fn singbox_config(
             "users": [{"username": endpoint.username, "password": endpoint.password}]
         }],
         "outbounds": outbounds,
+        // Do not register a DNS listener or override the desktop's DNS settings.
         "route": {"final": tag}
     }))
 }
@@ -337,9 +338,12 @@ mod tests {
             password: "session-token".into(),
         };
         let config = singbox_config(&proxy, None, 18080, "exit", &endpoint)?;
+        assert_eq!(config["inbounds"].as_array().map(Vec::len), Some(1));
         assert_eq!(config["inbounds"][0]["listen"], "127.0.0.1");
+        assert_eq!(config["inbounds"][0]["listen_port"], 18080);
         assert_eq!(config["inbounds"][0]["users"][0]["password"], "session-token");
         assert!(config["inbounds"][0].get("tun").is_none());
+        assert!(config.get("dns").is_none());
         assert_eq!(config["route"]["final"], "exit");
         Ok(())
     }

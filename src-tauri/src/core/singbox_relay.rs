@@ -8,11 +8,11 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    io::{AsyncReadExt as _, AsyncWriteExt as _},
+    io::{AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _},
     net::{TcpListener, TcpStream},
-    sync::oneshot,
+    sync::{oneshot, watch},
     task::{JoinHandle, JoinSet},
-    time::Instant,
+    time::{Instant, sleep_until},
 };
 
 const SOCKS_VERSION: u8 = 5;
@@ -20,6 +20,9 @@ const AUTH_VERSION: u8 = 1;
 const CONNECT: u8 = 1;
 const MAX_RELAY_CONNECTIONS: usize = 64;
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
+const DEAD_CONNECTION_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+const TCP_KEEPALIVE_TIME: Duration = Duration::from_secs(30);
+const TCP_KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct RelayEndpoint {
@@ -242,6 +245,8 @@ async fn forward_connect(
     let mut upstream_stream = tokio::time::timeout(Duration::from_secs(3), TcpStream::connect(upstream))
         .await
         .context("sing-box relay connection timed out")??;
+    configure_tcp_keepalive(client)?;
+    configure_tcp_keepalive(&upstream_stream)?;
     upstream_stream.write_all(&[SOCKS_VERSION, 1, 2]).await?;
     let mut upstream_method = [0_u8; 2];
     read_handshake(&mut upstream_stream, &mut upstream_method).await?;
@@ -287,8 +292,67 @@ async fn forward_connect(
     if response[1] != 0 {
         anyhow::bail!("sing-box CONNECT request failed");
     }
-    let _ = tokio::io::copy_bidirectional(client, &mut upstream_stream).await?;
+    forward_until_idle(client, &mut upstream_stream, DEAD_CONNECTION_IDLE_TIMEOUT).await?;
     Ok(())
+}
+
+fn configure_tcp_keepalive(stream: &TcpStream) -> Result<()> {
+    let keepalive = socket2::TcpKeepalive::new()
+        .with_time(TCP_KEEPALIVE_TIME)
+        .with_interval(TCP_KEEPALIVE_INTERVAL);
+    socket2::SockRef::from(stream)
+        .set_tcp_keepalive(&keepalive)
+        .context("failed to enable relay TCP keepalive")
+}
+
+async fn forward_until_idle(client: &mut TcpStream, upstream: &mut TcpStream, idle_timeout: Duration) -> Result<()> {
+    let (client_reader, mut client_writer) = tokio::io::split(client);
+    let (upstream_reader, mut upstream_writer) = tokio::io::split(upstream);
+    let (activity, mut changes) = watch::channel(Instant::now());
+    let mut copy = Box::pin(async {
+        tokio::try_join!(
+            copy_with_activity(client_reader, &mut upstream_writer, activity.clone()),
+            copy_with_activity(upstream_reader, &mut client_writer, activity),
+        )?;
+        Ok::<_, std::io::Error>(())
+    });
+
+    loop {
+        let last_activity = *changes.borrow_and_update();
+        tokio::select! {
+            result = &mut copy => {
+                result.context("relay stream forwarding failed")?;
+                return Ok(());
+            }
+            _ = sleep_until(last_activity + idle_timeout) => {
+                if *changes.borrow() <= last_activity {
+                    anyhow::bail!("relay connection exceeded its idle timeout");
+                }
+            }
+            result = changes.changed() => {
+                if result.is_err() {
+                    return Ok(());
+                }
+            }
+        }
+    }
+}
+
+async fn copy_with_activity<R, W>(mut reader: R, mut writer: W, activity: watch::Sender<Instant>) -> std::io::Result<()>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let mut buffer = [0_u8; 16 * 1024];
+    loop {
+        let count = reader.read(&mut buffer).await?;
+        if count == 0 {
+            writer.shutdown().await?;
+            return Ok(());
+        }
+        activity.send_replace(Instant::now());
+        writer.write_all(&buffer[..count]).await?;
+    }
 }
 
 async fn read_handshake(stream: &mut TcpStream, bytes: &mut [u8]) -> Result<()> {
@@ -340,6 +404,29 @@ mod tests {
         .await
         .context("relay activity did not become idle after the client disconnected")?;
         relay.stop().await;
+        Ok(())
+    }
+
+    async fn tcp_pair() -> Result<(TcpStream, TcpStream)> {
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).await?;
+        let address = listener.local_addr()?;
+        let client = TcpStream::connect(address).await?;
+        let (server, _) = listener.accept().await?;
+        Ok((client, server))
+    }
+
+    #[tokio::test]
+    async fn relay_closes_a_connection_after_its_idle_timeout() -> Result<()> {
+        let (mut client, _client_peer) = tcp_pair().await?;
+        let (mut upstream, _upstream_peer) = tcp_pair().await?;
+        let result = tokio::time::timeout(
+            Duration::from_secs(1),
+            forward_until_idle(&mut client, &mut upstream, Duration::from_millis(30)),
+        )
+        .await
+        .context("idle relay connection was not closed")?;
+        let error = result.err().context("an idle relay connection should be closed")?;
+        assert!(error.to_string().contains("idle timeout"));
         Ok(())
     }
 

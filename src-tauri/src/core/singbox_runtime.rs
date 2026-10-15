@@ -98,9 +98,10 @@ impl SingboxRoute {
             .await
             .context("failed to reserve a loopback sing-box inbound")?;
         let inbound_port = inbound.local_addr()?.port();
-        drop(inbound);
-
         let relay = AuthenticatedRelay::start(SocketAddr::from(([127, 0, 0, 1], inbound_port))).await?;
+        // Keep the selected sing-box port reserved until the relay has bound its own port.
+        // This avoids the OS assigning the same ephemeral port to both listeners.
+        drop(inbound);
         let launch = async {
             let config: YamlValue =
                 serde_yaml_ng::from_str(&runtime_yaml).context("failed to parse the generated runtime config")?;
