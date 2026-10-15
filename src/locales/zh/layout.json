@@ -4,6 +4,7 @@
       "tabs": {
         "home": "首 页",
         "proxies": "代 理",
+        "nodePool": "节点池",
         "profiles": "订 阅",
         "connections": "连 接",
         "rules": "规 则",

@@ -208,6 +208,7 @@ export interface TranslationResources {
             connections: string
             home: string
             logs: string
+            nodePool: string
             profiles: string
             proxies: string
             rules: string
@@ -262,6 +263,58 @@ export interface TranslationResources {
       page: {
         title: string
       }
+    }
+    nodePool: {
+      active: string
+      all: string
+      details: string
+      duplicateCount: string
+      duplicates: string
+      empty: string
+      error: string
+      failed: string
+      handshakeDelay: string
+      healthy: string
+      highQuality: string
+      importClipboard: string
+      importError: string
+      importInvalid: string
+      importSuccess: string
+      inactive: string
+      key: string
+      manual: string
+      manualImportSuccess: string
+      milliseconds: string
+      nodeCount: string
+      notTested: string
+      oneSelected: string
+      port: string
+      probe: string
+      probeError: string
+      probeSummary: string
+      probing: string
+      protocol: string
+      proxyProvider: string
+      quality: string
+      refresh: string
+      removed: string
+      search: string
+      select: string
+      server: string
+      shortDelay: string
+      slow: string
+      sortName: string
+      sortQuality: string
+      sortSource: string
+      source: string
+      sourceConfig: string
+      sourceCount: string
+      stableId: string
+      subscription: string
+      subtitle: string
+      title: string
+      unknown: string
+      value: string
     }
     profiles: {
       components: {

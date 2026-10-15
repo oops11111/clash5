@@ -4,6 +4,7 @@
       "tabs": {
         "home": "Home",
         "proxies": "Прокси",
+        "nodePool": "Node Pool",
         "profiles": "Профильләр",
         "connections": "Тоташулар",
         "rules": "Кагыйдәләр",

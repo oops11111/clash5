@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 #![recursion_limit = "512"]
 
+mod clash5;
 mod cmd;
 pub mod config;
 mod constants;
@@ -195,6 +196,9 @@ mod app_init {
             cmd::get_network_interfaces_info,
             cmd::get_profiles,
             cmd::clash5_list_bindings,
+            cmd::clash5_list_nodes,
+            cmd::clash5_probe_nodes,
+            cmd::clash5_import_manual_proxies,
             cmd::clash5_bind_node,
             cmd::clash5_purge_orphans,
             cmd::clash5_register_manual_node,

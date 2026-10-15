@@ -4,6 +4,7 @@
       "tabs": {
         "home": "Home",
         "proxies": "Proksi",
+        "nodePool": "Node Pool",
         "profiles": "Profil",
         "connections": "Koneksi",
         "rules": "Aturan",

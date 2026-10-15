@@ -10,6 +10,7 @@
 <details>
 <summary><strong> ✨ 新增功能 </strong></summary>
 
+- 新增「节点池」：导入独立节点、查看订阅来源与重复状态，并按探测结果筛选和排序
 
 </details>
 

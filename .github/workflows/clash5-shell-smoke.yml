@@ -9,6 +9,7 @@ on:
       - 'crates/clash5-data/**'
       - 'src-tauri/**'
       - 'src/**'
+      - 'scripts/m1-*.mjs'
       - 'package.json'
       - 'pnpm-lock.yaml'
   schedule:
@@ -20,13 +21,26 @@ permissions:
 
 jobs:
   windows-shell:
-    runs-on: windows-latest
+    # WebView2 WebDriver sessions currently fail on the Server 2025 image.
+    # Keep PR build/launch coverage on the current Windows image while the
+    # manually dispatched native WebDriver acceptance uses Server 2022:
+    # https://github.com/actions/runner-images/issues/14738
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && 'windows-2022' || 'windows-latest' }}
     timeout-minutes: 60
     env:
       HUSKY: 0
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: 'v1-rust'
+          key: 'm1-shell-x86_64-pc-windows-msvc'
+          workspaces: |
+            . -> target
+          cache-all-crates: true
+          cache-workspace-crates: true
+          save-if: ${{ github.event_name == 'workflow_dispatch' }}
       - uses: pnpm/action-setup@v6
         with:
           run_install: false
@@ -38,11 +52,51 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Provision real desktop resources
         run: pnpm prebuild x86_64-pc-windows-msvc
+      - name: Probe through Mihomo and the local rate-limit fixture
+        run: pnpm m1:mihomo-smoke src-tauri/sidecar/verge-mihomo-x86_64-pc-windows-msvc.exe
       - name: Build frontend
         run: pnpm web:build
       - name: Build desktop shell without an installer
         run: cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --release --locked
+      - name: Assemble portable desktop test shell
+        shell: pwsh
+        run: |
+          $release = 'target/x86_64-pc-windows-msvc/release'
+          Copy-Item -LiteralPath 'src-tauri/resources' -Destination $release -Recurse -Force
+          foreach ($core in @('verge-mihomo', 'verge-mihomo-alpha')) {
+            $source = "src-tauri/sidecar/${core}-x86_64-pc-windows-msvc.exe"
+            Copy-Item -LiteralPath $source -Destination (Join-Path $release "$core.exe") -Force
+          }
+      - name: Verify native Tauri bridge and node workspace
+        if: github.event_name == 'workflow_dispatch'
+        run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --full
+      - name: Verify manual node persistence after desktop restart
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          if (Get-Process -Name clash-verge -ErrorAction SilentlyContinue) {
+            throw 'The first desktop session did not exit before the persistence check'
+          }
+          pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --persisted
+      - name: Report desktop process state on failure
+        if: failure() && github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          Get-Process -Name clash-verge,msedgewebview2,msedgedriver,tauri-driver -ErrorAction SilentlyContinue |
+            Select-Object ProcessName,Id,Path | Format-Table
+          $appData = Join-Path $env:APPDATA 'io.github.oops11111.clash5'
+          Write-Output "clash5 app data exists: $(Test-Path -LiteralPath $appData)"
+          $startupLog = Join-Path $appData 'logs/startup.log'
+          if (Test-Path -LiteralPath $startupLog) {
+            Write-Output 'Recent startup log (URLs and credential fields redacted):'
+            Get-Content -LiteralPath $startupLog -Tail 80 | ForEach-Object {
+              ($_ -replace '(?i)\b(?:https?|ss|vmess|vless|trojan|hy2|hysteria2)://[^\s''"<>]+', '[redacted-uri]') -replace '(?i)(\b(?:secret|token|password|authorization|api-key)\b\s*[=:]\s*)[^,\s;]+', '$1[redacted]'
+            }
+          } else {
+            Write-Output 'clash5 startup log was not created'
+          }
       - name: Launch shell briefly
+        if: github.event_name != 'workflow_dispatch'
         shell: pwsh
         run: |
           $binary = 'target/x86_64-pc-windows-msvc/release/clash-verge.exe'
@@ -58,13 +112,23 @@ jobs:
               Stop-Process -Id $process.Id -Force
             }
           }
-      - name: Upload nightly test shell
-        if: github.event_name == 'schedule'
+      - name: Upload desktop screenshot
+        if: always() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: clash5-m1-desktop-smoke
+          path: |
+            target/m1-desktop-smoke.png
+            target/m1-desktop-persisted.png
+          if-no-files-found: warn
+      - name: Upload test shell
+        if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v7
         with:
           name: clash5-windows-shell
           path: |
             target/x86_64-pc-windows-msvc/release/clash-verge.exe
-            src-tauri/resources/**
-            src-tauri/sidecar/**
-          if-no-files-found: error
+            target/x86_64-pc-windows-msvc/release/resources/**
+            target/x86_64-pc-windows-msvc/release/verge-mihomo.exe
+            target/x86_64-pc-windows-msvc/release/verge-mihomo-alpha.exe
+          if-no-files-found: warn

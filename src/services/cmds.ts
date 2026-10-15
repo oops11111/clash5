@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 
 import type { CommandFailure } from '@/services/notice-service'
 import { showNotice } from '@/services/notice-service'
+import type { Clash5NodeRecord } from '@/types/clash5-node'
 import type { ProxyViewV1 } from '@/types/proxy-view'
 import { debugLog } from '@/utils/debug'
 
@@ -13,6 +14,25 @@ export async function copyClashEnv() {
 
 export async function getProfiles() {
   return invoke<IProfilesConfig>('get_profiles')
+}
+
+export async function listClash5Nodes(includeInactive = false) {
+  return invoke<Clash5NodeRecord[]>('clash5_list_nodes', { includeInactive })
+}
+
+export async function importClash5ManualProxies(proxies: IProxyConfig[]) {
+  return invoke<{ imported: number }>('clash5_import_manual_proxies', {
+    proxies,
+  })
+}
+
+export async function probeClash5Nodes() {
+  return invoke<{
+    probed: number
+    cached: number
+    unavailable: number
+    failed: number
+  }>('clash5_probe_nodes')
 }
 
 export async function enhanceProfiles() {

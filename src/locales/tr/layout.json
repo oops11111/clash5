@@ -4,6 +4,7 @@
       "tabs": {
         "home": "Ana Sayfa",
         "proxies": "Vekil'ler",
+        "nodePool": "Node Pool",
         "profiles": "Profiller",
         "connections": "Bağlantılar",
         "rules": "Kurallar",

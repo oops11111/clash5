@@ -21,6 +21,7 @@ import { navigationItems } from './_navigation-meta'
 import ConnectionsPage from './connections'
 import HomePage from './home'
 import LogsPage from './logs'
+import NodePoolPage from './node-pool'
 import ProfilePage from './profiles'
 import ProxyPage from './proxies'
 import RulesPage from './rules'
@@ -44,6 +45,11 @@ export const navItems: NavigationItem[] = [
     ...navigationItems.proxies,
     icon: [<WifiOutlinedIcon key="mui" />, <ProxiesSvg key="svg" />],
     Component: ProxyPage,
+  },
+  {
+    ...navigationItems.nodePool,
+    icon: [<DnsOutlinedIcon key="mui" />, <ProxiesSvg key="svg" />],
+    Component: NodePoolPage,
   },
   {
     ...navigationItems.profiles,
