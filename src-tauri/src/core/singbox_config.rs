@@ -200,8 +200,14 @@ pub fn map_landing_outbound(proxy: &YamlValue, tag: &str) -> Result<JsonValue> {
     Ok(JsonValue::Object(outbound))
 }
 
-/// Produces an isolated sing-box configuration with only a loopback SOCKS inbound and one exit.
-pub fn singbox_config(proxy: &YamlValue, inbound_port: u16, tag: &str, endpoint: &RelayEndpoint) -> Result<JsonValue> {
+/// Produces an isolated sing-box configuration with a loopback SOCKS inbound and one landing outbound.
+pub fn singbox_config(
+    proxy: &YamlValue,
+    detour_proxy: Option<&YamlValue>,
+    inbound_port: u16,
+    tag: &str,
+    endpoint: &RelayEndpoint,
+) -> Result<JsonValue> {
     anyhow::ensure!(inbound_port != 0, "sing-box inbound port must be nonzero");
     anyhow::ensure!(
         !endpoint.username.is_empty()
@@ -210,6 +216,24 @@ pub fn singbox_config(proxy: &YamlValue, inbound_port: u16, tag: &str, endpoint:
             && endpoint.password.len() <= u8::MAX as usize,
         "invalid sing-box inbound credentials"
     );
+    let mut outbounds = Vec::new();
+    if let Some(detour_proxy) = detour_proxy {
+        let mut detour = map_landing_outbound(detour_proxy, "clash5-front")?;
+        // The detour dials the selected landing server. It must not itself recurse.
+        detour
+            .as_object_mut()
+            .context("sing-box front outbound is invalid")?
+            .remove("detour");
+        outbounds.push(detour);
+    }
+    let mut landing = map_landing_outbound(proxy, tag)?;
+    if detour_proxy.is_some() {
+        landing
+            .as_object_mut()
+            .context("sing-box landing outbound is invalid")?
+            .insert("detour".into(), JsonValue::String("clash5-front".into()));
+    }
+    outbounds.extend([landing, json!({"type": "direct", "tag": "direct"})]);
     Ok(json!({
         "log": {"disabled": true},
         "inbounds": [{
@@ -219,7 +243,7 @@ pub fn singbox_config(proxy: &YamlValue, inbound_port: u16, tag: &str, endpoint:
             "listen_port": inbound_port,
             "users": [{"username": endpoint.username, "password": endpoint.password}]
         }],
-        "outbounds": [map_landing_outbound(proxy, tag)?, {"type": "direct", "tag": "direct"}],
+        "outbounds": outbounds,
         "route": {"final": tag}
     }))
 }
@@ -269,7 +293,9 @@ pub fn replace_landing_with_relay(config: &mut Mapping, landing_name: &str, endp
     relay.insert("port".into(), YamlValue::Number(endpoint.port.into()));
     relay.insert("username".into(), YamlValue::String(endpoint.username.clone()));
     relay.insert("password".into(), YamlValue::String(endpoint.password.clone()));
-    for key in ["dialer-proxy", "udp", "ip-version", "interface-name"] {
+    // Mihomo must connect to the local relay directly. The original dialer-proxy is
+    // represented by the sing-box landing outbound's detour instead.
+    for key in ["udp", "ip-version", "interface-name"] {
         if let Some(value) = original.get(YamlValue::String(key.into())) {
             relay.insert(YamlValue::String(key.into()), value.clone());
         }
@@ -310,7 +336,7 @@ mod tests {
             username: "clash5".into(),
             password: "session-token".into(),
         };
-        let config = singbox_config(&proxy, 18080, "exit", &endpoint)?;
+        let config = singbox_config(&proxy, None, 18080, "exit", &endpoint)?;
         assert_eq!(config["inbounds"][0]["listen"], "127.0.0.1");
         assert_eq!(config["inbounds"][0]["users"][0]["password"], "session-token");
         assert!(config["inbounds"][0].get("tun").is_none());
@@ -336,8 +362,32 @@ mod tests {
         assert_eq!(proxy["type"], "socks5");
         assert_eq!(proxy["port"].as_u64(), Some(49152));
         assert_eq!(proxy["password"], "session-token");
-        assert_eq!(proxy["dialer-proxy"], "copy-front");
+        assert!(proxy.get("dialer-proxy").is_none());
         assert!(proxy.get("cipher").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn maps_the_mihomo_front_proxy_as_a_singbox_landing_detour() -> Result<()> {
+        let front: YamlValue = serde_yaml_ng::from_str(
+            "type: ss\nserver: front.example\nport: 8388\ncipher: aes-128-gcm\npassword: front-secret\n",
+        )?;
+        let landing: YamlValue = serde_yaml_ng::from_str(
+            "type: trojan\nserver: landing.example\nport: 443\npassword: landing-secret\ntls: true\n",
+        )?;
+        let endpoint = RelayEndpoint {
+            host: "127.0.0.1".into(),
+            port: 49152,
+            username: "clash5".into(),
+            password: "session-token".into(),
+        };
+
+        let config = singbox_config(&landing, Some(&front), 18080, "exit", &endpoint)?;
+
+        assert_eq!(config["outbounds"][0]["tag"], "clash5-front");
+        assert_eq!(config["outbounds"][1]["tag"], "exit");
+        assert_eq!(config["outbounds"][1]["detour"], "clash5-front");
+        assert_eq!(config["route"]["final"], "exit");
         Ok(())
     }
 
