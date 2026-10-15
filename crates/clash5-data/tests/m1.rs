@@ -33,7 +33,8 @@ fn manual_batch_validates_every_identity_before_writing() {
 fn manual_rename_keeps_probe_cache_but_runtime_change_invalidates_it() {
     let mut db = BindingStore::memory().unwrap();
     let id = node("Original").stable_id().unwrap();
-    db.upsert_manual_batch(&[node("Original")], std::slice::from_ref(&id)).unwrap();
+    db.upsert_manual_batch(&[node("Original")], std::slice::from_ref(&id))
+        .unwrap();
     db.save_quality(
         &Source::Manual,
         &id,
