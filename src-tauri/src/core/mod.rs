@@ -17,6 +17,7 @@ pub(crate) mod runtime_bundle;
 pub mod service;
 pub mod singbox_config;
 pub mod singbox_relay;
+pub mod singbox_runtime;
 pub mod sysopt;
 pub mod timer;
 pub mod tray;
