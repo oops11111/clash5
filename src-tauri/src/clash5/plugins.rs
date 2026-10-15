@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_yaml_ng::{Mapping, Value};
-use sha2::{Digest, Sha256};
+use sha2::{Digest as _, Sha256};
 use std::{
     collections::{BTreeMap, HashSet},
     fs,
-    io::{Cursor, Read},
+    io::{Cursor, Read as _},
     path::Path,
     sync::OnceLock,
     thread,
@@ -665,7 +665,11 @@ mod tests {
     #[test]
     fn signed_desktop_fixture_passes_package_verification_and_requires_signer_consent() {
         let package = include_bytes!("../../../scripts/fixtures/m3-acceptance-plugin.c5p");
-        let inspected = inspect_package(package).unwrap();
+        let inspected = inspect_package(package);
+        assert!(inspected.is_ok());
+        let Some(inspected) = inspected.ok() else {
+            return;
+        };
         assert_eq!(inspected.manifest.id, "m3.smoke.plugin");
         assert_eq!(
             inspected.manifest.permissions,

@@ -968,7 +968,10 @@ mod tests {
         )
         .await;
 
-        let error = result.unwrap_err();
+        assert!(result.is_err());
+        let Some(error) = result.err() else {
+            return;
+        };
         assert_eq!(error.code.as_deref(), Some("C5-PLUGIN-005"));
         assert!(error.detail.contains("previous binding was restored"));
         assert_eq!(restore_count.load(Ordering::SeqCst), 1);
@@ -991,7 +994,11 @@ mod tests {
         )
         .await;
 
-        assert_eq!(result.unwrap_err().code.as_deref(), Some("C5-PLUGIN-004"));
+        assert!(result.is_err());
+        let Some(error) = result.err() else {
+            return;
+        };
+        assert_eq!(error.code.as_deref(), Some("C5-PLUGIN-004"));
         assert_eq!(update_count.load(Ordering::SeqCst), 1);
     }
 
@@ -1018,7 +1025,11 @@ mod tests {
         )
         .await;
 
-        assert_eq!(result.unwrap_err().code.as_deref(), Some("C5-PLUGIN-004"));
+        assert!(result.is_err());
+        let Some(error) = result.err() else {
+            return;
+        };
+        assert_eq!(error.code.as_deref(), Some("C5-PLUGIN-004"));
         assert_eq!(restore_count.load(Ordering::SeqCst), 1);
         assert_eq!(update_count.load(Ordering::SeqCst), 2);
     }
