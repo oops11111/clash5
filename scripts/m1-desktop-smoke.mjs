@@ -141,21 +141,52 @@ async function clickButton(labels) {
 
 async function importLink(link, count, expectedName) {
   await invoke('plugin:clipboard-manager|write_text', { text: link })
+  const clipboard = await invoke('plugin:clipboard-manager|read_text')
+  if (clipboard !== link) {
+    throw new Error(
+      `Clipboard fixture did not round-trip: ${JSON.stringify(clipboard)}`,
+    )
+  }
   await clickButton(['Import from clipboard', '从剪贴板导入'])
-  await browser.waitUntil(
-    async () => {
-      const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
-      return (
-        nodes.length === count &&
-        nodes.some((node) => node.display_name === expectedName)
-      )
-    },
-    {
-      timeout: 45_000,
-      interval: 500,
-      timeoutMsg: `Manual import did not yield ${count} nodes`,
-    },
-  )
+  try {
+    await browser.waitUntil(
+      async () => {
+        const nodes = await invoke('clash5_list_nodes', {
+          includeInactive: true,
+        })
+        return (
+          nodes.length === count &&
+          nodes.some((node) => node.display_name === expectedName)
+        )
+      },
+      {
+        timeout: 45_000,
+        interval: 500,
+        timeoutMsg: `Manual import did not yield ${count} nodes`,
+      },
+    )
+  } catch (error) {
+    const [nodes, alerts, currentClipboard] = await Promise.all([
+      invoke('clash5_list_nodes', { includeInactive: true }),
+      browser.execute(() =>
+        [...document.querySelectorAll('.MuiAlert-root')].map((alert) =>
+          alert.textContent?.trim(),
+        ),
+      ),
+      invoke('plugin:clipboard-manager|read_text').catch((readError) =>
+        `read failed: ${String(readError)}`,
+      ),
+    ])
+    const details = {
+      error: String(error),
+      nodes,
+      alerts,
+      clipboard: currentClipboard,
+    }
+    throw new Error(
+      `Manual import acceptance failed: ${JSON.stringify(details)}`,
+    )
+  }
 }
 
 async function verifyImportAndProbe() {
