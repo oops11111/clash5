@@ -121,9 +121,10 @@ M0 的原验收已完成并合并至 `dev`。以下是本草案新增或收紧�
 | 共存与导入 | app identifier、目录、deep link 已隔离；服务/包名仍有上游遗留 | 同机安装验证；只读迁移向导与源目录校验（R-18/R-19） |
 | 安全与契约 | M0 IPC 已返回结构化错误 | 统一 `C5-*` 码、脱敏测试和所有 command 契约快照；尚无证据证明全面覆盖（R-20） |
 | 上游同步 | M0 文档及仓库基线来自上游 `dev` | 本草案将后续同步改为 release tag 的独立 PR；首次采用前核对目标 tag 与当前基线关系 |
-| M1 节点池 | PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；[Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过页面交互、外部 provider 健康检查、筛选、搜索、质量排序与重启身份检查，附桌面截图 | 已达到 M1 退出标准，待合并。截图覆盖默认 940 × 700 窗口，未单独截图验证 1600 × 900 布局；完整合并配置/插件来源属于后续里程碑。Mihomo 接口未暴露上游 HTTP 状态及 `Retry-After`，当前为连续失败通用退避（R-11/R-26） |
+| M1 节点池 | PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；[Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过页面交互、外部 provider 健康检查、筛选、搜索、质量排序与重启身份检查，附桌面截图 | 已达到 M1 退出标准并合并至 `dev`。截图覆盖默认 940 × 700 窗口，未单独截图验证 1600 × 900 布局；完整合并配置/插件来源属于后续里程碑。Mihomo 接口未暴露上游 HTTP 状态及 `Retry-After`，当前为连续失败通用退避（R-11/R-26） |
+| M2 链路编排 | PR #18 实现稳定两跳生成、来源隔离、保存和回滚、出口 IP 检测与 L2 策略；[Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38701837292)通过默认窗口无横向溢出检查、桌面交互和重启恢复 | 退出标准已达到，待 PR #18 合并。当前 UI 页面、provider 缓存路径限制与 Mihomo 官方行为见 [`M2 链路说明`](clash5/m2-chains.md) |
 
-M0 现有实现见 [`clash5/implementation.md`](clash5/implementation.md)；M1 当前实现及限制见[草稿 PR #4](https://github.com/oops11111/clash5/pull/4)。
+M0 现有实现见 [`clash5/implementation.md`](clash5/implementation.md)；M1 已合并至 `dev`；M2 变更和限制见[草稿 PR #18](https://github.com/oops11111/clash5/pull/18)。
 
 ---
 

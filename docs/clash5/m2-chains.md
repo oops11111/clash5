@@ -1,6 +1,6 @@
 # M2 chain orchestration
 
-Implementation for [Issue #17](https://github.com/oops11111/clash5/issues/17). Desktop and real-core acceptance is pending; this document describes the current implementation, not a completed milestone.
+Implementation for [Issue #17](https://github.com/oops11111/clash5/issues/17). The implementation and desktop acceptance passed on commit `ee6922c`; [Windows Server 2022 native run 38701837292](https://github.com/oops11111/clash5/actions/runs/38701837292) verified the desktop bridge, default-window layout, chain operations and restart persistence. PR #18 remains open for review and merge.
 
 Each chain has a UUID v4, a profile scope, two source-scoped stable node references, an enabled flag and an exit-IP failure policy. SQLite stores these references without proxy credentials. The existing opaque M0 chain records remain readable through their original API.
 
@@ -16,6 +16,6 @@ Exit-IP detection creates a temporary HTTP listener bound to `127.0.0.1` on an a
 
 The default L2 policy warns and keeps the selected route. An explicitly selected fallback is probed first and selected only on success. Detection is user-triggered; no background polling is installed. Failure to remove a temporary listener is a distinct error and does not trigger a fallback switch.
 
-The editor follows the approved prototype's front-to-landing canvas, toolbar, chain list, template and three-column details. Plugin output remains an explicit pending state until M3. Current M2 data tests cover generated configuration, source isolation, renames, ambiguous identities, name conflicts, disabled definitions, SQLite reopen, absent credentials and fallback graph validation.
+The editor follows the approved prototype's front-to-landing canvas, toolbar, chain list, template and three-column details. The node cards and details reflow within the default 940 × 700 window without horizontal overflow. Plugin output remains an explicit pending state until M3. Current M2 data tests cover generated configuration, source isolation, renames, ambiguous identities, name conflicts, disabled definitions, SQLite reopen, absent credentials and fallback graph validation. Native desktop acceptance covers save, provider node selection, connectivity test, exit-IP rendering, default warning, rejected-edit rollback, verified fallback, legacy-command rejection, restart persistence and the layout overflow assertion.
 
 Official behavior references: [Mihomo dialer-proxy](https://wiki.metacubex.one/en/config/proxies/dialer-proxy/), [provider overrides](https://wiki.metacubex.one/en/config/proxy-providers/), and [listener proxy routing](https://wiki.metacubex.one/en/config/inbound/listeners/).
