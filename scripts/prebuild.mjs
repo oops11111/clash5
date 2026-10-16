@@ -509,11 +509,14 @@ const resolvePlugin = async () => {
 
 // Service executable permissions
 const resolveServicePermission = async () => {
-  const serviceExecutables = [
-    'clash-verge-service*',
-    'clash-verge-service-install*',
-    'clash-verge-service-uninstall*',
-  ]
+  const serviceExecutables =
+    platform === 'linux'
+      ? ['clash5-service*', 'clash5-service-install*', 'clash5-service-uninstall*']
+      : [
+          'clash-verge-service*',
+          'clash-verge-service-install*',
+          'clash-verge-service-uninstall*',
+        ]
   const hashCache = await loadHashCache()
   let hasChanges = false
 
@@ -553,9 +556,13 @@ const SERVICE_BINARIES = [
 function serviceFileInfo(name) {
   const ext = platform === 'win32' ? '.exe' : ''
   const suffix = platform === 'linux' ? `-${SIDECAR_HOST}` : ''
+  const targetName =
+    platform === 'linux'
+      ? name.replace('clash-verge-service', 'clash5-service')
+      : name
   return {
     sourceFile: `${name}${ext}`,
-    targetFile: `${name}${suffix}${ext}`,
+    targetFile: `${targetName}${suffix}${ext}`,
   }
 }
 
