@@ -303,7 +303,7 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         }
     };
     if has_manual_proxies {
-        apply_manual_identity_rotation(&mut manual_file, &old_key, &new_key, previous.as_deref()).await?;
+        save_manual_identity_rotation(&mut manual_file, &old_key, &new_key, previous.as_deref()).await?;
         log_identity_rotation("manual_proxies_saved", None, None, None);
     }
 
@@ -316,6 +316,16 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         return Err(failure(error));
     }
     log_identity_rotation("committed", Some(generation), None, None);
+    if has_manual_proxies {
+        let applied = CoreManager::global().update_config_forced().await;
+        log_identity_rotation("runtime_update_returned", Some(generation), None, None);
+        if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+            return Err(coded_error(
+                "IDENTITY_ROTATION_RUNTIME_PENDING",
+                "identity rotation was saved, but the running configuration could not be refreshed",
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -378,7 +388,7 @@ async fn collect_identity_rotation_snapshots(
     Ok(snapshots)
 }
 
-async fn apply_manual_identity_rotation(
+async fn save_manual_identity_rotation(
     manual_file: &mut manual::ManualProxyFile,
     old_key: &clash5_data::IdentityKey,
     new_key: &clash5_data::IdentityKey,
@@ -392,15 +402,6 @@ async fn apply_manual_identity_rotation(
         return Err(coded_error(
             "IDENTITY_ROTATION_FAILED",
             "manual proxies could not be saved",
-        ));
-    }
-    let applied = CoreManager::global().update_config_forced().await;
-    log_identity_rotation("runtime_update_returned", None, None, None);
-    if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
-        restore_manual_file(previous).await?;
-        return Err(coded_error(
-            "IDENTITY_ROTATION_FAILED",
-            "the rekeyed manual proxies were rejected",
         ));
     }
     Ok(())

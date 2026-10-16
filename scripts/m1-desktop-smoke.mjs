@@ -1139,6 +1139,32 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   if (rotationUiState?.open && !rotationUiState.busy) {
     throw new Error('Identity rotation confirmation did not start the command')
   }
+  await browser.waitUntil(
+    () =>
+      browser.execute(() => {
+        const dialog = document.querySelector('.MuiDialog-root')
+        return !dialog || dialog.getAttribute('aria-busy') !== 'true'
+      }),
+    {
+      timeout: 60_000,
+      interval: 250,
+      timeoutMsg: 'Identity rotation command did not reach a terminal state',
+    },
+  )
+  const rotationResultState = await browser.execute(() => ({
+    error: document
+      .querySelector('.MuiAlert-standardError')
+      ?.textContent?.trim(),
+    runtimePending: Boolean(
+      document.querySelector('[data-testid="identity-rotation-runtime-pending"]'),
+    ),
+  }))
+  if (rotationResultState?.error) {
+    throw new Error(`Identity rotation command failed: ${rotationResultState.error}`)
+  }
+  if (rotationResultState?.runtimePending) {
+    throw new Error('Identity rotated, but its runtime configuration was not refreshed')
+  }
   let rotatedTarget
   await browser.waitUntil(
     async () => {

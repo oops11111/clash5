@@ -59,6 +59,7 @@ const PluginsPage = () => {
   const [resetOpen, setResetOpen] = useState(false)
   const [rotationOpen, setRotationOpen] = useState(false)
   const [rotationBusy, setRotationBusy] = useState(false)
+  const [rotationRuntimePending, setRotationRuntimePending] = useState(false)
   const [identityError, setIdentityError] = useState(false)
   const [orphanCleanup, setOrphanCleanup] =
     useState<Clash5OrphanCleanupPreview | null>(null)
@@ -106,13 +107,25 @@ const PluginsPage = () => {
   }
 
   const confirmRotation = async () => {
+    setIdentityError(false)
+    setRotationRuntimePending(false)
     setRotationBusy(true)
     try {
       await rotateClash5Identity()
       setRotationOpen(false)
       await refreshIdentity()
-    } catch {
-      setIdentityError(true)
+    } catch (error) {
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? error.code
+          : undefined
+      if (code === 'IDENTITY_ROTATION_RUNTIME_PENDING') {
+        setRotationOpen(false)
+        await refreshIdentity()
+        setRotationRuntimePending(true)
+      } else {
+        setIdentityError(true)
+      }
     } finally {
       setRotationBusy(false)
     }
@@ -204,6 +217,14 @@ const PluginsPage = () => {
             {identityError && (
               <Alert severity="error">
                 {t('layout.components.navigation.identityError')}
+              </Alert>
+            )}
+            {rotationRuntimePending && (
+              <Alert
+                data-testid="identity-rotation-runtime-pending"
+                severity="warning"
+              >
+                {t('layout.components.navigation.rotationRuntimePending')}
               </Alert>
             )}
             {orphanCleanup && (
