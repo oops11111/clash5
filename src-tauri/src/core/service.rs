@@ -772,9 +772,9 @@ fn uninstall_service() -> Result<()> {
 const fn bundled_core_name(core: &str) -> &str {
     #[cfg(target_os = "linux")]
     {
-        match core {
-            "verge-mihomo" => "clash5-mihomo",
-            "verge-mihomo-alpha" => "clash5-mihomo-alpha",
+        match core.as_bytes() {
+            b"verge-mihomo" => "clash5-mihomo",
+            b"verge-mihomo-alpha" => "clash5-mihomo-alpha",
             _ => core,
         }
     }
