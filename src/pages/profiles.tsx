@@ -11,6 +11,7 @@ import {
   ClearRounded,
   ContentPasteRounded,
   DeleteRounded,
+  FolderOpenOutlined,
   IndeterminateCheckBoxRounded,
   LocalFireDepartmentRounded,
   RefreshRounded,
@@ -19,6 +20,7 @@ import {
 import { Box, Button, Divider, Grid, IconButton, Stack } from '@mui/material'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { readTextFile } from '@tauri-apps/plugin-fs'
 import { useLockFn } from 'ahooks'
 import { throttle } from 'lodash-es'
@@ -46,6 +48,7 @@ import {
   enhanceProfiles,
   getRuntimeLogs,
   importProfile,
+  importClash5VergeData,
   reorderProfile,
   updateProfile,
 } from '@/services/cmds'
@@ -258,6 +261,32 @@ const ProfilePage = () => {
       }
     } finally {
       setDisabled(false)
+      setLoading(false)
+    }
+  }
+
+  const onImportVergeData = async () => {
+    try {
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+        title: t('profiles.page.vergeImport.chooseSource'),
+      })
+      if (typeof selected !== 'string') return
+      if (!window.confirm(t('profiles.page.vergeImport.backupReminder'))) return
+
+      setLoading(true)
+      const report = await importClash5VergeData(selected)
+      await mutateProfiles()
+      showNotice.success('profiles.page.vergeImport.success', {
+        imported: report.imported,
+        skipped: report.skipped.length,
+        manifest: report.source_manifest_after,
+        syncFailures: report.binding_sync_failures,
+      })
+    } catch (error) {
+      showNotice.error(error)
+    } finally {
       setLoading(false)
     }
   }
@@ -865,6 +894,17 @@ const ProfilePage = () => {
           onClick={onImport}
         >
           {t('profiles.page.actions.import')}
+        </Button>
+        <Button
+          disabled={loading || disabled}
+          variant="outlined"
+          size="small"
+          sx={{ borderRadius: '6px', minWidth: 36, px: 1 }}
+          title={t('profiles.page.vergeImport.action')}
+          aria-label={t('profiles.page.vergeImport.action')}
+          onClick={() => void onImportVergeData()}
+        >
+          <FolderOpenOutlined fontSize="small" />
         </Button>
         <Button
           variant="contained"

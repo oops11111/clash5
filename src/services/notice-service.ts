@@ -61,6 +61,13 @@ const DEFAULT_DURATIONS: Readonly<Record<NoticeType, number>> = {
 
 const TRANSLATION_KEY_PATTERN = /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+$/
 const CODED_ERROR_TRANSLATION_KEYS: Readonly<Record<string, TranslationKey>> = {
+  'C5-IMPORT-001': 'profiles.page.vergeImport.failure',
+  'C5-IMPORT-002': 'profiles.page.vergeImport.failure',
+  'C5-IMPORT-003': 'profiles.page.vergeImport.failure',
+  'C5-IMPORT-004': 'profiles.page.vergeImport.failure',
+  'C5-IMPORT-005': 'profiles.page.vergeImport.failure',
+  'C5-IMPORT-006': 'profiles.page.vergeImport.failure',
+  'C5-IMPORT-007': 'profiles.page.vergeImport.failure',
   CLASH_CONFIG_UPDATE_FAILED:
     'settings.feedback.errors.clash.configUpdateFailed',
   CLASH_MODE_UPDATE_FAILED: 'settings.feedback.errors.clash.modeUpdateFailed',

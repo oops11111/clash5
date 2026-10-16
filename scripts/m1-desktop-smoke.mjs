@@ -1292,11 +1292,10 @@ try {
     await browser.waitUntil(
       () =>
         browser.execute(() =>
-          [...document.querySelectorAll('.base-page .MuiAlert-root')].some(
-            (alert) =>
-              /Imported 1 standalone proxy link|已导入 1 个独立节点链接/.test(
-                alert.textContent ?? '',
-              ),
+          [...document.querySelectorAll('.MuiAlert-root')].some((alert) =>
+            /Imported 1 standalone proxy link|已导入 1 个独立节点链接/.test(
+              alert.textContent ?? '',
+            ),
           ),
         ),
       {

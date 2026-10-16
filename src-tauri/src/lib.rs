@@ -210,6 +210,7 @@ mod app_init {
             cmd::clash5_set_orphan_retention_days,
             cmd::clash5_purge_expired_orphans,
             cmd::clash5_register_manual_node,
+            cmd::clash5_import_verge_data,
             cmd::enhance_profiles,
             cmd::patch_profiles_config,
             cmd::view_profile,
