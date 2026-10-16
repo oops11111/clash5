@@ -266,7 +266,7 @@ pub async fn clash5_reset_identity() -> CmdResult {
 #[tauri::command]
 pub async fn clash5_rotate_identity() -> CmdResult {
     let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
-    tracing::info!(target: "clash5::identity", stage = "started");
+    log_identity_rotation("started", None, None, None);
     let old_key = crate::config::profiles::clash5_identity_key().await.map_err(failure)?;
     let profiles = Config::profiles().await.latest_arc();
     let mut snapshots = match profiles.current.clone() {
@@ -286,17 +286,12 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         source: Source::Manual,
         nodes: manual_nodes,
     });
-    tracing::info!(
-        target: "clash5::identity",
-        stage = "sources_captured",
-        source_count = snapshots.len(),
-        manual_node_count
-    );
+    log_identity_rotation("sources_captured", None, Some(snapshots.len()), Some(manual_node_count));
 
     let (generation, new_key) = crate::config::profiles::stage_clash5_identity_rotation_key()
         .await
         .map_err(failure)?;
-    tracing::info!(target: "clash5::identity", stage = "key_staged", generation);
+    log_identity_rotation("key_staged", Some(generation), None, None);
     let previous = match tokio::fs::read_to_string(manual::path().map_err(super::CommandFailure::plain)?).await {
         Ok(yaml) => Some(yaml),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -309,7 +304,7 @@ pub async fn clash5_rotate_identity() -> CmdResult {
     };
     if has_manual_proxies {
         apply_manual_identity_rotation(&mut manual_file, &old_key, &new_key, previous.as_deref()).await?;
-        tracing::info!(target: "clash5::identity", stage = "manual_proxies_saved");
+        log_identity_rotation("manual_proxies_saved", None, None, None);
     }
 
     if let Err(error) =
@@ -320,7 +315,7 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         }
         return Err(failure(error));
     }
-    tracing::info!(target: "clash5::identity", stage = "committed", generation);
+    log_identity_rotation("committed", Some(generation), None, None);
     Ok(())
 }
 
@@ -400,7 +395,7 @@ async fn apply_manual_identity_rotation(
         ));
     }
     let applied = CoreManager::global().update_config_forced().await;
-    tracing::info!(target: "clash5::identity", stage = "runtime_update_returned");
+    log_identity_rotation("runtime_update_returned", None, None, None);
     if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
         restore_manual_file(previous).await?;
         return Err(coded_error(
@@ -409,6 +404,21 @@ async fn apply_manual_identity_rotation(
         ));
     }
     Ok(())
+}
+
+fn log_identity_rotation(
+    stage: &'static str,
+    generation: Option<i64>,
+    source_count: Option<usize>,
+    manual_node_count: Option<usize>,
+) {
+    tracing::info!(
+        target: "clash5::identity",
+        stage,
+        generation = ?generation,
+        source_count = ?source_count,
+        manual_node_count = ?manual_node_count
+    );
 }
 
 #[tauri::command]
