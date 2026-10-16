@@ -83,7 +83,20 @@ function Uninstall-IfPresent([string]$DisplayName) {
   $record = Get-InstallRecord $DisplayName
   if (-not $record) { return }
   $uninstaller = Join-Path (Get-InstallDirectory $record) 'uninstall.exe'
-  if (Test-Path -LiteralPath $uninstaller) { Invoke-Setup $uninstaller @('/S') }
+  if (Test-Path -LiteralPath $uninstaller) {
+    Write-Output "Running $DisplayName uninstaller: $uninstaller (registry: $($record.PSPath))"
+    Invoke-Setup $uninstaller @('/S')
+  }
+}
+
+function Assert-Unregistered([string]$DisplayName) {
+  $deadline = [DateTime]::UtcNow.AddSeconds(15)
+  do {
+    $record = Get-InstallRecord $DisplayName
+    if (-not $record) { return }
+    Start-Sleep -Milliseconds 250
+  } while ([DateTime]::UtcNow -lt $deadline)
+  throw "$DisplayName remained registered after uninstall at $($record.PSPath); version='$($record.DisplayVersion)', install='$($record.InstallLocation)', uninstall='$($record.UninstallString)'"
 }
 
 try {
@@ -127,7 +140,7 @@ try {
   Assert-Running (Join-Path $clash5Dir 'clash5.exe')
   $checksumBeforeClash5Uninstall = Get-TreeChecksum $upstreamConfigDir
   Uninstall-IfPresent 'clash5'
-  if (Get-InstallRecord 'clash5') { throw 'clash5 remained registered after uninstall' }
+  Assert-Unregistered 'clash5'
   if (-not (Test-Path -LiteralPath (Join-Path $upstreamDir 'clash-verge.exe'))) {
     throw 'Uninstalling clash5 removed the Clash Verge Rev executable'
   }
@@ -136,7 +149,7 @@ try {
   }
 
   Uninstall-IfPresent 'Clash Verge'
-  if (Get-InstallRecord 'Clash Verge') { throw 'Clash Verge Rev remained registered after uninstall' }
+  Assert-Unregistered 'Clash Verge'
   if (Get-InstallRecord 'clash5') { throw 'Uninstalling Clash Verge Rev changed clash5 registration' }
   Write-Output "Upstream configuration SHA-256 before/after clash5 install/update/uninstall: $beforeClash5Install"
 } finally {
