@@ -1173,28 +1173,45 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
     )
   }
   let rotatedTarget
-  await browser.waitUntil(
-    async () => {
-      const currentNodes = await invoke('clash5_list_nodes', {
-        includeInactive: true,
-      })
-      rotatedTarget = currentNodes.find(
-        (node) =>
-          node.source.kind === selectedNode.source.kind &&
-          node.source.provider_id === selectedNode.source.provider_id &&
-          node.display_name === selectedNode.display_name &&
-          node.active,
-      )
-      return Boolean(
-        rotatedTarget && rotatedTarget.stable_id !== selectedNode.stable_id,
-      )
-    },
-    {
-      timeout: 60_000,
-      interval: 500,
-      timeoutMsg: 'Identity rotation did not finish',
-    },
-  )
+  try {
+    await browser.waitUntil(
+      async () => {
+        const currentNodes = await invoke('clash5_list_nodes', {
+          includeInactive: true,
+        })
+        rotatedTarget = currentNodes.find(
+          (node) =>
+            node.source.kind === selectedNode.source.kind &&
+            node.source.provider_id === selectedNode.source.provider_id &&
+            node.display_name === selectedNode.display_name &&
+            node.active,
+        )
+        return Boolean(
+          rotatedTarget && rotatedTarget.stable_id !== selectedNode.stable_id,
+        )
+      },
+      {
+        timeout: 60_000,
+        interval: 500,
+        timeoutMsg: 'Identity rotation did not finish',
+      },
+    )
+  } catch (error) {
+    const currentNodes = await invoke('clash5_list_nodes', {
+      includeInactive: true,
+    })
+    const diagnostics = currentNodes.map((node) => ({
+      source: node.source,
+      stable_id: node.stable_id,
+      display_name: node.display_name,
+      port: node.port,
+      active: node.active,
+    }))
+    throw new Error(
+      `${String(error)}; identity inventory: ${JSON.stringify(diagnostics)}`,
+      { cause: error },
+    )
+  }
   const rotatedNodes = await invoke('clash5_list_nodes', {
     includeInactive: true,
   })
