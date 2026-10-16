@@ -196,6 +196,8 @@ export interface TranslationResources {
     layout: {
       components: {
         navigation: {
+          cancel: string
+          chooseCandidate: string
           diagnostics: string
           empty: {
             bindingDescription: string
@@ -209,6 +211,8 @@ export interface TranslationResources {
             settingsDescription: string
             settingsTitle: string
           }
+          identityError: string
+          identityRecovery: string
           menu: {
             collapseNavBar: string
             expandNavBar: string
@@ -217,6 +221,10 @@ export interface TranslationResources {
             restoreDefaultOrder: string
             unlock: string
           }
+          orphanBinding: string
+          orphanRetentionDays: string
+          orphanRetentionSummary: string
+          pendingRebind: string
           pluginTabs: {
             binding: string
             installed: string
@@ -224,6 +232,19 @@ export interface TranslationResources {
             settings: string
           }
           proxyGroups: string
+          purgeExpiredOrphans: string
+          purgeExpiredOrphansConfirm: string
+          purgeExpiredOrphansTitle: string
+          rebind: string
+          resetIdentity: string
+          resetIdentityConfirm: string
+          resetIdentityTitle: string
+          reviewOrphanCleanup: string
+          rotateIdentity: string
+          rotateIdentityConfirm: string
+          rotateIdentityDescription: string
+          rotateIdentityTitle: string
+          saveOrphanRetention: string
           tabs: {
             chains: string
             connections: string

@@ -1,6 +1,6 @@
 # r2 node identity migration decision
 
-Issue: [#7](https://github.com/oops11111/clash5/issues/7). This document fixes the recovery and migration behavior before changing identity code. The accepted M0 baseline remains valid as `v1`; the M1 draft adds SQLite schema v2 but has not yet merged. The implementation must rebase on the merged schema and must not relabel old IDs as new IDs.
+Issue: [#7](https://github.com/oops11111/clash5/issues/7). The accepted M0 baseline remains valid as `v1`; the M1 SQLite schema v2 is migrated transactionally to schema v3 with identity metadata and version columns. Existing IDs are never relabeled as new IDs.
 
 ## Key ownership and recovery
 
@@ -27,7 +27,7 @@ The ID is `v2:` followed by lowercase hex HMAC-SHA256. Its payload is a length-d
 
 Transport defaults for an absent `network` field are `tcp` for `ss`, `ssr`, `trojan`, `vless`, `vmess`, `anytls`, `socks5`, `http`, `ssh`, `shadowtls`; `quic` for `hysteria`, `hysteria2`, `tuic`; and `wireguard` for `wireguard`. An explicit `network` equal to that default is the same identity. For protocol-native transports, an explicit different `network` is invalid. Network-specific options such as a WebSocket path remain configuration of the same node in `v2`; changing the protocol transport type or effective SNI changes identity. The credential field list is the accepted `v1` list, sorted by UTF-8 bytes for `v2` and encoded with an unambiguous length-delimited format. These choices need fixed-key golden fixtures before implementation is merged.
 
-The outer HMAC uses a distinct `clash5-node-v2` domain tag. Store `stable_id_version = 2` and the key generation with each node, and key identifiers in database metadata; no raw credential or credential fingerprint is stored. Changes to any canonical field or its normalization require a new ID version and migration plan.
+The outer HMAC uses a distinct `clash5-node-v2` domain tag. Store `stable_id_version = 2` and the key generation with each node, and key identifiers in database metadata; no raw credential or credential fingerprint is stored. Fixed-key golden tests pin the canonical bytes and digest. Changes to any canonical field or its normalization require a new ID version and migration plan.
 
 ## Database and source migration
 
@@ -37,6 +37,8 @@ The outer HMAC uses a distinct `clash5-node-v2` domain tag. Store `stable_id_ver
 4. Credential rotation produces a new `v2` ID. Search only inactive identities from the same subscription provider whose normalized protocol, server, port, transport and SNI match. Exactly one candidate may transfer bindings automatically. Zero candidates leave a new node with no inherited binding; multiple candidates create a pending choice and leave all old bindings orphaned. Manual nodes and different providers are never automatic candidates.
 5. All source diff, identity changes and binding moves commit atomically. Audit records contain event names and counts only. A failed source parse, missing key, collision or database error leaves the previous source snapshot and bindings intact.
 
+Planned key rotation takes complete, successfully parsed snapshots for each available source. It re-keys exact definitions and moves their bindings and quality records in one transaction. Historical rows outside those snapshots become inactive and their bindings remain readable orphans. The old key stays in the OS credential store; it is never overwritten during rotation. Manual runtime names are rewritten and validated before the SQLite commit, with the previous encrypted manual file restored if runtime validation or the database commit fails.
+
 ## Required evidence before completion
 
-Fixtures must cover exact `v1` to `v2` migration, a removed historical node, key missing/mismatched/locked, explicit reset cancellation, planned key rotation, credential rotation with one and multiple candidates, different providers, manual nodes, same endpoint with different transport or SNI, and migration rollback. Verify that credentials and keys are absent from SQLite and logs. A desktop check must demonstrate the recovery and pending-rebind choices without auto-selecting an ambiguous target.
+The data-layer fixtures cover exact `v1` to `v2` migration, planned rotation with exact snapshots and unresolved orphans, collision rollback, credential rotation with unique and ambiguous candidates, provider isolation, transport/SNI changes, and credential/key absence from SQLite. Desktop acceptance must additionally exercise missing, mismatched and locked keyring states, confirm that cancelling reset changes nothing, and demonstrate rotation plus pending-rebind choices without auto-selecting an ambiguous target. Keep issue #7 open until those desktop checks pass.
