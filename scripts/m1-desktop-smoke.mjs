@@ -867,9 +867,24 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   const clickButtonIn = async (labels, selector = '.base-page') => {
     const clicked = await browser.execute(
       (values, rootSelector) => {
-        const button = [
-          ...document.querySelectorAll(`${rootSelector} button`),
-        ].find((item) => values.includes(item.textContent?.trim()))
+        const roots = [...document.querySelectorAll(rootSelector)].filter(
+          (root) => {
+            const surface = root.matches('.MuiDialog-root')
+              ? root.querySelector('[role="dialog"]')
+              : root
+            if (!surface) return false
+            const style = getComputedStyle(surface)
+            const bounds = surface.getBoundingClientRect()
+            return (
+              style.visibility !== 'hidden' &&
+              bounds.width > 0 &&
+              bounds.height > 0
+            )
+          },
+        )
+        const button = roots
+          .flatMap((root) => [...root.querySelectorAll('button')])
+          .find((item) => values.includes(item.textContent?.trim()))
         button?.click()
         return Boolean(button)
       },
@@ -1104,25 +1119,72 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   phase = 'identity rotation'
   await clickButtonIn(rotateLabels)
   await clickButtonIn(rotateLabels, '.MuiDialog-root')
-  await browser.waitUntil(
-    () =>
-      browser.execute(() => {
-        const dialog = document.querySelector('.MuiDialog-root')
-        const error = document.querySelector('.MuiAlert-standardError')
-        return (
-          dialog?.getAttribute('aria-busy') === 'true' ||
-          !dialog ||
-          Boolean(error)
-        )
+  try {
+    await browser.waitUntil(
+      () =>
+        browser.execute(() => {
+          const dialog = [...document.querySelectorAll('.MuiDialog-root')].find(
+            (root) => {
+              const surface = root.querySelector('[role="dialog"]')
+              if (!surface) return false
+              const style = getComputedStyle(surface)
+              const bounds = surface.getBoundingClientRect()
+              return (
+                style.visibility !== 'hidden' &&
+                bounds.width > 0 &&
+                bounds.height > 0
+              )
+            },
+          )
+          const error = document.querySelector('.MuiAlert-standardError')
+          return (
+            dialog?.getAttribute('aria-busy') === 'true' ||
+            !dialog ||
+            Boolean(error)
+          )
+        }),
+      {
+        timeout: 10_000,
+        interval: 250,
+        timeoutMsg: 'Identity rotation confirmation did not start or finish',
+      },
+    )
+  } catch (error) {
+    const state = await browser.execute(() =>
+      [...document.querySelectorAll('.MuiDialog-root')].map((root) => {
+        const dialog = root.querySelector('[role="dialog"]')
+        return {
+          visible: Boolean(
+            dialog &&
+              getComputedStyle(dialog).visibility !== 'hidden' &&
+              dialog.getBoundingClientRect().width > 0,
+          ),
+          busy: root.getAttribute('aria-busy'),
+          title: dialog?.querySelector('.MuiDialogTitle-root')?.textContent,
+          buttons: [...root.querySelectorAll('button')].map((button) => ({
+            label: button.textContent?.trim(),
+            disabled: button.disabled,
+          })),
+        }
       }),
-    {
-      timeout: 10_000,
-      interval: 250,
-      timeoutMsg: 'Identity rotation confirmation did not start or finish',
-    },
-  )
+    )
+    throw new Error(
+      `${String(error)}; rotation dialog state: ${JSON.stringify(state)}`,
+      { cause: error },
+    )
+  }
   const rotationUiState = await browser.execute(() => {
-    const dialog = document.querySelector('.MuiDialog-root')
+    const dialog = [...document.querySelectorAll('.MuiDialog-root')].find(
+      (root) => {
+        const surface = root.querySelector('[role="dialog"]')
+        if (!surface) return false
+        const style = getComputedStyle(surface)
+        const bounds = surface.getBoundingClientRect()
+        return (
+          style.visibility !== 'hidden' && bounds.width > 0 && bounds.height > 0
+        )
+      },
+    )
     return {
       busy: dialog?.getAttribute('aria-busy') === 'true',
       open: Boolean(dialog),
@@ -1142,7 +1204,19 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   await browser.waitUntil(
     () =>
       browser.execute(() => {
-        const dialog = document.querySelector('.MuiDialog-root')
+        const dialog = [...document.querySelectorAll('.MuiDialog-root')].find(
+          (root) => {
+            const surface = root.querySelector('[role="dialog"]')
+            if (!surface) return false
+            const style = getComputedStyle(surface)
+            const bounds = surface.getBoundingClientRect()
+            return (
+              style.visibility !== 'hidden' &&
+              bounds.width > 0 &&
+              bounds.height > 0
+            )
+          },
+        )
         return !dialog || dialog.getAttribute('aria-busy') !== 'true'
       }),
     {
