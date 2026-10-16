@@ -716,13 +716,16 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn a_hung_mihomo_request_returns_at_its_deadline() {
+    async fn a_hung_mihomo_request_returns_at_its_deadline() -> anyhow::Result<()> {
         let started = tokio::time::Instant::now();
-        let error = await_with_timeout(Duration::from_secs(5), std::future::pending::<anyhow::Result<()>>())
-            .await
-            .unwrap_err();
+        let error = match await_with_timeout(Duration::from_secs(5), std::future::pending::<anyhow::Result<()>>()).await
+        {
+            Err(error) => error,
+            Ok(()) => anyhow::bail!("the pending operation unexpectedly completed"),
+        };
 
         assert!(error.to_string().contains("timed out"));
         assert_eq!(started.elapsed(), Duration::from_secs(5));
+        Ok(())
     }
 }
