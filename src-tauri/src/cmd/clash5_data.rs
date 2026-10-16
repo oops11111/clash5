@@ -23,7 +23,10 @@ use crate::{
         Config, PrfItem,
         profiles::{PROFILE_WRITE_LOCK, profiles_append_item_with_filedata_safe, profiles_save_file_safe},
     },
-    core::{CoreManager, handle::Handle, proxy_view::ProxyNodeSource, runtime_bundle::remote_providers_of},
+    core::{
+        CoreManager, handle::Handle, proxy_view::ProxyNodeSource, runtime_bundle::remote_providers_of,
+        validate::ValidationOutcome,
+    },
     utils::dirs,
 };
 
@@ -32,6 +35,8 @@ const HANDSHAKE_PROBE_MS: u32 = 10_000;
 const PROBE_CONCURRENCY: usize = 16;
 const SHORT_PROBE_URL: &str = "http://cp.cloudflare.com/generate_204";
 const HANDSHAKE_PROBE_URL: &str = "https://cp.cloudflare.com/generate_204";
+const PLUGIN_CONFIG_BUSY_TIMEOUT: Duration = Duration::from_secs(15);
+const PLUGIN_CONFIG_BUSY_POLL: Duration = Duration::from_millis(50);
 static PROBE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn failure(error: DataError) -> super::CommandFailure {
@@ -62,6 +67,34 @@ where
         "C5-PLUGIN-005",
         "plugin configuration was rejected; the previous binding was restored",
     ))
+}
+
+async fn retry_plugin_config_while_busy<Update, UpdateFuture>(
+    mut update: Update,
+    timeout: Duration,
+    poll_interval: Duration,
+) -> anyhow::Result<ValidationOutcome>
+where
+    Update: FnMut() -> UpdateFuture,
+    UpdateFuture: Future<Output = anyhow::Result<ValidationOutcome>>,
+{
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        let outcome = update().await?;
+        if !matches!(outcome, ValidationOutcome::Busy) || tokio::time::Instant::now() >= deadline {
+            return Ok(outcome);
+        }
+        tokio::time::sleep(poll_interval).await;
+    }
+}
+
+async fn update_plugin_configuration() -> anyhow::Result<ValidationOutcome> {
+    retry_plugin_config_while_busy(
+        || CoreManager::global().update_config_forced(),
+        PLUGIN_CONFIG_BUSY_TIMEOUT,
+        PLUGIN_CONFIG_BUSY_POLL,
+    )
+    .await
 }
 
 #[derive(Serialize)]
@@ -409,7 +442,7 @@ pub async fn clash5_save_plugin_binding(mut binding: PluginBinding) -> CmdResult
     .await
     .map_err(failure)?;
     apply_plugin_change_with_rollback(
-        || CoreManager::global().update_config_forced(),
+        || update_plugin_configuration(),
         move || {
             crate::config::profiles::with_clash5_binding_store(move |store| match previous {
                 Some(previous) => store.upsert_plugin_binding(&previous),
@@ -467,7 +500,7 @@ pub async fn clash5_delete_plugin_binding(target: PluginBindingTarget, binding_i
         return Ok(());
     }
     apply_plugin_change_with_rollback(
-        || CoreManager::global().update_config_forced(),
+        || update_plugin_configuration(),
         move || crate::config::profiles::with_clash5_binding_store(move |store| store.upsert_plugin_binding(&previous)),
         |result| result.is_valid(),
     )
@@ -502,7 +535,7 @@ pub async fn clash5_set_plugin_binding_enabled(
     .await
     .map_err(failure)?;
     apply_plugin_change_with_rollback(
-        || CoreManager::global().update_config_forced(),
+        || update_plugin_configuration(),
         move || crate::config::profiles::with_clash5_binding_store(move |store| store.upsert_plugin_binding(&previous)),
         |result| result.is_valid(),
     )
@@ -559,7 +592,7 @@ async fn save_plugin_bindings(mut bindings: Vec<PluginBinding>) -> CmdResult {
     .await;
     saved.map_err(failure)?;
     apply_plugin_change_with_rollback(
-        || CoreManager::global().update_config_forced(),
+        || update_plugin_configuration(),
         move || {
             crate::config::profiles::with_clash5_binding_store(move |store| {
                 store.delete_plugin_bindings(&rollback_keys).map(|_| ())
@@ -1299,6 +1332,33 @@ mod tests {
         assert_eq!(results.len(), PROBE_CONCURRENCY * 3);
         assert!(peak.load(Ordering::SeqCst) > 1);
         assert!(peak.load(Ordering::SeqCst) <= PROBE_CONCURRENCY);
+    }
+
+    #[tokio::test]
+    async fn plugin_config_update_retries_when_another_update_is_running() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let outcome = retry_plugin_config_while_busy(
+            {
+                let attempts = Arc::clone(&attempts);
+                move || {
+                    let attempt = attempts.fetch_add(1, Ordering::SeqCst);
+                    async move {
+                        Ok(if attempt == 0 {
+                            ValidationOutcome::Busy
+                        } else {
+                            ValidationOutcome::Valid
+                        })
+                    }
+                }
+            },
+            Duration::from_secs(1),
+            Duration::from_millis(1),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(outcome, ValidationOutcome::Valid);
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
     }
 
     #[test]
