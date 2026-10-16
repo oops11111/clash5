@@ -914,6 +914,8 @@ Section Install
   CreateDirectory "$0"
   DetailPrint "Ensured user startup folder exists: $0"
 
+  !insertmacro SetContext
+
 
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
