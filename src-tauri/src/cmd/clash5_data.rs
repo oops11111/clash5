@@ -90,7 +90,7 @@ pub async fn clash5_import_verge_data(source_dir: String) -> CmdResult<VergeImpo
             name: Some(profile.name.clone().into()),
             ..PrfItem::default()
         };
-        let uid = profiles_append_item_with_filedata_safe(&item, Some(profile.contents.clone()))
+        let uid = profiles_append_item_with_filedata_safe(&item, Some(profile.contents.clone().into()))
             .await
             .map_err(|_| coded_error("C5-IMPORT-005", "could not save an imported profile"))?;
         if let Some(uid) = uid

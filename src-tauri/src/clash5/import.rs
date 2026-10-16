@@ -4,7 +4,8 @@ use sha2::{Digest as _, Sha256};
 use std::{
     fs::{self, File},
     io::Read,
-    path::{Component, Path},
+    path::{Component, Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 const MAX_MANIFEST_ENTRIES: usize = 100_000;
@@ -124,6 +125,13 @@ fn has_external_provider_files(root: &Mapping) -> bool {
     })
 }
 
+fn profile_label(item: &crate::config::PrfItem, fallback: &str) -> String {
+    item.name
+        .as_deref()
+        .map(str::to_owned)
+        .unwrap_or_else(|| fallback.to_owned())
+}
+
 /// Reads supported cached profile files. Remote URLs and external provider files are never imported.
 pub(crate) fn read_supported_profiles(source: &Path) -> Result<(Vec<ImportedProfile>, Vec<String>)> {
     let root = fs::canonicalize(source).context("Could not resolve source directory")?;
@@ -149,17 +157,17 @@ pub(crate) fn read_supported_profiles(source: &Path) -> Result<(Vec<ImportedProf
             continue;
         };
         if !matches!(kind, "local" | "remote") {
-            skipped.push(item.name.unwrap_or_else(|| "unsupported profile".into()));
+            skipped.push(profile_label(&item, "unsupported profile"));
             continue;
         }
         let Some(file) = item.file.as_deref() else {
-            skipped.push(item.name.unwrap_or_else(|| "profile without a cache file".into()));
+            skipped.push(profile_label(&item, "profile without a cache file"));
             continue;
         };
         let filename = match safe_profile_filename(file) {
             Ok(filename) => filename,
             Err(_) => {
-                skipped.push(item.name.unwrap_or_else(|| "profile with an unsafe file path".into()));
+                skipped.push(profile_label(&item, "profile with an unsafe file path"));
                 continue;
             }
         };
@@ -167,40 +175,36 @@ pub(crate) fn read_supported_profiles(source: &Path) -> Result<(Vec<ImportedProf
         let metadata = match fs::symlink_metadata(&path) {
             Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => metadata,
             _ => {
-                skipped.push(item.name.unwrap_or_else(|| "profile cache file is unavailable".into()));
+                skipped.push(profile_label(&item, "profile cache file is unavailable"));
                 continue;
             }
         };
         if metadata.len() > MAX_PROFILE_BYTES {
-            skipped.push(item.name.unwrap_or_else(|| "profile cache file is too large".into()));
+            skipped.push(profile_label(&item, "profile cache file is too large"));
             continue;
         }
         let contents = fs::read_to_string(&path).context("Profile cache is not valid UTF-8")?;
         let parsed: Value = match serde_yaml_ng::from_str(&contents) {
             Ok(parsed) => parsed,
             Err(_) => {
-                skipped.push(item.name.unwrap_or_else(|| "profile cache is invalid YAML".into()));
+                skipped.push(profile_label(&item, "profile cache is invalid YAML"));
                 continue;
             }
         };
         let Some(mapping) = parsed.as_mapping() else {
-            skipped.push(
-                item.name
-                    .unwrap_or_else(|| "profile cache is not a YAML mapping".into()),
-            );
+            skipped.push(profile_label(&item, "profile cache is not a YAML mapping"));
             continue;
         };
         if has_external_provider_files(mapping) {
-            skipped.push(
-                item.name
-                    .unwrap_or_else(|| "profile uses external provider files".into()),
-            );
+            skipped.push(profile_label(&item, "profile uses external provider files"));
             continue;
         }
         imported.push(ImportedProfile {
             name: item
                 .name
-                .unwrap_or_else(|| filename.file_stem().unwrap_or_default().to_string_lossy().into()),
+                .as_deref()
+                .map(str::to_owned)
+                .unwrap_or_else(|| filename.file_stem().unwrap_or_default().to_string_lossy().into_owned()),
             contents,
         });
     }
@@ -211,7 +215,27 @@ pub(crate) fn read_supported_profiles(source: &Path) -> Result<(Vec<ImportedProf
 mod tests {
     use super::*;
     use std::fs;
-    use tempfile::tempdir;
+
+    struct TestDir(PathBuf);
+
+    impl TestDir {
+        fn new() -> std::io::Result<Self> {
+            let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+            let path = std::env::temp_dir().join(format!("clash5-import-{}-{nonce}", std::process::id()));
+            fs::create_dir(&path)?;
+            Ok(Self(path))
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
 
     fn fixture(root: &Path) -> Result<()> {
         fs::create_dir_all(root.join("profiles"))?;
@@ -232,7 +256,7 @@ mod tests {
 
     #[test]
     fn manifest_is_deterministic_and_changes_when_source_content_changes() -> Result<()> {
-        let temp = tempdir()?;
+        let temp = TestDir::new()?;
         fixture(temp.path())?;
         let before = source_manifest(temp.path())?;
         assert_eq!(before, source_manifest(temp.path())?);
@@ -243,7 +267,7 @@ mod tests {
 
     #[test]
     fn reads_only_cached_inline_profiles_and_preserves_source_fixture() -> Result<()> {
-        let temp = tempdir()?;
+        let temp = TestDir::new()?;
         fixture(temp.path())?;
         let before = source_manifest(temp.path())?;
         let (profiles, skipped) = read_supported_profiles(temp.path())?;
@@ -273,7 +297,7 @@ mod tests {
 
     #[test]
     fn refuses_source_and_target_directories_that_overlap() -> Result<()> {
-        let temp = tempdir()?;
+        let temp = TestDir::new()?;
         let source = temp.path().join("source");
         let target = temp.path().join("target");
         let nested = source.join("nested");
