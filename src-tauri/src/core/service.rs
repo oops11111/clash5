@@ -583,35 +583,25 @@ impl StagedServiceTools {
 
         for attempt in 0..32 {
             let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-            let directory = std::env::temp_dir().join(format!(
-                "clash5-service-tools-{}-{nonce}-{attempt}",
-                std::process::id()
-            ));
+            let directory =
+                std::env::temp_dir().join(format!("clash5-service-tools-{}-{nonce}-{attempt}", std::process::id()));
             match std::fs::create_dir(&directory) {
                 Ok(()) => {
                     let staging = Self { directory };
                     #[cfg(unix)]
-                    std::fs::set_permissions(
-                        &staging.directory,
-                        std::fs::Permissions::from_mode(0o700),
-                    )?;
+                    std::fs::set_permissions(&staging.directory, std::fs::Permissions::from_mode(0o700))?;
                     let suffix = std::env::consts::EXE_SUFFIX;
-                    let installer = staging
-                        .directory
-                        .join(format!("clash-verge-service-install{suffix}"));
+                    let installer = staging.directory.join(format!("clash-verge-service-install{suffix}"));
                     let service = staging.directory.join(format!("clash-verge-service{suffix}"));
                     std::fs::copy(installer_source, &installer)?;
                     std::fs::copy(service_source, &service)?;
                     #[cfg(unix)]
                     for executable in [&installer, &service] {
-                        std::fs::set_permissions(
-                            executable,
-                            std::fs::Permissions::from_mode(0o700),
-                        )?;
+                        std::fs::set_permissions(executable, std::fs::Permissions::from_mode(0o700))?;
                     }
                     return Ok(staging);
                 }
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
                 Err(error) => return Err(error.into()),
             }
         }
@@ -779,7 +769,7 @@ fn uninstall_service() -> Result<()> {
     Ok(())
 }
 
-fn bundled_core_name(core: &str) -> &str {
+const fn bundled_core_name(core: &str) -> &str {
     #[cfg(target_os = "linux")]
     {
         match core {
@@ -2138,6 +2128,8 @@ mod tests {
         generate_service_session_token, mark_service_unavailable_after_owner_loss, owner_recovery_policy,
         service_core_path_for, session_matches_status,
     };
+    #[cfg(target_os = "linux")]
+    use super::{StagedServiceTools, bundled_core_name};
     #[cfg(unix)]
     use super::{service_core_path_for_with_publisher, service_tool_path_for};
     use crate::core::runstate::{FakeEnv, OwnerRecoveryReason, PendingAction, RunStateStore};
@@ -2232,7 +2224,10 @@ mod tests {
         let installer = staged.installer_path();
         let service = directory.join("clash-verge-service");
 
-        assert_eq!(installer.file_name().and_then(|name| name.to_str()), Some("clash-verge-service-install"));
+        assert_eq!(
+            installer.file_name().and_then(|name| name.to_str()),
+            Some("clash-verge-service-install")
+        );
         assert_eq!(std::fs::read(&installer)?, b"clash5 installer");
         assert_eq!(std::fs::read(&service)?, b"clash5 service");
         assert_eq!(std::fs::metadata(&directory)?.permissions().mode() & 0o777, 0o700);
