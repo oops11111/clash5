@@ -902,16 +902,20 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   await browser.execute(() => {
     const binding = [
       ...document.querySelectorAll('.base-page [role="tab"]'),
-    ].find((tab) => ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()))
+    ].find((tab) =>
+      ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+    )
     binding?.click()
   })
   await browser.waitUntil(
     () =>
-      browser.execute((labels) =>
-        [...document.querySelectorAll('.base-page button')].some((button) =>
-          labels.includes(button.textContent?.trim()),
-        ),
-      rotateLabels),
+      browser.execute(
+        (labels) =>
+          [...document.querySelectorAll('.base-page button')].some((button) =>
+            labels.includes(button.textContent?.trim()),
+          ),
+        rotateLabels,
+      ),
     {
       timeout: 10_000,
       interval: 250,
