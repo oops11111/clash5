@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-chmod +x /usr/bin/clash-verge-service-install
-chmod +x /usr/bin/clash-verge-service-uninstall
-chmod +x /usr/bin/clash-verge-service
+chmod +x /usr/bin/clash5-service-install
+chmod +x /usr/bin/clash5-service-uninstall
+chmod +x /usr/bin/clash5-service
 
 # The enforcement file exists in both Enforcing and Permissive mode.
 if [ ! -e /sys/fs/selinux/enforce ]; then
