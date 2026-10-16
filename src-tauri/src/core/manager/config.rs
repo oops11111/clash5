@@ -103,17 +103,18 @@ async fn ask_to_stage(path: &std::path::Path) -> StageAttempt {
     }
 }
 
-/// Confirms one silent request because the service may commit before its reply is lost.
-/// Re-staging an already committed bundle is idempotent and bounded by `confirm_within`.
+/// Confirms a silent request because the service may commit before its reply is lost.
+/// Both IPC attempts are bounded; re-staging an already committed bundle is idempotent.
 #[tracing::instrument(skip_all, level = "debug", fields(confirm_within = ?confirm_within, asks = 1))]
 async fn stage_with_confirmation<Ask, Fut>(confirm_within: Duration, ask: Ask) -> StageAttempt
 where
     Ask: Fn() -> Fut,
     Fut: std::future::Future<Output = StageAttempt>,
 {
-    let first = match ask().await {
-        StageAttempt::Unanswered(first) => first,
-        answered => return answered,
+    let first = match tokio::time::timeout(confirm_within, ask()).await {
+        Ok(StageAttempt::Unanswered(first)) => first,
+        Ok(answered) => return answered,
+        Err(_) => format!("the first ask did not answer within {confirm_within:?}").into(),
     };
     logging!(
         warn,
@@ -634,6 +635,24 @@ mod tests {
             ConfigApplication::ReloadFrom("/service/runtime.generation-1/config.yaml".into()),
             "resolving the silence is only worth doing if it changes what happens next"
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_first_ask_that_keeps_working_is_bounded_before_retry() {
+        let asks = Cell::new(0);
+        let started = tokio::time::Instant::now();
+        let outcome = stage_with_confirmation(CONFIRM_WITHIN, || async {
+            asks.set(asks.get() + 1);
+            match asks.get() {
+                1 => std::future::pending().await,
+                _ => staged(),
+            }
+        })
+        .await;
+
+        assert_eq!(outcome, staged());
+        assert_eq!(asks.get(), 2);
+        assert_eq!(started.elapsed(), CONFIRM_WITHIN);
     }
 
     #[tokio::test]
