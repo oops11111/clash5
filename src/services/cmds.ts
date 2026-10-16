@@ -124,6 +124,20 @@ export async function importClash5ManualProxies(proxies: IProxyConfig[]) {
   })
 }
 
+export interface VergeImportReport {
+  imported: number
+  skipped: string[]
+  binding_sync_failures: number
+  source_manifest_before: string
+  source_manifest_after: string
+}
+
+export async function importClash5VergeData(sourceDir: string) {
+  return invoke<VergeImportReport>('clash5_import_verge_data', {
+    sourceDir,
+  })
+}
+
 export async function probeClash5Nodes() {
   return invoke<{
     probed: number

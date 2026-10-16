@@ -428,9 +428,13 @@ impl IProfiles {
 // These helpers serialize asynchronous operations against committed profile data.
 use crate::config::Config;
 
-pub(crate) async fn profiles_append_item_with_filedata_safe(item: &PrfItem, file_data: Option<String>) -> Result<()> {
+pub(crate) async fn profiles_append_item_with_filedata_safe(
+    item: &PrfItem,
+    file_data: Option<String>,
+) -> Result<Option<std::string::String>> {
     let item = &mut PrfItem::from(item, file_data).await?;
-    profiles_append_item_safe(item).await
+    profiles_append_item_safe(item).await?;
+    Ok(item.uid.as_deref().map(ToString::to_string))
 }
 
 pub(crate) async fn profiles_append_item_safe(item: &mut PrfItem) -> Result<()> {
