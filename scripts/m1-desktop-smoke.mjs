@@ -98,7 +98,7 @@ async function freeLoopbackPort() {
   return port
 }
 
-async function startM4SingboxFixture(targetPort) {
+async function startM4SingboxFixture() {
   const ssPort = await freeLoopbackPort()
   const password = randomBytes(24).toString('base64')
   const child = spawn(
@@ -1728,7 +1728,7 @@ async function verifyRecoveryResetCancellation() {
 
 async function verifyM2Chains() {
   chainFixture = await startChainFixture(true)
-  m4Fixture = await startM4SingboxFixture(chainFixture.targetPort)
+  m4Fixture = await startM4SingboxFixture()
   const fileData = dump({
     proxies: [
       {
@@ -2069,8 +2069,38 @@ async function verifyM4SingboxRoute() {
     )
 
   phase = 'M4 persistent sidecar behavior'
-  await sleep(135_000)
-  status = await invoke('clash5_singbox_route_status', { landingName })
+  const persistentDeadline = Date.now() + 135_000
+  let routeDriftRecovered = false
+  while (Date.now() < persistentDeadline) {
+    await sleep(Math.min(5_000, persistentDeadline - Date.now()))
+    status = await invoke('clash5_singbox_route_status', { landingName })
+    if (
+      status.active &&
+      !status.degraded &&
+      status.mihomo_proxy_type === 'Socks5'
+    )
+      continue
+
+    const recoveryDeadline = Date.now() + 45_000
+    while (
+      Date.now() < recoveryDeadline &&
+      (!status.active ||
+        status.degraded ||
+        status.mihomo_proxy_type !== 'Socks5')
+    ) {
+      await sleep(2_000)
+      status = await invoke('clash5_singbox_route_status', { landingName })
+    }
+    if (
+      !status.active ||
+      status.degraded ||
+      status.mihomo_proxy_type !== 'Socks5'
+    )
+      throw new Error(
+        `Persistent M4 route drift was not recovered: ${JSON.stringify(status)}`,
+      )
+    routeDriftRecovered = true
+  }
   const persistentConfigAfterIdle = await invoke('get_verge_config')
   if (
     persistentConfigAfterIdle.singbox_persistent !== true ||
@@ -2079,6 +2109,10 @@ async function verifyM4SingboxRoute() {
   )
     throw new Error(
       `Persistent M4 route changed unexpectedly: ${JSON.stringify({ persistent: persistentConfigAfterIdle.singbox_persistent, ...status })}`,
+    )
+  if (routeDriftRecovered)
+    process.stdout.write(
+      'M4 supervisor recovered Mihomo route drift while persistent mode was enabled\n',
     )
 
   phase = 'M4 idle sidecar shutdown and Mihomo rollback'
