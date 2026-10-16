@@ -16,7 +16,7 @@ if [ ! -x /usr/sbin/semanage ] || [ ! -x /usr/sbin/restorecon ]; then
 fi
 
 # Keep these local rules on removal: they may predate this package or serve a standalone development service.
-for service in clash-verge-service clash-verge-service-dev; do
+for service in clash-verge-service-dev; do
     for directory in bin cores; do
         target="/var/lib/$service/$directory"
         if [ -L "/var/lib/$service" ] || [ -L "$target" ]; then
