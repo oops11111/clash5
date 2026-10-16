@@ -727,63 +727,13 @@ impl From<PluginBinding> for PluginBindingSummary {
 #[tauri::command]
 pub async fn clash5_rotate_identity() -> CmdResult {
     let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    log_identity_rotation("started", None, None, None);
     let old_key = crate::config::profiles::clash5_identity_key().await.map_err(failure)?;
-    let mut snapshots = Vec::<clash5_data::IdentitySourceSnapshot>::new();
-
     let profiles = Config::profiles().await.latest_arc();
-    if let Some(profile_id) = profiles.current.clone() {
-        let mapping = profiles
-            .current_mapping()
-            .await
-            .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "the current profile could not be read"))?;
-        let yaml = serde_yaml_ng::to_string(&mapping)
-            .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "the current profile could not be parsed"))?;
-        if let Some(nodes) = parse_inline_nodes(&yaml).map_err(|_| {
-            coded_error(
-                "IDENTITY_ROTATION_FAILED",
-                "the current profile contains invalid node data",
-            )
-        })? {
-            snapshots.push(clash5_data::IdentitySourceSnapshot {
-                source: Source::Subscription {
-                    provider_id: profile_id.to_string(),
-                },
-                nodes,
-            });
-        }
-
-        let runtime = Config::runtime().await;
-        let applied = runtime.data_arc();
-        if let Some(config) = applied.config.as_ref() {
-            let app_dir = dirs::app_home_dir().map_err(super::CommandFailure::plain)?;
-            let providers = remote_providers_of(config, &app_dir).map_err(super::CommandFailure::plain)?;
-            for provider in providers
-                .into_iter()
-                .filter(|provider| provider.section == "proxy-providers")
-            {
-                let path = app_dir.join(&provider.provider.destination);
-                let yaml = match tokio::fs::read_to_string(path).await {
-                    Ok(yaml) => yaml,
-                    Err(_) => continue,
-                };
-                let Some(nodes) = parse_inline_nodes(&yaml).map_err(|_| {
-                    coded_error(
-                        "IDENTITY_ROTATION_FAILED",
-                        "a proxy provider contains invalid node data",
-                    )
-                })?
-                else {
-                    continue;
-                };
-                snapshots.push(clash5_data::IdentitySourceSnapshot {
-                    source: Source::Subscription {
-                        provider_id: proxy_provider_source_id(&profile_id, &provider.name),
-                    },
-                    nodes,
-                });
-            }
-        }
-    }
+    let mut snapshots = match profiles.current.clone() {
+        Some(profile_id) => collect_identity_rotation_snapshots(&profile_id).await?,
+        None => Vec::new(),
+    };
 
     let mut manual_file = manual::load()
         .await
@@ -791,15 +741,18 @@ pub async fn clash5_rotate_identity() -> CmdResult {
     let manual_nodes = manual_file
         .identity_nodes(&old_key)
         .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "manual proxy identity data is invalid"))?;
+    let manual_node_count = manual_nodes.len();
     let has_manual_proxies = !manual_nodes.is_empty();
     snapshots.push(clash5_data::IdentitySourceSnapshot {
         source: Source::Manual,
         nodes: manual_nodes,
     });
+    log_identity_rotation("sources_captured", None, Some(snapshots.len()), Some(manual_node_count));
 
     let (generation, new_key) = crate::config::profiles::stage_clash5_identity_rotation_key()
         .await
         .map_err(failure)?;
+    log_identity_rotation("key_staged", Some(generation), None, None);
     let previous = match tokio::fs::read_to_string(manual::path().map_err(super::CommandFailure::plain)?).await {
         Ok(yaml) => Some(yaml),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -811,29 +764,8 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         }
     };
     if has_manual_proxies {
-        manual_file
-            .rekey_identity(&old_key, &new_key)
-            .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "manual proxies could not be rekeyed"))?;
-        if manual::save(&manual_file).await.is_err() {
-            manual::restore(previous.as_deref()).await.map_err(|_| {
-                coded_error(
-                    "IDENTITY_ROTATION_ROLLBACK_FAILED",
-                    "manual proxies could not be restored",
-                )
-            })?;
-            return Err(coded_error(
-                "IDENTITY_ROTATION_FAILED",
-                "manual proxies could not be saved",
-            ));
-        }
-        let applied = CoreManager::global().update_config_forced().await;
-        if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
-            restore_manual_file(previous.as_deref()).await?;
-            return Err(coded_error(
-                "IDENTITY_ROTATION_FAILED",
-                "the rekeyed manual proxies were rejected",
-            ));
-        }
+        save_manual_identity_rotation(&mut manual_file, &old_key, &new_key, previous.as_deref()).await?;
+        log_identity_rotation("manual_proxies_saved", None, None, None);
     }
 
     if let Err(error) =
@@ -844,8 +776,171 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         }
         return Err(failure(error));
     }
+    log_identity_rotation("committed", Some(generation), None, None);
+    if has_manual_proxies {
+        let applied = CoreManager::global().update_config_forced().await;
+        log_identity_rotation("runtime_update_returned", Some(generation), None, None);
+        if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+            return Err(coded_error(
+                "IDENTITY_ROTATION_RUNTIME_PENDING",
+                "identity rotation was saved, but the running configuration could not be refreshed",
+            ));
+        }
+    }
     Ok(())
 }
+
+async fn collect_identity_rotation_snapshots(
+    profile_id: &str,
+) -> Result<Vec<clash5_data::IdentitySourceSnapshot>, super::CommandFailure> {
+    let mut snapshots = Vec::new();
+    let profiles = Config::profiles().await.latest_arc();
+
+    // Identity rotation changes the installation key, so exact definitions from
+    // non-current profiles must be included too. Otherwise their saved nodes are
+    // left under the old key and become inactive even though their profile files
+    // are still available locally.
+    if let Some(items) = profiles.items.as_ref() {
+        let app_dir = dirs::app_home_dir().map_err(super::CommandFailure::plain)?;
+        let profiles_dir = dirs::app_profiles_dir().map_err(super::CommandFailure::plain)?;
+        for item in items {
+            if !matches!(item.itype.as_deref(), None | Some("remote") | Some("local")) {
+                continue;
+            }
+            let (Some(uid), Some(file)) = (item.uid.as_deref(), item.file.as_deref()) else {
+                continue;
+            };
+            if uid == profile_id {
+                continue;
+            }
+            let path = profiles_dir.join(file);
+            let Ok(yaml) = tokio::fs::read_to_string(&path).await else {
+                continue;
+            };
+            let Ok(Some(nodes)) = parse_inline_nodes(&yaml) else {
+                continue;
+            };
+            snapshots.push(clash5_data::IdentitySourceSnapshot {
+                source: Source::Subscription {
+                    provider_id: uid.to_owned(),
+                },
+                nodes,
+            });
+
+            let Ok(mapping) = serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&yaml) else {
+                continue;
+            };
+            let Ok(providers) = remote_providers_of(&mapping, &app_dir) else {
+                continue;
+            };
+            for provider in providers
+                .into_iter()
+                .filter(|provider| provider.section == "proxy-providers")
+            {
+                let source_id = proxy_provider_source_id(uid, &provider.name);
+                let path = app_dir.join(&provider.provider.destination);
+                let Ok(yaml) = tokio::fs::read_to_string(path).await else {
+                    continue;
+                };
+                let Ok(Some(nodes)) = parse_inline_nodes(&yaml) else {
+                    continue;
+                };
+                snapshots.push(clash5_data::IdentitySourceSnapshot {
+                    source: Source::Subscription { provider_id: source_id },
+                    nodes,
+                });
+            }
+        }
+    }
+
+    let mapping = profiles
+        .current_mapping()
+        .await
+        .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "the current profile could not be read"))?;
+    let yaml = serde_yaml_ng::to_string(&mapping)
+        .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "the current profile could not be parsed"))?;
+    if let Some(nodes) = parse_inline_nodes(&yaml).map_err(|_| {
+        coded_error(
+            "IDENTITY_ROTATION_FAILED",
+            "the current profile contains invalid node data",
+        )
+    })? {
+        snapshots.push(clash5_data::IdentitySourceSnapshot {
+            source: Source::Subscription {
+                provider_id: profile_id.to_string(),
+            },
+            nodes,
+        });
+    }
+
+    let runtime = Config::runtime().await;
+    let applied = runtime.data_arc();
+    if let Some(config) = applied.config.as_ref() {
+        let app_dir = dirs::app_home_dir().map_err(super::CommandFailure::plain)?;
+        let providers = remote_providers_of(config, &app_dir).map_err(super::CommandFailure::plain)?;
+        for provider in providers
+            .into_iter()
+            .filter(|provider| provider.section == "proxy-providers")
+        {
+            let path = app_dir.join(&provider.provider.destination);
+            let yaml = match tokio::fs::read_to_string(path).await {
+                Ok(yaml) => yaml,
+                Err(_) => continue,
+            };
+            let Some(nodes) = parse_inline_nodes(&yaml).map_err(|_| {
+                coded_error(
+                    "IDENTITY_ROTATION_FAILED",
+                    "a proxy provider contains invalid node data",
+                )
+            })?
+            else {
+                continue;
+            };
+            snapshots.push(clash5_data::IdentitySourceSnapshot {
+                source: Source::Subscription {
+                    provider_id: proxy_provider_source_id(profile_id, &provider.name),
+                },
+                nodes,
+            });
+        }
+    }
+    Ok(snapshots)
+}
+
+async fn save_manual_identity_rotation(
+    manual_file: &mut manual::ManualProxyFile,
+    old_key: &clash5_data::IdentityKey,
+    new_key: &clash5_data::IdentityKey,
+    previous: Option<&str>,
+) -> Result<(), super::CommandFailure> {
+    manual_file
+        .rekey_identity(old_key, new_key)
+        .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "manual proxies could not be rekeyed"))?;
+    if manual::save(manual_file).await.is_err() {
+        restore_manual_file(previous).await?;
+        return Err(coded_error(
+            "IDENTITY_ROTATION_FAILED",
+            "manual proxies could not be saved",
+        ));
+    }
+    Ok(())
+}
+
+fn log_identity_rotation(
+    stage: &'static str,
+    generation: Option<i64>,
+    source_count: Option<usize>,
+    manual_node_count: Option<usize>,
+) {
+    tracing::info!(
+        target: "clash5::identity",
+        stage,
+        generation = ?generation,
+        source_count = ?source_count,
+        manual_node_count = ?manual_node_count
+    );
+}
+
 #[tauri::command]
 pub async fn clash5_list_nodes(include_inactive: Option<bool>) -> CmdResult<Vec<NodeRecord>> {
     let recovery_mode = crate::config::profiles::with_clash5_binding_store(|store| Ok(store.identity_recovery()))

@@ -502,6 +502,7 @@ impl BindingStore {
         let mut migrated_nodes = 0usize;
         let mut migrated_bindings = 0usize;
         let mut unresolved_bindings = 0usize;
+        let mut rekeyed_ids = BTreeMap::<(String, String, StableId), StableId>::new();
 
         for snapshot in snapshots {
             let (kind, provider) = snapshot.source.scope()?;
@@ -509,6 +510,9 @@ impl BindingStore {
             for node in &snapshot.nodes {
                 let old_id = node.stable_id_v2(old_key)?;
                 let new_id = node.stable_id_v2(&new_key)?;
+                if old_id != new_id {
+                    rekeyed_ids.insert((kind.to_owned(), provider.to_owned(), old_id.clone()), new_id.clone());
+                }
                 next.entry(new_id)
                     .and_modify(|(selected, count, _)| {
                         *count += 1;
@@ -611,6 +615,35 @@ impl BindingStore {
             }
         }
 
+        let stored_chains = {
+            let mut statement = tx.prepare(
+                "SELECT id,definition FROM chains WHERE json_extract(definition,'$.schema_version') IS NOT NULL",
+            )?;
+            statement
+                .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+                .collect::<Result<Vec<_>, _>>()?
+        };
+        let mut chains_rekeyed = 0usize;
+        for (id, definition) in stored_chains {
+            let mut chain: ProxyChain = serde_json::from_str(&definition).map_err(|_| DataError::Database)?;
+            let mut changed = false;
+            for reference in [&mut chain.front, &mut chain.landing] {
+                let (kind, provider) = reference.source.scope()?;
+                if let Some(new_id) =
+                    rekeyed_ids.get(&(kind.to_owned(), provider.to_owned(), reference.stable_id.clone()))
+                {
+                    reference.stable_id = new_id.clone();
+                    changed = true;
+                }
+            }
+            if changed {
+                chain.validate()?;
+                let definition = serde_json::to_string(&chain).map_err(|_| DataError::InvalidInput)?;
+                tx.execute("UPDATE chains SET definition=?2 WHERE id=?1", params![id, definition])?;
+                chains_rekeyed += 1;
+            }
+        }
+
         tx.execute("UPDATE identity_keys SET active=0 WHERE active=1", [])?;
         tx.execute(
             "INSERT INTO identity_keys(generation,key_id,active) VALUES(?1,?2,1)",
@@ -636,7 +669,8 @@ impl BindingStore {
             serde_json::json!({
                 "nodes_migrated": migrated_nodes,
                 "bindings_migrated": migrated_bindings,
-                "bindings_orphaned": unresolved_bindings
+                "bindings_orphaned": unresolved_bindings,
+                "chains_rekeyed": chains_rekeyed
             }),
         )?;
         tx.commit()?;

@@ -170,6 +170,7 @@ export const translationKeys = [
   'layout.components.navigation.diagnostics',
   'layout.components.navigation.cancel',
   'layout.components.navigation.identityError',
+  'layout.components.navigation.rotationRuntimePending',
   'layout.components.navigation.identityRecovery',
   'layout.components.navigation.resetIdentity',
   'layout.components.navigation.resetIdentityTitle',

@@ -324,6 +324,7 @@ export interface TranslationResources {
           rotateIdentityConfirm: string
           rotateIdentityDescription: string
           rotateIdentityTitle: string
+          rotationRuntimePending: string
           saveOrphanRetention: string
           tabs: {
             chains: string
