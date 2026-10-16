@@ -46,6 +46,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
+      - name: Audit platform package and helper identifiers
+        run: node scripts/check-r18-identifiers.mjs
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
       - name: Provision clash5 desktop resources
