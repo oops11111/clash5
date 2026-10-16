@@ -1188,9 +1188,24 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   const clickButtonIn = async (labels, selector = '.base-page') => {
     const clicked = await browser.execute(
       (values, rootSelector) => {
-        const button = [
-          ...document.querySelectorAll(`${rootSelector} button`),
-        ].find((item) => values.includes(item.textContent?.trim()))
+        const roots = [...document.querySelectorAll(rootSelector)].filter(
+          (root) => {
+            const surface = root.matches('.MuiDialog-root')
+              ? root.querySelector('[role="dialog"]')
+              : root
+            if (!surface) return false
+            const style = getComputedStyle(surface)
+            const bounds = surface.getBoundingClientRect()
+            return (
+              style.visibility !== 'hidden' &&
+              bounds.width > 0 &&
+              bounds.height > 0
+            )
+          },
+        )
+        const button = roots
+          .flatMap((root) => [...root.querySelectorAll('button')])
+          .find((item) => values.includes(item.textContent?.trim()))
         button?.click()
         return Boolean(button)
       },
@@ -1423,31 +1438,79 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   if (!selectedNode) throw new Error('Selected rebind target is missing')
 
   phase = 'identity rotation'
-  await clickButtonIn(rotateLabels)
-  await clickButtonIn(rotateLabels, '.MuiDialog-root')
-  let rotatedTarget
-  await browser.waitUntil(
-    async () => {
-      const currentNodes = await invoke('clash5_list_nodes', {
-        includeInactive: true,
+  await browser.execute(() => {
+    const root = document.documentElement
+    const key = 'clash5SmokeIdentityRotation'
+    root.dataset[key] = 'pending'
+    window.__TAURI_INTERNALS__
+      .invoke('clash5_rotate_identity')
+      .then(() => {
+        root.dataset[key] = 'success'
       })
-      rotatedTarget = currentNodes.find(
-        (node) =>
-          node.source.kind === selectedNode.source.kind &&
-          node.source.provider_id === selectedNode.source.provider_id &&
-          node.display_name === selectedNode.display_name &&
-          node.active,
-      )
-      return Boolean(
-        rotatedTarget && rotatedTarget.stable_id !== selectedNode.stable_id,
-      )
-    },
+      .catch((error) => {
+        root.dataset[key] =
+          `error:${typeof error === 'string' ? error : JSON.stringify(error)}`
+      })
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () =>
+          document.documentElement.dataset.clash5SmokeIdentityRotation !==
+          'pending',
+      ),
     {
-      timeout: 60_000,
-      interval: 500,
-      timeoutMsg: 'Identity rotation did not finish',
+      timeout: 180_000,
+      interval: 250,
+      timeoutMsg: 'Identity rotation command did not finish within 180 seconds',
     },
   )
+  const rotationResult = await browser.execute(
+    () => document.documentElement.dataset.clash5SmokeIdentityRotation,
+  )
+  if (rotationResult !== 'success') {
+    throw new Error(`Identity rotation command failed: ${rotationResult}`)
+  }
+  let rotatedTarget
+  try {
+    await browser.waitUntil(
+      async () => {
+        const currentNodes = await invoke('clash5_list_nodes', {
+          includeInactive: true,
+        })
+        rotatedTarget = currentNodes.find(
+          (node) =>
+            node.source.kind === selectedNode.source.kind &&
+            node.source.provider_id === selectedNode.source.provider_id &&
+            node.display_name === selectedNode.display_name &&
+            node.active,
+        )
+        return Boolean(
+          rotatedTarget && rotatedTarget.stable_id !== selectedNode.stable_id,
+        )
+      },
+      {
+        timeout: 60_000,
+        interval: 500,
+        timeoutMsg: 'Identity rotation did not finish',
+      },
+    )
+  } catch (error) {
+    const currentNodes = await invoke('clash5_list_nodes', {
+      includeInactive: true,
+    })
+    const diagnostics = currentNodes.map((node) => ({
+      source: node.source,
+      stable_id: node.stable_id,
+      display_name: node.display_name,
+      port: node.port,
+      active: node.active,
+    }))
+    throw new Error(
+      `${String(error)}; identity inventory: ${JSON.stringify(diagnostics)}`,
+      { cause: error },
+    )
+  }
   const rotatedNodes = await invoke('clash5_list_nodes', {
     includeInactive: true,
   })
