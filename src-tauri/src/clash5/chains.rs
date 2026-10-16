@@ -180,6 +180,7 @@ mod tests {
             },
             &proxy,
             Some(&overrides),
+            None,
         );
         assert_eq!(catalog[0].reference.stable_id, expected);
         assert_eq!(catalog[0].proxy["dialer-proxy"], "user-front");
@@ -208,7 +209,8 @@ mod tests {
             quality: None,
         };
 
-        let found = matching_manual_record(&proxy, &node, &[record]);
+        let records = [record];
+        let found = matching_manual_record(&proxy, &node, &records);
         assert_eq!(found.map(|record| record.stable_id.as_str()), Some(stable_id.as_str()));
         Ok(())
     }
