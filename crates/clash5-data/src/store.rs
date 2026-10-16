@@ -1,4 +1,4 @@
-use crate::{DataError, IdentityKey, Node, NodeRef, ProxyChain, StableId, identity::text};
+use crate::{DataError, IdentityKey, Node, ProxyChain, StableId, identity::text};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
