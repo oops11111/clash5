@@ -866,9 +866,23 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   }
   const clickButtonIn = async (labels, selector = '.base-page') => {
     if (selector === '.MuiDialog-root') {
-      const dialogs = await browser.$$('.MuiDialog-root [role="dialog"]')
-      for (const dialog of dialogs) {
-        if (!(await dialog.isDisplayed())) continue
+      const visibleIndex = await browser.execute((rootSelector) => {
+        return [...document.querySelectorAll(rootSelector)].findIndex(
+          (root) => {
+            const surface = root.querySelector('[role="dialog"]')
+            if (!surface) return false
+            const style = getComputedStyle(surface)
+            const bounds = surface.getBoundingClientRect()
+            return (
+              style.visibility !== 'hidden' &&
+              bounds.width > 0 &&
+              bounds.height > 0
+            )
+          },
+        )
+      }, selector)
+      if (visibleIndex >= 0) {
+        const dialog = (await browser.$$(selector))[visibleIndex]
         for (const button of await dialog.$$('button')) {
           if (labels.includes((await button.getText()).trim())) {
             await button.click()
