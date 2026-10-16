@@ -578,6 +578,13 @@ export interface TranslationResources {
           placeholder: string
         }
         title: string
+        vergeImport: {
+          action: string
+          backupReminder: string
+          chooseSource: string
+          failure: string
+          success: string
+        }
       }
     }
     proxies: {
@@ -1701,3 +1708,4 @@ export interface TranslationResources {
     }
   }
 }
+

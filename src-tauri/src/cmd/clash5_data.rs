@@ -8,12 +8,16 @@ use serde_yaml_ng::Value;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
+    path::PathBuf,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
-    clash5::manual,
-    config::{Config, profiles::PROFILE_WRITE_LOCK},
+    clash5::{import, manual},
+    config::{
+        Config, PrfItem,
+        profiles::{PROFILE_WRITE_LOCK, profiles_append_item_with_filedata_safe, profiles_save_file_safe},
+    },
     core::{CoreManager, handle::Handle, proxy_view::ProxyNodeSource, runtime_bundle::remote_providers_of},
     utils::dirs,
 };
@@ -47,6 +51,74 @@ pub async fn clash5_register_manual_node(node: Node) -> CmdResult<ManualNodeIden
 #[derive(Serialize)]
 pub struct ManualImportResult {
     imported: usize,
+}
+
+#[derive(Serialize)]
+pub struct VergeImportReport {
+    imported: usize,
+    skipped: Vec<String>,
+    binding_sync_failures: usize,
+    source_manifest_before: String,
+    source_manifest_after: String,
+}
+
+#[tauri::command]
+pub async fn clash5_import_verge_data(source_dir: String) -> CmdResult<VergeImportReport> {
+    let source = PathBuf::from(source_dir.as_str());
+    let target =
+        dirs::app_home_dir().map_err(|_| coded_error("C5-IMPORT-001", "clash5 data directory is unavailable"))?;
+    import::ensure_separate_data_dirs(&source, &target)
+        .map_err(|_| coded_error("C5-IMPORT-001", "source and clash5 data directories must be separate"))?;
+    let manifest_before = import::source_manifest(&source)
+        .map_err(|_| coded_error("C5-IMPORT-001", "could not inspect the selected source directory"))?;
+    let (profiles, skipped) = import::read_supported_profiles(&source)
+        .map_err(|_| coded_error("C5-IMPORT-002", "could not read supported cached profiles"))?;
+    let manifest_after_read = import::source_manifest(&source)
+        .map_err(|_| coded_error("C5-IMPORT-003", "could not verify the source directory"))?;
+    if manifest_before != manifest_after_read {
+        return Err(coded_error(
+            "C5-IMPORT-004",
+            "source directory changed while it was being read",
+        ));
+    }
+
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let mut binding_sync_failures = 0;
+    for profile in &profiles {
+        let item = PrfItem {
+            itype: Some("local".into()),
+            name: Some(profile.name.clone().into()),
+            ..PrfItem::default()
+        };
+        let uid = profiles_append_item_with_filedata_safe(&item, Some(profile.contents.clone()))
+            .await
+            .map_err(|_| coded_error("C5-IMPORT-005", "could not save an imported profile"))?;
+        if let Some(uid) = uid
+            && let crate::config::profiles::BindingSync::Failed(_) =
+                crate::config::profiles::reconcile_clash5_snapshot(uid, profile.contents.clone()).await
+        {
+            binding_sync_failures += 1;
+        }
+    }
+    if !profiles.is_empty() {
+        profiles_save_file_safe()
+            .await
+            .map_err(|_| coded_error("C5-IMPORT-005", "could not save imported profile metadata"))?;
+    }
+
+    let manifest_after = import::source_manifest(&source)
+        .map_err(|_| coded_error("C5-IMPORT-006", "could not verify source preservation"))?;
+    if manifest_before != manifest_after {
+        return Err(coded_error("C5-IMPORT-007", "source directory changed during import"));
+    }
+
+    Ok(VergeImportReport {
+        imported: profiles.len(),
+        skipped,
+        binding_sync_failures,
+        source_manifest_before: manifest_before,
+        source_manifest_after: manifest_after,
+    })
 }
 
 async fn restore_manual_file(previous: Option<&str>) -> CmdResult {
@@ -674,3 +746,4 @@ mod tests {
         assert!(peak.load(Ordering::SeqCst) <= PROBE_CONCURRENCY);
     }
 }
+
