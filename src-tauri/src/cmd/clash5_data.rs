@@ -1,5 +1,4 @@
 use super::{CmdResult, coded_error};
-use clash_verge_logging::{Type, logging};
 use clash5_data::{
     Binding, DataError, Node, NodeQuality, NodeRecord, PendingIdentityRebind, QualityStatus, Source, parse_inline_nodes,
 };
@@ -267,7 +266,7 @@ pub async fn clash5_reset_identity() -> CmdResult {
 #[tauri::command]
 pub async fn clash5_rotate_identity() -> CmdResult {
     let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
-    logging!(info, Type::Cmd, "clash5 identity rotation started");
+    tracing::info!(target: "clash5::identity", stage = "started");
     let old_key = crate::config::profiles::clash5_identity_key().await.map_err(failure)?;
     let mut snapshots = Vec::<clash5_data::IdentitySourceSnapshot>::new();
 
@@ -338,22 +337,17 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         source: Source::Manual,
         nodes: manual_nodes,
     });
-    logging!(
-        info,
-        Type::Cmd,
-        "clash5 identity rotation captured {} sources and {} manual nodes",
-        snapshots.len(),
+    tracing::info!(
+        target: "clash5::identity",
+        stage = "sources_captured",
+        source_count = snapshots.len(),
         manual_node_count
     );
 
     let (generation, new_key) = crate::config::profiles::stage_clash5_identity_rotation_key()
         .await
         .map_err(failure)?;
-    logging!(
-        info,
-        Type::Cmd,
-        "clash5 identity rotation staged generation {generation}"
-    );
+    tracing::info!(target: "clash5::identity", stage = "key_staged", generation);
     let previous = match tokio::fs::read_to_string(manual::path().map_err(super::CommandFailure::plain)?).await {
         Ok(yaml) => Some(yaml),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -380,9 +374,9 @@ pub async fn clash5_rotate_identity() -> CmdResult {
                 "manual proxies could not be saved",
             ));
         }
-        logging!(info, Type::Cmd, "clash5 identity rotation saved rekeyed manual proxies");
+        tracing::info!(target: "clash5::identity", stage = "manual_proxies_saved");
         let applied = CoreManager::global().update_config_forced().await;
-        logging!(info, Type::Cmd, "clash5 identity rotation runtime update returned");
+        tracing::info!(target: "clash5::identity", stage = "runtime_update_returned");
         if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
             restore_manual_file(previous.as_deref()).await?;
             return Err(coded_error(
@@ -400,11 +394,7 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         }
         return Err(failure(error));
     }
-    logging!(
-        info,
-        Type::Cmd,
-        "clash5 identity rotation committed generation {generation}"
-    );
+    tracing::info!(target: "clash5::identity", stage = "committed", generation);
     Ok(())
 }
 
