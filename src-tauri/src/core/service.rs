@@ -781,8 +781,16 @@ fn install_service() -> Result<()> {
         .iter()
         .map(|core| {
             let name = format!("{core}{}", std::env::consts::EXE_SUFFIX);
+            #[cfg(target_os = "linux")]
+            let bundled_name = match *core {
+                "verge-mihomo" => "clash5-mihomo",
+                "verge-mihomo-alpha" => "clash5-mihomo-alpha",
+                _ => core,
+            };
+            #[cfg(not(target_os = "linux"))]
+            let bundled_name = core;
             clash_verge_service_ipc::management::CoreSource {
-                path: executable.with_file_name(&name),
+                path: executable.with_file_name(format!("{bundled_name}{}", std::env::consts::EXE_SUFFIX)),
                 name,
             }
         })
@@ -2182,6 +2190,27 @@ mod tests {
     #[cfg(unix)]
     fn service_tools_staging_directory(home: &Path) -> PathBuf {
         home.join("Applications/.clash-verge-rev-dev/service-tools")
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_core_sources_use_clash5_sidecar_names_and_upstream_install_names() {
+        let executable = Path::new("/usr/bin/clash5");
+
+        for (core, sidecar) in [
+            ("verge-mihomo", "clash5-mihomo"),
+            ("verge-mihomo-alpha", "clash5-mihomo-alpha"),
+        ] {
+            let name = format!("{core}{}", std::env::consts::EXE_SUFFIX);
+            let bundled_name = match core {
+                "verge-mihomo" => "clash5-mihomo",
+                "verge-mihomo-alpha" => "clash5-mihomo-alpha",
+                _ => core,
+            };
+            let source = executable.with_file_name(format!("{bundled_name}{}", std::env::consts::EXE_SUFFIX));
+            assert_eq!(source.file_stem().and_then(|value| value.to_str()), Some(sidecar));
+            assert_eq!(name, format!("{core}{}", std::env::consts::EXE_SUFFIX));
+        }
     }
 
     #[cfg(target_os = "linux")]
