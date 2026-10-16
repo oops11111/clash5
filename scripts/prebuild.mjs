@@ -566,19 +566,6 @@ function serviceFileInfo(name) {
   }
 }
 
-async function findExtractedFile(dir, fileName) {
-  const entries = await fsp.readdir(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const entryPath = path.join(dir, entry.name)
-    if (entry.isFile() && entry.name === fileName) return entryPath
-    if (entry.isDirectory()) {
-      const found = await findExtractedFile(entryPath, fileName)
-      if (found) return found
-    }
-  }
-  return null
-}
-
 async function resolveServiceBundle() {
   const files = SERVICE_BINARIES.map((name) => {
     const info = serviceFileInfo(name)
