@@ -1708,4 +1708,3 @@ export interface TranslationResources {
     }
   }
 }
-

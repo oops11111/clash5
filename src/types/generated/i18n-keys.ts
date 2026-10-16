@@ -1044,4 +1044,3 @@ export const translationKeys = [
 ] as const
 
 export type TranslationKey = (typeof translationKeys)[number]
-

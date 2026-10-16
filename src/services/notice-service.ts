@@ -566,4 +566,3 @@ export function subscribeNotices(subscriber: NoticeSubscriber) {
 export function getSnapshotNotices() {
   return notices
 }
-
