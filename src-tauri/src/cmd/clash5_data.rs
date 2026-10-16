@@ -442,7 +442,7 @@ pub async fn clash5_save_plugin_binding(mut binding: PluginBinding) -> CmdResult
     .await
     .map_err(failure)?;
     apply_plugin_change_with_rollback(
-        || update_plugin_configuration(),
+        update_plugin_configuration,
         move || {
             crate::config::profiles::with_clash5_binding_store(move |store| match previous {
                 Some(previous) => store.upsert_plugin_binding(&previous),
@@ -500,7 +500,7 @@ pub async fn clash5_delete_plugin_binding(target: PluginBindingTarget, binding_i
         return Ok(());
     }
     apply_plugin_change_with_rollback(
-        || update_plugin_configuration(),
+        update_plugin_configuration,
         move || crate::config::profiles::with_clash5_binding_store(move |store| store.upsert_plugin_binding(&previous)),
         |result| result.is_valid(),
     )
@@ -535,7 +535,7 @@ pub async fn clash5_set_plugin_binding_enabled(
     .await
     .map_err(failure)?;
     apply_plugin_change_with_rollback(
-        || update_plugin_configuration(),
+        update_plugin_configuration,
         move || crate::config::profiles::with_clash5_binding_store(move |store| store.upsert_plugin_binding(&previous)),
         |result| result.is_valid(),
     )
@@ -592,7 +592,7 @@ async fn save_plugin_bindings(mut bindings: Vec<PluginBinding>) -> CmdResult {
     .await;
     saved.map_err(failure)?;
     apply_plugin_change_with_rollback(
-        || update_plugin_configuration(),
+        update_plugin_configuration,
         move || {
             crate::config::profiles::with_clash5_binding_store(move |store| {
                 store.delete_plugin_bindings(&rollback_keys).map(|_| ())
@@ -1354,10 +1354,9 @@ mod tests {
             Duration::from_secs(1),
             Duration::from_millis(1),
         )
-        .await
-        .unwrap();
+        .await;
 
-        assert_eq!(outcome, ValidationOutcome::Valid);
+        assert_eq!(outcome.ok(), Some(ValidationOutcome::Valid));
         assert_eq!(attempts.load(Ordering::SeqCst), 2);
     }
 
