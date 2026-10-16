@@ -775,20 +775,28 @@ fn uninstall_service() -> Result<()> {
     Ok(())
 }
 
+fn bundled_core_name(core: &str) -> &str {
+    #[cfg(target_os = "linux")]
+    {
+        match core {
+            "verge-mihomo" => "clash5-mihomo",
+            "verge-mihomo-alpha" => "clash5-mihomo-alpha",
+            _ => core,
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        core
+    }
+}
+
 fn install_service() -> Result<()> {
     let executable = current_exe()?;
     let cores = crate::config::IVerge::VALID_CLASH_CORES
         .iter()
         .map(|core| {
             let name = format!("{core}{}", std::env::consts::EXE_SUFFIX);
-            #[cfg(target_os = "linux")]
-            let bundled_name = match *core {
-                "verge-mihomo" => "clash5-mihomo",
-                "verge-mihomo-alpha" => "clash5-mihomo-alpha",
-                _ => core,
-            };
-            #[cfg(not(target_os = "linux"))]
-            let bundled_name = core;
+            let bundled_name = bundled_core_name(core);
             clash_verge_service_ipc::management::CoreSource {
                 path: executable.with_file_name(format!("{bundled_name}{}", std::env::consts::EXE_SUFFIX)),
                 name,
@@ -2202,11 +2210,7 @@ mod tests {
             ("verge-mihomo-alpha", "clash5-mihomo-alpha"),
         ] {
             let name = format!("{core}{}", std::env::consts::EXE_SUFFIX);
-            let bundled_name = match core {
-                "verge-mihomo" => "clash5-mihomo",
-                "verge-mihomo-alpha" => "clash5-mihomo-alpha",
-                _ => core,
-            };
+            let bundled_name = bundled_core_name(core);
             let source = executable.with_file_name(format!("{bundled_name}{}", std::env::consts::EXE_SUFFIX));
             assert_eq!(source.file_stem().and_then(|value| value.to_str()), Some(sidecar));
             assert_eq!(name, format!("{core}{}", std::env::consts::EXE_SUFFIX));
