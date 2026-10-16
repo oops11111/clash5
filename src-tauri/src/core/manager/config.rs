@@ -482,6 +482,7 @@ impl CoreManager {
             MIHOMO_RELOAD_TIMEOUT,
             handle::Handle::mihomo().reload_config(true, path),
         )
+        .await
     }
 }
 
