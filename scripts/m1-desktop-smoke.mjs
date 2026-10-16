@@ -298,6 +298,7 @@ async function importLink(link, count, expectedName) {
     }
     throw new Error(
       `Manual import acceptance failed: ${JSON.stringify(details)}`,
+      { cause: error },
     )
   }
 }
