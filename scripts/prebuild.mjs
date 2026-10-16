@@ -591,7 +591,9 @@ async function resolveServiceBundle() {
       ),
     )
     serviceManifest = metadata.packages.find(
-      (pkg) => pkg.name === 'clash_verge_service_ipc' && pkg.version === packageVersion,
+      (pkg) =>
+        pkg.name === 'clash_verge_service_ipc' &&
+        pkg.version === packageVersion,
     )?.manifest_path
   }
   if (!serviceManifest) {
