@@ -199,6 +199,7 @@ impl SingboxRoute {
 
     /// Reapplies the relay config if Mihomo replaced the in-memory route while sing-box stayed up.
     pub async fn ensure_mihomo_route(&self, mihomo: &Mihomo) -> Result<bool> {
+        anyhow::ensure!(self.is_running().await?, "sing-box sidecar is not running");
         let proxy = mihomo
             .get_proxy_by_name(&self.landing_name)
             .await
