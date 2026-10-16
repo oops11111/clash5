@@ -865,6 +865,19 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
     bindings: await invoke('clash5_list_bindings', { source: null }),
   }
   const clickButtonIn = async (labels, selector = '.base-page') => {
+    if (selector === '.MuiDialog-root') {
+      const dialogs = await browser.$$('.MuiDialog-root [role="dialog"]')
+      for (const dialog of dialogs) {
+        if (!(await dialog.isDisplayed())) continue
+        for (const button of await dialog.$$('button')) {
+          if (labels.includes((await button.getText()).trim())) {
+            await button.click()
+            return
+          }
+        }
+      }
+      throw new Error(`Visible dialog button is missing: ${labels[0]}`)
+    }
     const clicked = await browser.execute(
       (values, rootSelector) => {
         const roots = [...document.querySelectorAll(rootSelector)].filter(
