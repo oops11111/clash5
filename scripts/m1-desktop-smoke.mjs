@@ -1156,14 +1156,20 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
       .querySelector('.MuiAlert-standardError')
       ?.textContent?.trim(),
     runtimePending: Boolean(
-      document.querySelector('[data-testid="identity-rotation-runtime-pending"]'),
+      document.querySelector(
+        '[data-testid="identity-rotation-runtime-pending"]',
+      ),
     ),
   }))
   if (rotationResultState?.error) {
-    throw new Error(`Identity rotation command failed: ${rotationResultState.error}`)
+    throw new Error(
+      `Identity rotation command failed: ${rotationResultState.error}`,
+    )
   }
   if (rotationResultState?.runtimePending) {
-    throw new Error('Identity rotated, but its runtime configuration was not refreshed')
+    throw new Error(
+      'Identity rotated, but its runtime configuration was not refreshed',
+    )
   }
   let rotatedTarget
   await browser.waitUntil(
