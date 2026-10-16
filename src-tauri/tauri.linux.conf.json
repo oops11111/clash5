@@ -15,8 +15,7 @@
         "depends": ["openssl", "libayatana-appindicator-gtk3"],
         "recommends": ["policycoreutils", "policycoreutils-python-utils"],
         "desktopTemplate": "./packages/linux/clash5.desktop",
-        "provides": ["clash-verge"],
-        "conflicts": ["clash-verge"],
+        "provides": ["clash5"],
         "postInstallScript": "./packages/linux/post-install-rpm.sh",
         "preRemoveScript": "./packages/linux/pre-remove.sh"
       }
