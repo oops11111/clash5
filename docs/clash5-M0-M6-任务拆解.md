@@ -2,7 +2,7 @@
 
 > 基于 [`clash5-工程手册.md`](clash5-工程手册.md) r2 修订稿（待冻结）。后续上游同步拟按 release tag 的独立 merge PR（S2 r2）；产品名 **clash5**。
 > **模型标注**：`[Opus]` = 架构/高风险/复杂并发与安全，使用 Opus-class 或同级高推理模型；`[标准]` = 常规编码模型；`[人工]` = 需账号、设备或真机验收。
-> **进度口径**：原版 M0 已按验收合并至 `dev`；r2 的新增要求仍需逐项补齐。M1 节点池已通过桌面验收并由 PR #4 合并；九入口导航及插件页签由 PR #16 合并。
+> **进度口径**：原版 M0 已按验收合并至 `dev`；r2 的新增要求仍逐项补齐。M1 节点池及九入口导航已通过桌面验收并分别合并（PR #4、#16）；M0.2 身份恢复已由 PR #23 合并。M2 实现及 Windows Server 2022 原生验收已通过，PR #18 正在同步 `dev`，尚未合并。
 
 ---
 
@@ -56,18 +56,18 @@
 - [x] `[Opus]` 手动节点加入运行时后可安全探测；限流自动退避及 fixture 验证（R-11）
 - [x] `[标准]` 对照工作区外层 `src/ui-hifi` 的已确认 UI 做桌面验收，提供 r2 所需的集成测试与演示步骤
 
-**验收结果**：PR #4 的 SQLite 库存、剪贴板导入、订阅刷新与规则保留、手动节点运行时映射、外部 provider 探测、最多 16 并发、600 秒缓存和连续失败退避已通过数据层与真实 Mihomo fixture 测试。[Windows Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过 Tauri 页面导入、独立节点与 429 代理探测、缓存、来源/状态筛选、搜索、质量排序，以及桌面重启后的稳定身份检查；截图与范围见 [`M1 桌面演示步骤`](clash5/m1-acceptance.md)。M1 退出标准已达到，待 PR 合并。Windows Server 2025 的 WebDriver 问题仍由[上游 runner 问题](https://github.com/actions/runner-images/issues/14738)追踪。Mihomo 延迟接口不提供上游 HTTP 状态或 `Retry-After`，所以限流缓解是连续失败通用退避，风险 R-11 仍需观察。
+**验收结果**：PR #4 的 SQLite 库存、剪贴板导入、订阅刷新与规则保留、手动节点运行时映射、外部 provider 探测、最多 16 并发、600 秒缓存和连续失败退避已通过数据层与真实 Mihomo fixture 测试。[Windows Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过 Tauri 页面导入、独立节点与 429 代理探测、缓存、来源/状态筛选、搜索、质量排序，以及桌面重启后的稳定身份检查；截图与范围见 [`M1 桌面演示步骤`](clash5/m1-acceptance.md)。M1 已通过 PR #4 合并至 `dev`。Windows Server 2025 的 WebDriver 问题仍由[上游 runner 问题](https://github.com/actions/runner-images/issues/14738)追踪。Mihomo 延迟接口不提供上游 HTTP 状态或 `Retry-After`，所以限流缓解是连续失败通用退避，风险 R-11 仍需观察。
 
 ---
 
 ## M2 · 链路编排
 
-- [ ] `[Opus]` `dialer-proxy` 生成、override、与 provider 协同
-- [ ] `[标准]` 链路编排画布 UI、工具栏
-- [ ] `[Opus]` 出口 IP 检测与 L2 告警/可选切换策略
-- [ ] `[标准]` 链路详情三栏布局壳
+- [x] `[Opus]` `dialer-proxy` 生成、override、与 provider 协同
+- [x] `[标准]` 链路编排画布 UI、工具栏
+- [x] `[Opus]` 出口 IP 检测与 L2 告警/可选切换策略
+- [x] `[标准]` 链路详情三栏布局壳
 
-**Opus 必做**：链式配置正确性与出口 IP 策略。
+**验收结果**：PR #18 的两跳生成、provider override 与原配置保留、保存/测试/应用、出口 IP 检测、默认告警、经验证的备用切换、失败回滚及旧命令保护已通过 fixture 与 Windows Server 2022 桌面验收。[原生验收](https://github.com/oops11111/clash5/actions/runs/38701837292)通过默认 940 × 700 窗口的页面无横向溢出检查、Tauri 桥接与桌面重启后的链路恢复。M2 代码与桌面验收已完成，待 PR #18 合并。插件输出和绑定仍属于 M3。
 
 ---
 

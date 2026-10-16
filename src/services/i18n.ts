@@ -90,6 +90,7 @@ const STARTUP_LANGUAGE_SECTIONS = [
   'profiles',
   'proxies',
   'nodePool',
+  'chains',
   'tests',
   'rules',
   'connections',
