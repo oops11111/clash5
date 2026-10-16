@@ -3,9 +3,8 @@ use serde_yaml_ng::{Mapping, Value};
 use sha2::{Digest as _, Sha256};
 use std::{
     fs::{self, File},
-    io::Read,
-    path::{Component, Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
+    io::Read as _,
+    path::{Component, Path},
 };
 
 const MAX_MANIFEST_ENTRIES: usize = 100_000;
@@ -24,7 +23,7 @@ fn hex(bytes: &[u8]) -> String {
 fn update_file_hash(path: &Path) -> Result<String> {
     let mut file = File::open(path).with_context(|| format!("Could not read {}", path.display()))?;
     let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 32 * 1024];
+    let mut buffer = vec![0_u8; 32 * 1024].into_boxed_slice();
     loop {
         let count = file.read(&mut buffer)?;
         if count == 0 {
@@ -214,13 +213,20 @@ pub(crate) fn read_supported_profiles(source: &Path) -> Result<(Vec<ImportedProf
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     struct TestDir(PathBuf);
 
     impl TestDir {
         fn new() -> std::io::Result<Self> {
-            let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos();
             let path = std::env::temp_dir().join(format!("clash5-import-{}-{nonce}", std::process::id()));
             fs::create_dir(&path)?;
             Ok(Self(path))
