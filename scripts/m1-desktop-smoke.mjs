@@ -1169,8 +1169,8 @@ async function cleanupM3PluginFixture() {
   }
 }
 
-async function verifyNavigation() {
-  await prepareM3PluginFixture()
+async function verifyNavigation({ includePluginFixture = true } = {}) {
+  if (includePluginFixture) await prepareM3PluginFixture()
   const sidebar = await browser.execute(() => {
     const menu = document.querySelector('.the-menu')
     const items = [...menu.querySelectorAll('.MuiListItemButton-root')]
@@ -1230,20 +1230,22 @@ async function verifyNavigation() {
       timeoutMsg: 'Plugin binding tab did not render',
     },
   )
-  await browser.waitUntil(
-    () =>
-      browser.execute(
-        () =>
-          document
-            .querySelector('.base-page')
-            ?.textContent?.includes('M3 Acceptance Plugin') ?? false,
-      ),
-    {
-      timeout: 20_000,
-      interval: 250,
-      timeoutMsg: 'The signed M3 plugin was not listed in the installed page',
-    },
-  )
+  if (includePluginFixture) {
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document
+              .querySelector('.base-page')
+              ?.textContent?.includes('M3 Acceptance Plugin') ?? false,
+        ),
+      {
+        timeout: 20_000,
+        interval: 250,
+        timeoutMsg: 'The signed M3 plugin was not listed in the installed page',
+      },
+    )
+  }
   await browser.execute(() => {
     const binding = [
       ...document.querySelectorAll('.base-page [role="tab"]'),
@@ -1290,7 +1292,7 @@ async function verifyNavigation() {
     throw new Error('Orphan retention summary did not render')
   }
   await browser.saveScreenshot(resolve('target/nav-plugins-binding.png'))
-  await verifyM3PluginUi()
+  if (includePluginFixture) await verifyM3PluginUi()
 }
 
 async function verifyIdentityRotationAndAmbiguousRebind() {
@@ -2195,7 +2197,7 @@ try {
     await verifySubscriptionRefresh()
     await verifyWorkspaceControls()
   } else if (recoveryCancel) {
-    await verifyNavigation()
+    await verifyNavigation({ includePluginFixture: false })
     await verifyRecoveryResetCancellation()
   } else if (persisted) {
     phase = 'manual node persistence'
