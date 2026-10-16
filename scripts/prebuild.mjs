@@ -277,7 +277,7 @@ function clashMetaAlpha() {
   const urlExt = isWin ? 'zip' : 'gz'
   return {
     name: 'verge-mihomo-alpha',
-    targetFile: `verge-mihomo-alpha-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
+    targetFile: `${platform === 'linux' ? 'clash5-mihomo-alpha' : 'verge-mihomo-alpha'}-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile: `${name}-${META_ALPHA_VERSION}.${urlExt}`,
     downloadURL: `${META_ALPHA_URL_PREFIX}/${name}-${META_ALPHA_VERSION}.${urlExt}`,
@@ -290,7 +290,7 @@ function clashMeta() {
   const urlExt = isWin ? 'zip' : 'gz'
   return {
     name: 'verge-mihomo',
-    targetFile: `verge-mihomo-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
+    targetFile: `${platform === 'linux' ? 'clash5-mihomo' : 'verge-mihomo'}-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile: `${name}-${META_VERSION}.${urlExt}`,
     downloadURL: `${META_URL_PREFIX}/${META_VERSION}/${name}-${META_VERSION}.${urlExt}`,
