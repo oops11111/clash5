@@ -186,15 +186,34 @@ const NodePoolPage = () => {
       )
     } catch (error) {
       const errorName = error instanceof Error ? error.name : typeof error
-      const rawMessage = error instanceof Error ? error.message : ''
+      const errorRecord =
+        typeof error === 'object' && error !== null
+          ? (error as { code?: unknown; detail?: unknown })
+          : null
+      const errorCode =
+        typeof errorRecord?.code === 'string'
+          ? errorRecord.code.slice(0, 80)
+          : null
+      const rawMessage =
+        error instanceof Error
+          ? error.message
+          : typeof errorRecord?.detail === 'string'
+            ? errorRecord.detail
+            : ''
       const errorMessage = rawMessage
         .replace(/[a-z][a-z\d+.-]*:\/\/[^\s"'<>]+/gi, '[redacted-uri]')
         .slice(0, 200)
       document.documentElement.dataset.clash5ClipboardImportFailure =
-        JSON.stringify({ stage: importStage, errorName })
+        JSON.stringify({
+          stage: importStage,
+          errorName,
+          errorCode,
+          errorMessage,
+        })
       console.error('[NodePool] Clipboard import failed', {
         stage: importStage,
         errorName,
+        errorCode,
         errorMessage,
       })
       setImportError(true)
