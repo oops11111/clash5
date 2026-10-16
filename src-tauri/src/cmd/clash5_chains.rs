@@ -274,15 +274,14 @@ pub struct SingboxRouteStatus {
 
 #[tauri::command]
 pub async fn clash5_singbox_route_status(landing_name: String) -> CmdResult<SingboxRouteStatus> {
-    let active = CoreManager::global().singbox_route_active_for(&landing_name).await;
-    let proxy = Handle::mihomo()
-        .get_proxy_by_name(&landing_name)
+    let (active, degraded, mihomo_proxy_type) = CoreManager::global()
+        .singbox_route_status_for(&landing_name)
         .await
         .map_err(|_| coded_error("C5-CHAIN-014", "the sing-box landing route status is unavailable"))?;
     Ok(SingboxRouteStatus {
         active,
-        degraded: CoreManager::global().singbox_degraded(),
-        mihomo_proxy_type: format!("{:?}", proxy.proxy_type),
+        degraded,
+        mihomo_proxy_type,
     })
 }
 

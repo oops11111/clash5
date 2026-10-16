@@ -285,12 +285,19 @@ impl CoreManager {
         self.singbox_degraded.load(Ordering::Acquire)
     }
 
-    pub async fn singbox_route_active_for(&self, landing_name: &str) -> bool {
+    pub async fn singbox_route_status_for(&self, landing_name: &str) -> Result<(bool, bool, String)> {
         let active = self.singbox_route.lock().await;
-        match active.as_ref() {
-            Some(route) if route.landing_name() == landing_name => route.is_running().await.unwrap_or(false),
+        let route_active = match active.as_ref() {
+            Some(route) if route.landing_name() == landing_name => route.is_running().await?,
             _ => false,
-        }
+        };
+        let degraded = self.singbox_degraded.load(Ordering::Acquire);
+        drop(active);
+        let proxy = Handle::mihomo()
+            .get_proxy_by_name(landing_name)
+            .await
+            .context("failed to read the Mihomo landing proxy")?;
+        Ok((route_active, degraded, format!("{:?}", proxy.proxy_type)))
     }
 
     fn spawn_singbox_supervisor(landing_name: String) {
