@@ -1,4 +1,4 @@
-use crate::{DataError, Node};
+use crate::{DataError, Node, identity::normalize_sni};
 use serde_yaml_ng::Value;
 use std::collections::BTreeMap;
 
@@ -37,6 +37,30 @@ pub fn parse_proxy_node(proxy: &Value) -> Result<Node, DataError> {
     let required =
         |key: &str| -> Result<String, DataError> { scalar(field(mapping, key).ok_or(DataError::InvalidInput)?) };
     let port: u16 = required("port")?.parse().map_err(|_| DataError::InvalidInput)?;
+    let transport = field(mapping, "network").map(scalar).transpose()?.unwrap_or_default();
+    if field(mapping, "network").is_some() && transport.trim().is_empty() {
+        return Err(DataError::InvalidInput);
+    }
+    let mut sni_values = Vec::new();
+    for key in ["sni", "servername"] {
+        if let Some(value) = field(mapping, key) {
+            let value = scalar(value)?;
+            if !value.trim().is_empty() {
+                sni_values.push(normalize_sni(&value)?);
+            }
+        }
+    }
+    if let Some(tls) = field(mapping, "tls").and_then(Value::as_mapping) {
+        if let Some(value) = field(tls, "servername") {
+            let value = scalar(value)?;
+            if !value.trim().is_empty() {
+                sni_values.push(normalize_sni(&value)?);
+            }
+        }
+    }
+    if sni_values.windows(2).any(|values| values[0] != values[1]) {
+        return Err(DataError::InvalidInput);
+    }
     let mut credentials = BTreeMap::new();
     for &key in CREDENTIAL_FIELDS {
         if let Some(value) = field(mapping, key) {
@@ -49,6 +73,8 @@ pub fn parse_proxy_node(proxy: &Value) -> Result<Node, DataError> {
         port,
         credentials,
         display_name: required("name")?,
+        transport,
+        sni: sni_values.into_iter().next().unwrap_or_default(),
     };
     let identity_fields: &[&str] = match node.kind.as_str() {
         "vless" | "vmess" | "tuic" => &["uuid"],

@@ -1,0 +1,5 @@
+proxy-providers:
+  external:
+    type: file
+    path: ./providers/nodes.yaml
+proxies: []

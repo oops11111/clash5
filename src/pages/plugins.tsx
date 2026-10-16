@@ -22,6 +22,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BasePage } from '@/components/base'
+import { IdentityRecoveryPanel } from '@/components/identity-recovery-panel'
 import {
   getClash5PluginBindingConfig,
   installStagedClash5Plugin,
@@ -807,7 +808,10 @@ const PluginsPage = () => {
         {tab === 'installed' ? (
           renderInstalled()
         ) : tab === 'binding' ? (
-          renderBindings()
+          <Stack spacing={2}>
+            {renderBindings()}
+            <IdentityRecoveryPanel />
+          </Stack>
         ) : tab === 'settings' ? (
           renderSettings()
         ) : (
