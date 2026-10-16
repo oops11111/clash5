@@ -866,9 +866,10 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   }
   const clickButtonIn = async (labels, selector = '.base-page') => {
     if (selector === '.MuiDialog-root') {
-      const visibleIndex = await browser.execute((rootSelector) => {
-        return [...document.querySelectorAll(rootSelector)].findIndex(
-          (root) => {
+      const target = await browser.execute(
+        (rootSelector, values) => {
+          const roots = [...document.querySelectorAll(rootSelector)]
+          const rootIndex = roots.findIndex((root) => {
             const surface = root.querySelector('[role="dialog"]')
             if (!surface) return false
             const style = getComputedStyle(surface)
@@ -878,16 +879,22 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
               bounds.width > 0 &&
               bounds.height > 0
             )
-          },
-        )
-      }, selector)
-      if (visibleIndex >= 0) {
-        const dialog = (await browser.$$(selector))[visibleIndex]
-        for (const button of await dialog.$$('button')) {
-          if (labels.includes((await button.getText()).trim())) {
-            await button.click()
-            return
-          }
+          })
+          if (rootIndex < 0) return null
+          const buttonIndex = [
+            ...roots[rootIndex].querySelectorAll('button'),
+          ].findIndex((button) => values.includes(button.textContent?.trim()))
+          return buttonIndex < 0 ? null : { rootIndex, buttonIndex }
+        },
+        selector,
+        labels,
+      )
+      if (target) {
+        const dialog = (await browser.$$(selector))[target.rootIndex]
+        const button = (await dialog.$$('button'))[target.buttonIndex]
+        if (button) {
+          await button.click()
+          return
         }
       }
       throw new Error(`Visible dialog button is missing: ${labels[0]}`)
