@@ -35,7 +35,11 @@ assert.ok(!/DeleteRegKey[^\r\n]*Clash Verge/i.test(windowsInstaller))
 assert.ok(!/RMDir[^\r\n]*Clash Verge/i.test(windowsInstaller))
 
 const macService = await read('src-tauri/packages/macos/info_merge.plist')
-assert.ok(macService.includes('io.github.clash-verge-rev.clash-verge-rev.dev.service'))
-assert.ok(!macService.includes('io.github.clash-verge-rev.clash-verge-rev.service'))
+assert.ok(
+  macService.includes('io.github.clash-verge-rev.clash-verge-rev.dev.service'),
+)
+assert.ok(
+  !macService.includes('io.github.clash-verge-rev.clash-verge-rev.service'),
+)
 
 console.log('R-18 platform identity audit passed')
