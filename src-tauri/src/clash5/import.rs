@@ -216,20 +216,28 @@ mod tests {
     use std::{
         fs,
         path::PathBuf,
-        time::{SystemTime, UNIX_EPOCH},
+        sync::atomic::{AtomicUsize, Ordering},
     };
+
+    static NEXT_TEMP_DIR: AtomicUsize = AtomicUsize::new(0);
 
     struct TestDir(PathBuf);
 
     impl TestDir {
         fn new() -> std::io::Result<Self> {
-            let nonce = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos();
-            let path = std::env::temp_dir().join(format!("clash5-import-{}-{nonce}", std::process::id()));
-            fs::create_dir(&path)?;
-            Ok(Self(path))
+            for _ in 0..100 {
+                let nonce = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
+                let path = std::env::temp_dir().join(format!("clash5-import-{}-{nonce}", std::process::id()));
+                match fs::create_dir(&path) {
+                    Ok(()) => return Ok(Self(path)),
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(error) => return Err(error),
+                }
+            }
+            Err(std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                "could not allocate a unique import test directory",
+            ))
         }
 
         fn path(&self) -> &Path {
