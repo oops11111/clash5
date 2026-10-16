@@ -949,7 +949,15 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
         paper.querySelector('[role="combobox"]'),
     )
     const select = card?.querySelector('[role="combobox"]')
-    select?.click()
+    // MUI Select opens on mousedown; HTMLElement.click() dispatches only click.
+    select?.dispatchEvent(
+      new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        button: 0,
+      }),
+    )
     return Boolean(select)
   }, oldId)
   if (!opened) throw new Error('Ambiguous rebind candidate selector is missing')
