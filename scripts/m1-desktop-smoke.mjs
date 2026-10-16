@@ -1122,15 +1122,35 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
         throw error
       }
     }
-    internals.invoke = wrappedInvoke
+    let hookInstallError = null
+    try {
+      Object.defineProperty(internals, 'invoke', {
+        configurable: true,
+        writable: true,
+        value: wrappedInvoke,
+      })
+    } catch (error) {
+      hookInstallError = error instanceof Error ? error.message : String(error)
+      try {
+        internals.invoke = wrappedInvoke
+      } catch (fallbackError) {
+        hookInstallError += `; ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`
+      }
+    }
     window.__clash5RotationHookInstalled = internals.invoke === wrappedInvoke
+    window.__clash5RotationHookInstallError = hookInstallError
   })
-  const rotationHookInstalled = await browser.execute(
-    () => window.__clash5RotationHookInstalled === true,
-  )
-  if (!rotationHookInstalled) {
+  const rotationHookInstalled = await browser.execute(() => ({
+    installed: window.__clash5RotationHookInstalled === true,
+    error: window.__clash5RotationHookInstallError,
+    descriptor: Object.getOwnPropertyDescriptor(
+      window.__TAURI_INTERNALS__,
+      'invoke',
+    ),
+  }))
+  if (!rotationHookInstalled?.installed) {
     throw new Error(
-      'Identity rotation invoke diagnostic hook was not installed',
+      `Identity rotation diagnostic hook was not installed: ${JSON.stringify(rotationHookInstalled)}`,
     )
   }
   await clickButtonIn(rotateLabels)
