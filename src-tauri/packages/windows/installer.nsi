@@ -859,13 +859,13 @@ Section Install
   ; Not fatal on failure; a later elevated service install can stage the cores again.
   !ifdef MIHOMO_SHA256
     DetailPrint "Staging verge-mihomo for ${PRODUCTNAME} Service..."
-    nsExec::ExecToLog '"$INSTDIR\resources\clash-verge-service-install.exe" --install-core "$INSTDIR\verge-mihomo.exe" --sha256 "${MIHOMO_SHA256}"'
+    nsExec::ExecToLog '"$INSTDIR\resources\clash5-service-install.exe" --install-core "$INSTDIR\verge-mihomo.exe" --sha256 "${MIHOMO_SHA256}"'
     Pop $0
     ${IfThen} $0 != 0 ${|} DetailPrint "Staging verge-mihomo returned $0" ${|}
   !endif
   !ifdef MIHOMO_ALPHA_SHA256
     DetailPrint "Staging verge-mihomo-alpha for ${PRODUCTNAME} Service..."
-    nsExec::ExecToLog '"$INSTDIR\resources\clash-verge-service-install.exe" --install-core "$INSTDIR\verge-mihomo-alpha.exe" --sha256 "${MIHOMO_ALPHA_SHA256}"'
+    nsExec::ExecToLog '"$INSTDIR\resources\clash5-service-install.exe" --install-core "$INSTDIR\verge-mihomo-alpha.exe" --sha256 "${MIHOMO_ALPHA_SHA256}"'
     Pop $0
     ${IfThen} $0 != 0 ${|} DetailPrint "Staging verge-mihomo-alpha returned $0" ${|}
   !endif
