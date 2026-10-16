@@ -572,14 +572,13 @@ fn shell_single_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', r"'\''"))
 }
 
-#[cfg(target_os = "linux")]
-struct StagedLinuxServiceTools {
+struct StagedServiceTools {
     directory: PathBuf,
 }
 
-#[cfg(target_os = "linux")]
-impl StagedLinuxServiceTools {
+impl StagedServiceTools {
     fn create(installer_source: &Path, service_source: &Path) -> Result<Self> {
+        #[cfg(unix)]
         use std::os::unix::fs::PermissionsExt as _;
 
         for attempt in 0..32 {
@@ -591,14 +590,19 @@ impl StagedLinuxServiceTools {
             match std::fs::create_dir(&directory) {
                 Ok(()) => {
                     let staging = Self { directory };
+                    #[cfg(unix)]
                     std::fs::set_permissions(
                         &staging.directory,
                         std::fs::Permissions::from_mode(0o700),
                     )?;
-                    let installer = staging.directory.join("clash-verge-service-install");
-                    let service = staging.directory.join("clash-verge-service");
+                    let suffix = std::env::consts::EXE_SUFFIX;
+                    let installer = staging
+                        .directory
+                        .join(format!("clash-verge-service-install{suffix}"));
+                    let service = staging.directory.join(format!("clash-verge-service{suffix}"));
                     std::fs::copy(installer_source, &installer)?;
                     std::fs::copy(service_source, &service)?;
+                    #[cfg(unix)]
                     for executable in [&installer, &service] {
                         std::fs::set_permissions(
                             executable,
@@ -615,12 +619,12 @@ impl StagedLinuxServiceTools {
     }
 
     fn installer_path(&self) -> PathBuf {
-        self.directory.join("clash-verge-service-install")
+        self.directory
+            .join(format!("clash-verge-service-install{}", std::env::consts::EXE_SUFFIX))
     }
 }
 
-#[cfg(target_os = "linux")]
-impl Drop for StagedLinuxServiceTools {
+impl Drop for StagedServiceTools {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.directory);
     }
@@ -654,8 +658,8 @@ fn uninstall_service() -> Result<()> {
     use runas::Command as RunasCommand;
     use std::os::windows::process::CommandExt as _;
 
-    let uninstall_path = packaged_service_tool_path("clash-verge-service-uninstall.exe", || {
-        Ok(dirs::service_path()?.with_file_name("clash-verge-service-uninstall.exe"))
+    let uninstall_path = packaged_service_tool_path("clash5-service-uninstall.exe", || {
+        Ok(dirs::service_path()?.with_file_name("clash5-service-uninstall.exe"))
     })?;
 
     if !uninstall_path.exists() {
@@ -742,8 +746,8 @@ fn linux_running_as_root() -> bool {
 fn uninstall_service() -> Result<()> {
     logging!(info, Type::Service, "uninstall service");
 
-    let uninstall_path = packaged_service_tool_path("clash-verge-service-uninstall", || {
-        Ok(dirs::service_path()?.with_file_name("clash-verge-service-uninstall"))
+    let uninstall_path = packaged_service_tool_path("clash5-service-uninstall", || {
+        Ok(dirs::service_path()?.with_file_name("clash5-service-uninstall"))
     })?;
 
     if !uninstall_path.exists() {
@@ -807,10 +811,7 @@ fn install_service() -> Result<()> {
 }
 
 fn invoke_service_install(cores: &[clash_verge_service_ipc::management::CoreSource], core_only: bool) -> Result<()> {
-    #[cfg(target_os = "linux")]
-    let name = "clash5-service-install".to_owned();
-    #[cfg(not(target_os = "linux"))]
-    let name = format!("clash-verge-service-install{}", std::env::consts::EXE_SUFFIX);
+    let name = format!("clash5-service-install{}", std::env::consts::EXE_SUFFIX);
     let installer = packaged_service_tool_path(&name, || {
         #[cfg(target_os = "linux")]
         let executable = tauri::utils::platform::current_exe()?;
@@ -822,12 +823,10 @@ fn invoke_service_install(cores: &[clash_verge_service_ipc::management::CoreSour
     let gid = Some(tauri_plugin_clash_verge_sysinfo::current_gid());
     #[cfg(windows)]
     let gid = None;
-    #[cfg(target_os = "linux")]
-    let staged_tools = StagedLinuxServiceTools::create(
+    let staged_tools = StagedServiceTools::create(
         &installer,
-        &tauri::utils::platform::current_exe()?.with_file_name("clash5-service"),
+        &installer.with_file_name(format!("clash5-service{}", std::env::consts::EXE_SUFFIX)),
     )?;
-    #[cfg(target_os = "linux")]
     let installer = staged_tools.installer_path();
     clash_verge_service_ipc::management::install(
         &installer,
@@ -2228,7 +2227,7 @@ mod tests {
         std::fs::write(&installer_source, b"clash5 installer")?;
         std::fs::write(&service_source, b"clash5 service")?;
 
-        let staged = StagedLinuxServiceTools::create(&installer_source, &service_source)?;
+        let staged = StagedServiceTools::create(&installer_source, &service_source)?;
         let directory = staged.directory.clone();
         let installer = staged.installer_path();
         let service = directory.join("clash-verge-service");
