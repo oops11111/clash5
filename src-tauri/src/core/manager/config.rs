@@ -22,7 +22,20 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tauri_plugin_mihomo::Error as MihomoError;
+
+const MIHOMO_RELOAD_TIMEOUT: Duration = Duration::from_secs(15);
+
+async fn await_with_timeout<T, E, Fut>(duration: Duration, operation: Fut) -> Result<T>
+where
+    E: std::fmt::Display,
+    Fut: std::future::Future<Output = std::result::Result<T, E>>,
+{
+    match tokio::time::timeout(duration, operation).await {
+        Ok(Ok(value)) => Ok(value),
+        Ok(Err(error)) => Err(anyhow!(error.to_string())),
+        Err(_) => Err(anyhow!("operation timed out after {duration:?}")),
+    }
+}
 
 /// A staging result separated from the policy that acts on it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -464,14 +477,20 @@ impl CoreManager {
         }
     }
 
-    async fn reload_config(&self, path: &str) -> Result<(), MihomoError> {
-        handle::Handle::mihomo().reload_config(true, path).await
+    async fn reload_config(&self, path: &str) -> Result<()> {
+        await_with_timeout(
+            MIHOMO_RELOAD_TIMEOUT,
+            handle::Handle::mihomo().reload_config(true, path),
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{ConfigApplication, StageAttempt, StageRequest, plan_config_application, stage_with_confirmation};
+    use super::{
+        ConfigApplication, StageAttempt, StageRequest, await_with_timeout, plan_config_application,
+        stage_with_confirmation,
+    };
     use clash_verge_service_ipc::{StageRejection, StageRuntimeOutcome};
     use std::{cell::Cell, time::Duration};
 
@@ -693,5 +712,16 @@ mod tests {
             CONFIRM_WITHIN,
             "the caller must be released at the deadline, not at the service's convenience"
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_hung_mihomo_request_returns_at_its_deadline() {
+        let started = tokio::time::Instant::now();
+        let error = await_with_timeout(Duration::from_secs(5), std::future::pending::<anyhow::Result<()>>())
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("timed out"));
+        assert_eq!(started.elapsed(), Duration::from_secs(5));
     }
 }
