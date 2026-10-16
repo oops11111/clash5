@@ -587,7 +587,7 @@ async function resolveServiceBundle() {
       execFileSync(
         'cargo',
         ['metadata', '--format-version', '1', '--manifest-path', manifestPath],
-        { cwd, encoding: 'utf8' },
+        { cwd, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
       ),
     )
     serviceManifest = metadata.packages.find(
