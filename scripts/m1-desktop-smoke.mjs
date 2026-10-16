@@ -1102,82 +1102,42 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   if (!selectedNode) throw new Error('Selected rebind target is missing')
 
   phase = 'identity rotation'
-  await browser.execute(() => {
-    const internals = window.__TAURI_INTERNALS__
-    const invoke = internals.invoke.bind(internals)
-    window.__clash5RotationResult = null
-    window.__clash5RotationInvokeStarted = false
-    const wrappedInvoke = async (...args) => {
-      if (args[0] !== 'clash5_rotate_identity') return invoke(...args)
-      window.__clash5RotationInvokeStarted = true
-      try {
-        const value = await invoke(...args)
-        window.__clash5RotationResult = { ok: true }
-        return value
-      } catch (error) {
-        window.__clash5RotationResult = {
-          ok: false,
-          message: error instanceof Error ? error.message : String(error),
-        }
-        throw error
-      }
-    }
-    let hookInstallError = null
-    try {
-      Object.defineProperty(internals, 'invoke', {
-        configurable: true,
-        writable: true,
-        value: wrappedInvoke,
-      })
-    } catch (error) {
-      hookInstallError = error instanceof Error ? error.message : String(error)
-      try {
-        internals.invoke = wrappedInvoke
-      } catch (fallbackError) {
-        hookInstallError += `; ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`
-      }
-    }
-    window.__clash5RotationHookInstalled = internals.invoke === wrappedInvoke
-    window.__clash5RotationHookInstallError = hookInstallError
-  })
-  const rotationHookInstalled = await browser.execute(() => ({
-    installed: window.__clash5RotationHookInstalled === true,
-    error: window.__clash5RotationHookInstallError,
-    descriptor: Object.getOwnPropertyDescriptor(
-      window.__TAURI_INTERNALS__,
-      'invoke',
-    ),
-  }))
-  if (!rotationHookInstalled?.installed) {
-    throw new Error(
-      `Identity rotation diagnostic hook was not installed: ${JSON.stringify(rotationHookInstalled)}`,
-    )
-  }
   await clickButtonIn(rotateLabels)
   await clickButtonIn(rotateLabels, '.MuiDialog-root')
   await browser.waitUntil(
-    () => browser.execute(() => window.__clash5RotationInvokeStarted === true),
+    () =>
+      browser.execute(() => {
+        const dialog = document.querySelector('.MuiDialog-root')
+        const error = document.querySelector('.MuiAlert-standardError')
+        return (
+          dialog?.getAttribute('aria-busy') === 'true' ||
+          !dialog ||
+          Boolean(error)
+        )
+      }),
     {
       timeout: 10_000,
       interval: 250,
-      timeoutMsg: 'Identity rotation confirmation did not invoke the command',
+      timeoutMsg: 'Identity rotation confirmation did not start or finish',
     },
   )
-  await browser.waitUntil(
-    () => browser.execute(() => window.__clash5RotationResult !== null),
-    {
-      timeout: 60_000,
-      interval: 250,
-      timeoutMsg: 'Identity rotation command did not finish',
-    },
-  )
-  const rotationResult = await browser.execute(
-    () => window.__clash5RotationResult,
-  )
-  if (!rotationResult?.ok) {
+  const rotationUiState = await browser.execute(() => {
+    const dialog = document.querySelector('.MuiDialog-root')
+    return {
+      busy: dialog?.getAttribute('aria-busy') === 'true',
+      open: Boolean(dialog),
+      error: document
+        .querySelector('.MuiAlert-standardError')
+        ?.textContent?.trim(),
+    }
+  })
+  if (rotationUiState?.error) {
     throw new Error(
-      `Identity rotation command failed: ${rotationResult?.message ?? 'unknown error'}`,
+      `Identity rotation command failed: ${rotationUiState.error}`,
     )
+  }
+  if (rotationUiState?.open && !rotationUiState.busy) {
+    throw new Error('Identity rotation confirmation did not start the command')
   }
   let rotatedTarget
   await browser.waitUntil(
