@@ -285,6 +285,14 @@ impl CoreManager {
         self.singbox_degraded.load(Ordering::Acquire)
     }
 
+    pub async fn singbox_route_active_for(&self, landing_name: &str) -> bool {
+        let active = self.singbox_route.lock().await;
+        match active.as_ref() {
+            Some(route) if route.landing_name() == landing_name => route.is_running().await.unwrap_or(false),
+            _ => false,
+        }
+    }
+
     fn spawn_singbox_supervisor(landing_name: String) {
         tokio::spawn(async move {
             loop {

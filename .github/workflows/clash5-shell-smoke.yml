@@ -56,6 +56,24 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Provision real desktop resources
         run: pnpm prebuild x86_64-pc-windows-msvc
+      - name: Provision pinned sing-box test binary
+        shell: pwsh
+        run: |
+          $version = '1.14.2'
+          $archiveName = "sing-box-$version-windows-amd64.zip"
+          $archive = Join-Path $env:RUNNER_TEMP $archiveName
+          $destination = Join-Path $env:RUNNER_TEMP "clash5-sing-box-$version"
+          $url = "https://github.com/SagerNet/sing-box/releases/download/v$version/$archiveName"
+          $expectedSha256 = 'c2d8bfff918755808781dfdeeb8581b6c91eb3a243d9a7b55483cfc0c0684d32'
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $actualSha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $expectedSha256) {
+            throw "Official sing-box test archive SHA-256 mismatch: $actualSha256"
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force
+          $binary = Get-ChildItem -LiteralPath $destination -Filter 'sing-box.exe' -File -Recurse | Select-Object -First 1
+          if (-not $binary) { throw 'Pinned sing-box archive did not contain sing-box.exe' }
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $binary.DirectoryName
       - name: Probe through Mihomo and the local rate-limit fixture
         run: pnpm m1:mihomo-smoke src-tauri/sidecar/verge-mihomo-x86_64-pc-windows-msvc.exe
       - name: Verify generated two-hop routing and exit IP through local proxies
@@ -166,6 +184,7 @@ jobs:
             target/m1-desktop-persisted.png
             target/nav-plugins-binding.png
             target/m2-desktop-chains.png
+            target/m4-desktop-route.png
           if-no-files-found: warn
       - name: Upload test shell
         if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

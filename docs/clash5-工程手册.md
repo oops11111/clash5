@@ -268,6 +268,7 @@ trait KernelScheduler {
 ```
 
 - **本地中转**：监听 `127.0.0.1` 随机高位端口；每次启动生成会话令牌，中转入口要求令牌（SOCKS5 用户名/密码或首包头部校验）；令牌不写日志、不写磁盘。
+- **协议映射**：当前 sing-box 可承接 Shadowsocks、VMess、VLESS、Trojan、Hysteria、Hysteria2 与 TUIC 落地节点；HTTP 与 SOCKS5 可用作 detour 前置。配置缺项或传输方式不支持时 fail-closed，并保留 Mihomo 原路由。
 - **Mihomo external-controller**：绑定回环地址，启用 secret，secret 由应用生成并存入系统密钥库。
 - **内核异常**：按 K2 在 10 分钟窗口内最多重启 3 次，超限进入降级态并通知用户，不再自动重启。
 - **sing-box 前置/落地**：M4 仅支持 sing-box 作为落地（出口）；sing-box 作为前置的场景不在本版本范围内，写入风险登记。
