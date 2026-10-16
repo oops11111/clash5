@@ -1,0 +1,77 @@
+name: clash5 Windows installer isolation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/clash5-installer-isolation.yml'
+      - 'scripts/r18-windows-install-smoke.ps1'
+      - 'src-tauri/**'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-installer:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      CARGO_INCREMENTAL: 0
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: 'v1-rust'
+          key: 'r18-installer-x86_64-pc-windows-msvc'
+          workspaces: |
+            . -> target
+          cache-all-crates: true
+          cache-workspace-crates: true
+          save-if: true
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.21.0'
+          cache: pnpm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Provision clash5 desktop resources
+        run: pnpm prebuild x86_64-pc-windows-msvc
+      - name: Build clash5 2.5.9 installer
+        shell: pwsh
+        run: |
+          $configPath = Join-Path $env:RUNNER_TEMP 'clash5-no-updater.json'
+          '{"bundle":{"createUpdaterArtifacts":false}}' | Set-Content -LiteralPath $configPath -Encoding utf8
+          pnpm exec tauri build --target x86_64-pc-windows-msvc --bundles nsis --config $configPath
+          if ($LASTEXITCODE -ne 0) { throw 'clash5 2.5.9 installer build failed' }
+          $bundle = 'target/x86_64-pc-windows-msvc/release/bundle/nsis'
+          $installer = Get-ChildItem -LiteralPath $bundle -Filter '*-setup.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $installer -or $installer.Name -notmatch '2\.5\.9') { throw 'clash5 2.5.9 NSIS installer was not produced' }
+          Copy-Item -LiteralPath $installer.FullName -Destination (Join-Path $env:RUNNER_TEMP 'clash5-2.5.9-setup.exe')
+      - name: Build clash5 2.5.10 upgrade installer
+        shell: pwsh
+        run: |
+          $configPath = Join-Path $env:RUNNER_TEMP 'clash5-2.5.10-no-updater.json'
+          '{"version":"2.5.10","bundle":{"createUpdaterArtifacts":false}}' | Set-Content -LiteralPath $configPath -Encoding utf8
+          pnpm exec tauri build --target x86_64-pc-windows-msvc --bundles nsis --config $configPath
+          if ($LASTEXITCODE -ne 0) { throw 'clash5 2.5.10 installer build failed' }
+          $bundle = 'target/x86_64-pc-windows-msvc/release/bundle/nsis'
+          $installer = Get-ChildItem -LiteralPath $bundle -Filter '*-setup.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $installer -or $installer.Name -notmatch '2\.5\.10') { throw 'clash5 2.5.10 NSIS installer was not produced' }
+          Copy-Item -LiteralPath $installer.FullName -Destination (Join-Path $env:RUNNER_TEMP 'clash5-2.5.10-setup.exe')
+      - name: Install, update, launch, and independently uninstall both apps
+        shell: pwsh
+        run: ./scripts/r18-windows-install-smoke.ps1 -Clash5OldInstaller (Join-Path $env:RUNNER_TEMP 'clash5-2.5.9-setup.exe') -Clash5NewInstaller (Join-Path $env:RUNNER_TEMP 'clash5-2.5.10-setup.exe')
