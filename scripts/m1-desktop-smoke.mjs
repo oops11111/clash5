@@ -879,6 +879,44 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   }
   const rotateLabels = ['Rotate identity key', '轮换身份密钥', '輪替身分金鑰']
   const cancelLabels = ['Cancel', '取消']
+  await browser.execute(() => {
+    const plugins = [
+      ...document.querySelectorAll('.the-menu .MuiListItemButton-root'),
+    ].find((item) => ['Plugins', '插件'].includes(item.textContent?.trim()))
+    plugins?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.base-page [role="tab"]')].some((tab) =>
+          ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Plugin binding tab did not render before identity recovery',
+    },
+  )
+  await browser.execute(() => {
+    const binding = [
+      ...document.querySelectorAll('.base-page [role="tab"]'),
+    ].find((tab) => ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()))
+    binding?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute((labels) =>
+        [...document.querySelectorAll('.base-page button')].some((button) =>
+          labels.includes(button.textContent?.trim()),
+        ),
+      rotateLabels),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity controls did not render on the plugin binding tab',
+    },
+  )
   await clickButtonIn(rotateLabels)
   await browser.waitUntil(
     () =>
