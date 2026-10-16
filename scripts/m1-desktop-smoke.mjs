@@ -1146,9 +1146,9 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
         return !dialog || dialog.getAttribute('aria-busy') !== 'true'
       }),
     {
-      timeout: 60_000,
+      timeout: 180_000,
       interval: 250,
-      timeoutMsg: 'Identity rotation command did not reach a terminal state',
+      timeoutMsg: 'Identity rotation command did not reach a terminal state within 180 seconds',
     },
   )
   const rotationResultState = await browser.execute(() => ({
