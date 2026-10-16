@@ -284,7 +284,7 @@ mod tests {
         assert!(profiles[0].contents.contains("fixture-node"));
         assert_eq!(skipped.len(), 2);
         assert!(skipped.iter().any(|item| item == "Unsupported merge profile"));
-        assert!(skipped.iter().any(|item| item.contains("external provider files")));
+        assert!(skipped.iter().any(|item| item == "External provider profile"));
         assert!(!profiles[0].contents.contains("secret-token"));
         Ok(())
     }
