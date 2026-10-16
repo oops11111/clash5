@@ -1106,8 +1106,10 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
     const internals = window.__TAURI_INTERNALS__
     const invoke = internals.invoke.bind(internals)
     window.__clash5RotationResult = null
-    internals.invoke = async (...args) => {
+    window.__clash5RotationInvokeStarted = false
+    const wrappedInvoke = async (...args) => {
       if (args[0] !== 'clash5_rotate_identity') return invoke(...args)
+      window.__clash5RotationInvokeStarted = true
       try {
         const value = await invoke(...args)
         window.__clash5RotationResult = { ok: true }
@@ -1120,9 +1122,27 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
         throw error
       }
     }
+    internals.invoke = wrappedInvoke
+    window.__clash5RotationHookInstalled = internals.invoke === wrappedInvoke
   })
+  const rotationHookInstalled = await browser.execute(
+    () => window.__clash5RotationHookInstalled === true,
+  )
+  if (!rotationHookInstalled) {
+    throw new Error(
+      'Identity rotation invoke diagnostic hook was not installed',
+    )
+  }
   await clickButtonIn(rotateLabels)
   await clickButtonIn(rotateLabels, '.MuiDialog-root')
+  await browser.waitUntil(
+    () => browser.execute(() => window.__clash5RotationInvokeStarted === true),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity rotation confirmation did not invoke the command',
+    },
+  )
   await browser.waitUntil(
     () => browser.execute(() => window.__clash5RotationResult !== null),
     {
