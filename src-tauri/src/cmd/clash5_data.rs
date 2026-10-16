@@ -343,7 +343,7 @@ async fn collect_identity_rotation_snapshots(
         let app_dir = dirs::app_home_dir().map_err(super::CommandFailure::plain)?;
         let profiles_dir = dirs::app_profiles_dir().map_err(super::CommandFailure::plain)?;
         for item in items {
-            if item.itype.as_deref() == Some("script") {
+            if !matches!(item.itype.as_deref(), None | Some("remote") | Some("local")) {
                 continue;
             }
             let (Some(uid), Some(file)) = (item.uid.as_deref(), item.file.as_deref()) else {
@@ -356,16 +356,15 @@ async fn collect_identity_rotation_snapshots(
             let Ok(yaml) = tokio::fs::read_to_string(&path).await else {
                 continue;
             };
-            if let Some(nodes) = parse_inline_nodes(&yaml)
-                .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "a saved profile contains invalid node data"))?
-            {
-                snapshots.push(clash5_data::IdentitySourceSnapshot {
-                    source: Source::Subscription {
-                        provider_id: uid.to_owned(),
-                    },
-                    nodes,
-                });
-            }
+            let Ok(Some(nodes)) = parse_inline_nodes(&yaml) else {
+                continue;
+            };
+            snapshots.push(clash5_data::IdentitySourceSnapshot {
+                source: Source::Subscription {
+                    provider_id: uid.to_owned(),
+                },
+                nodes,
+            });
 
             let Ok(mapping) = serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&yaml) else {
                 continue;
@@ -382,13 +381,7 @@ async fn collect_identity_rotation_snapshots(
                 let Ok(yaml) = tokio::fs::read_to_string(path).await else {
                     continue;
                 };
-                let Some(nodes) = parse_inline_nodes(&yaml).map_err(|_| {
-                    coded_error(
-                        "IDENTITY_ROTATION_FAILED",
-                        "a saved proxy provider contains invalid node data",
-                    )
-                })?
-                else {
+                let Ok(Some(nodes)) = parse_inline_nodes(&yaml) else {
                     continue;
                 };
                 snapshots.push(clash5_data::IdentitySourceSnapshot {
