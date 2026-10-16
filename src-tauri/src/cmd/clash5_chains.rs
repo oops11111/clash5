@@ -265,6 +265,27 @@ pub fn clash5_singbox_degraded() -> bool {
     CoreManager::global().singbox_degraded()
 }
 
+#[derive(Serialize)]
+pub struct SingboxRouteStatus {
+    active: bool,
+    degraded: bool,
+    mihomo_proxy_type: String,
+}
+
+#[tauri::command]
+pub async fn clash5_singbox_route_status(landing_name: String) -> CmdResult<SingboxRouteStatus> {
+    let active = CoreManager::global().singbox_route_active_for(&landing_name).await;
+    let proxy = Handle::mihomo()
+        .get_proxy_by_name(&landing_name)
+        .await
+        .map_err(|_| coded_error("C5-CHAIN-014", "the sing-box landing route status is unavailable"))?;
+    Ok(SingboxRouteStatus {
+        active,
+        degraded: CoreManager::global().singbox_degraded(),
+        mihomo_proxy_type: format!("{:?}", proxy.proxy_type),
+    })
+}
+
 #[tauri::command]
 pub async fn clash5_activate_chain(id: String, policy_group: String) -> CmdResult<ChainActivation> {
     let _guard = PROFILE_WRITE_LOCK.lock().await;

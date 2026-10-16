@@ -200,6 +200,32 @@ pub fn map_landing_outbound(proxy: &YamlValue, tag: &str) -> Result<JsonValue> {
     Ok(JsonValue::Object(outbound))
 }
 
+fn map_front_outbound(proxy: &YamlValue, tag: &str) -> Result<JsonValue> {
+    let source_kind = text(proxy, "type")?;
+    if !matches!(source_kind.as_str(), "http" | "socks5") {
+        return map_landing_outbound(proxy, tag);
+    }
+    let mut outbound = Map::new();
+    outbound.insert(
+        "type".into(),
+        JsonValue::String(if source_kind == "socks5" { "socks" } else { "http" }.into()),
+    );
+    outbound.insert("tag".into(), JsonValue::String(tag.into()));
+    outbound.insert("server".into(), JsonValue::String(text(proxy, "server")?));
+    outbound.insert("server_port".into(), json!(port(proxy)?));
+    let username = optional_text(proxy, "username");
+    let password = optional_text(proxy, "password");
+    anyhow::ensure!(
+        username.is_some() == password.is_some(),
+        "sing-box front proxy credentials are incomplete"
+    );
+    if let (Some(username), Some(password)) = (username, password) {
+        outbound.insert("username".into(), JsonValue::String(username));
+        outbound.insert("password".into(), JsonValue::String(password));
+    }
+    Ok(JsonValue::Object(outbound))
+}
+
 /// Produces an isolated sing-box configuration with a loopback SOCKS inbound and one landing outbound.
 pub fn singbox_config(
     proxy: &YamlValue,
@@ -218,7 +244,7 @@ pub fn singbox_config(
     );
     let mut outbounds = Vec::new();
     if let Some(detour_proxy) = detour_proxy {
-        let mut detour = map_landing_outbound(detour_proxy, "clash5-front")?;
+        let mut detour = map_front_outbound(detour_proxy, "clash5-front")?;
         // The detour dials the selected landing server. It must not itself recurse.
         detour
             .as_object_mut()
@@ -392,6 +418,26 @@ mod tests {
         assert_eq!(config["outbounds"][1]["tag"], "exit");
         assert_eq!(config["outbounds"][1]["detour"], "clash5-front");
         assert_eq!(config["route"]["final"], "exit");
+        Ok(())
+    }
+
+    #[test]
+    fn maps_http_and_socks5_front_proxies_with_optional_authentication() -> Result<()> {
+        let http: YamlValue = serde_yaml_ng::from_str(
+            "type: http\nserver: 127.0.0.1\nport: 8080\nusername: front-user\npassword: front-pass\n",
+        )?;
+        let http = map_front_outbound(&http, "front")?;
+        assert_eq!(http["type"], "http");
+        assert_eq!(http["username"], "front-user");
+        assert_eq!(http["password"], "front-pass");
+        let landing_http: YamlValue = serde_yaml_ng::from_str("type: http\nserver: 127.0.0.1\nport: 8080\n")?;
+        assert!(map_landing_outbound(&landing_http, "exit").is_err());
+
+        let socks: YamlValue = serde_yaml_ng::from_str("type: socks5\nserver: 127.0.0.1\nport: 1080\n")?;
+        let socks = map_front_outbound(&socks, "front")?;
+        assert_eq!(socks["type"], "socks");
+        assert!(socks.get("username").is_none());
+        assert!(socks.get("password").is_none());
         Ok(())
     }
 

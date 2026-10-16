@@ -218,6 +218,7 @@ mod app_init {
             cmd::clash5_test_chain,
             cmd::clash5_activate_chain,
             cmd::clash5_singbox_degraded,
+            cmd::clash5_singbox_route_status,
             cmd::clash5_detect_exit_ip,
             cmd::clash5_list_nodes,
             cmd::clash5_probe_nodes,
