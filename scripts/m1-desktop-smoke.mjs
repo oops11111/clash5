@@ -1148,7 +1148,8 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
     {
       timeout: 180_000,
       interval: 250,
-      timeoutMsg: 'Identity rotation command did not reach a terminal state within 180 seconds',
+      timeoutMsg:
+        'Identity rotation command did not reach a terminal state within 180 seconds',
     },
   )
   const rotationResultState = await browser.execute(() => ({
