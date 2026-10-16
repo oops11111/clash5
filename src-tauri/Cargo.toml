@@ -1,11 +1,11 @@
 [package]
-name = "clash-verge"
+name = "clash5"
 version = "2.5.9"
 description = "clash verge"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
 repository = "https://github.com/clash-verge-rev/clash-verge-rev.git"
-default-run = "clash-verge"
+default-run = "clash5"
 build = "build.rs"
 edition = "2024"
 rust-version = "1.99"
@@ -26,7 +26,7 @@ clippy = ["tauri/test"]
 perf-harness = ["dep:tauri-plugin-wdio-webdriver"]
 
 [package.metadata.bundle]
-identifier = "io.github.clash-verge-rev.clash-verge-rev"
+identifier = "io.github.oops11111.clash5"
 
 [build-dependencies]
 tauri-build = { version = "2.7.1", features = [] }
