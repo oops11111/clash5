@@ -9,6 +9,8 @@ fn node(name: &str, password: &str) -> Node {
         kind: "http".into(),
         server: "edge.example.invalid".into(),
         port: 8443,
+        transport: String::new(),
+        sni: String::new(),
         credentials: BTreeMap::from([("password".into(), password.into())]),
         display_name: name.into(),
     }
@@ -155,13 +157,17 @@ fn plugin_audit_records_metadata_without_binding_settings() {
 }
 
 #[test]
-fn schema_v2_migrates_transactionally_to_plugin_bindings_v3() {
+fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
     std::fs::create_dir_all(&root).unwrap();
     let directory = tempfile::tempdir_in(&root).unwrap();
     let path = directory.path().join("m2.sqlite");
     {
         let db = rusqlite::Connection::open(&path).unwrap();
+        db.execute_batch(
+            "CREATE TABLE nodes(source_kind TEXT,provider_id TEXT,stable_id TEXT,display_name TEXT,kind TEXT,server TEXT,port INTEGER,duplicate_count INTEGER,active INTEGER);",
+        )
+        .unwrap();
         db.pragma_update(None, "user_version", 2).unwrap();
     }
     let store = BindingStore::open(&path).unwrap();
@@ -175,7 +181,7 @@ fn schema_v2_migrates_transactionally_to_plugin_bindings_v3() {
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(version, 3);
+    assert_eq!(version, 5);
     assert!(table_exists);
 
     let rollback_directory = tempfile::tempdir_in(&root).unwrap();
@@ -198,4 +204,56 @@ fn schema_v2_migrates_transactionally_to_plugin_bindings_v3() {
         .unwrap();
     assert_eq!(version, 2);
     assert!(!table_exists);
+}
+
+#[test]
+fn prior_m3_and_m2_schemas_upgrade_to_v5() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
+    std::fs::create_dir_all(&root).unwrap();
+
+    for version in [3, 4] {
+        let directory = tempfile::tempdir_in(&root).unwrap();
+        let path = directory.path().join(format!("v{version}.sqlite"));
+        {
+            let db = rusqlite::Connection::open(&path).unwrap();
+            db.execute_batch(
+                "CREATE TABLE nodes(source_kind TEXT,provider_id TEXT,stable_id TEXT,display_name TEXT,kind TEXT,server TEXT,port INTEGER,duplicate_count INTEGER,active INTEGER);",
+            )
+            .unwrap();
+            if version == 3 {
+                db.execute_batch(
+                    "CREATE TABLE plugin_bindings(target_type TEXT,source_kind TEXT,provider_id TEXT,target_id TEXT,binding_id TEXT,plugin_id TEXT,priority INTEGER,enabled INTEGER,config TEXT,orphan INTEGER,disappeared_at TEXT);",
+                )
+                .unwrap();
+            } else {
+                db.execute_batch(
+                    "ALTER TABLE nodes ADD COLUMN stable_id_version INTEGER NOT NULL DEFAULT 1;
+                     ALTER TABLE nodes ADD COLUMN key_generation INTEGER;
+                     ALTER TABLE nodes ADD COLUMN transport TEXT NOT NULL DEFAULT '';
+                     ALTER TABLE nodes ADD COLUMN sni TEXT NOT NULL DEFAULT '';
+                     ALTER TABLE nodes ADD COLUMN identity_context_known INTEGER NOT NULL DEFAULT 0;
+                     CREATE TABLE identity_keys(generation INTEGER PRIMARY KEY,key_id TEXT NOT NULL UNIQUE,active INTEGER NOT NULL);
+                     CREATE TABLE pending_identity_rebinds(source_kind TEXT,provider_id TEXT,old_stable_id TEXT,candidate_ids TEXT,created_at TEXT);
+                     CREATE TABLE app_settings(setting_key TEXT PRIMARY KEY,setting_value TEXT NOT NULL);
+                     INSERT INTO app_settings VALUES('orphan_retention_days','30');",
+                )
+                .unwrap();
+            }
+            db.pragma_update(None, "user_version", version).unwrap();
+        }
+
+        let store = BindingStore::open(&path).unwrap();
+        drop(store);
+        let db = rusqlite::Connection::open(&path).unwrap();
+        let migrated_version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
+        assert_eq!(migrated_version, 5);
+        let plugin_table_exists: bool = db
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='plugin_bindings')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(plugin_table_exists);
+    }
 }

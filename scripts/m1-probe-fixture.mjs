@@ -18,6 +18,12 @@ const counts = { requests: 0, tunnels: 0, subscriptions: 0, providers: 0 }
 let phase = 1
 const subscription = () => `proxies:
   - {name: M1-inline, type: http, server: 127.0.0.1, port: ${phase === 1 ? 18080 : 18081}}
+${
+  phase === 1
+    ? ''
+    : `  - {name: M1-candidate-a, type: http, server: 127.0.0.1, port: 18080, username: candidate-a, password: candidate-a-secret}
+  - {name: M1-candidate-b, type: http, server: 127.0.0.1, port: 18080, username: candidate-b, password: candidate-b-secret}`
+}
 proxy-providers:
   M1-remote:
     type: http

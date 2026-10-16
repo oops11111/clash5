@@ -1,7 +1,7 @@
 use super::{CmdResult, coded_error};
 use clash5_data::{
-    Binding, DataError, Node, NodeQuality, NodeRecord, PluginAuditEvent, PluginBinding, PluginBindingTarget,
-    QualityStatus, Source, parse_inline_nodes,
+    Binding, DataError, Node, NodeQuality, NodeRecord, PendingIdentityRebind, PluginAuditEvent, PluginBinding,
+    PluginBindingTarget, QualityStatus, Source, parse_inline_nodes,
 };
 use futures::{StreamExt as _, stream};
 use serde::Serialize;
@@ -10,15 +10,19 @@ use sha2::Digest as _;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
+    path::PathBuf,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
     clash5::{
-        manual,
+        import, manual,
         plugins::{self, PluginFailure},
     },
-    config::{Config, profiles::PROFILE_WRITE_LOCK},
+    config::{
+        Config, PrfItem,
+        profiles::{PROFILE_WRITE_LOCK, profiles_append_item_with_filedata_safe, profiles_save_file_safe},
+    },
     core::{CoreManager, handle::Handle, proxy_view::ProxyNodeSource, runtime_bundle::remote_providers_of},
     utils::dirs,
 };
@@ -80,6 +84,74 @@ pub struct ManualImportResult {
     imported: usize,
 }
 
+#[derive(Serialize)]
+pub struct VergeImportReport {
+    imported: usize,
+    skipped: Vec<String>,
+    binding_sync_failures: usize,
+    source_manifest_before: String,
+    source_manifest_after: String,
+}
+
+#[tauri::command]
+pub async fn clash5_import_verge_data(source_dir: String) -> CmdResult<VergeImportReport> {
+    let source = PathBuf::from(source_dir.as_str());
+    let target =
+        dirs::app_home_dir().map_err(|_| coded_error("C5-IMPORT-001", "clash5 data directory is unavailable"))?;
+    import::ensure_separate_data_dirs(&source, &target)
+        .map_err(|_| coded_error("C5-IMPORT-001", "source and clash5 data directories must be separate"))?;
+    let manifest_before = import::source_manifest(&source)
+        .map_err(|_| coded_error("C5-IMPORT-001", "could not inspect the selected source directory"))?;
+    let (profiles, skipped) = import::read_supported_profiles(&source)
+        .map_err(|_| coded_error("C5-IMPORT-002", "could not read supported cached profiles"))?;
+    let manifest_after_read = import::source_manifest(&source)
+        .map_err(|_| coded_error("C5-IMPORT-003", "could not verify the source directory"))?;
+    if manifest_before != manifest_after_read {
+        return Err(coded_error(
+            "C5-IMPORT-004",
+            "source directory changed while it was being read",
+        ));
+    }
+
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let mut binding_sync_failures = 0;
+    for profile in &profiles {
+        let item = PrfItem {
+            itype: Some("local".into()),
+            name: Some(profile.name.clone().into()),
+            ..PrfItem::default()
+        };
+        let uid = profiles_append_item_with_filedata_safe(&item, Some(profile.contents.clone().into()))
+            .await
+            .map_err(|_| coded_error("C5-IMPORT-005", "could not save an imported profile"))?;
+        if let Some(uid) = uid
+            && let crate::config::profiles::BindingSync::Failed(_) =
+                crate::config::profiles::reconcile_clash5_snapshot(uid, profile.contents.clone()).await
+        {
+            binding_sync_failures += 1;
+        }
+    }
+    if !profiles.is_empty() {
+        profiles_save_file_safe()
+            .await
+            .map_err(|_| coded_error("C5-IMPORT-005", "could not save imported profile metadata"))?;
+    }
+
+    let manifest_after = import::source_manifest(&source)
+        .map_err(|_| coded_error("C5-IMPORT-006", "could not verify source preservation"))?;
+    if manifest_before != manifest_after {
+        return Err(coded_error("C5-IMPORT-007", "source directory changed during import"));
+    }
+
+    Ok(VergeImportReport {
+        imported: profiles.len(),
+        skipped,
+        binding_sync_failures,
+        source_manifest_before: manifest_before,
+        source_manifest_after: manifest_after,
+    })
+}
+
 async fn restore_manual_file(previous: Option<&str>) -> CmdResult {
     manual::restore(previous)
         .await
@@ -111,14 +183,21 @@ pub async fn clash5_import_manual_proxies(proxies: Vec<Value>) -> CmdResult<Manu
     let mut file = manual::load()
         .await
         .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy file is invalid"))?;
+    let identity_key = crate::config::profiles::clash5_identity_key()
+        .await
+        .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "node identity is in recovery mode"))?;
     let import = file
-        .add_import(proxies)
+        .add_import(proxies, &identity_key)
         .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy import is invalid"))?;
     let imported = import.nodes.len();
     manual::save(&file)
         .await
         .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy file could not be saved"))?;
-    if manual::load().await.and_then(|saved| saved.runtime_proxies()).is_err() {
+    if manual::load()
+        .await
+        .and_then(|saved| saved.runtime_proxies(&identity_key))
+        .is_err()
+    {
         manual::restore(previous.as_deref())
             .await
             .map_err(|_| coded_error("MANUAL_IMPORT_ROLLBACK_FAILED", "could not restore manual proxy file"))?;
@@ -171,6 +250,40 @@ pub async fn clash5_list_plugin_bindings() -> CmdResult<Vec<PluginBindingSummary
         store
             .plugin_bindings(None)
             .map(|bindings| bindings.into_iter().map(PluginBindingSummary::from).collect())
+    })
+    .await
+    .map_err(failure)
+}
+
+#[tauri::command]
+pub async fn clash5_list_pending_identity_rebinds(source: Option<Source>) -> CmdResult<Vec<PendingIdentityRebind>> {
+    crate::config::profiles::with_clash5_binding_store(move |store| store.pending_identity_rebinds(source.as_ref()))
+        .await
+        .map_err(failure)
+}
+
+#[tauri::command]
+pub async fn clash5_resolve_identity_rebind(source: Source, old_id: String, new_id: String) -> CmdResult {
+    crate::config::profiles::with_clash5_binding_store(move |store| {
+        store.resolve_identity_rebind(&source, &old_id, &new_id)
+    })
+    .await
+    .map_err(failure)
+}
+
+#[derive(Serialize)]
+pub struct Clash5IdentityStatus {
+    recovery_mode: bool,
+    pending_rebinds: usize,
+}
+
+#[tauri::command]
+pub async fn clash5_identity_status() -> CmdResult<Clash5IdentityStatus> {
+    crate::config::profiles::with_clash5_binding_store(|store| {
+        Ok(Clash5IdentityStatus {
+            recovery_mode: store.identity_recovery(),
+            pending_rebinds: store.pending_identity_rebinds(None)?.len(),
+        })
     })
     .await
     .map_err(failure)
@@ -307,6 +420,22 @@ pub async fn clash5_save_plugin_binding(mut binding: PluginBinding) -> CmdResult
     )
     .await?;
     Handle::refresh_clash();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clash5_reset_identity() -> CmdResult {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    crate::config::profiles::reset_clash5_identity()
+        .await
+        .map_err(failure)?;
+    let applied = CoreManager::global().update_config_forced().await;
+    if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+        return Err(coded_error(
+            "IDENTITY_RESET_RUNTIME_PENDING",
+            "the new identity was saved but the running configuration could not be refreshed",
+        ));
+    }
     Ok(())
 }
 
@@ -596,8 +725,135 @@ impl From<PluginBinding> for PluginBindingSummary {
 }
 
 #[tauri::command]
+pub async fn clash5_rotate_identity() -> CmdResult {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let old_key = crate::config::profiles::clash5_identity_key().await.map_err(failure)?;
+    let mut snapshots = Vec::<clash5_data::IdentitySourceSnapshot>::new();
+
+    let profiles = Config::profiles().await.latest_arc();
+    if let Some(profile_id) = profiles.current.clone() {
+        let mapping = profiles
+            .current_mapping()
+            .await
+            .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "the current profile could not be read"))?;
+        let yaml = serde_yaml_ng::to_string(&mapping)
+            .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "the current profile could not be parsed"))?;
+        if let Some(nodes) = parse_inline_nodes(&yaml).map_err(|_| {
+            coded_error(
+                "IDENTITY_ROTATION_FAILED",
+                "the current profile contains invalid node data",
+            )
+        })? {
+            snapshots.push(clash5_data::IdentitySourceSnapshot {
+                source: Source::Subscription {
+                    provider_id: profile_id.to_string(),
+                },
+                nodes,
+            });
+        }
+
+        let runtime = Config::runtime().await;
+        let applied = runtime.data_arc();
+        if let Some(config) = applied.config.as_ref() {
+            let app_dir = dirs::app_home_dir().map_err(super::CommandFailure::plain)?;
+            let providers = remote_providers_of(config, &app_dir).map_err(super::CommandFailure::plain)?;
+            for provider in providers
+                .into_iter()
+                .filter(|provider| provider.section == "proxy-providers")
+            {
+                let path = app_dir.join(&provider.provider.destination);
+                let yaml = match tokio::fs::read_to_string(path).await {
+                    Ok(yaml) => yaml,
+                    Err(_) => continue,
+                };
+                let Some(nodes) = parse_inline_nodes(&yaml).map_err(|_| {
+                    coded_error(
+                        "IDENTITY_ROTATION_FAILED",
+                        "a proxy provider contains invalid node data",
+                    )
+                })?
+                else {
+                    continue;
+                };
+                snapshots.push(clash5_data::IdentitySourceSnapshot {
+                    source: Source::Subscription {
+                        provider_id: proxy_provider_source_id(&profile_id, &provider.name),
+                    },
+                    nodes,
+                });
+            }
+        }
+    }
+
+    let mut manual_file = manual::load()
+        .await
+        .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "manual proxies could not be read"))?;
+    let manual_nodes = manual_file
+        .identity_nodes(&old_key)
+        .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "manual proxy identity data is invalid"))?;
+    let has_manual_proxies = !manual_nodes.is_empty();
+    snapshots.push(clash5_data::IdentitySourceSnapshot {
+        source: Source::Manual,
+        nodes: manual_nodes,
+    });
+
+    let (generation, new_key) = crate::config::profiles::stage_clash5_identity_rotation_key()
+        .await
+        .map_err(failure)?;
+    let previous = match tokio::fs::read_to_string(manual::path().map_err(super::CommandFailure::plain)?).await {
+        Ok(yaml) => Some(yaml),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(_) => {
+            return Err(coded_error(
+                "IDENTITY_ROTATION_FAILED",
+                "manual proxy data could not be backed up",
+            ));
+        }
+    };
+    if has_manual_proxies {
+        manual_file
+            .rekey_identity(&old_key, &new_key)
+            .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "manual proxies could not be rekeyed"))?;
+        if manual::save(&manual_file).await.is_err() {
+            manual::restore(previous.as_deref()).await.map_err(|_| {
+                coded_error(
+                    "IDENTITY_ROTATION_ROLLBACK_FAILED",
+                    "manual proxies could not be restored",
+                )
+            })?;
+            return Err(coded_error(
+                "IDENTITY_ROTATION_FAILED",
+                "manual proxies could not be saved",
+            ));
+        }
+        let applied = CoreManager::global().update_config_forced().await;
+        if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+            restore_manual_file(previous.as_deref()).await?;
+            return Err(coded_error(
+                "IDENTITY_ROTATION_FAILED",
+                "the rekeyed manual proxies were rejected",
+            ));
+        }
+    }
+
+    if let Err(error) =
+        crate::config::profiles::commit_clash5_identity_rotation(old_key, generation, new_key, snapshots).await
+    {
+        if has_manual_proxies {
+            restore_manual_file(previous.as_deref()).await?;
+        }
+        return Err(failure(error));
+    }
+    Ok(())
+}
+#[tauri::command]
 pub async fn clash5_list_nodes(include_inactive: Option<bool>) -> CmdResult<Vec<NodeRecord>> {
-    refresh_runtime_proxy_providers().await?;
+    let recovery_mode = crate::config::profiles::with_clash5_binding_store(|store| Ok(store.identity_recovery()))
+        .await
+        .map_err(failure)?;
+    if !recovery_mode {
+        refresh_runtime_proxy_providers().await?;
+    }
     crate::config::profiles::with_clash5_binding_store(move |store| {
         store.node_records(include_inactive.unwrap_or(false))
     })
@@ -824,6 +1080,27 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
 #[tauri::command]
 pub async fn clash5_purge_orphans(source: Option<Source>) -> CmdResult<usize> {
     crate::config::profiles::with_clash5_binding_store(move |store| store.purge_orphans(source.as_ref()))
+        .await
+        .map_err(failure)
+}
+
+#[tauri::command]
+pub async fn clash5_orphan_cleanup_preview() -> CmdResult<clash5_data::OrphanCleanupPreview> {
+    crate::config::profiles::with_clash5_binding_store(|store| store.orphan_cleanup_preview())
+        .await
+        .map_err(failure)
+}
+
+#[tauri::command]
+pub async fn clash5_set_orphan_retention_days(days: u16) -> CmdResult<()> {
+    crate::config::profiles::with_clash5_binding_store(move |store| store.set_orphan_retention_days(days))
+        .await
+        .map_err(failure)
+}
+
+#[tauri::command]
+pub async fn clash5_purge_expired_orphans() -> CmdResult<usize> {
+    crate::config::profiles::with_clash5_binding_store(|store| store.purge_expired_orphans(None))
         .await
         .map_err(failure)
 }

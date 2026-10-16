@@ -5,13 +5,13 @@ mod profile;
 mod store;
 
 pub use chain::{ChainError, CompiledChain, ExitPolicy, NodeRef, ProxyChain, ScopedProxy, compile_chains};
-pub use identity::{DataError, Node, StableId};
+pub use identity::{DataError, IdentityKey, Node, StableId};
 pub use plugin_patch::{
     ConfigProvenance, EffectiveConfig, PluginConflict, PluginPatch, merge_plugin_patches, validate_plugin_patch,
     validate_writable_paths,
 };
 pub use profile::{parse_inline_nodes, parse_proxy_node, replace_subscription_lines};
 pub use store::{
-    Binding, BindingStore, NodeQuality, NodeRecord, PluginAuditEvent, PluginBinding, PluginBindingTarget, ProviderDiff,
-    QualityStatus, Source,
+    Binding, BindingStore, IdentitySourceSnapshot, NodeQuality, NodeRecord, OrphanCleanupPreview,
+    PendingIdentityRebind, PluginAuditEvent, PluginBinding, PluginBindingTarget, ProviderDiff, QualityStatus, Source,
 };

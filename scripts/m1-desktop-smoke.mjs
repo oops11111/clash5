@@ -5,12 +5,12 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
-import AdmZip from 'adm-zip'
 import {
   cleanupWdioSession,
   createTauriCapabilities,
   startWdioSession,
 } from '@wdio/tauri-service'
+import AdmZip from 'adm-zip'
 import { dump, load } from 'js-yaml'
 
 import { startChainFixture } from './m2-mihomo-smoke.mjs'
@@ -20,7 +20,10 @@ if (!binary)
   throw new Error('Usage: node scripts/m1-desktop-smoke.mjs <app-binary>')
 const full = process.argv.includes('--full')
 const persisted = process.argv.includes('--persisted')
-if (full && persisted) throw new Error('Choose either --full or --persisted')
+const recoveryCancel = process.argv.includes('--recovery-cancel')
+if ([full, persisted, recoveryCancel].filter(Boolean).length > 1) {
+  throw new Error('Choose only one desktop smoke mode')
+}
 
 const capabilities = createTauriCapabilities(resolve(binary), {
   driverProvider: 'external',
@@ -37,7 +40,11 @@ let m3StagingPath
 let m3FixtureInstalled = false
 let m3BindingIds = []
 const screenshot = resolve(
-  persisted ? 'target/m1-desktop-persisted.png' : 'target/m1-desktop-smoke.png',
+  persisted
+    ? 'target/m1-desktop-persisted.png'
+    : recoveryCancel
+      ? 'target/m1-recovery-cancel.png'
+      : 'target/m1-desktop-smoke.png',
 )
 const fixtures = []
 let chainFixture
@@ -144,23 +151,162 @@ async function clickButton(labels) {
   if (!clicked) throw new Error(`${labels[0]} button disappeared`)
 }
 
+async function captureClipboardImportFlow() {
+  await browser.execute(() => {
+    const internals = window.__TAURI_INTERNALS__
+    const flow = {
+      installed: false,
+      installError: null,
+      invokeDescriptor: null,
+      clipboardReads: [],
+      importCalls: [],
+      importErrors: [],
+    }
+    const publish = () => {
+      document.documentElement.dataset.clash5SmokeImportFlow =
+        JSON.stringify(flow)
+    }
+    publish()
+    if (!internals) {
+      flow.installError = 'Tauri internals are unavailable'
+      publish()
+      return
+    }
+
+    const invoke = internals.invoke
+    const descriptor = Object.getOwnPropertyDescriptor(internals, 'invoke')
+    flow.invokeDescriptor = descriptor
+      ? {
+          configurable: descriptor.configurable,
+          writable: descriptor.writable ?? null,
+          hasGetter: typeof descriptor.get === 'function',
+          hasSetter: typeof descriptor.set === 'function',
+        }
+      : null
+    const wrappedInvoke = async function (...args) {
+      try {
+        const result = await invoke.apply(this, args)
+        if (args[0] === 'plugin:clipboard-manager|read_text') {
+          flow.clipboardReads.push(
+            typeof result === 'string' ? result.slice(0, 240) : result,
+          )
+        }
+        if (args[0] === 'clash5_import_manual_proxies') {
+          flow.importCalls.push({
+            proxyCount: args[1]?.proxies?.length ?? null,
+            imported: result?.imported ?? null,
+          })
+        }
+        return result
+      } catch (error) {
+        if (args[0] === 'clash5_import_manual_proxies') {
+          let detail = error?.detail
+          if (typeof error === 'string') {
+            try {
+              detail = JSON.parse(error)?.detail ?? error
+            } catch {
+              detail = error
+            }
+          }
+          flow.importErrors.push({
+            code: error?.code,
+            detail: typeof detail === 'string' ? detail.slice(0, 240) : null,
+          })
+        }
+        throw error
+      } finally {
+        publish()
+      }
+    }
+
+    try {
+      try {
+        Object.defineProperty(internals, 'invoke', {
+          configurable: true,
+          writable: true,
+          value: wrappedInvoke,
+        })
+      } catch {
+        internals.invoke = wrappedInvoke
+      }
+      flow.installed = internals.invoke === wrappedInvoke
+      if (!flow.installed)
+        flow.installError = 'Tauri invoke hook was not installed'
+    } catch (error) {
+      flow.installError = String(error).slice(0, 240)
+    }
+    publish()
+  })
+}
+
 async function importLink(link, count, expectedName) {
   await invoke('plugin:clipboard-manager|write_text', { text: link })
-  await clickButton(['Import from clipboard', '从剪贴板导入'])
-  await browser.waitUntil(
-    async () => {
-      const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
-      return (
-        nodes.length === count &&
-        nodes.some((node) => node.display_name === expectedName)
-      )
-    },
-    {
-      timeout: 45_000,
-      interval: 500,
-      timeoutMsg: `Manual import did not yield ${count} nodes`,
-    },
+  const clipboard = await invoke('plugin:clipboard-manager|read_text')
+  if (clipboard !== link) {
+    throw new Error(
+      `Clipboard fixture did not round-trip: ${JSON.stringify(clipboard)}`,
+    )
+  }
+  await captureClipboardImportFlow()
+  const clipboardAfterCapture = await invoke(
+    'plugin:clipboard-manager|read_text',
   )
+  if (clipboardAfterCapture !== link) {
+    throw new Error('Clipboard fixture changed before the UI import click')
+  }
+  await clickButton(['Import from clipboard', '从剪贴板导入'])
+  try {
+    await browser.waitUntil(
+      async () => {
+        const nodes = await invoke('clash5_list_nodes', {
+          includeInactive: true,
+        })
+        return (
+          nodes.length === count &&
+          nodes.some((node) => node.display_name === expectedName)
+        )
+      },
+      {
+        timeout: 45_000,
+        interval: 500,
+        timeoutMsg: `Manual import did not yield ${count} nodes`,
+      },
+    )
+  } catch (error) {
+    const [nodes, alerts, importFlow, importFailure, currentClipboard] =
+      await Promise.all([
+        invoke('clash5_list_nodes', { includeInactive: true }),
+        browser.execute(() =>
+          [...document.querySelectorAll('.MuiAlert-root')].map((alert) =>
+            alert.textContent?.trim(),
+          ),
+        ),
+        browser.execute(() => {
+          const flow = document.documentElement.dataset.clash5SmokeImportFlow
+          return flow ? JSON.parse(flow) : null
+        }),
+        browser.execute(() => {
+          const failure =
+            document.documentElement.dataset.clash5ClipboardImportFailure
+          return failure ? JSON.parse(failure) : null
+        }),
+        invoke('plugin:clipboard-manager|read_text').catch(
+          (readError) => `read failed: ${String(readError)}`,
+        ),
+      ])
+    const details = {
+      error: String(error),
+      nodes,
+      alerts,
+      clipboard: currentClipboard,
+      importFlow,
+      importFailure,
+    }
+    throw new Error(
+      `Manual import acceptance failed: ${JSON.stringify(details)}`,
+      { cause: error },
+    )
+  }
 }
 
 async function verifyImportAndProbe() {
@@ -277,6 +423,28 @@ async function verifySubscriptionRefresh() {
       timeoutMsg: 'Imported subscription did not populate the node inventory',
     },
   )
+
+  const originalNode = (
+    await invoke('clash5_list_nodes', { includeInactive: true })
+  ).find(
+    (node) =>
+      node.source.kind === 'subscription' &&
+      node.source.provider_id === uid &&
+      node.display_name === 'M1-inline' &&
+      node.active,
+  )
+  if (!originalNode) throw new Error('Initial subscription node is missing')
+  await invoke('clash5_bind_node', {
+    binding: {
+      id: 'm1-ambiguous-rebind',
+      plugin_id: 'desktop-smoke',
+      target_id: originalNode.stable_id,
+      source: { kind: 'subscription', provider_id: uid },
+      priority: 10,
+      enabled: true,
+      config: {},
+    },
+  })
 
   const original = load(await invoke('read_profile_file', { index: uid }))
   const group = original['proxy-groups']?.find(
@@ -421,12 +589,12 @@ async function verifySubscriptionRefresh() {
       browser.execute(
         () =>
           document.querySelectorAll('.base-page button[aria-pressed]')
-            .length === 4,
+            .length === 6,
       ),
     {
       timeout: 20_000,
       interval: 500,
-      timeoutMsg: 'Node workspace did not show four active source-scoped rows',
+      timeoutMsg: 'Node workspace did not show six active source-scoped rows',
     },
   )
 }
@@ -897,7 +1065,7 @@ async function verifyNavigation() {
         last && last.top >= viewport.top && last.bottom <= viewport.bottom + 1,
       ),
       logoVisible: Boolean(
-        document.querySelector('.the-logo .MuiSvgIcon-root'),
+        document.querySelector('.the-logo img[alt="clash5"]'),
       ),
     }
   })
@@ -982,8 +1150,398 @@ async function verifyNavigation() {
       timeoutMsg: 'Plugin binding tab did not activate',
     },
   )
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.base-page label')].some((label) =>
+          ['Keep orphan bindings (days)', '孤儿绑定保留天数'].includes(
+            label.textContent?.trim(),
+          ),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Orphan retention controls did not render',
+    },
+  )
+  const retentionSummaryVisible = await browser.execute(() => {
+    const text = document.querySelector('.base-page')?.textContent ?? ''
+    return /orphan bindings|孤儿绑定/.test(text)
+  })
+  if (!retentionSummaryVisible) {
+    throw new Error('Orphan retention summary did not render')
+  }
   await browser.saveScreenshot(resolve('target/nav-plugins-binding.png'))
   await verifyM3PluginUi()
+}
+
+async function verifyIdentityRotationAndAmbiguousRebind() {
+  phase = 'identity rotation cancellation'
+  const beforeCancel = {
+    status: await invoke('clash5_identity_status'),
+    nodes: (await invoke('clash5_list_nodes', { includeInactive: true })).map(
+      (node) => [node.source, node.stable_id, node.active],
+    ),
+    bindings: await invoke('clash5_list_bindings', { source: null }),
+  }
+  const clickButtonIn = async (labels, selector = '.base-page') => {
+    const clicked = await browser.execute(
+      (values, rootSelector) => {
+        const button = [
+          ...document.querySelectorAll(`${rootSelector} button`),
+        ].find((item) => values.includes(item.textContent?.trim()))
+        button?.click()
+        return Boolean(button)
+      },
+      labels,
+      selector,
+    )
+    if (!clicked) throw new Error(`Button is missing: ${labels[0]}`)
+  }
+  const rotateLabels = ['Rotate identity key', '轮换身份密钥', '輪替身分金鑰']
+  const cancelLabels = ['Cancel', '取消']
+  await browser.execute(() => {
+    const plugins = [
+      ...document.querySelectorAll('.the-menu .MuiListItemButton-root'),
+    ].find((item) => ['Plugins', '插件'].includes(item.textContent?.trim()))
+    plugins?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.base-page [role="tab"]')].some((tab) =>
+          ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Plugin binding tab did not render before identity recovery',
+    },
+  )
+  await browser.execute(() => {
+    const binding = [
+      ...document.querySelectorAll('.base-page [role="tab"]'),
+    ].find((tab) =>
+      ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+    )
+    binding?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        (labels) =>
+          [...document.querySelectorAll('.base-page button')].some((button) =>
+            labels.includes(button.textContent?.trim()),
+          ),
+        rotateLabels,
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity controls did not render on the plugin binding tab',
+    },
+  )
+  await clickButtonIn(rotateLabels)
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.MuiDialogTitle-root')].some((title) =>
+          [
+            'Rotate the node identity key?',
+            '轮换节点身份密钥？',
+            '輪替節點身分金鑰？',
+          ].includes(title.textContent?.trim()),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity rotation confirmation did not open',
+    },
+  )
+  await clickButtonIn(cancelLabels, '.MuiDialog-root')
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () => document.querySelectorAll('.MuiDialog-root').length === 0,
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity rotation dialog did not close after cancellation',
+    },
+  )
+  const afterCancel = {
+    status: await invoke('clash5_identity_status'),
+    nodes: (await invoke('clash5_list_nodes', { includeInactive: true })).map(
+      (node) => [node.source, node.stable_id, node.active],
+    ),
+    bindings: await invoke('clash5_list_bindings', { source: null }),
+  }
+  if (JSON.stringify(beforeCancel) !== JSON.stringify(afterCancel)) {
+    throw new Error('Cancelling identity rotation changed persisted data')
+  }
+
+  phase = 'ambiguous manual rebind'
+  const pending = await invoke('clash5_list_pending_identity_rebinds', {
+    source: null,
+  })
+  const item = pending.find((candidate) => candidate.candidate_ids.length === 2)
+  if (!item)
+    throw new Error('Subscription refresh did not create two rebind candidates')
+  const oldBinding = (
+    await invoke('clash5_list_bindings', { source: null })
+  ).find((binding) => binding.id === 'm1-ambiguous-rebind')
+  if (!oldBinding?.orphan || oldBinding.target_id !== item.old_stable_id) {
+    throw new Error('Rotation did not preserve the old binding as an orphan')
+  }
+  const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
+  const candidateNames = item.candidate_ids.map(
+    (id) => nodes.find((node) => node.stable_id === id)?.display_name,
+  )
+  if (
+    candidateNames.length !== 2 ||
+    candidateNames.some((name) => !name?.startsWith('M1-candidate-'))
+  ) {
+    throw new Error(
+      `Unexpected rebind candidates: ${JSON.stringify(candidateNames)}`,
+    )
+  }
+
+  const oldId = item.old_stable_id
+  const opened = await browser.execute((id) => {
+    const card = [
+      ...document.querySelectorAll('.base-page .MuiPaper-root'),
+    ].find(
+      (paper) =>
+        paper.textContent?.includes(id) &&
+        paper.querySelector('[role="combobox"]'),
+    )
+    const select = card?.querySelector('[role="combobox"]')
+    // MUI Select opens on mousedown; HTMLElement.click() dispatches only click.
+    select?.dispatchEvent(
+      new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+        button: 0,
+      }),
+    )
+    return Boolean(select)
+  }, oldId)
+  if (!opened) throw new Error('Ambiguous rebind candidate selector is missing')
+  const rebindInitiallyDisabled = await browser.execute((id) => {
+    const card = [
+      ...document.querySelectorAll('.base-page .MuiPaper-root'),
+    ].find(
+      (paper) =>
+        paper.textContent?.includes(id) &&
+        paper.querySelector('[role="combobox"]'),
+    )
+    return [...(card?.querySelectorAll('button') ?? [])].some(
+      (button) =>
+        button.disabled &&
+        ['Rebind', '重新绑定', '重新綁定'].includes(button.textContent?.trim()),
+    )
+  }, oldId)
+  if (!rebindInitiallyDisabled) {
+    throw new Error('Ambiguous rebind was enabled without an explicit choice')
+  }
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        (id) =>
+          [...document.querySelectorAll('[role="option"]')].some(
+            (option) => option.textContent?.trim() === id,
+          ),
+        item.candidate_ids[0],
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Ambiguous candidate options did not open',
+    },
+  )
+  await browser.execute((id) => {
+    ;[...document.querySelectorAll('[role="option"]')]
+      .find((option) => option.textContent?.trim() === id)
+      ?.click()
+  }, item.candidate_ids[0])
+  const rebindEnabled = await browser.execute((id) => {
+    const card = [
+      ...document.querySelectorAll('.base-page .MuiPaper-root'),
+    ].find(
+      (paper) =>
+        paper.textContent?.includes(id) &&
+        paper.querySelector('[role="combobox"]'),
+    )
+    return [...(card?.querySelectorAll('button') ?? [])].some(
+      (button) =>
+        !button.disabled &&
+        ['Rebind', '重新绑定', '重新綁定'].includes(button.textContent?.trim()),
+    )
+  }, oldId)
+  if (!rebindEnabled) throw new Error('Rebind stayed disabled after selection')
+  await browser.execute((id) => {
+    const card = [
+      ...document.querySelectorAll('.base-page .MuiPaper-root'),
+    ].find(
+      (paper) =>
+        paper.textContent?.includes(id) &&
+        paper.querySelector('[role="combobox"]'),
+    )
+    ;[...(card?.querySelectorAll('button') ?? [])]
+      .find((button) =>
+        ['Rebind', '重新绑定', '重新綁定'].includes(button.textContent?.trim()),
+      )
+      ?.click()
+  }, oldId)
+  await browser.waitUntil(
+    async () => (await invoke('clash5_identity_status')).pending_rebinds === 0,
+    {
+      timeout: 30_000,
+      interval: 250,
+      timeoutMsg: 'Explicit rebind choice was not saved',
+    },
+  )
+  const selectedBinding = (
+    await invoke('clash5_list_bindings', { source: null })
+  ).find((binding) => binding.id === 'm1-ambiguous-rebind')
+  if (
+    selectedBinding?.target_id !== item.candidate_ids[0] ||
+    selectedBinding.orphan
+  ) {
+    throw new Error(
+      `Explicit rebind was not applied: ${JSON.stringify(selectedBinding)}`,
+    )
+  }
+  const selectedNode = nodes.find(
+    (node) => node.stable_id === item.candidate_ids[0],
+  )
+  if (!selectedNode) throw new Error('Selected rebind target is missing')
+
+  phase = 'identity rotation'
+  await clickButtonIn(rotateLabels)
+  await clickButtonIn(rotateLabels, '.MuiDialog-root')
+  let rotatedTarget
+  await browser.waitUntil(
+    async () => {
+      const currentNodes = await invoke('clash5_list_nodes', {
+        includeInactive: true,
+      })
+      rotatedTarget = currentNodes.find(
+        (node) =>
+          node.source.kind === selectedNode.source.kind &&
+          node.source.provider_id === selectedNode.source.provider_id &&
+          node.display_name === selectedNode.display_name &&
+          node.active,
+      )
+      return Boolean(
+        rotatedTarget && rotatedTarget.stable_id !== selectedNode.stable_id,
+      )
+    },
+    {
+      timeout: 60_000,
+      interval: 500,
+      timeoutMsg: 'Identity rotation did not finish',
+    },
+  )
+  const rotatedNodes = await invoke('clash5_list_nodes', {
+    includeInactive: true,
+  })
+  rotatedTarget = rotatedNodes.find(
+    (node) =>
+      node.source.kind === selectedNode.source.kind &&
+      node.source.provider_id === selectedNode.source.provider_id &&
+      node.display_name === selectedNode.display_name &&
+      node.active,
+  )
+  const rotatedBinding = (
+    await invoke('clash5_list_bindings', { source: null })
+  ).find((binding) => binding.id === 'm1-ambiguous-rebind')
+  if (
+    !rotatedTarget ||
+    rotatedTarget.stable_id === selectedNode.stable_id ||
+    rotatedBinding?.target_id !== rotatedTarget.stable_id ||
+    rotatedBinding.orphan
+  ) {
+    throw new Error(
+      `Identity rotation did not preserve the explicit binding: ${JSON.stringify({ rotatedTarget, rotatedBinding })}`,
+    )
+  }
+}
+
+async function verifyRecoveryResetCancellation() {
+  phase = 'identity recovery reset cancellation'
+  const before = {
+    status: await invoke('clash5_identity_status'),
+    nodes: await invoke('clash5_list_nodes', { includeInactive: true }),
+    bindings: await invoke('clash5_list_bindings', { source: null }),
+  }
+  if (!before.status.recovery_mode) {
+    throw new Error('Desktop smoke did not start in identity recovery mode')
+  }
+  const clicked = await browser.execute(() => {
+    const button = [...document.querySelectorAll('.base-page button')].find(
+      (item) =>
+        ['Reset identity key', '重置身份密钥', '重設身分金鑰'].includes(
+          item.textContent?.trim(),
+        ),
+    )
+    button?.click()
+    return Boolean(button)
+  })
+  if (!clicked) throw new Error('Identity recovery reset action is missing')
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.MuiDialogTitle-root')].some((title) =>
+          [
+            'Reset node identity key?',
+            '重置节点身份密钥？',
+            '重設節點身分金鑰？',
+          ].includes(title.textContent?.trim()),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity reset confirmation did not open',
+    },
+  )
+  const cancelled = await browser.execute(() => {
+    const button = [
+      ...document.querySelectorAll('.MuiDialog-root button'),
+    ].find((item) => ['Cancel', '取消'].includes(item.textContent?.trim()))
+    button?.click()
+    return Boolean(button)
+  })
+  if (!cancelled)
+    throw new Error('Identity reset cancellation action is missing')
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () => document.querySelectorAll('.MuiDialog-root').length === 0,
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity reset dialog did not close after cancellation',
+    },
+  )
+  const after = {
+    status: await invoke('clash5_identity_status'),
+    nodes: await invoke('clash5_list_nodes', { includeInactive: true }),
+    bindings: await invoke('clash5_list_bindings', { source: null }),
+  }
+  if (
+    !after.status.recovery_mode ||
+    JSON.stringify(before) !== JSON.stringify(after)
+  ) {
+    throw new Error('Cancelling identity reset changed persisted data')
+  }
 }
 
 async function verifyM2Chains() {
@@ -1302,7 +1860,7 @@ try {
       cause: error,
     })
   }
-  if (!persisted && inventory.length !== 0) {
+  if (!persisted && !recoveryCancel && inventory.length !== 0) {
     throw new Error(`Fresh desktop session contains ${inventory.length} nodes`)
   }
   const persistedManual = inventory.filter(
@@ -1351,7 +1909,7 @@ try {
   if (
     !page.title ||
     page.title.includes('nodePool.') ||
-    (!persisted && page.rows !== 0)
+    (!persisted && !recoveryCancel && page.rows !== 0)
   ) {
     throw new Error(`Unexpected node workspace: ${JSON.stringify(page)}`)
   }
@@ -1362,6 +1920,9 @@ try {
     phase = 'subscription refresh and provider probe'
     await verifySubscriptionRefresh()
     await verifyWorkspaceControls()
+  } else if (recoveryCancel) {
+    await verifyNavigation()
+    await verifyRecoveryResetCancellation()
   } else if (persisted) {
     phase = 'manual node persistence'
     originalClipboard = await invoke(
@@ -1375,11 +1936,10 @@ try {
     await browser.waitUntil(
       () =>
         browser.execute(() =>
-          [...document.querySelectorAll('.base-page .MuiAlert-root')].some(
-            (alert) =>
-              /Imported 1 standalone proxy link|已导入 1 个独立节点链接/.test(
-                alert.textContent ?? '',
-              ),
+          [...document.querySelectorAll('.MuiAlert-root')].some((alert) =>
+            /Imported 1 standalone proxy link|已导入 1 个独立节点链接/.test(
+              alert.textContent ?? '',
+            ),
           ),
         ),
       {
@@ -1416,6 +1976,7 @@ try {
     await verifyNavigation()
     phase = 'M2 chain editor and exit-IP policy'
     await verifyM2Chains()
+    await verifyIdentityRotationAndAmbiguousRebind()
   } else if (persisted) {
     const workspace = await invoke('clash5_chain_workspace')
     if (
@@ -1453,9 +2014,11 @@ try {
   process.stdout.write(
     persisted
       ? 'Manual nodes and their stable identities survived a desktop restart\n'
-      : full
-        ? 'Native Tauri import, probe cache, subscription refresh, and source isolation passed\n'
-        : 'Native Tauri bridge and empty node workspace passed\n',
+      : recoveryCancel
+        ? 'Identity reset cancellation preserved recovery state and data\n'
+        : full
+          ? 'Native Tauri import, probe cache, subscription refresh, and source isolation passed\n'
+          : 'Native Tauri bridge and empty node workspace passed\n',
   )
 } catch (error) {
   testError = error

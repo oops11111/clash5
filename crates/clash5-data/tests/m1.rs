@@ -1,4 +1,6 @@
-use clash5_data::{BindingStore, DataError, Node, NodeQuality, QualityStatus, Source, replace_subscription_lines};
+use clash5_data::{
+    Binding, BindingStore, DataError, Node, NodeQuality, QualityStatus, Source, replace_subscription_lines,
+};
 use std::collections::BTreeMap;
 
 fn node(name: &str) -> Node {
@@ -8,6 +10,8 @@ fn node(name: &str) -> Node {
         port: 443,
         credentials: BTreeMap::from([("uuid".into(), "a".repeat(32))]),
         display_name: name.into(),
+        transport: String::new(),
+        sni: String::new(),
     }
 }
 
@@ -121,6 +125,131 @@ fn v1_database_migrates_without_discarding_nodes() {
     assert_eq!(record.stable_id, "v1:old");
     assert_eq!(record.display_name, "Old");
     assert_eq!(record.duplicate_count, 1);
+    let migrated = rusqlite::Connection::open(&path).unwrap();
+    let version: i64 = migrated
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, 5);
+    let columns: Vec<String> = migrated
+        .prepare("PRAGMA table_info(nodes)")
+        .unwrap()
+        .query_map([], |row| row.get(1))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert!(columns.iter().any(|column| column == "stable_id_version"));
+    assert!(columns.iter().any(|column| column == "key_generation"));
+    assert!(columns.iter().any(|column| column == "transport"));
+    assert!(columns.iter().any(|column| column == "sni"));
+    let retention: String = migrated
+        .query_row(
+            "SELECT setting_value FROM app_settings WHERE setting_key='orphan_retention_days'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(retention, "30");
+    let journal_mode: String = migrated
+        .pragma_query_value(None, "journal_mode", |row| row.get(0))
+        .unwrap();
+    assert_eq!(journal_mode.to_ascii_lowercase(), "wal");
+}
+
+#[test]
+fn orphan_retention_is_configurable_and_expired_cleanup_preserves_recent_bindings() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
+    std::fs::create_dir_all(&root).unwrap();
+    let dir = tempfile::tempdir_in(root).unwrap();
+    let path = dir.path().join("orphan-retention.sqlite");
+    let source = Source::Subscription {
+        provider_id: "retention-provider".into(),
+    };
+    let mut store = BindingStore::open(&path).unwrap();
+    let id = node("retention-node").stable_id().unwrap();
+    store
+        .refresh_provider("retention-provider", &[node("retention-node")])
+        .unwrap();
+    for binding_id in ["expired", "recent"] {
+        store
+            .upsert_binding(&Binding {
+                id: binding_id.into(),
+                plugin_id: "fixture-plugin".into(),
+                target_id: id.clone(),
+                source: source.clone(),
+                priority: 0,
+                enabled: true,
+                config: serde_json::json!({}),
+                orphan: false,
+                disappeared_at: None,
+            })
+            .unwrap();
+    }
+    store.refresh_provider("retention-provider", &[]).unwrap();
+    assert_eq!(store.orphan_retention_days().unwrap(), 30);
+    assert!(store.set_orphan_retention_days(0).is_err());
+    assert!(store.set_orphan_retention_days(366).is_err());
+    drop(store);
+
+    let db = rusqlite::Connection::open(&path).unwrap();
+    db.execute(
+        "UPDATE bindings SET disappeared_at=CASE id WHEN 'expired' THEN strftime('%Y-%m-%dT%H:%M:%fZ','now','-31 days') ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day') END",
+        [],
+    )
+    .unwrap();
+    drop(db);
+
+    let mut store = BindingStore::open(&path).unwrap();
+    let preview = store.orphan_cleanup_preview().unwrap();
+    assert_eq!(preview.retention_days, 30);
+    assert_eq!(preview.total_orphans, 2);
+    assert_eq!(preview.eligible_orphans, 1);
+    store.set_orphan_retention_days(7).unwrap();
+    let preview = store.orphan_cleanup_preview().unwrap();
+    assert_eq!(preview.retention_days, 7);
+    assert_eq!(preview.eligible_orphans, 1);
+    assert_eq!(store.purge_expired_orphans(Some(&source)).unwrap(), 1);
+    let remaining = store.bindings(Some(&source)).unwrap();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].id, "recent");
+    assert!(remaining[0].orphan);
+}
+
+#[test]
+fn v2_plugin_migration_commits_before_identity_migration_rolls_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("rollback.sqlite");
+    let db = rusqlite::Connection::open(&path).unwrap();
+    db.execute_batch(
+        "CREATE TABLE nodes(source_kind TEXT, provider_id TEXT, stable_id TEXT, display_name TEXT, kind TEXT, server TEXT, port INTEGER, duplicate_count INTEGER, active INTEGER);
+         CREATE TABLE identity_keys(generation INTEGER);
+         INSERT INTO nodes VALUES('manual','','v1:old','Old','ss','edge.example',443,1,1);
+         PRAGMA user_version=2;",
+    ).unwrap();
+    drop(db);
+    assert!(BindingStore::open(&path).is_err());
+    let db = rusqlite::Connection::open(&path).unwrap();
+    let version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
+    assert_eq!(version, 3);
+    let columns: Vec<String> = db
+        .prepare("PRAGMA table_info(nodes)")
+        .unwrap()
+        .query_map([], |row| row.get(1))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert!(!columns.iter().any(|column| column == "stable_id_version"));
+    let plugin_table_exists: bool = db
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='plugin_bindings')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(plugin_table_exists);
+    let id: String = db
+        .query_row("SELECT stable_id FROM nodes", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(id, "v1:old");
 }
 
 #[test]

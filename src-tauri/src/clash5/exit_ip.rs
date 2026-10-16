@@ -46,8 +46,8 @@ pub(crate) fn parse_ip(bytes: &[u8]) -> Result<IpAddr> {
         .ok_or_else(|| anyhow!("C5-EXIT-003"))
 }
 
-async fn request(url: Url, port: u16) -> Result<ExitObservation> {
-    let proxy = Proxy::all(format!("http://127.0.0.1:{port}"))?;
+async fn request(url: Url, port: u16, token: &str) -> Result<ExitObservation> {
+    let proxy = Proxy::all(format!("http://127.0.0.1:{port}"))?.basic_auth("clash5", token);
     let client = Client::builder()
         .no_proxy()
         .proxy(proxy)
@@ -71,6 +71,26 @@ async fn request(url: Url, port: u16) -> Result<ExitObservation> {
     })
 }
 
+fn session_token() -> Result<String> {
+    let mut secret = [0_u8; 32];
+    getrandom::fill(&mut secret)?;
+    Ok(secret.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn probe_listener(name: &str, port: u16, proxy_name: &str, password: &str) -> Value {
+    let mut user = Mapping::new();
+    user.insert("username".into(), "clash5".into());
+    user.insert("password".into(), password.into());
+    let mut listener = Mapping::new();
+    listener.insert("name".into(), name.into());
+    listener.insert("type".into(), "http".into());
+    listener.insert("listen".into(), "127.0.0.1".into());
+    listener.insert("port".into(), port.into());
+    listener.insert("proxy".into(), proxy_name.into());
+    listener.insert("users".into(), Value::Sequence(vec![Value::Mapping(user)]));
+    Value::Mapping(listener)
+}
+
 /// Probe through a temporary loopback inbound pinned to one chain, then remove only that inbound.
 pub(crate) async fn detect(proxy_name: &str, url: Url) -> Result<ExitObservation> {
     let reservation = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
@@ -90,12 +110,8 @@ pub(crate) async fn detect(proxy_name: &str, url: Url) -> Result<ExitObservation
     {
         return Err(anyhow!("C5-EXIT-002"));
     }
-    let mut listener = Mapping::new();
-    listener.insert("name".into(), name.clone().into());
-    listener.insert("type".into(), "http".into());
-    listener.insert("listen".into(), "127.0.0.1".into());
-    listener.insert("port".into(), port.into());
-    listener.insert("proxy".into(), proxy_name.into());
+    let token = session_token()?;
+    let listener = probe_listener(&name, port, proxy_name, &token);
     drop(reservation);
     let applied = CoreManager::global()
         .update_runtime_config(move |runtime| {
@@ -104,13 +120,13 @@ pub(crate) async fn detect(proxy_name: &str, url: Url) -> Result<ExitObservation
                     .entry(Value::from("listeners"))
                     .or_insert_with(|| Value::Sequence(vec![]));
                 if let Some(listeners) = listeners.as_sequence_mut() {
-                    listeners.push(Value::Mapping(listener));
+                    listeners.push(listener);
                 }
             }
         })
         .await;
     let observed = if applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
-        request(url, port).await.map_err(|_| anyhow!("C5-EXIT-003"))
+        request(url, port, &token).await.map_err(|_| anyhow!("C5-EXIT-003"))
     } else {
         Err(anyhow!("C5-EXIT-002"))
     };
@@ -133,6 +149,14 @@ pub(crate) async fn detect(proxy_name: &str, url: Url) -> Result<ExitObservation
 mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+    #[test]
+    fn probe_listener_requires_its_ephemeral_credentials() {
+        let value = probe_listener("probe", 12345, "chain", "ephemeral-secret");
+        assert_eq!(value["listen"], "127.0.0.1");
+        assert_eq!(value["users"][0]["username"], "clash5");
+        assert_eq!(value["users"][0]["password"], "ephemeral-secret");
+    }
 
     #[test]
     fn service_accepts_https_and_loopback_fixtures_without_url_credentials() {
@@ -170,10 +194,11 @@ mod tests {
                 .await?;
             Ok::<_, anyhow::Error>(String::from_utf8_lossy(&bytes[..count]).into_owned())
         });
-        let result = request(service_url("https://exit.example.invalid/ip")?, port).await;
+        let result = request(service_url("https://exit.example.invalid/ip")?, port, "test-secret").await;
         let headers = server.await??;
         assert!(headers.starts_with("CONNECT exit.example.invalid:443 HTTP/1.1"));
-        assert!(!headers.to_lowercase().contains("authorization:"));
+        assert!(headers.to_lowercase().contains("proxy-authorization: basic "));
+        assert!(!headers.contains("test-secret"));
         assert!(result.is_err());
         Ok(())
     }
@@ -191,7 +216,7 @@ mod tests {
                 .await?;
             Ok::<_, anyhow::Error>(String::from_utf8_lossy(&bytes[..count]).into_owned())
         });
-        let result = request(service_url("http://127.0.0.1:1/ip")?, port).await?;
+        let result = request(service_url("http://127.0.0.1:1/ip")?, port, "test-secret").await?;
         assert_eq!(result.ip, IpAddr::from([203, 0, 113, 27]));
         assert!(server.await??.starts_with("GET http://127.0.0.1:1/ip HTTP/1.1"));
         Ok(())

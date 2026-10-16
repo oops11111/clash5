@@ -6,6 +6,13 @@
       "reactivate": "重新啟用訂閱",
       "import": "匯入"
     },
+    "vergeImport": {
+      "action": "匯入 Clash Verge Rev 資料",
+      "chooseSource": "選擇 Clash Verge Rev 資料目錄",
+      "backupReminder": "匯入前請備份此來源目錄。clash5 只會讀取檔案，不會修改來源資料。要繼續嗎？",
+      "success": "已匯入 {{imported}} 個設定；略過 {{skipped}} 個不支援的項目；節點索引同步失敗 {{syncFailures}} 項。來源目錄 SHA-256 清單：{{manifest}}",
+      "failure": "匯入失敗；clash5 無法驗證或確保所選來源目錄未被更改。"
+    },
     "batch": {
       "actions": {
         "delete": "刪除選取訂閱",

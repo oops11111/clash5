@@ -1,9 +1,9 @@
 import { DragDropProvider, KeyboardSensor, PointerSensor } from '@dnd-kit/react'
-import { Box, List, Menu, MenuItem, SvgIcon } from '@mui/material'
+import { Box, List, Menu, MenuItem } from '@mui/material'
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import BrandIcon from '@/assets/image/clash5-icon.svg?react'
+import brandIcon from '@/assets/image/clash5-icon.png'
 import { useVerge } from '@/hooks/use-verge'
 import { useNavMenuOrder } from '@/pages/_layout/hooks'
 import { navItems } from '@/pages/_navigation'
@@ -131,8 +131,9 @@ export const LayoutSidebar = (props: LayoutSidebarProps) => {
             justifyContent: 'space-between',
           }}
         >
-          <SvgIcon
-            component={BrandIcon}
+          <img
+            src={brandIcon}
+            alt="clash5"
             style={{
               height: '36px',
               width: '36px',
@@ -140,7 +141,6 @@ export const LayoutSidebar = (props: LayoutSidebarProps) => {
               marginRight: '5px',
               marginLeft: '-3px',
             }}
-            inheritViewBox
           />
           <span
             style={{
