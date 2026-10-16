@@ -2032,6 +2032,11 @@ async function verifyM4SingboxRoute() {
   }
   await invoke('clash5_save_chain', { chain })
   await invoke('patch_verge_config', { payload: { singbox_persistent: true } })
+  const persistentConfig = await invoke('get_verge_config')
+  if (persistentConfig.singbox_persistent !== true)
+    throw new Error(
+      `M4 keep-running preference did not persist: ${JSON.stringify(persistentConfig.singbox_persistent)}`,
+    )
   const activation = await invoke('clash5_activate_chain', {
     id: chain.id,
     policyGroup: 'M2-selected',
@@ -2066,8 +2071,15 @@ async function verifyM4SingboxRoute() {
   phase = 'M4 persistent sidecar behavior'
   await sleep(135_000)
   status = await invoke('clash5_singbox_route_status', { landingName })
-  if (!status.active || status.mihomo_proxy_type !== 'Socks5')
-    throw new Error('Persistent M4 route exited while configured to stay alive')
+  const persistentConfigAfterIdle = await invoke('get_verge_config')
+  if (
+    persistentConfigAfterIdle.singbox_persistent !== true ||
+    !status.active ||
+    status.mihomo_proxy_type !== 'Socks5'
+  )
+    throw new Error(
+      `Persistent M4 route changed unexpectedly: ${JSON.stringify({ persistent: persistentConfigAfterIdle.singbox_persistent, ...status })}`,
+    )
 
   phase = 'M4 idle sidecar shutdown and Mihomo rollback'
   await invoke('patch_verge_config', { payload: { singbox_persistent: false } })
