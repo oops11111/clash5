@@ -1102,8 +1102,43 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   if (!selectedNode) throw new Error('Selected rebind target is missing')
 
   phase = 'identity rotation'
+  await browser.execute(() => {
+    const internals = window.__TAURI_INTERNALS__
+    const invoke = internals.invoke.bind(internals)
+    window.__clash5RotationResult = null
+    internals.invoke = async (...args) => {
+      if (args[0] !== 'clash5_rotate_identity') return invoke(...args)
+      try {
+        const value = await invoke(...args)
+        window.__clash5RotationResult = { ok: true }
+        return value
+      } catch (error) {
+        window.__clash5RotationResult = {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+        }
+        throw error
+      }
+    }
+  })
   await clickButtonIn(rotateLabels)
   await clickButtonIn(rotateLabels, '.MuiDialog-root')
+  await browser.waitUntil(
+    () => browser.execute(() => window.__clash5RotationResult !== null),
+    {
+      timeout: 60_000,
+      interval: 250,
+      timeoutMsg: 'Identity rotation command did not finish',
+    },
+  )
+  const rotationResult = await browser.execute(
+    () => window.__clash5RotationResult,
+  )
+  if (!rotationResult?.ok) {
+    throw new Error(
+      `Identity rotation command failed: ${rotationResult?.message ?? 'unknown error'}`,
+    )
+  }
   let rotatedTarget
   await browser.waitUntil(
     async () => {
