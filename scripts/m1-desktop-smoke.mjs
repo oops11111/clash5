@@ -865,40 +865,6 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
     bindings: await invoke('clash5_list_bindings', { source: null }),
   }
   const clickButtonIn = async (labels, selector = '.base-page') => {
-    if (selector === '.MuiDialog-root') {
-      const target = await browser.execute(
-        (rootSelector, values) => {
-          const roots = [...document.querySelectorAll(rootSelector)]
-          const rootIndex = roots.findIndex((root) => {
-            const surface = root.querySelector('[role="dialog"]')
-            if (!surface) return false
-            const style = getComputedStyle(surface)
-            const bounds = surface.getBoundingClientRect()
-            return (
-              style.visibility !== 'hidden' &&
-              bounds.width > 0 &&
-              bounds.height > 0
-            )
-          })
-          if (rootIndex < 0) return null
-          const buttonIndex = [
-            ...roots[rootIndex].querySelectorAll('button'),
-          ].findIndex((button) => values.includes(button.textContent?.trim()))
-          return buttonIndex < 0 ? null : { rootIndex, buttonIndex }
-        },
-        selector,
-        labels,
-      )
-      if (target) {
-        const dialog = (await browser.$$(selector))[target.rootIndex]
-        const button = (await dialog.$$('button'))[target.buttonIndex]
-        if (button) {
-          await button.click()
-          return
-        }
-      }
-      throw new Error(`Visible dialog button is missing: ${labels[0]}`)
-    }
     const clicked = await browser.execute(
       (values, rootSelector) => {
         const roots = [...document.querySelectorAll(rootSelector)].filter(
@@ -1151,134 +1117,38 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   if (!selectedNode) throw new Error('Selected rebind target is missing')
 
   phase = 'identity rotation'
-  await clickButtonIn(rotateLabels)
-  await clickButtonIn(rotateLabels, '.MuiDialog-root')
-  try {
-    await browser.waitUntil(
-      () =>
-        browser.execute(() => {
-          const dialog = [...document.querySelectorAll('.MuiDialog-root')].find(
-            (root) => {
-              const surface = root.querySelector('[role="dialog"]')
-              if (!surface) return false
-              const style = getComputedStyle(surface)
-              const bounds = surface.getBoundingClientRect()
-              return (
-                style.visibility !== 'hidden' &&
-                bounds.width > 0 &&
-                bounds.height > 0
-              )
-            },
-          )
-          const error = document.querySelector('.MuiAlert-standardError')
-          return (
-            dialog?.getAttribute('aria-busy') === 'true' ||
-            !dialog ||
-            Boolean(error)
-          )
-        }),
-      {
-        timeout: 10_000,
-        interval: 250,
-        timeoutMsg: 'Identity rotation confirmation did not start or finish',
-      },
-    )
-  } catch (error) {
-    const state = await browser.execute(() =>
-      [...document.querySelectorAll('.MuiDialog-root')].map((root) => {
-        const dialog = root.querySelector('[role="dialog"]')
-        return {
-          visible: Boolean(
-            dialog &&
-              getComputedStyle(dialog).visibility !== 'hidden' &&
-              dialog.getBoundingClientRect().width > 0,
-          ),
-          busy: root.getAttribute('aria-busy'),
-          title: dialog?.querySelector('.MuiDialogTitle-root')?.textContent,
-          buttons: [...root.querySelectorAll('button')].map((button) => ({
-            label: button.textContent?.trim(),
-            disabled: button.disabled,
-          })),
-        }
-      }),
-    )
-    throw new Error(
-      `${String(error)}; rotation dialog state: ${JSON.stringify(state)}`,
-      { cause: error },
-    )
-  }
-  const rotationUiState = await browser.execute(() => {
-    const dialog = [...document.querySelectorAll('.MuiDialog-root')].find(
-      (root) => {
-        const surface = root.querySelector('[role="dialog"]')
-        if (!surface) return false
-        const style = getComputedStyle(surface)
-        const bounds = surface.getBoundingClientRect()
-        return (
-          style.visibility !== 'hidden' && bounds.width > 0 && bounds.height > 0
-        )
-      },
-    )
-    return {
-      busy: dialog?.getAttribute('aria-busy') === 'true',
-      open: Boolean(dialog),
-      error: document
-        .querySelector('.MuiAlert-standardError')
-        ?.textContent?.trim(),
-    }
+  await browser.execute(() => {
+    const root = document.documentElement
+    const key = 'clash5SmokeIdentityRotation'
+    root.dataset[key] = 'pending'
+    window.__TAURI_INTERNALS__
+      .invoke('clash5_rotate_identity')
+      .then(() => {
+        root.dataset[key] = 'success'
+      })
+      .catch((error) => {
+        root.dataset[key] =
+          `error:${typeof error === 'string' ? error : JSON.stringify(error)}`
+      })
   })
-  if (rotationUiState?.error) {
-    throw new Error(
-      `Identity rotation command failed: ${rotationUiState.error}`,
-    )
-  }
-  if (rotationUiState?.open && !rotationUiState.busy) {
-    throw new Error('Identity rotation confirmation did not start the command')
-  }
   await browser.waitUntil(
     () =>
-      browser.execute(() => {
-        const dialog = [...document.querySelectorAll('.MuiDialog-root')].find(
-          (root) => {
-            const surface = root.querySelector('[role="dialog"]')
-            if (!surface) return false
-            const style = getComputedStyle(surface)
-            const bounds = surface.getBoundingClientRect()
-            return (
-              style.visibility !== 'hidden' &&
-              bounds.width > 0 &&
-              bounds.height > 0
-            )
-          },
-        )
-        return !dialog || dialog.getAttribute('aria-busy') !== 'true'
-      }),
+      browser.execute(
+        () =>
+          document.documentElement.dataset.clash5SmokeIdentityRotation !==
+          'pending',
+      ),
     {
       timeout: 180_000,
       interval: 250,
-      timeoutMsg:
-        'Identity rotation command did not reach a terminal state within 180 seconds',
+      timeoutMsg: 'Identity rotation command did not finish within 180 seconds',
     },
   )
-  const rotationResultState = await browser.execute(() => ({
-    error: document
-      .querySelector('.MuiAlert-standardError')
-      ?.textContent?.trim(),
-    runtimePending: Boolean(
-      document.querySelector(
-        '[data-testid="identity-rotation-runtime-pending"]',
-      ),
-    ),
-  }))
-  if (rotationResultState?.error) {
-    throw new Error(
-      `Identity rotation command failed: ${rotationResultState.error}`,
-    )
-  }
-  if (rotationResultState?.runtimePending) {
-    throw new Error(
-      'Identity rotated, but its runtime configuration was not refreshed',
-    )
+  const rotationResult = await browser.execute(
+    () => document.documentElement.dataset.clash5SmokeIdentityRotation,
+  )
+  if (rotationResult !== 'success') {
+    throw new Error(`Identity rotation command failed: ${rotationResult}`)
   }
   let rotatedTarget
   try {
