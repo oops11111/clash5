@@ -33,7 +33,10 @@ tauri-build = { version = "2.7.1", features = [] }
 
 [dependencies]
 clash5-data = { path = "../crates/clash5-data" }
-keyring = "=3.6.3"
+keyring = { version = "=3.6.3", features = [
+  "apple-native",
+  "windows-native",
+] }
 clash-verge-draft = { workspace = true }
 clash-verge-media-unlock = { workspace = true }
 clash-verge-logging = { workspace = true }
