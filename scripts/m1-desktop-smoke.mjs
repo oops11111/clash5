@@ -758,7 +758,7 @@ async function verifyNavigation() {
         last && last.top >= viewport.top && last.bottom <= viewport.bottom + 1,
       ),
       logoVisible: Boolean(
-        document.querySelector('.the-logo .MuiSvgIcon-root'),
+        document.querySelector('.the-logo img[alt="clash5"]'),
       ),
     }
   })
