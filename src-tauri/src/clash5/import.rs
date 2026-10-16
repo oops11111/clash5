@@ -230,7 +230,7 @@ mod tests {
                 let path = std::env::temp_dir().join(format!("clash5-import-{}-{nonce}", std::process::id()));
                 match fs::create_dir(&path) {
                     Ok(()) => return Ok(Self(path)),
-                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
                     Err(error) => return Err(error),
                 }
             }
