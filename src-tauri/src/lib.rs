@@ -570,4 +570,3 @@ mod startup_tests {
         assert!(reported.get());
     }
 }
-

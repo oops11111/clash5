@@ -746,4 +746,3 @@ mod tests {
         assert!(peak.load(Ordering::SeqCst) <= PROBE_CONCURRENCY);
     }
 }
-
