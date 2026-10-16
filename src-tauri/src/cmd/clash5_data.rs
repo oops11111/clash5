@@ -334,6 +334,71 @@ async fn collect_identity_rotation_snapshots(
 ) -> Result<Vec<clash5_data::IdentitySourceSnapshot>, super::CommandFailure> {
     let mut snapshots = Vec::new();
     let profiles = Config::profiles().await.latest_arc();
+
+    // Identity rotation changes the installation key, so exact definitions from
+    // non-current profiles must be included too. Otherwise their saved nodes are
+    // left under the old key and become inactive even though their profile files
+    // are still available locally.
+    if let Some(items) = profiles.items.as_ref() {
+        let app_dir = dirs::app_home_dir().map_err(super::CommandFailure::plain)?;
+        let profiles_dir = dirs::app_profiles_dir().map_err(super::CommandFailure::plain)?;
+        for item in items {
+            if item.itype.as_deref() == Some("script") {
+                continue;
+            }
+            let (Some(uid), Some(file)) = (item.uid.as_deref(), item.file.as_deref()) else {
+                continue;
+            };
+            if uid == profile_id {
+                continue;
+            }
+            let path = profiles_dir.join(file);
+            let Ok(yaml) = tokio::fs::read_to_string(&path).await else {
+                continue;
+            };
+            if let Some(nodes) = parse_inline_nodes(&yaml)
+                .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "a saved profile contains invalid node data"))?
+            {
+                snapshots.push(clash5_data::IdentitySourceSnapshot {
+                    source: Source::Subscription {
+                        provider_id: uid.to_owned(),
+                    },
+                    nodes,
+                });
+            }
+
+            let Ok(mapping) = serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&yaml) else {
+                continue;
+            };
+            let Ok(providers) = remote_providers_of(&mapping, &app_dir) else {
+                continue;
+            };
+            for provider in providers
+                .into_iter()
+                .filter(|provider| provider.section == "proxy-providers")
+            {
+                let source_id = proxy_provider_source_id(uid, &provider.name);
+                let path = app_dir.join(&provider.provider.destination);
+                let Ok(yaml) = tokio::fs::read_to_string(path).await else {
+                    continue;
+                };
+                let Some(nodes) = parse_inline_nodes(&yaml).map_err(|_| {
+                    coded_error(
+                        "IDENTITY_ROTATION_FAILED",
+                        "a saved proxy provider contains invalid node data",
+                    )
+                })?
+                else {
+                    continue;
+                };
+                snapshots.push(clash5_data::IdentitySourceSnapshot {
+                    source: Source::Subscription { provider_id: source_id },
+                    nodes,
+                });
+            }
+        }
+    }
+
     let mapping = profiles
         .current_mapping()
         .await
