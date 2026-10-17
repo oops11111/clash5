@@ -91,7 +91,7 @@ fn mask_url_token(url: &str, scheme_len: usize) -> String {
                 .split('&')
                 .map(|part| {
                     part.split_once('=')
-                        .map_or(part.to_owned(), |(key, _)| format!("{key}=***"))
+                        .map_or("***".to_owned(), |(key, _)| format!("{key}=***"))
                 })
                 .collect::<Vec<_>>()
                 .join("&"),
@@ -509,6 +509,7 @@ mod redaction_tests {
         assert!(!output.contains("user:pass"));
         assert!(!output.contains("abc"));
         assert!(!output.contains("frag"));
+        assert_eq!(redact("https://example.test?bare-token"), "https://example.test?***");
     }
 
     #[test]
