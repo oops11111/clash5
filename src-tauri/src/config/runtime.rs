@@ -9,6 +9,8 @@ const PATCH_CONFIG_INNER: [&str; 5] = ["allow-lan", "ipv6", "log-level", "unifie
 #[derive(Default, Clone)]
 pub struct IRuntime {
     pub config: Option<Mapping>,
+    pub plugin_provenance: std::collections::BTreeMap<std::string::String, clash5_data::ConfigProvenance>,
+    pub plugin_conflicts: Vec<clash5_data::PluginConflict>,
     pub(crate) dns_override: Option<super::dns::DnsOverrideState>,
     // Keys seen in the profile pipeline, including merge and script output.
     pub exists_keys: HashSet<String>,

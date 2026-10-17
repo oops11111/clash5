@@ -238,7 +238,11 @@ impl Config {
 
         resolve_provider_path_conflicts(&mut config, &dirs::app_home_dir()?)?;
         sanitize_tunnels_proxy(&mut config);
-        crate::clash5::chains::generate(&mut config, profiles.current.as_deref()).await?;
+        let compiled_chains = crate::clash5::chains::generate(&mut config, profiles.current.as_deref()).await?;
+        let active_chain_ids = compiled_chains.into_iter().map(|chain| chain.chain_id).collect();
+        let plugin_application =
+            crate::clash5::plugins::apply_bound_plugins(&mut config, profiles.current.as_deref(), &active_chain_ids)
+                .await?;
         // Apply only to generated core config so the saved choice survives the next launch.
         if let Some(port) = MixedPort::session_fallback() {
             config.insert(MIXED_PORT_KEY.into(), port.into());
@@ -250,6 +254,8 @@ impl Config {
                 dns_override: Some(dns_override),
                 exists_keys,
                 chain_logs: logs,
+                plugin_provenance: plugin_application.provenance,
+                plugin_conflicts: plugin_application.conflicts,
             }
         });
 
