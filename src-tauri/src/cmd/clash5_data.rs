@@ -59,7 +59,6 @@ const C5_COMMAND_ERROR_CODES: &[&str] = &[
     C5_PROBE_CLOCK,
 ];
 
-
 fn failure(error: DataError) -> super::CommandFailure {
     let code = match error {
         DataError::InvalidInput => "C5-DATA-001",
@@ -690,7 +689,6 @@ mod tests {
         Arc,
         atomic::{AtomicUsize, Ordering},
     };
-
 
     #[test]
     fn every_registered_node_data_error_code_is_namespaced_and_unique() {
