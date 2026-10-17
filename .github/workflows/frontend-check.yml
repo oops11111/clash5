@@ -102,7 +102,20 @@ jobs:
           filters: |
             contract:
               - 'src/services/contract.ts'
+              - 'src/services/tauri-commands.generated.ts'
+              - 'src/services/cmds.ts'
+              - 'scripts/gen-command-contract.mjs'
+              - 'scripts/check-command-contract.mjs'
               - 'scripts/gen-contract.mjs'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'src-tauri/Cargo.toml'
+              - 'src-tauri/Cargo.lock'
+              - 'src-tauri/src/cmd/**'
+              - 'src-tauri/src/config/**'
+              - 'src-tauri/src/core/**'
+              - 'src-tauri/src/feat/**'
+              - 'crates/**'
               - 'src-tauri/src/core/notify/**'
               - 'src-tauri/src/bin/**'
               - 'src-tauri/src/lib.rs'
@@ -163,4 +176,6 @@ jobs:
         if: steps.check_inputs.outputs.contract == 'true'
         run: |
           pnpm gen:contract
-          git diff --exit-code -- src/services/contract.ts
+          pnpm gen:command-contract
+          pnpm check:command-contract
+          git diff --exit-code -- src/services/contract.ts src/services/tauri-commands.generated.ts

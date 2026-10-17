@@ -49,8 +49,9 @@ const SELECTED_NODES_SETTLE_INTERVAL: Duration = Duration::from_secs(1);
 const SELECTED_NODES_FIRST_PASS_BUDGET: Duration = Duration::from_secs(3);
 
 /// Define the `profiles.yaml` schema
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
 pub struct IProfiles {
+    #[specta(type = Option<std::string::String>)]
     pub current: Option<String>,
 
     pub items: Option<Vec<PrfItem>>,

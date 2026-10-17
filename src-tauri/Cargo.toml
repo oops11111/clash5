@@ -55,6 +55,9 @@ tauri = { workspace = true, features = [
   "image-ico",
   "image-png",
 ] }
+specta = { version = "=2.0.0-rc.25", features = ["derive", "chrono"] }
+specta-typescript = "=0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 parking_lot = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
