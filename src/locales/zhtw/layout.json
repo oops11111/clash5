@@ -18,6 +18,7 @@
       "diagnostics": "解鎖測試",
       "cancel": "取消",
       "identityError": "身分金鑰服務暫時無法使用。請在系統憑證庫解鎖後重試。",
+      "rotationRuntimePending": "身分輪替已儲存，但執行中的設定無法刷新。請刷新設定或重新啟動核心後再繼續。",
       "identityRecovery": "身分金鑰遺失或與資料庫不符。現有綁定已保留；重設會建立新的節點身分，舊綁定將保留為孤兒並需手動重新綁定。",
       "resetIdentity": "重設身分金鑰",
       "resetIdentityTitle": "重設節點身分金鑰？",
