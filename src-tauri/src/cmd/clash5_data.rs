@@ -30,7 +30,14 @@ const HANDSHAKE_PROBE_URL: &str = "https://cp.cloudflare.com/generate_204";
 static PROBE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn failure(error: DataError) -> super::CommandFailure {
-    coded_error(&error.to_string(), "clash5 node data operation failed")
+    let code = match error {
+        DataError::InvalidInput => "C5-DATA-001",
+        DataError::NotFound => "C5-DATA-002",
+        DataError::Database => "C5-DATA-003",
+        DataError::SchemaVersion => "C5-DATA-004",
+        DataError::IdentityRecovery => "C5-IDENTITY-001",
+    };
+    coded_error(code, "clash5 node data operation failed")
 }
 
 #[derive(Serialize, specta::Type)]
@@ -683,6 +690,23 @@ mod tests {
         Arc,
         atomic::{AtomicUsize, Ordering},
     };
+
+    #[test]
+    fn data_failures_use_stable_c5_codes_without_exposing_internal_errors() {
+        let cases = [
+            (DataError::InvalidInput, "C5-DATA-001"),
+            (DataError::NotFound, "C5-DATA-002"),
+            (DataError::Database, "C5-DATA-003"),
+            (DataError::SchemaVersion, "C5-DATA-004"),
+            (DataError::IdentityRecovery, "C5-IDENTITY-001"),
+        ];
+
+        for (error, expected_code) in cases {
+            let failure = super::failure(error);
+            assert_eq!(failure.code.as_deref(), Some(expected_code));
+            assert_eq!(failure.detail, "clash5 node data operation failed");
+        }
+    }
 
     fn node(stable_id: &str) -> NodeRecord {
         NodeRecord {
