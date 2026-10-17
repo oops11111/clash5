@@ -4,9 +4,9 @@ Status: proposal; requires the Opus-class design review specified by Issue #24 a
 
 ## Decision
 
-Use Windows Filtering Platform (WFP) ALE connect redirection with a signed kernel callout and a user-mode redirect relay. Do not inject DLLs or hooks into target processes. WFP's connect-redirect layer can redirect TCP and UDP connect requests to a local proxy, but local redirection requires a callout driver, a redirect handle, redirect-loop checks, and a target PID for the local service. The proxy must read the original destination and opaque redirect records, then attach those records to its outbound socket so other WFP redirectors can cooperate.
+Use Windows Filtering Platform (WFP) ALE connect redirection with a signed kernel callout and a user-mode redirect relay. Do not inject DLLs or hooks into target processes. WFP's connect-redirect layer can redirect TCP and UDP connect requests to a local proxy, but local redirection requires a callout driver, a redirect handle, redirect-loop checks, and a target PID for the local service. The relay must retrieve the original destination and opaque redirect records. Windows expects a redirect record on the proxy socket that connects toward the final destination for cooperation with other WFP redirectors. Because this design delegates that socket to Mihomo, record propagation is unresolved and external redirector coexistence is not supported by the proposal yet.
 
-The relay is a required protocol adapter between WFP and clash5's selected Chain. It accepts redirected sockets, extracts the original destination and redirect context, authenticates the local session, and opens an authenticated SOCKS5 connection to the selected Mihomo inbound. A direct redirect from WFP to Mihomo's ordinary SOCKS listener is not sufficient: that listener does not implement WFP redirect-record/context handoff. UDP must use the WFP redirect-aware socket path and SOCKS5 UDP relay; it must not assume connected UDP redirection is interchangeable with TCP.
+The relay is a required protocol adapter between WFP and clash5's selected Chain. It accepts redirected sockets, extracts the original destination and redirect context, then forwards the flow to a session-authenticated Mihomo listener pinned to the selected generated chain group. A direct redirect to Mihomo's global SOCKS port is insufficient because it does not pin a flow to the selected Chain. clash5 already creates temporary authenticated, chain-pinned HTTP listeners for exit-IP checks; the process-proxy session can build on that runtime-only pattern. TCP can use HTTP CONNECT to a pinned HTTP listener. UDP needs a pinned SOCKS listener with UDP enabled and its own WFP redirect-record handling. Neither transport is supported until its redirect context, chain selection, and teardown are verified end to end.
 
 ## Target identity and process tree
 
@@ -17,6 +17,16 @@ The initial supported target contract remains an executable process tree, includ
 ## TUN coordination
 
 The KernelScheduler remains the single owner of TUN and injection coordination. Before installing redirect filters, it must prepare an exclusion for the relay and proxy core and verify that the TUN configuration actually applies it. If the active TUN backend cannot express the exclusion, injection cannot start while TUN is active. The exclusion must be part of the same attach transaction as the WFP filters; detach removes only clash5-owned filters and restores the prior TUN setting.
+
+The current Mihomo TUN schema documents UID inclusion/exclusion as Linux-only and does not document a Windows process-exclusion setting. A `PROCESS-NAME` routing rule is not proof that the Windows TUN backend excludes a process from capture. Until a tested mechanism prevents proxy-core re-entry, attach must fail closed while TUN is active; do not silently disable TUN or claim N1 coexistence.
+
+## Chain adapter and redirect-record boundary
+
+The chain-pinned listener must be created in runtime configuration with a random session credential, bound to loopback, and removed on every detach or failed attach. Its `proxy` field must name the selected generated chain group. This reuses the existing `exit_ip::probe_listener` pattern without persisting session credentials or listeners.
+
+WFP redirect records are opaque and normally need to be transferred to the socket that the proxy service opens toward the final destination. In this design Mihomo owns that final socket, so clash5's relay cannot itself attach the record to it. Coexistence with other WFP redirectors therefore remains unproven; the relay and Mihomo must be excluded from clash5's own target filters, and external redirector coexistence must not be claimed until tested on Windows.
+
+Connected UDP is a separate compatibility gate. Microsoft documents a failure mode when a redirected local proxy uses connected UDP with redirect records; the documented workaround uses connectionless `sendto`. The relay must either implement and test that path or report UDP as unsupported while preserving TCP functionality.
 
 ## Lifecycle and failure policy
 
@@ -29,8 +39,9 @@ No test fixture can establish that Windows route state was restored. Release acc
 - Choose and package the signed WFP callout driver and privileged service; this repository currently has no driver project or installer lifecycle for one.
 - Verify supported Windows versions, signing requirements, Secure Boot behavior, upgrade/uninstall cleanup, and antivirus/anti-cheat observations.
 - Prove exact-instance process-tree tracking, including race-free child discovery and PID reuse handling.
-- Prove the active Mihomo TUN backend can exclude both the relay and core; otherwise define the safe mutual-exclusion behavior.
-- Validate TCP, UDP, IPv4, IPv6, loopback, and other WFP redirector coexistence on real Windows hosts.
+- Prove how the active Windows Mihomo TUN backend avoids core re-entry; until then, keep injection unavailable while TUN is active rather than silently changing the user's TUN setting.
+- Validate TCP, UDP, IPv4, IPv6, loopback, SOCKS/HTTP chain-pinned listeners, and other WFP redirector coexistence on real Windows hosts.
+- Confirm how WFP redirect records are handled when Mihomo, rather than the relay, opens the final destination socket.
 
 Until these gates pass, the UI must report injection as unavailable and must not claim it is active.
 
@@ -40,3 +51,5 @@ Until these gates pass, the UI must report injection as unavailable and must not
 - Microsoft, [Application Layer Enforcement](https://learn.microsoft.com/en-us/windows/win32/fwp/application-layer-enforcement--ale-)
 - Microsoft, [SIO_SET_WFP_CONNECTION_REDIRECT_RECORDS](https://learn.microsoft.com/en-us/windows/win32/winsock/sio-set-wfp-connection-redirect-records)
 - Microsoft, [Failed to redirect connected UDP traffic to a local proxy service](https://learn.microsoft.com/en-us/troubleshoot/windows-hardware/drivers/redirection-connected-udp-traffic-local-proxy-fail)
+- MetaCubeX, [Mihomo TUN configuration](https://wiki.metacubex.one/en/config/inbound/tun/)
+- MetaCubeX, [Mihomo listener common fields](https://wiki.metacubex.one/en/config/inbound/listeners/)
