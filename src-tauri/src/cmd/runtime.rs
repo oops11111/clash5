@@ -27,13 +27,8 @@ pub async fn get_runtime_yaml() -> CmdResult<std::string::String> {
     let config = runtime.config.as_ref();
     config
         .ok_or_else(|| anyhow!("failed to parse config to yaml file"))
-        .and_then(|config| {
-            yaml_emitter::to_mihomo_config_string(config)
-                .context("failed to convert config to yaml")
-                .map(|s| -> std::string::String { s.into() })
-        })
+        .and_then(|config| yaml_emitter::to_mihomo_config_string(config).context("failed to convert config to yaml"))
         .stringify_err()
-        .map(Into::into)
 }
 
 #[tauri::command]
@@ -107,9 +102,7 @@ pub async fn get_runtime_proxy_chain_config(
 
         yaml_emitter::to_mihomo_config_string(&config)
             .context("YAML generation failed")
-            .map(|s| -> std::string::String { s.into() })
             .stringify_err()
-            .map(Into::into)
     } else {
         Err("failed to get proxies or proxy-groups".into())
     }

@@ -18,10 +18,14 @@ mod tests {
     fn json_value_round_trips_without_changing_the_ipc_shape() {
         let value = serde_json::json!({ "enabled": true, "port": 1080, "bypass": ["localhost"] });
         let wire = JsonValue(value.clone());
-        let encoded = serde_json::to_value(&wire).expect("serialize JSON wire value");
-        let decoded: JsonValue = serde_json::from_value(encoded.clone()).expect("deserialize JSON wire value");
+        let encoded_matches = serde_json::to_value(&wire)
+            .map(|encoded| encoded == value)
+            .unwrap_or(false);
+        let decoded_matches = serde_json::from_value::<JsonValue>(value.clone())
+            .map(|decoded| decoded.0 == value)
+            .unwrap_or(false);
 
-        assert_eq!(encoded, value);
-        assert_eq!(decoded.0, value);
+        assert!(encoded_matches);
+        assert!(decoded_matches);
     }
 }

@@ -10,6 +10,7 @@ import type {
   PendingIdentityRebind as GeneratedPendingIdentityRebind,
   RunStateView,
   RunningMode as GeneratedRunningMode,
+  ServiceInstallOutcome as GeneratedServiceInstallOutcome,
   UnlockItem as GeneratedUnlockItem,
 } from '@/services/tauri-commands.generated'
 import type { Clash5NodeRecord } from '@/types/clash5-node'
@@ -606,9 +607,7 @@ export const getAppUptime = async () => {
   return invoke<number>('get_app_uptime')
 }
 
-export type ServiceInstallOutcome =
-  | { status: 'installed' }
-  | { status: 'sidecar'; reason: string }
+export type ServiceInstallOutcome = GeneratedServiceInstallOutcome
 
 export const installService = async () => {
   return invoke<ServiceInstallOutcome>('install_service')

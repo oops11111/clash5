@@ -54,7 +54,7 @@ pub async fn patch_clash_mode(payload: std::string::String) -> CmdResult {
 #[tauri::command]
 #[specta::specta]
 pub async fn get_clash_mode() -> CmdResult<Option<std::string::String>> {
-    Ok(Config::clash().await.data_arc().get_mode().map(Into::into))
+    Ok(Config::clash().await.data_arc().get_mode())
 }
 
 #[tauri::command]
