@@ -168,6 +168,11 @@ fn mask_sensitive_fields(input: &str) -> String {
                 }
             }
         }
+        if key.ends_with("cookie") {
+            while value_end < input.len() && !matches!(input.as_bytes()[value_end], b'\r' | b'\n') {
+                value_end += 1;
+            }
+        }
         output.push_str(&input[cursor..value_start]);
         output.push_str("***");
         cursor = value_end;
@@ -525,6 +530,12 @@ mod redaction_tests {
         assert!(!output.contains("json-token"));
         assert!(!output.contains("header-token"));
         assert!(output.contains("Authorization: ***"));
+    }
+
+    #[test]
+    fn masks_all_cookie_pairs_on_the_header_line() {
+        let output = redact("Cookie: session=abc; csrf=xyz\nnext line");
+        assert_eq!(output, "Cookie: ***\nnext line");
     }
 
     #[test]
