@@ -3,7 +3,7 @@
 > 产品名：**clash5**
 > 基线：Fork [clash-verge-rev](https://github.com/clash-verge-rev/clash-verge-rev) · GPL-3.0 · 上游 tag 跟踪（见 §1.2）
 > 配套：[`clash5-M0-M6-任务拆解.md`](clash5-M0-M6-任务拆解.md)、[`clash5-风险登记.md`](clash5-风险登记.md)、[`clash5-AI协作规范.md`](clash5-AI协作规范.md)
-> 状态：r2 修订稿，待整体评审冻结。M0 已按原验收基线合并；新增标准的实现差距见下文，不视为已通过验收。身份恢复与迁移方案已在 [PR #8](https://github.com/oops11111/clash5/pull/8) 决定，实现仍待验收。
+> 状态：r2 修订稿，待整体评审冻结。M0 原验收基线已合并；新增标准的实现差距见下文，不视为已通过验收。身份迁移方案由 PR #8 确认，代码迁移、fixture 与 Windows 桌面验收已由 [PR #23](https://github.com/oops11111/clash5/pull/23) 合并通过；R-25 已缓解。
 
 ## 变更说明（相对 r1）
 
@@ -149,7 +149,7 @@ OrphanBinding   = PluginBinding + disappeared_at + last_stable_id + candidates[]
 
 - 凭证轮换（UUID/密码变化）导致的 stable_id 变化，视为「同一节点的新身份」。`reattach` 仅在**同一订阅来源内**对失活身份按 type、server、port、transport、SNI 匹配：候选唯一时自动重绑，多候选时进入人工确认；手动节点与不同 provider 不跨来源自动重绑。
 - 本机密钥丢失、锁定或不匹配时，保持现有节点与绑定可读，暂停刷新和身份写入；须由用户确认重置后逐项显式重绑，不得生成替代密钥后静默迁移。计划内轮换在旧密钥仍可用时才可精确迁移。
-- r2 的密钥分代、`v1`→`v2` 迁移、规范字段及崩溃恢复顺序以 [`clash5/r2-identity-migration.md`](clash5/r2-identity-migration.md) 为准；代码与 fixture 验收仍由 [Issue #7](https://github.com/oops11111/clash5/issues/7) 跟踪（R-01/R-02/R-25）。
+- r2 的密钥分代、`v1`→`v2` 迁移、规范字段及崩溃恢复顺序以 [`clash5/r2-identity-migration.md`](clash5/r2-identity-migration.md) 为准；代码与 fixture 验收已随 [PR #23](https://github.com/oops11111/clash5/pull/23) 完成并合并（R-01/R-02/R-25）。
 - 同机同端口不同 transport/SNI 的节点，因 canonical 字段包含 transport 与 sni，不会碰撞；若仍碰撞，diff 阶段报错而非静默合并。
 
 **孤儿策略（A2 补充）**：
