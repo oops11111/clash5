@@ -2,6 +2,12 @@
   "page": {
     "title": "连接"
   },
+  "processProxy": {
+    "title": "按进程路由",
+    "toggle": "启用按进程路由",
+    "unavailable": "当前版本暂不支持按进程路由。所选应用的流量不会被单独转发。",
+    "off": "不可用"
+  },
   "components": {
     "fields": {
       "host": "主机",
