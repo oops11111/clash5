@@ -66,3 +66,5 @@
 | 2026-10-17 | R-19 | 已缓解 | [PR #26](https://github.com/oops11111/clash5/pull/26) 已合并；只读导入通过 Windows 安全测试与桌面验收，导入前后源目录 SHA-256 清单一致。 |
 | 2026-10-17 | R-18 | 验收通过、待合入 | [PR #27](https://github.com/oops11111/clash5/pull/27) 的 Windows 同机安装/升级/启动/独立卸载验收及上游配置目录 SHA-256 前后比对通过；Windows/macOS/Linux 标识审计通过。PR 尚未合入 dev；macOS/Linux 运行时安装升级测试为后续覆盖。 |
 | 2026-10-17 | R-20 | 开放 | 只读复核确认 `mask_url` 保留 URL 主机及短路径段，`mask_err` 只处理错误文本中的 HTTP(S) URL，日志宏没有统一脱敏出口。`cmd/profile.rs::import_profile` 把 `{e:#}` 下载错误链直接写日志，`profile_import_error` 也将原始链放入 IPC 详情，未调用 `mask_err`。`utils/help.rs` 没有遮罩函数单测；凭证、controller secret、relay token 回归测试仍缺。该项标为 Opus-class，未宣称完成。 |
+| 2026-10-18 | R-18 | 已合入、后续覆盖 | [PR #27](https://github.com/oops11111/clash5/pull/27) 已合入 dev；Windows 同机安装/升级/启动/独立卸载、上游配置目录 SHA-256 前后比对和三平台标识审计均有通过证据。macOS/Linux 运行时安装升级测试仍待补。 |
+| 2026-10-18 | M0 契约/错误码 | 已合入 | [PR #31](https://github.com/oops11111/clash5/pull/31)、[#32](https://github.com/oops11111/clash5/pull/32)、[#34](https://github.com/oops11111/clash5/pull/34) 已按顺序合入 dev；#34 最终提交通过 Formatting、Frontend、Backend Guardrails、M0 data、Clippy（含 Windows security tests）和 Windows desktop smoke 六项 CI。 |
