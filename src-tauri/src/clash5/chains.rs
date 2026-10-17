@@ -214,7 +214,7 @@ mod tests {
             .as_mapping()
             .cloned()
             .ok_or_else(|| anyhow!("proxy fixture is not a mapping"))?;
-        runtime_proxy.insert("name".into(), runtime_name.clone().into());
+        runtime_proxy.insert("name".into(), runtime_name.into());
         let record = NodeRecord {
             stable_id: stable_id.clone(),
             source: Source::Manual,
