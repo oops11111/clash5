@@ -1,5 +1,5 @@
 use crate::{DataError, IdentityKey, Node, StableId, identity::text};
-use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use rusqlite::{Connection, DatabaseName, OptionalExtension, Transaction, backup::Progress, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, path::Path, time::Duration};
@@ -314,6 +314,16 @@ impl BindingStore {
         let mut store = Self::initialize(Connection::open_in_memory()?)?;
         store.install_identity_key(key)?;
         Ok(store)
+    }
+
+    pub fn snapshot_to(&self, path: impl AsRef<Path>) -> Result<(), DataError> {
+        self.db.backup(DatabaseName::Main, path, None)?;
+        Ok(())
+    }
+
+    pub fn restore_from(&mut self, path: impl AsRef<Path>) -> Result<(), DataError> {
+        self.db.restore(DatabaseName::Main, path, None::<fn(Progress)>)?;
+        Ok(())
     }
 
     fn install_identity_key(&mut self, key: IdentityKey) -> Result<(), DataError> {

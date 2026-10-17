@@ -16,6 +16,24 @@ fn node() -> Node {
         sni: String::new(),
     }
 }
+
+#[test]
+fn backup_snapshot_restores_committed_wal_data() {
+    let dir = tempfile::tempdir().unwrap();
+    let live_path = dir.path().join("live.sqlite");
+    let snapshot_path = dir.path().join("snapshot.sqlite");
+    let restored_path = dir.path().join("restored.sqlite");
+    let mut live = BindingStore::open(&live_path).unwrap();
+    let stable_id = live.upsert_manual(&node()).unwrap();
+    assert!(live_path.with_extension("sqlite-wal").exists());
+
+    live.snapshot_to(&snapshot_path).unwrap();
+    let mut restored = BindingStore::open(&restored_path).unwrap();
+    restored.restore_from(&snapshot_path).unwrap();
+    let records = restored.node_records(false).unwrap();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].stable_id, stable_id);
+}
 #[test]
 fn identity_snapshot_matches_typescript_v1() {
     assert_eq!(

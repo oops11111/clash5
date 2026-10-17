@@ -338,8 +338,15 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
     zip.write_all(fs::read(dirs::profiles_path()?).await?.as_slice())?;
 
     if data_db_path.is_file() {
+        let snapshot_path = temp_dir().join(format!("clash5-snapshot-{}.sqlite", nanoid::nanoid!()));
+        let source = data_db_path.clone();
+        let destination = snapshot_path.clone();
+        AsyncHandler::spawn_blocking(move || clash5_data::BindingStore::open(source)?.snapshot_to(destination))
+            .await??;
+        let snapshot = fs::read(&snapshot_path).await;
+        let _ = fs::remove_file(&snapshot_path).await;
         zip.start_file(dirs::CLASH5_DATA_DB, options)?;
-        zip.write_all(fs::read(data_db_path).await?.as_slice())?;
+        zip.write_all(snapshot?.as_slice())?;
     }
     zip.finish()?;
     Ok((zip_file_name, zip_path))
