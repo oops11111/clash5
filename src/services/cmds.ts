@@ -1,8 +1,9 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
+import type { DownloadEvent as UpdaterDownloadEvent } from '@tauri-apps/plugin-updater'
 import dayjs from 'dayjs'
 
 import type { CommandFailure } from '@/services/notice-service'
-import type { DownloadEvent as UpdaterDownloadEvent } from '@tauri-apps/plugin-updater'
+import { showNotice } from '@/services/notice-service'
 import type {
   Binding as GeneratedBinding,
   DownloadEvent as ContractDownloadEvent,
@@ -11,7 +12,6 @@ import type {
   RunningMode as GeneratedRunningMode,
   UnlockItem as GeneratedUnlockItem,
 } from '@/services/tauri-commands.generated'
-import { showNotice } from '@/services/notice-service'
 import type { Clash5NodeRecord } from '@/types/clash5-node'
 import type { ProxyViewV1 } from '@/types/proxy-view'
 import { debugLog } from '@/utils/debug'
