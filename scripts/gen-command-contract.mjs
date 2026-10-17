@@ -6,7 +6,14 @@ const OUT = 'src/services/tauri-commands.generated.ts'
 
 execFileSync(
   'cargo',
-  ['run', '-p', 'clash-verge', '--bin', 'tauri-command-contract', '-q'],
+  [
+    'run',
+    '--manifest-path',
+    path.join(ROOT, 'src-tauri', 'Cargo.toml'),
+    '--bin',
+    'tauri-command-contract',
+    '-q',
+  ],
   {
     cwd: path.join(ROOT, 'src-tauri'),
     stdio: 'inherit',
