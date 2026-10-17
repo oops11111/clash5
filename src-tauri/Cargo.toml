@@ -1,11 +1,11 @@
 [package]
-name = "clash-verge"
+name = "clash5"
 version = "2.5.9"
-description = "clash verge"
+description = "clash5"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
 repository = "https://github.com/clash-verge-rev/clash-verge-rev.git"
-default-run = "clash-verge"
+default-run = "clash5"
 build = "build.rs"
 edition = "2024"
 rust-version = "1.99"
@@ -26,7 +26,7 @@ clippy = ["tauri/test"]
 perf-harness = ["dep:tauri-plugin-wdio-webdriver"]
 
 [package.metadata.bundle]
-identifier = "io.github.clash-verge-rev.clash-verge-rev"
+identifier = "io.github.oops11111.clash5"
 
 [build-dependencies]
 tauri-build = { version = "2.7.1", features = [] }
@@ -55,6 +55,9 @@ tauri = { workspace = true, features = [
   "image-ico",
   "image-png",
 ] }
+specta = { version = "=2.0.0-rc.25", features = ["derive", "chrono"] }
+specta-typescript = "=0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 parking_lot = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
@@ -108,6 +111,7 @@ tauri-plugin-mihomo = { git = "https://github.com/clash-verge-rev/tauri-plugin-m
 async-trait = "0.1.92"
 clash_verge_service_ipc = { git = "https://github.com/clash-verge-rev/clash-verge-service-ipc.git", tag = "v2.7.6", version = "2.7.6", features = [
   "client",
+  "development-channel",
 ] }
 arc-swap = "1.9.2"
 tokio-rustls = "0.26.6"

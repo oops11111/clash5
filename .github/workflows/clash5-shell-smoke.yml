@@ -75,7 +75,7 @@ jobs:
           }
       - name: Verify native Tauri bridge and node workspace
         if: github.event_name != 'schedule'
-        run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --full
+        run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash5.exe --full
       - name: Verify reset cancellation in identity recovery mode
         if: github.event_name != 'schedule'
         shell: pwsh
@@ -100,10 +100,10 @@ jobs:
           try {
             $prepareDatabase | python - $database $backup
             if ($LASTEXITCODE -ne 0) { throw 'Could not prepare identity recovery fixture' }
-            pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --recovery-cancel
+            pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash5.exe --recovery-cancel
             if ($LASTEXITCODE -ne 0) { throw 'Identity recovery reset-cancellation smoke failed' }
           } finally {
-            Get-Process -Name clash-verge -ErrorAction SilentlyContinue | Stop-Process -Force
+            Get-Process -Name clash5 -ErrorAction SilentlyContinue | Stop-Process -Force
             Start-Sleep -Seconds 2
             foreach ($suffix in @('-wal', '-shm')) {
               Remove-Item -LiteralPath "$database$suffix" -Force -ErrorAction SilentlyContinue
@@ -117,15 +117,15 @@ jobs:
         if: github.event_name != 'schedule'
         shell: pwsh
         run: |
-          if (Get-Process -Name clash-verge -ErrorAction SilentlyContinue) {
+          if (Get-Process -Name clash5 -ErrorAction SilentlyContinue) {
             throw 'The first desktop session did not exit before the persistence check'
           }
-          pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash-verge.exe --persisted
+          pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash5.exe --persisted
       - name: Report desktop process state on failure
         if: failure() && github.event_name != 'schedule'
         shell: pwsh
         run: |
-          Get-Process -Name clash-verge,msedgewebview2,msedgedriver,tauri-driver -ErrorAction SilentlyContinue |
+          Get-Process -Name clash5,msedgewebview2,msedgedriver,tauri-driver -ErrorAction SilentlyContinue |
             Select-Object ProcessName,Id,Path | Format-Table
           $appData = Join-Path $env:APPDATA 'io.github.oops11111.clash5'
           Write-Output "clash5 app data exists: $(Test-Path -LiteralPath $appData)"
@@ -142,7 +142,7 @@ jobs:
         if: github.event_name == 'schedule'
         shell: pwsh
         run: |
-          $binary = 'target/x86_64-pc-windows-msvc/release/clash-verge.exe'
+          $binary = 'target/x86_64-pc-windows-msvc/release/clash5.exe'
           $process = Start-Process -FilePath $binary -WindowStyle Hidden -PassThru
           try {
             Start-Sleep -Seconds 15
@@ -173,7 +173,7 @@ jobs:
         with:
           name: clash5-windows-shell
           path: |
-            target/x86_64-pc-windows-msvc/release/clash-verge.exe
+            target/x86_64-pc-windows-msvc/release/clash5.exe
             target/x86_64-pc-windows-msvc/release/resources/**
             target/x86_64-pc-windows-msvc/release/verge-mihomo.exe
             target/x86_64-pc-windows-msvc/release/verge-mihomo-alpha.exe

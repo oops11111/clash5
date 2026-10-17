@@ -1,4 +1,4 @@
-use super::{CmdResult, coded_error};
+use super::{CmdResult, coded_error, wire::JsonValue};
 use clash5_data::{
     Binding, DataError, Node, NodeQuality, NodeRecord, PendingIdentityRebind, QualityStatus, Source, parse_inline_nodes,
 };
@@ -30,15 +30,23 @@ const HANDSHAKE_PROBE_URL: &str = "https://cp.cloudflare.com/generate_204";
 static PROBE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn failure(error: DataError) -> super::CommandFailure {
-    coded_error(&error.to_string(), "clash5 node data operation failed")
+    let code = match error {
+        DataError::InvalidInput => "C5-DATA-001",
+        DataError::NotFound => "C5-DATA-002",
+        DataError::Database => "C5-DATA-003",
+        DataError::SchemaVersion => "C5-DATA-004",
+        DataError::IdentityRecovery => "C5-IDENTITY-001",
+    };
+    coded_error(code, "clash5 node data operation failed")
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub struct ManualNodeIdentity {
     stable_id: String,
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_register_manual_node(node: Node) -> CmdResult<ManualNodeIdentity> {
     crate::config::profiles::with_clash5_binding_store(move |store| {
         let stable_id = store.upsert_manual(&node)?;
@@ -48,21 +56,25 @@ pub async fn clash5_register_manual_node(node: Node) -> CmdResult<ManualNodeIden
     .map_err(failure)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub struct ManualImportResult {
+    #[specta(type = specta_typescript::Number)]
     imported: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub struct VergeImportReport {
+    #[specta(type = specta_typescript::Number)]
     imported: usize,
     skipped: Vec<String>,
+    #[specta(type = specta_typescript::Number)]
     binding_sync_failures: usize,
     source_manifest_before: String,
     source_manifest_after: String,
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_import_verge_data(source_dir: String) -> CmdResult<VergeImportReport> {
     let source = PathBuf::from(source_dir.as_str());
     let target =
@@ -141,7 +153,13 @@ async fn restore_manual_file(previous: Option<&str>) -> CmdResult {
 }
 
 #[tauri::command]
-pub async fn clash5_import_manual_proxies(proxies: Vec<Value>) -> CmdResult<ManualImportResult> {
+#[specta::specta]
+pub async fn clash5_import_manual_proxies(proxies: Vec<JsonValue>) -> CmdResult<ManualImportResult> {
+    let proxies = proxies
+        .into_iter()
+        .map(|value| serde_json::from_value(value.0))
+        .collect::<Result<Vec<Value>, _>>()
+        .map_err(|error| coded_error("MANUAL_IMPORT_FAILED", error))?;
     let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
     let path = manual::path().map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy path is unavailable"))?;
     let previous = match tokio::fs::read_to_string(&path).await {
@@ -200,6 +218,7 @@ pub async fn clash5_import_manual_proxies(proxies: Vec<Value>) -> CmdResult<Manu
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_bind_node(binding: Binding) -> CmdResult {
     crate::config::profiles::with_clash5_binding_store(move |store| store.upsert_binding(&binding))
         .await
@@ -207,6 +226,7 @@ pub async fn clash5_bind_node(binding: Binding) -> CmdResult {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_list_bindings(source: Option<Source>) -> CmdResult<Vec<Binding>> {
     crate::config::profiles::with_clash5_binding_store(move |store| store.bindings(source.as_ref()))
         .await
@@ -214,6 +234,7 @@ pub async fn clash5_list_bindings(source: Option<Source>) -> CmdResult<Vec<Bindi
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_list_pending_identity_rebinds(source: Option<Source>) -> CmdResult<Vec<PendingIdentityRebind>> {
     crate::config::profiles::with_clash5_binding_store(move |store| store.pending_identity_rebinds(source.as_ref()))
         .await
@@ -221,6 +242,7 @@ pub async fn clash5_list_pending_identity_rebinds(source: Option<Source>) -> Cmd
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_resolve_identity_rebind(source: Source, old_id: String, new_id: String) -> CmdResult {
     crate::config::profiles::with_clash5_binding_store(move |store| {
         store.resolve_identity_rebind(&source, &old_id, &new_id)
@@ -229,13 +251,15 @@ pub async fn clash5_resolve_identity_rebind(source: Source, old_id: String, new_
     .map_err(failure)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub struct Clash5IdentityStatus {
     recovery_mode: bool,
+    #[specta(type = specta_typescript::Number)]
     pending_rebinds: usize,
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_identity_status() -> CmdResult<Clash5IdentityStatus> {
     crate::config::profiles::with_clash5_binding_store(|store| {
         Ok(Clash5IdentityStatus {
@@ -248,6 +272,7 @@ pub async fn clash5_identity_status() -> CmdResult<Clash5IdentityStatus> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_reset_identity() -> CmdResult {
     let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
     crate::config::profiles::reset_clash5_identity()
@@ -264,6 +289,7 @@ pub async fn clash5_reset_identity() -> CmdResult {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_rotate_identity() -> CmdResult {
     let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
     log_identity_rotation("started", None, None, None);
@@ -481,6 +507,7 @@ fn log_identity_rotation(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_list_nodes(include_inactive: Option<bool>) -> CmdResult<Vec<NodeRecord>> {
     let recovery_mode = crate::config::profiles::with_clash5_binding_store(|store| Ok(store.identity_recovery()))
         .await
@@ -562,11 +589,15 @@ async fn refresh_runtime_proxy_providers() -> CmdResult {
     .map_err(failure)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub struct ProbeBatch {
+    #[specta(type = specta_typescript::Number)]
     pub probed: usize,
+    #[specta(type = specta_typescript::Number)]
     pub cached: usize,
+    #[specta(type = specta_typescript::Number)]
     pub unavailable: usize,
+    #[specta(type = specta_typescript::Number)]
     pub failed: usize,
 }
 
@@ -619,6 +650,7 @@ where
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
     let _guard = PROBE_LOCK
         .try_lock()
@@ -712,13 +744,16 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
 }
 
 #[tauri::command]
-pub async fn clash5_purge_orphans(source: Option<Source>) -> CmdResult<usize> {
+#[specta::specta]
+pub async fn clash5_purge_orphans(source: Option<Source>) -> CmdResult<f64> {
     crate::config::profiles::with_clash5_binding_store(move |store| store.purge_orphans(source.as_ref()))
         .await
+        .map(|count| count as f64)
         .map_err(failure)
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_orphan_cleanup_preview() -> CmdResult<clash5_data::OrphanCleanupPreview> {
     crate::config::profiles::with_clash5_binding_store(|store| store.orphan_cleanup_preview())
         .await
@@ -726,6 +761,7 @@ pub async fn clash5_orphan_cleanup_preview() -> CmdResult<clash5_data::OrphanCle
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_set_orphan_retention_days(days: u16) -> CmdResult<()> {
     crate::config::profiles::with_clash5_binding_store(move |store| store.set_orphan_retention_days(days))
         .await
@@ -733,9 +769,11 @@ pub async fn clash5_set_orphan_retention_days(days: u16) -> CmdResult<()> {
 }
 
 #[tauri::command]
-pub async fn clash5_purge_expired_orphans() -> CmdResult<usize> {
+#[specta::specta]
+pub async fn clash5_purge_expired_orphans() -> CmdResult<f64> {
     crate::config::profiles::with_clash5_binding_store(|store| store.purge_expired_orphans(None))
         .await
+        .map(|count| count as f64)
         .map_err(failure)
 }
 
@@ -746,6 +784,23 @@ mod tests {
         Arc,
         atomic::{AtomicUsize, Ordering},
     };
+
+    #[test]
+    fn data_failures_use_stable_c5_codes_without_exposing_internal_errors() {
+        let cases = [
+            (DataError::InvalidInput, "C5-DATA-001"),
+            (DataError::NotFound, "C5-DATA-002"),
+            (DataError::Database, "C5-DATA-003"),
+            (DataError::SchemaVersion, "C5-DATA-004"),
+            (DataError::IdentityRecovery, "C5-IDENTITY-001"),
+        ];
+
+        for (error, expected_code) in cases {
+            let failure = super::failure(error);
+            assert_eq!(failure.code.as_deref(), Some(expected_code));
+            assert_eq!(failure.detail, "clash5 node data operation failed");
+        }
+    }
 
     fn node(stable_id: &str) -> NodeRecord {
         NodeRecord {

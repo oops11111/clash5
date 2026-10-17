@@ -29,18 +29,19 @@
 - [x] `[Opus]` 原版 stable_id 指纹与凭证归一化、测试；r2 HMAC 与版本迁移另列
 - [x] `[Opus]` 原版 SQLite bindings / chains / quality / audit / orphan，手动与订阅隔离（C2）
 - [x] `[Opus]` 原版订阅 diff：同身份继承 / 新增 / orphan 恢复（A2），名称匹配默认关（B）
-- [ ] `[标准]` 导出/导入包
-- [ ] `[标准]` 孤儿保留期提醒与到期清理入口（代码已在 PR #23 实现；待 CI、桌面验收和合并）
+- [ ] `[标准]` 导出/导入包。现有上游 ZIP 仅包含 profiles、clash config、verge config（剔除 WebDAV 凭证）、DNS 与 profile 元数据；未包含 `clash5-nodes.sqlite`，其 HMAC key 存于操作系统凭据库。现有备份不能验收为 clash5 数据包；包内容与是否支持跨设备恢复仍待明确，不能把本机 HMAC key 直接放入迁移包。
+- [x] `[标准]` 孤儿保留期提醒与到期清理入口（PR #23 已合并；含 1–365 天保留期、清理预览/确认、到期清理及 CI/Windows 桌面验收）
 
 ### M0.3 验收
 - [x] `[标准]` 原版 M0 空壳与数据层验收，已合并至 `dev`
 
 ### M0 r2 增量差距（不能按已完成项勾选）
-- [ ] `[Opus]` R-01/R-02/R-25：按[已合并的身份迁移决定](clash5/r2-identity-migration.md) 无损迁移至本机密钥 HMAC 并存储版本与密钥代次；密钥丢失须显式重绑，凭证轮换仅在同来源按唯一候选自动重绑，多候选人工确认，附迁移 fixture
-- [ ] `[Opus]` SQLite WAL 与版本迁移方案：代码已启用 WAL，schema v4 从现有版本逐级迁移；孤儿默认 30 天、可设 1–365 天，并提供清理预览、确认和到期清理。回滚及保留期数据测试已通过本地验收；待 PR #23 CI、Windows 桌面验收和合并
-- [ ] `[标准]` R-18/R-19：服务与包名隔离、同机共存实测；只读导入 verge-rev 数据并比较源目录前后校验和
+- [x] `[Opus]` R-01/R-02/R-25：按[已合并的身份迁移决定](clash5/r2-identity-migration.md) 无损迁移至本机密钥 HMAC 并存储版本与密钥代次；密钥丢失须显式重绑，凭证轮换仅在同来源按唯一候选自动重绑，多候选人工确认，附迁移 fixture（PR #23 已合并并通过密钥丢失、错配、轮换和绑定保留 CI/桌面验收）
+- [x] `[Opus]` SQLite WAL 与版本迁移方案：schema v4 从现有版本逐级迁移；孤儿默认 30 天、可设 1–365 天，并提供清理预览、确认和到期清理。PR #23 已合并；CI、Windows 桌面验收及迁移回滚/保留期数据测试通过
+- [x] `[标准]` R-18：服务与包名隔离、同机共存。PR #27 的 Windows 安装/升级/启动/独立卸载和源配置校验和前后比对、三平台标识审计均通过，已合入 dev；macOS/Linux 安装运行仍留作后续覆盖。
+- [x] `[标准]` R-19：只读导入 verge-rev 数据并比较源目录前后校验和（PR #26 已合并；CI 和 Windows 桌面验收确认不修改源目录）
 - [ ] `[Opus]` R-20：统一日志/诊断脱敏；凭证、完整订阅 URL、controller secret、relay token 的泄露回归测试
-- [ ] `[标准]` 对外 `C5-*` 错误码、IPC 契约快照与 r2 CI 矩阵证据
+- [x] `[标准]` 对外 `C5-*` 错误码、IPC 契约快照与 r2 CI 矩阵证据。PR #31、#32 已依次合入 dev；PR #34 已实现 108 个 Tauri command 的参数/成功返回/错误类型快照与前端调用校验，并通过完整六项 CI（含 Windows 桌面 smoke）后合入 dev。日志/诊断脱敏仍未完成验收，R-20 保持开放
 - [ ] `[标准]` 首次 release-tag 同步前核对 M0 所用上游 `dev` 基线，单独 PR 记录取舍
 
 **本阶段 Opus 必做**：M0.2 全部核心逻辑。
@@ -56,7 +57,7 @@
 - [x] `[Opus]` 手动节点加入运行时后可安全探测；限流自动退避及 fixture 验证（R-11）
 - [x] `[标准]` 对照工作区外层 `src/ui-hifi` 的已确认 UI 做桌面验收，提供 r2 所需的集成测试与演示步骤
 
-**验收结果**：PR #4 的 SQLite 库存、剪贴板导入、订阅刷新与规则保留、手动节点运行时映射、外部 provider 探测、最多 16 并发、600 秒缓存和连续失败退避已通过数据层与真实 Mihomo fixture 测试。[Windows Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过 Tauri 页面导入、独立节点与 429 代理探测、缓存、来源/状态筛选、搜索、质量排序，以及桌面重启后的稳定身份检查；截图与范围见 [`M1 桌面演示步骤`](clash5/m1-acceptance.md)。M1 已通过 PR #4 合并至 `dev`。Windows Server 2025 的 WebDriver 问题仍由[上游 runner 问题](https://github.com/actions/runner-images/issues/14738)追踪。Mihomo 延迟接口不提供上游 HTTP 状态或 `Retry-After`，所以限流缓解是连续失败通用退避，风险 R-11 仍需观察。
+**验收结果**：PR #4 的 SQLite 库存、剪贴板导入、订阅刷新与规则保留、手动节点运行时映射、外部 provider 探测、最多 16 并发、600 秒缓存和连续失败退避已通过数据层与真实 Mihomo fixture 测试。[Windows Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过 Tauri 页面导入、独立节点与 429 代理探测、缓存、来源/状态筛选、搜索、质量排序，以及桌面重启后的稳定身份检查；截图与范围见 [`M1 桌面演示步骤`](clash5/m1-acceptance.md)。M1 退出标准已达到，PR #4 已合并至 `dev`。Windows Server 2025 的 WebDriver 问题仍由[上游 runner 问题](https://github.com/actions/runner-images/issues/14738)追踪。Mihomo 延迟接口不提供上游 HTTP 状态或 `Retry-After`，所以限流缓解是连续失败通用退避，风险 R-11 仍需观察。
 
 ---
 
@@ -68,6 +69,8 @@
 - [x] `[标准]` 链路详情三栏布局壳
 
 **验收结果**：PR #18 的两跳生成、provider override 与原配置保留、保存/测试/应用、出口 IP 检测、默认告警、经验证的备用切换、失败回滚及旧命令保护已通过 fixture 与 Windows Server 2022 桌面验收。[原生验收](https://github.com/oops11111/clash5/actions/runs/38701837292)通过默认 940 × 700 窗口的页面无横向溢出检查、Tauri 桥接与桌面重启后的链路恢复。M2 代码与桌面验收已完成，待 PR #18 合并。插件输出和绑定仍属于 M3。
+
+**当前状态（2026-10-17）**：PR #18 已实现两跳路由、链路编辑、出口 IP 检测与回退策略；Windows 桌面验收及格式、前后端、M0 数据、三平台 Clippy 检查全部通过。PR 已准备好审查，尚未合入 `dev`，因此此处的退出项仍未勾选。
 
 ---
 
@@ -83,6 +86,8 @@
 
 **本阶段几乎整段后端标 Opus；UI 标准。**
 
+**当前状态（2026-10-17）**：PR #20 已完成签名 WASM 插件宿主、来源绑定、补丁合并回滚、生效配置来源与插件页；当前头部 CI 和 Windows 桌面验收全部通过，PR 已准备好审查，仍堆叠在 M2 PR #18 上且尚未合入 `dev`。退出项保持未勾选。
+
 ---
 
 ## M4 · sing-box 侧车
@@ -93,6 +98,8 @@
 - [ ] `[标准]` 设置项「常驻/自动退出」、状态展示
 
 **Opus 必做**：双内核生命周期与中转正确性。
+
+**当前状态（2026-10-17）**：PR #22 已实现受监督的 sing-box 侧车、鉴权回环中转、按需启动/退出与回滚；当前头部 Windows 桌面 smoke、前后端、格式及三平台 Clippy 全部通过。PR 已准备好审查，堆叠在 M3 PR #20 上，尚未合入 `dev`，故退出项保持未勾选。
 
 ---
 

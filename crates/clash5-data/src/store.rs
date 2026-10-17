@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, path::Path, time::Duration};
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Source {
     Manual,
@@ -21,14 +21,16 @@ impl Source {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
 pub struct Binding {
     pub id: String,
     pub plugin_id: String,
     pub target_id: StableId,
     pub source: Source,
+    #[specta(type = specta_typescript::Number)]
     pub priority: i64,
     pub enabled: bool,
+    #[specta(type = specta_typescript::Unknown)]
     pub config: Value,
     #[serde(default)]
     pub orphan: bool,
@@ -43,7 +45,7 @@ pub struct ProviderDiff {
     pub restored: Vec<StableId>,
     pub duplicates: usize,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, specta::Type)]
 pub struct NodeRecord {
     pub stable_id: StableId,
     pub source: Source,
@@ -52,19 +54,22 @@ pub struct NodeRecord {
     pub server: String,
     pub port: u16,
     pub active: bool,
+    #[specta(type = specta_typescript::Number)]
     pub duplicate_count: usize,
     pub quality: Option<NodeQuality>,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 pub struct PendingIdentityRebind {
     pub source: Source,
     pub old_stable_id: StableId,
     pub candidate_ids: Vec<StableId>,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 pub struct OrphanCleanupPreview {
     pub retention_days: u16,
+    #[specta(type = specta_typescript::Number)]
     pub total_orphans: usize,
+    #[specta(type = specta_typescript::Number)]
     pub eligible_orphans: usize,
 }
 
@@ -74,18 +79,19 @@ pub struct IdentitySourceSnapshot {
     pub source: Source,
     pub nodes: Vec<Node>,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub enum QualityStatus {
     Healthy,
     Slow,
     Failed,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 pub struct NodeQuality {
     pub status: QualityStatus,
     pub short_delay_ms: Option<u32>,
     pub handshake_delay_ms: Option<u32>,
+    #[specta(type = specta_typescript::Number)]
     pub checked_at_ms: u64,
     #[serde(default)]
     pub failure_streak: u8,
