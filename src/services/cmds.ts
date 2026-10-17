@@ -195,9 +195,9 @@ export async function getClashMode() {
 }
 
 export async function getRuntimeConfig() {
-  return (await invoke<unknown | null>('get_runtime_config')) as
-    | IConfigData
-    | null
+  return (await invoke<unknown | null>(
+    'get_runtime_config',
+  )) as IConfigData | null
 }
 
 export async function getRuntimeYaml() {

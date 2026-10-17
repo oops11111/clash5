@@ -36,9 +36,12 @@ function collectGeneratedCommands() {
         if (
           ts.isPropertyAssignment(member) &&
           propertyName(member.name) &&
-          (ts.isArrowFunction(member.initializer) || ts.isFunctionExpression(member.initializer))
+          (ts.isArrowFunction(member.initializer) ||
+            ts.isFunctionExpression(member.initializer))
         ) {
-          const signature = checker.getSignatureFromDeclaration(member.initializer)
+          const signature = checker.getSignatureFromDeclaration(
+            member.initializer,
+          )
           if (signature) commands.set(propertyName(member.name), signature)
         }
       }
@@ -61,7 +64,10 @@ function typeDescription(type, location) {
 }
 
 function equivalentTypes(left, right) {
-  return checker.isTypeAssignableTo(left, right) && checker.isTypeAssignableTo(right, left)
+  return (
+    checker.isTypeAssignableTo(left, right) &&
+    checker.isTypeAssignableTo(right, left)
+  )
 }
 
 function collectArguments(argument) {
@@ -97,15 +103,21 @@ function visitFrontend(node) {
     const location = `cmds.ts:${frontendFile.getLineAndCharacterOfPosition(node.getStart()).line + 1}`
 
     if (!signature) {
-      failures.push(`${location}: ${command} is missing from generated command contract`)
+      failures.push(
+        `${location}: ${command} is missing from generated command contract`,
+      )
     } else {
       const expectedParameters = signature.getParameters()
       const actualArguments = collectArguments(node.arguments[1])
 
       if (actualArguments === undefined) {
-        failures.push(`${location}: ${command} must pass a literal argument object so its keys can be checked`)
+        failures.push(
+          `${location}: ${command} must pass a literal argument object so its keys can be checked`,
+        )
       } else {
-        const expectedNames = expectedParameters.map((parameter) => parameter.name).sort()
+        const expectedNames = expectedParameters
+          .map((parameter) => parameter.name)
+          .sort()
         const actualNames = [...actualArguments.keys()].sort()
         if (JSON.stringify(expectedNames) !== JSON.stringify(actualNames)) {
           failures.push(
@@ -117,7 +129,10 @@ function visitFrontend(node) {
           const valueNode = actualArguments.get(parameter.name)
           if (!valueNode) continue
           const actualType = checker.getTypeAtLocation(valueNode)
-          const expectedType = checker.getTypeOfSymbolAtLocation(parameter, signature.declaration)
+          const expectedType = checker.getTypeOfSymbolAtLocation(
+            parameter,
+            signature.declaration,
+          )
           if (!checker.isTypeAssignableTo(actualType, expectedType)) {
             failures.push(
               `${location}: ${command}.${parameter.name} frontend type ${typeDescription(actualType, valueNode)} is not assignable to backend type ${typeDescription(expectedType, signature.declaration)}`,
@@ -127,9 +142,13 @@ function visitFrontend(node) {
       }
 
       if (!node.typeArguments?.length) {
-        failures.push(`${location}: ${command} must declare its invoke result type`)
+        failures.push(
+          `${location}: ${command} must declare its invoke result type`,
+        )
       } else {
-        const frontendResult = checker.getTypeFromTypeNode(node.typeArguments[0])
+        const frontendResult = checker.getTypeFromTypeNode(
+          node.typeArguments[0],
+        )
         const backendPromise = signature.getReturnType()
         const backendResult = checker.getPromisedTypeOfPromise(backendPromise)
         if (backendResult && !equivalentTypes(frontendResult, backendResult)) {

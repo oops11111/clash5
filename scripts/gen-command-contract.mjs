@@ -15,8 +15,15 @@ execFileSync(
 
 execFileSync(
   process.execPath,
-  [path.join(ROOT, 'node_modules', '@biomejs', 'biome', 'bin', 'biome'), 'format', '--write', OUT],
+  [
+    path.join(ROOT, 'node_modules', '@biomejs', 'biome', 'bin', 'biome'),
+    'format',
+    '--write',
+    OUT,
+  ],
   { cwd: ROOT, stdio: 'inherit' },
 )
 
-console.log(`[gen:command-contract] wrote ${OUT} from registered Rust command signatures`)
+console.log(
+  `[gen:command-contract] wrote ${OUT} from registered Rust command signatures`,
+)
