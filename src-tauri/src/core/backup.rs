@@ -360,7 +360,6 @@ mod tests {
         assert_eq!(manifest["format_version"], BACKUP_FORMAT_VERSION);
         assert_eq!(manifest["identity_key"], "excluded");
         assert_eq!(manifest["includes"][0], dirs::CLASH5_DATA_DB);
-        assert!(serde_json::to_string(&manifest)
-            .is_ok_and(|serialized| !serialized.contains("hmac_key")));
+        assert!(serde_json::to_string(&manifest).is_ok_and(|serialized| !serialized.contains("hmac_key")));
     }
 }

@@ -29,7 +29,7 @@
 - [x] `[Opus]` 原版 stable_id 指纹与凭证归一化、测试；r2 HMAC 与版本迁移另列
 - [x] `[Opus]` 原版 SQLite bindings / chains / quality / audit / orphan，手动与订阅隔离（C2）
 - [x] `[Opus]` 原版订阅 diff：同身份继承 / 新增 / orphan 恢复（A2），名称匹配默认关（B）
-- [ ] `[标准]` 导出/导入包。现有上游 ZIP 仅包含 profiles、clash config、verge config（剔除 WebDAV 凭证）、DNS 与 profile 元数据；未包含 `clash5-nodes.sqlite`，其 HMAC key 存于操作系统凭据库。现有备份不能验收为 clash5 数据包；包内容与是否支持跨设备恢复仍待明确，不能把本机 HMAC key 直接放入迁移包。
+- [x] `[标准]` 导出/导入包（PR #37）。新增版本化 `clash5-backup.json` 清单，并在存在时包含 `clash5-nodes.sqlite`，覆盖绑定、链路、孤儿和质量数据；WebDAV 凭证与本机 HMAC key 明确不进入包。跨设备导入沿用密钥恢复/显式重绑流程，旧 ZIP 仍可恢复。
 - [x] `[标准]` 孤儿保留期提醒与到期清理入口（PR #23 已合并；含 1–365 天保留期、清理预览/确认、到期清理及 CI/Windows 桌面验收）
 
 ### M0.3 验收
