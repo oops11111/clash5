@@ -43,6 +43,7 @@ pub async fn apply_config_payload(mihomo: &Mihomo, yaml: &str) -> Result<()> {
 pub struct SingboxRoute {
     landing_name: String,
     original_yaml: String,
+    relay_yaml: String,
     command_program: OsString,
     singbox_config: Vec<u8>,
     inbound_port: u16,
@@ -137,14 +138,15 @@ impl SingboxRoute {
             let relay_config = singbox_config::relay_config_json(&runtime_yaml, landing_name, relay.endpoint())?;
             let relay_yaml = String::from_utf8(relay_config).context("in-memory relay config was not UTF-8")?;
             apply_config_payload(mihomo, &relay_yaml).await?;
-            Ok::<_, anyhow::Error>((process, config_bytes))
+            Ok::<_, anyhow::Error>((process, config_bytes, relay_yaml))
         }
         .await;
 
         match launch {
-            Ok((process, config_bytes)) => Ok(Self {
+            Ok((process, config_bytes, relay_yaml)) => Ok(Self {
                 landing_name: landing_name.to_owned(),
                 original_yaml: runtime_yaml,
+                relay_yaml,
                 command_program,
                 singbox_config: config_bytes,
                 inbound_port,
@@ -191,6 +193,25 @@ impl SingboxRoute {
         Ok(true)
     }
 
+    pub fn belongs_to_runtime(&self, runtime_yaml: &str) -> bool {
+        self.original_yaml == runtime_yaml
+    }
+
+    /// Reapplies the relay config if Mihomo replaced the in-memory route while sing-box stayed up.
+    pub async fn ensure_mihomo_route(&self, mihomo: &Mihomo) -> Result<bool> {
+        anyhow::ensure!(self.is_running().await?, "sing-box sidecar is not running");
+        let proxy = mihomo
+            .get_proxy_by_name(&self.landing_name)
+            .await
+            .context("failed to read the Mihomo landing proxy")?;
+        if format!("{:?}", proxy.proxy_type) == "Socks5" {
+            return Ok(false);
+        }
+
+        apply_config_payload(mihomo, &self.relay_yaml).await?;
+        Ok(true)
+    }
+
     pub async fn is_running(&self) -> Result<bool> {
         match &self.process {
             Some(process) => process.is_running().await,
@@ -201,6 +222,11 @@ impl SingboxRoute {
     /// A failed Mihomo rollback keeps the route resources alive so active traffic is not stranded.
     pub async fn stop(&mut self, mihomo: &Mihomo) -> Result<()> {
         apply_config_payload(mihomo, &self.original_yaml).await?;
+        self.stop_resources().await
+    }
+
+    /// Tears down route-owned processes without applying a possibly stale Mihomo config.
+    pub async fn stop_resources(&mut self) -> Result<()> {
         let process_result = if let Some(process) = self.process.take() {
             process.stop().await
         } else {

@@ -98,7 +98,7 @@ async function freeLoopbackPort() {
   return port
 }
 
-async function startM4SingboxFixture(targetPort) {
+async function startM4SingboxFixture() {
   const ssPort = await freeLoopbackPort()
   const password = randomBytes(24).toString('base64')
   const child = spawn(
@@ -1728,7 +1728,7 @@ async function verifyRecoveryResetCancellation() {
 
 async function verifyM2Chains() {
   chainFixture = await startChainFixture(true)
-  m4Fixture = await startM4SingboxFixture(chainFixture.targetPort)
+  m4Fixture = await startM4SingboxFixture()
   const fileData = dump({
     proxies: [
       {
@@ -2032,6 +2032,11 @@ async function verifyM4SingboxRoute() {
   }
   await invoke('clash5_save_chain', { chain })
   await invoke('patch_verge_config', { payload: { singbox_persistent: true } })
+  const persistentConfig = await invoke('get_verge_config')
+  if (persistentConfig.singbox_persistent !== true)
+    throw new Error(
+      `M4 keep-running preference did not persist: ${JSON.stringify(persistentConfig.singbox_persistent)}`,
+    )
   const activation = await invoke('clash5_activate_chain', {
     id: chain.id,
     policyGroup: 'M2-selected',
@@ -2064,10 +2069,51 @@ async function verifyM4SingboxRoute() {
     )
 
   phase = 'M4 persistent sidecar behavior'
-  await sleep(135_000)
-  status = await invoke('clash5_singbox_route_status', { landingName })
-  if (!status.active || status.mihomo_proxy_type !== 'Socks5')
-    throw new Error('Persistent M4 route exited while configured to stay alive')
+  const persistentDeadline = Date.now() + 135_000
+  let routeDriftRecovered = false
+  while (Date.now() < persistentDeadline) {
+    await sleep(Math.min(5_000, persistentDeadline - Date.now()))
+    status = await invoke('clash5_singbox_route_status', { landingName })
+    if (
+      status.active &&
+      !status.degraded &&
+      status.mihomo_proxy_type === 'Socks5'
+    )
+      continue
+
+    const recoveryDeadline = Date.now() + 45_000
+    while (
+      Date.now() < recoveryDeadline &&
+      (!status.active ||
+        status.degraded ||
+        status.mihomo_proxy_type !== 'Socks5')
+    ) {
+      await sleep(2_000)
+      status = await invoke('clash5_singbox_route_status', { landingName })
+    }
+    if (
+      !status.active ||
+      status.degraded ||
+      status.mihomo_proxy_type !== 'Socks5'
+    )
+      throw new Error(
+        `Persistent M4 route drift was not recovered: ${JSON.stringify(status)}`,
+      )
+    routeDriftRecovered = true
+  }
+  const persistentConfigAfterIdle = await invoke('get_verge_config')
+  if (
+    persistentConfigAfterIdle.singbox_persistent !== true ||
+    !status.active ||
+    status.mihomo_proxy_type !== 'Socks5'
+  )
+    throw new Error(
+      `Persistent M4 route changed unexpectedly: ${JSON.stringify({ persistent: persistentConfigAfterIdle.singbox_persistent, ...status })}`,
+    )
+  if (routeDriftRecovered)
+    process.stdout.write(
+      'M4 supervisor recovered Mihomo route drift while persistent mode was enabled\n',
+    )
 
   phase = 'M4 idle sidecar shutdown and Mihomo rollback'
   await invoke('patch_verge_config', { payload: { singbox_persistent: false } })
@@ -2256,10 +2302,13 @@ try {
     await verifyM4SingboxRoute()
   } else if (persisted) {
     const workspace = await invoke('clash5_chain_workspace')
-    if (
-      workspace.chains.length !== 2 ||
-      !workspace.chains.some((chain) => chain.name === 'M2 desktop chain')
+    const original = workspace.chains.find(
+      (chain) => chain.name === 'M2 desktop chain',
     )
+    const fallback = workspace.chains.find(
+      (chain) => chain.id === '28dc0b8a-7485-49bc-8a91-f48bdc736846',
+    )
+    if (!original || !fallback)
       throw new Error('M2 chains did not survive a desktop restart')
     const runtime = await invoke('get_runtime_config')
     if (
@@ -2271,12 +2320,6 @@ try {
     )
       throw new Error('Saved M2 chains were not regenerated after restart')
     const view = await invoke('get_proxy_view')
-    const original = workspace.chains.find(
-      (chain) => chain.name === 'M2 desktop chain',
-    )
-    const fallback = workspace.chains.find(
-      (chain) => chain.id === '28dc0b8a-7485-49bc-8a91-f48bdc736846',
-    )
     if (
       view.groups.find((group) => group.name === `clash5-chain-${fallback.id}`)
         ?.now !== `clash5-chain-${original.id}`

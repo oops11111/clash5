@@ -285,12 +285,21 @@ impl CoreManager {
         self.singbox_degraded.load(Ordering::Acquire)
     }
 
-    pub async fn singbox_route_active_for(&self, landing_name: &str) -> bool {
+    pub async fn singbox_route_status_for(&self, landing_name: &str) -> Result<(bool, bool, String)> {
         let active = self.singbox_route.lock().await;
-        match active.as_ref() {
-            Some(route) if route.landing_name() == landing_name => route.is_running().await.unwrap_or(false),
+        let sidecar_running = match active.as_ref() {
+            Some(route) if route.landing_name() == landing_name => route.is_running().await?,
             _ => false,
-        }
+        };
+        drop(active);
+        let proxy = Handle::mihomo()
+            .get_proxy_by_name(landing_name)
+            .await
+            .context("failed to read the Mihomo landing proxy")?;
+        let proxy_type = format!("{:?}", proxy.proxy_type);
+        let route_active = sidecar_running && proxy_type == "Socks5";
+        let degraded = self.singbox_degraded.load(Ordering::Acquire) || (sidecar_running && !route_active);
+        Ok((route_active, degraded, proxy_type))
     }
 
     fn spawn_singbox_supervisor(landing_name: String) {
@@ -304,17 +313,81 @@ impl CoreManager {
         });
     }
 
-    async fn supervise_singbox_route_once(&self, landing_name: &str) -> bool {
-        let mut active = self.singbox_route.lock().await;
-        let Some(route) = active.as_mut() else {
-            drop(active);
+    async fn singbox_runtime_matches(route: &SingboxRoute) -> bool {
+        let runtime = Config::runtime().await.latest_arc();
+        let Some(config) = runtime.config.as_ref() else {
             return false;
         };
-        if route.landing_name() != landing_name {
-            drop(active);
+        serde_yaml_ng::to_string(config)
+            .ok()
+            .is_some_and(|runtime_yaml| route.belongs_to_runtime(&runtime_yaml))
+    }
+
+    async fn rebuild_singbox_route(
+        &self,
+        mut active: tokio::sync::MutexGuard<'_, Option<SingboxRoute>>,
+        landing_name: &str,
+    ) -> bool {
+        logging!(
+            warn,
+            Type::Core,
+            "Mihomo runtime changed while a sing-box route was active; rebuilding the route"
+        );
+        let Some(route) = active.as_mut() else {
             return false;
+        };
+        let cleanup = route.stop_resources().await;
+        if !route.is_stopped() {
+            if let Err(error) = cleanup {
+                logging!(error, Type::Core, "old sing-box route cleanup failed: {error:#}");
+            }
+            return true;
         }
 
+        *active = None;
+        self.singbox_degraded.store(true, Ordering::Release);
+        Handle::refresh_clash();
+        drop(active);
+        if let Err(error) = cleanup {
+            logging!(warn, Type::Core, "old sing-box route cleanup failed: {error:#}");
+        }
+        match self.set_singbox_landing(Some(landing_name)).await {
+            Ok(()) => false,
+            Err(error) => {
+                self.singbox_degraded.store(true, Ordering::Release);
+                logging!(error, Type::Core, "sing-box route rebuild failed: {error:#}");
+                false
+            }
+        }
+    }
+
+    async fn ensure_singbox_mihomo_route(&self, route: &SingboxRoute) {
+        match route.ensure_mihomo_route(Handle::mihomo()).await {
+            Ok(true) => {
+                logging!(
+                    warn,
+                    Type::Core,
+                    "Mihomo landing route drifted; sing-box relay route was restored"
+                );
+                self.singbox_degraded.store(false, Ordering::Release);
+                Handle::refresh_clash();
+            }
+            Ok(false) => self.singbox_degraded.store(false, Ordering::Release),
+            Err(error) => {
+                self.singbox_degraded.store(true, Ordering::Release);
+                logging!(
+                    warn,
+                    Type::Core,
+                    "failed to verify or restore Mihomo sing-box route: {error:#}"
+                );
+            }
+        }
+    }
+
+    async fn restart_singbox_if_exited(&self, active: &mut Option<SingboxRoute>) -> bool {
+        let Some(route) = active.as_mut() else {
+            return false;
+        };
         match route.restart_if_exited().await {
             Ok(true) => logging!(warn, Type::Core, "sing-box sidecar restarted after exiting"),
             Ok(false) => {}
@@ -332,17 +405,40 @@ impl CoreManager {
                     if let Err(error) = result {
                         logging!(error, Type::Core, "sing-box degraded-route cleanup failed: {error:#}");
                     }
-                    drop(active);
                     return false;
                 }
                 if let Err(error) = result {
                     logging!(error, Type::Core, "sing-box degraded-route rollback failed: {error:#}");
                 }
-                drop(active);
-                return true;
             }
             Err(error) => logging!(warn, Type::Core, "sing-box sidecar restart attempt failed: {error:#}"),
         }
+        true
+    }
+
+    async fn supervise_singbox_route_once(&self, landing_name: &str) -> bool {
+        let mut active = self.singbox_route.lock().await;
+        let Some(route) = active.as_mut() else {
+            drop(active);
+            return false;
+        };
+        if route.landing_name() != landing_name {
+            drop(active);
+            return false;
+        }
+
+        if !Self::singbox_runtime_matches(route).await {
+            return self.rebuild_singbox_route(active, landing_name).await;
+        }
+
+        if !self.restart_singbox_if_exited(&mut active).await {
+            return false;
+        }
+
+        let Some(route) = active.as_mut() else {
+            return false;
+        };
+        self.ensure_singbox_mihomo_route(route).await;
 
         let persistent = Config::verge().await.latest_arc().singbox_persistent.unwrap_or(false);
         if !persistent && route.idle_for(SINGBOX_IDLE_SHUTDOWN).await {
