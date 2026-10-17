@@ -12,14 +12,7 @@ if (!fs.existsSync(MANIFEST)) {
 
 execFileSync(
   'cargo',
-  [
-    'run',
-    '--manifest-path',
-    MANIFEST,
-    '--bin',
-    'tauri-command-contract',
-    '-q',
-  ],
+  ['run', '--manifest-path', MANIFEST, '--bin', 'tauri-command-contract', '-q'],
   {
     cwd: path.join(ROOT, 'src-tauri'),
     stdio: 'inherit',
