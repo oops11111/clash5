@@ -1,15 +1,21 @@
 import { execFileSync } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
+const MANIFEST = path.join(ROOT, 'src-tauri', 'Cargo.toml')
 const OUT = 'src/services/tauri-commands.generated.ts'
+
+if (!fs.existsSync(MANIFEST)) {
+  throw new Error(`Tauri Cargo manifest not found: ${MANIFEST}`)
+}
 
 execFileSync(
   'cargo',
   [
     'run',
     '--manifest-path',
-    path.join(ROOT, 'src-tauri', 'Cargo.toml'),
+    MANIFEST,
     '--bin',
     'tauri-command-contract',
     '-q',
