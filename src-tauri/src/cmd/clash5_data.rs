@@ -28,6 +28,36 @@ const PROBE_CONCURRENCY: usize = 16;
 const SHORT_PROBE_URL: &str = "http://cp.cloudflare.com/generate_204";
 const HANDSHAKE_PROBE_URL: &str = "https://cp.cloudflare.com/generate_204";
 static PROBE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+const C5_MANUAL_IMPORT_FAILED: &str = "C5-MANUAL-001";
+const C5_MANUAL_IMPORT_ROLLBACK_FAILED: &str = "C5-MANUAL-002";
+const C5_IDENTITY_RESET_RUNTIME_PENDING: &str = "C5-IDENTITY-002";
+const C5_IDENTITY_ROTATION_FAILED: &str = "C5-IDENTITY-003";
+const C5_IDENTITY_ROTATION_ROLLBACK_FAILED: &str = "C5-IDENTITY-004";
+const C5_PROBE_BUSY: &str = "C5-PROBE-001";
+const C5_PROBE_CLOCK: &str = "C5-PROBE-002";
+
+#[cfg(test)]
+const C5_COMMAND_ERROR_CODES: &[&str] = &[
+    "C5-DATA-001",
+    "C5-DATA-002",
+    "C5-DATA-003",
+    "C5-DATA-004",
+    "C5-IDENTITY-001",
+    "C5-IMPORT-001",
+    "C5-IMPORT-002",
+    "C5-IMPORT-003",
+    "C5-IMPORT-004",
+    "C5-IMPORT-005",
+    "C5-IMPORT-006",
+    "C5-IMPORT-007",
+    C5_MANUAL_IMPORT_FAILED,
+    C5_MANUAL_IMPORT_ROLLBACK_FAILED,
+    C5_IDENTITY_RESET_RUNTIME_PENDING,
+    C5_IDENTITY_ROTATION_FAILED,
+    C5_IDENTITY_ROTATION_ROLLBACK_FAILED,
+    C5_PROBE_BUSY,
+    C5_PROBE_CLOCK,
+];
 
 fn failure(error: DataError) -> super::CommandFailure {
     let code = match error {
@@ -131,16 +161,16 @@ pub async fn clash5_import_verge_data(source_dir: String) -> CmdResult<VergeImpo
 async fn restore_manual_file(previous: Option<&str>) -> CmdResult {
     manual::restore(previous)
         .await
-        .map_err(|_| coded_error("MANUAL_IMPORT_ROLLBACK_FAILED", "could not restore manual proxy file"))?;
+        .map_err(|_| coded_error(C5_MANUAL_IMPORT_ROLLBACK_FAILED, "could not restore manual proxy file"))?;
     let outcome = CoreManager::global().update_config_forced().await.map_err(|_| {
         coded_error(
-            "MANUAL_IMPORT_ROLLBACK_FAILED",
+            C5_MANUAL_IMPORT_ROLLBACK_FAILED,
             "could not restore running configuration",
         )
     })?;
     if !outcome.is_valid() {
         return Err(coded_error(
-            "MANUAL_IMPORT_ROLLBACK_FAILED",
+            C5_MANUAL_IMPORT_ROLLBACK_FAILED,
             "running configuration was not restored",
         ));
     }
@@ -150,25 +180,25 @@ async fn restore_manual_file(previous: Option<&str>) -> CmdResult {
 #[tauri::command]
 pub async fn clash5_import_manual_proxies(proxies: Vec<Value>) -> CmdResult<ManualImportResult> {
     let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
-    let path = manual::path().map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy path is unavailable"))?;
+    let path = manual::path().map_err(|_| coded_error(C5_MANUAL_IMPORT_FAILED, "manual proxy path is unavailable"))?;
     let previous = match tokio::fs::read_to_string(&path).await {
         Ok(yaml) => Some(yaml),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-        Err(_) => return Err(coded_error("MANUAL_IMPORT_FAILED", "manual proxy file is unavailable")),
+        Err(_) => return Err(coded_error(C5_MANUAL_IMPORT_FAILED, "manual proxy file is unavailable")),
     };
     let mut file = manual::load()
         .await
-        .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy file is invalid"))?;
+        .map_err(|_| coded_error(C5_MANUAL_IMPORT_FAILED, "manual proxy file is invalid"))?;
     let identity_key = crate::config::profiles::clash5_identity_key()
         .await
-        .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "node identity is in recovery mode"))?;
+        .map_err(|_| coded_error(C5_MANUAL_IMPORT_FAILED, "node identity is in recovery mode"))?;
     let import = file
         .add_import(proxies, &identity_key)
-        .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy import is invalid"))?;
+        .map_err(|_| coded_error(C5_MANUAL_IMPORT_FAILED, "manual proxy import is invalid"))?;
     let imported = import.nodes.len();
     manual::save(&file)
         .await
-        .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy file could not be saved"))?;
+        .map_err(|_| coded_error(C5_MANUAL_IMPORT_FAILED, "manual proxy file could not be saved"))?;
     if manual::load()
         .await
         .and_then(|saved| saved.runtime_proxies(&identity_key))
@@ -176,9 +206,9 @@ pub async fn clash5_import_manual_proxies(proxies: Vec<Value>) -> CmdResult<Manu
     {
         manual::restore(previous.as_deref())
             .await
-            .map_err(|_| coded_error("MANUAL_IMPORT_ROLLBACK_FAILED", "could not restore manual proxy file"))?;
+            .map_err(|_| coded_error(C5_MANUAL_IMPORT_ROLLBACK_FAILED, "could not restore manual proxy file"))?;
         return Err(coded_error(
-            "MANUAL_IMPORT_FAILED",
+            C5_MANUAL_IMPORT_FAILED,
             "manual proxy file could not be read back",
         ));
     }
@@ -187,7 +217,7 @@ pub async fn clash5_import_manual_proxies(proxies: Vec<Value>) -> CmdResult<Manu
     if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
         restore_manual_file(previous.as_deref()).await?;
         return Err(coded_error(
-            "MANUAL_IMPORT_FAILED",
+            C5_MANUAL_IMPORT_FAILED,
             "manual proxy configuration was rejected",
         ));
     }
@@ -199,7 +229,7 @@ pub async fn clash5_import_manual_proxies(proxies: Vec<Value>) -> CmdResult<Manu
     if saved.is_err() {
         restore_manual_file(previous.as_deref()).await?;
         return Err(coded_error(
-            "MANUAL_IMPORT_FAILED",
+            C5_MANUAL_IMPORT_FAILED,
             "manual proxy inventory could not be saved",
         ));
     }
@@ -263,7 +293,7 @@ pub async fn clash5_reset_identity() -> CmdResult {
     let applied = CoreManager::global().update_config_forced().await;
     if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
         return Err(coded_error(
-            "IDENTITY_RESET_RUNTIME_PENDING",
+            C5_IDENTITY_RESET_RUNTIME_PENDING,
             "the new identity was saved but the running configuration could not be refreshed",
         ));
     }
@@ -281,12 +311,12 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         let mapping = profiles
             .current_mapping()
             .await
-            .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "the current profile could not be read"))?;
+            .map_err(|_| coded_error(C5_IDENTITY_ROTATION_FAILED, "the current profile could not be read"))?;
         let yaml = serde_yaml_ng::to_string(&mapping)
-            .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "the current profile could not be parsed"))?;
+            .map_err(|_| coded_error(C5_IDENTITY_ROTATION_FAILED, "the current profile could not be parsed"))?;
         if let Some(nodes) = parse_inline_nodes(&yaml).map_err(|_| {
             coded_error(
-                "IDENTITY_ROTATION_FAILED",
+                C5_IDENTITY_ROTATION_FAILED,
                 "the current profile contains invalid node data",
             )
         })? {
@@ -314,7 +344,7 @@ pub async fn clash5_rotate_identity() -> CmdResult {
                 };
                 let Some(nodes) = parse_inline_nodes(&yaml).map_err(|_| {
                     coded_error(
-                        "IDENTITY_ROTATION_FAILED",
+                        C5_IDENTITY_ROTATION_FAILED,
                         "a proxy provider contains invalid node data",
                     )
                 })?
@@ -333,10 +363,10 @@ pub async fn clash5_rotate_identity() -> CmdResult {
 
     let mut manual_file = manual::load()
         .await
-        .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "manual proxies could not be read"))?;
+        .map_err(|_| coded_error(C5_IDENTITY_ROTATION_FAILED, "manual proxies could not be read"))?;
     let manual_nodes = manual_file
         .identity_nodes(&old_key)
-        .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "manual proxy identity data is invalid"))?;
+        .map_err(|_| coded_error(C5_IDENTITY_ROTATION_FAILED, "manual proxy identity data is invalid"))?;
     let has_manual_proxies = !manual_nodes.is_empty();
     snapshots.push(clash5_data::IdentitySourceSnapshot {
         source: Source::Manual,
@@ -351,7 +381,7 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(_) => {
             return Err(coded_error(
-                "IDENTITY_ROTATION_FAILED",
+                C5_IDENTITY_ROTATION_FAILED,
                 "manual proxy data could not be backed up",
             ));
         }
@@ -359,16 +389,16 @@ pub async fn clash5_rotate_identity() -> CmdResult {
     if has_manual_proxies {
         manual_file
             .rekey_identity(&old_key, &new_key)
-            .map_err(|_| coded_error("IDENTITY_ROTATION_FAILED", "manual proxies could not be rekeyed"))?;
+            .map_err(|_| coded_error(C5_IDENTITY_ROTATION_FAILED, "manual proxies could not be rekeyed"))?;
         if manual::save(&manual_file).await.is_err() {
             manual::restore(previous.as_deref()).await.map_err(|_| {
                 coded_error(
-                    "IDENTITY_ROTATION_ROLLBACK_FAILED",
+                    C5_IDENTITY_ROTATION_ROLLBACK_FAILED,
                     "manual proxies could not be restored",
                 )
             })?;
             return Err(coded_error(
-                "IDENTITY_ROTATION_FAILED",
+                C5_IDENTITY_ROTATION_FAILED,
                 "manual proxies could not be saved",
             ));
         }
@@ -376,7 +406,7 @@ pub async fn clash5_rotate_identity() -> CmdResult {
         if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
             restore_manual_file(previous.as_deref()).await?;
             return Err(coded_error(
-                "IDENTITY_ROTATION_FAILED",
+                C5_IDENTITY_ROTATION_FAILED,
                 "the rekeyed manual proxies were rejected",
             ));
         }
@@ -535,10 +565,10 @@ where
 pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
     let _guard = PROBE_LOCK
         .try_lock()
-        .map_err(|_| super::coded_error("PROBE_BUSY", "a node probe is already running"))?;
+        .map_err(|_| super::coded_error(C5_PROBE_BUSY, "a node probe is already running"))?;
     let now_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|_| super::coded_error("PROBE_CLOCK", "system clock is unavailable"))?
+        .map_err(|_| super::coded_error(C5_PROBE_CLOCK, "system clock is unavailable"))?
         .as_millis() as u64;
     refresh_runtime_proxy_providers().await?;
     let records = crate::config::profiles::with_clash5_binding_store(|store| store.node_records(false))
@@ -659,6 +689,17 @@ mod tests {
         Arc,
         atomic::{AtomicUsize, Ordering},
     };
+
+    #[test]
+    fn every_registered_node_data_error_code_is_namespaced_and_unique() {
+        for (index, code) in C5_COMMAND_ERROR_CODES.iter().enumerate() {
+            assert!(code.starts_with("C5-"), "{code}");
+            assert!(
+                C5_COMMAND_ERROR_CODES[index + 1..].iter().all(|other| code != other),
+                "duplicate code: {code}"
+            );
+        }
+    }
 
     #[test]
     fn data_failures_use_stable_c5_codes_without_exposing_internal_errors() {
