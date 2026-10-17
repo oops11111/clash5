@@ -62,3 +62,7 @@
 | 2026-10-14 | R-26 | 追踪中 | [第四次原生验收](https://github.com/oops11111/clash5/actions/runs/38542030896)确认键盘清空搜索后四条活动节点恢复；随后脚本用 DOM `click()` 未能展开 MUI 排序菜单，失败截图可见菜单关闭。脚本已改用 WebDriver 指针点击；排序、重启身份与完整视觉证据仍待重验。 |
 | 2026-10-15 | R-11 | 缓解中 | [M1 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)确认本地 429 fixture 的失败不阻断其它节点，缓存与连续失败退避生效；Mihomo 延迟接口不返回上游状态或 `Retry-After`，仍需观察真实机场限流行为。 |
 | 2026-10-15 | R-26 | 已缓解 | [Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过完整节点页面交互和桌面重启身份检查，并上传前后截图。脚本避开上游 Windows 驱动关闭阻塞；Server 2025 的 WebDriver 问题仍独立追踪。 |
+| 2026-10-17 | R-01、R-02、R-25 | 已缓解 | PR #23 已合入；本机 HMAC stable_id、版本迁移、密钥丢失恢复与同来源凭证轮换重绑通过数据层、跨平台 Clippy 和 Windows 桌面验收。issue #7 已完成。 |
+| 2026-10-17 | R-19 | 已缓解 | PR #26 已合入；只读导入的源目录前后 SHA-256、fixture 和 Windows 桌面验收通过。issue #25 已完成。 |
+| 2026-10-17 | R-18 | 缓解中 | PR #27 的 CI、Windows 安装器隔离与 shell smoke 通过；真实同机安装、启动、升级、卸载和配置校验和验收仍未完成。 |
+| 2026-10-17 | R-20 | 开放 | 仍需统一日志/诊断脱敏与凭证、完整订阅 URL、controller secret、relay token 的泄露回归证据。 |
