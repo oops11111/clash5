@@ -103,7 +103,8 @@ jobs:
             contract:
               - 'src/services/contract.ts'
               - 'src/services/tauri-commands.generated.ts'
-              - 'src/services/cmds.ts'
+              - 'src/**'
+              - 'tsconfig.json'
               - 'scripts/gen-command-contract.mjs'
               - 'scripts/check-command-contract.mjs'
               - 'scripts/gen-contract.mjs'
@@ -111,14 +112,8 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'src-tauri/Cargo.toml'
               - 'src-tauri/Cargo.lock'
-              - 'src-tauri/src/cmd/**'
-              - 'src-tauri/src/config/**'
-              - 'src-tauri/src/core/**'
-              - 'src-tauri/src/feat/**'
+              - 'src-tauri/src/**'
               - 'crates/**'
-              - 'src-tauri/src/core/notify/**'
-              - 'src-tauri/src/bin/**'
-              - 'src-tauri/src/lib.rs'
               - '.github/workflows/frontend-check.yml'
 
       - name: Skip if contract inputs unchanged

@@ -34,7 +34,7 @@ pub use crate::core::notify::frontend_wire_contract;
 /// Exports TypeScript bindings for every app-owned Tauri command.
 pub fn export_frontend_command_contract() -> Result<(), Box<dyn std::error::Error>> {
     let builder = tauri_specta::Builder::<tauri::Wry>::new()
-        .error_handling(tauri_specta::ErrorHandlingMode::Throw)
+        .error_handling(tauri_specta::ErrorHandlingMode::Result)
         .commands(tauri_specta::collect_commands![
             cmd::probe_listener,
             cmd::save_proxy_ports,

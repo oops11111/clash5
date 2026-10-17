@@ -28,6 +28,7 @@ pub(super) fn normalize_profile_home_url(raw: &str) -> Option<String> {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default, specta::Type)]
+#[serde(default)]
 pub struct PrfItem {
     #[specta(type = Option<std::string::String>)]
     pub uid: Option<String>,
@@ -77,6 +78,7 @@ pub struct PrfItem {
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq, specta::Type)]
+#[serde(default)]
 pub struct PrfSelected {
     #[specta(type = Option<std::string::String>)]
     pub name: Option<String>,
@@ -97,6 +99,7 @@ pub struct PrfExtra {
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq, specta::Type)]
+#[serde(default)]
 pub struct PrfOption {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[specta(type = Option<std::string::String>)]

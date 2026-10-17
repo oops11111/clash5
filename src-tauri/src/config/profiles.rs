@@ -50,6 +50,7 @@ const SELECTED_NODES_FIRST_PASS_BUDGET: Duration = Duration::from_secs(3);
 
 /// Define the `profiles.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(default)]
 pub struct IProfiles {
     #[specta(type = Option<std::string::String>)]
     pub current: Option<String>,

@@ -12,6 +12,7 @@ use smartstring::alias::String;
 
 /// ### `verge.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(default)]
 pub struct IVerge {
     /// silent | error | warn | info | debug | trace
     #[specta(type = Option<std::string::String>)]
@@ -55,7 +56,6 @@ pub struct IVerge {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub common_tray_icon: Option<bool>,
 
-    #[cfg(target_os = "macos")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[specta(type = Option<std::string::String>)]
     pub tray_icon: Option<String>,
@@ -218,7 +218,7 @@ pub struct IVerge {
     #[specta(type = Option<std::string::String>)]
     pub webdav_password: Option<String>,
 
-    #[cfg(target_os = "macos")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_tray_speed: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -242,6 +242,7 @@ pub struct IVerge {
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(default)]
 pub struct IVergeTestItem {
     #[specta(type = Option<std::string::String>)]
     pub uid: Option<String>,
@@ -254,6 +255,7 @@ pub struct IVergeTestItem {
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(default)]
 pub struct IVergeTheme {
     #[specta(type = Option<std::string::String>)]
     pub primary_color: Option<String>,
@@ -384,8 +386,7 @@ impl IVerge {
             enable_memory_usage: Some(true),
             enable_group_icon: Some(true),
             pause_render_traffic_stats_on_blur: Some(true),
-            #[cfg(target_os = "macos")]
-            tray_icon: Some("monochrome".into()),
+            tray_icon: cfg!(target_os = "macos").then(|| "monochrome".into()),
             menu_icon: Some("monochrome".into()),
             notice_position: Some("top-right".into()),
             collapse_navbar: Some(false),
@@ -423,8 +424,7 @@ impl IVerge {
             webdav_url: None,
             webdav_username: None,
             webdav_password: None,
-            #[cfg(target_os = "macos")]
-            enable_tray_speed: Some(false),
+            enable_tray_speed: cfg!(target_os = "macos").then_some(false),
             tray_proxy_groups_display_mode: Some("default".into()),
             tray_inline_outbound_modes: Some(false),
             enable_global_hotkey: Some(true),

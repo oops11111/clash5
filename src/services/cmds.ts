@@ -2,18 +2,32 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 import type { DownloadEvent as UpdaterDownloadEvent } from '@tauri-apps/plugin-updater'
 import dayjs from 'dayjs'
 
-import type { CommandFailure } from '@/services/notice-service'
+import {
+  nodeFromWire,
+  profilesFromWire,
+  proxyViewFromWire,
+  vergeFromWire,
+  withoutNulls,
+} from '@/services/command-wire'
 import { showNotice } from '@/services/notice-service'
 import type {
   Binding as GeneratedBinding,
+  ClashInfo,
+  CommandFailure_Serialize,
   DownloadEvent as ContractDownloadEvent,
+  IProfiles_Serialize,
+  IVerge_Serialize,
+  NetworkInterfaceWire,
+  NodeRecord,
   PendingIdentityRebind as GeneratedPendingIdentityRebind,
+  ProxyViewV1_Serialize,
   RunStateView,
   RunningMode as GeneratedRunningMode,
   ServiceInstallOutcome as GeneratedServiceInstallOutcome,
   UnlockItem as GeneratedUnlockItem,
+  ValidationOutcome,
+  WebDavBackupEntry,
 } from '@/services/tauri-commands.generated'
-import type { Clash5NodeRecord } from '@/types/clash5-node'
 import type { ProxyViewV1 } from '@/types/proxy-view'
 import { debugLog } from '@/utils/debug'
 
@@ -22,11 +36,13 @@ export async function copyClashEnv() {
 }
 
 export async function getProfiles() {
-  return invoke<IProfilesConfig>('get_profiles')
+  return profilesFromWire(await invoke<IProfiles_Serialize>('get_profiles'))
 }
 
 export async function listClash5Nodes(includeInactive = false) {
-  return invoke<Clash5NodeRecord[]>('clash5_list_nodes', { includeInactive })
+  return (
+    await invoke<NodeRecord[]>('clash5_list_nodes', { includeInactive })
+  ).map(nodeFromWire)
 }
 
 export type Clash5PendingIdentityRebind = GeneratedPendingIdentityRebind
@@ -187,7 +203,7 @@ export async function patchProfile(
 }
 
 export async function getClashInfo() {
-  return invoke<IClashInfo>('get_clash_info')
+  return withoutNulls(await invoke<ClashInfo>('get_clash_info'))
 }
 
 // Fallback mode read independent of strict mihomo `/configs` deserialization.
@@ -215,7 +231,9 @@ export async function getRuntimeProxyChainConfig(proxyChainExitNode: string) {
   })
 }
 
-export async function updateProxyChainConfigInRuntime(proxyChainConfig: any) {
+export async function updateProxyChainConfigInRuntime(
+  proxyChainConfig: unknown,
+) {
   return invoke<null>('update_proxy_chain_config_in_runtime', {
     proxyChainConfig,
   })
@@ -243,11 +261,9 @@ export async function forgetSelectedNode(groupName: string) {
 }
 
 export async function getProxyView(): Promise<ProxyViewV1> {
-  const view = await invoke<ProxyViewV1>('get_proxy_view')
-  if (view.schemaVersion !== 1) {
-    throw new Error('Unsupported proxy view schema: ' + view.schemaVersion)
-  }
-  return view
+  return proxyViewFromWire(
+    await invoke<ProxyViewV1_Serialize>('get_proxy_view'),
+  )
 }
 
 export async function getClashLogs() {
@@ -274,7 +290,7 @@ export async function getClashLogs() {
 }
 
 export async function getVergeConfig() {
-  return invoke<IVergeConfig>('get_verge_config')
+  return vergeFromWire(await invoke<IVerge_Serialize>('get_verge_config'))
 }
 
 export async function patchVergeConfig(payload: IVergeConfig) {
@@ -376,7 +392,11 @@ export async function getEmbeddedServerPort() {
 }
 
 export async function changeClashCore(clashCore: string) {
-  return invoke<CommandFailure | null>('change_clash_core', { clashCore })
+  const failure = await invoke<CommandFailure_Serialize | null>(
+    'change_clash_core',
+    { clashCore },
+  )
+  return failure === null ? null : withoutNulls(failure)
 }
 
 export async function restartCore() {
@@ -511,7 +531,9 @@ export async function getSystemHostname() {
 }
 
 export async function getNetworkInterfacesInfo() {
-  return invoke<INetworkInterface[]>('get_network_interfaces_info')
+  return withoutNulls(
+    await invoke<NetworkInterfaceWire[]>('get_network_interfaces_info'),
+  )
 }
 
 export async function createWebdavBackup() {
@@ -559,11 +581,14 @@ export async function saveWebdavConfig(
 }
 
 export async function listWebDavBackup() {
-  const list: IWebDavFile[] = await invoke<IWebDavFile[]>('list_webdav_backup')
-  list.forEach((item) => {
-    item.filename = item.href.split('/').pop() as string
-  })
-  return list
+  const list = await invoke<WebDavBackupEntry[]>('list_webdav_backup')
+  return list.map(
+    (item): IWebDavFile => ({
+      ...item,
+      filename: item.href.split('/').pop() ?? '',
+      tag: item.tag ?? '',
+    }),
+  )
 }
 
 export async function listLocalBackup() {

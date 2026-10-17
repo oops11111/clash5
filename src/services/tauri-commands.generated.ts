@@ -5,94 +5,173 @@ import { invoke as __TAURI_INVOKE, Channel } from '@tauri-apps/api/core'
 /** Commands */
 export const commands = {
   probeListener: (request: ListenerProbe) =>
-    __TAURI_INVOKE<ListenerProbeOutcome>('probe_listener', { request }),
+    typedError<ListenerProbeOutcome, CommandFailure_Serialize>(
+      __TAURI_INVOKE('probe_listener', { request }),
+    ),
   saveProxyPorts: (settings: ProxyPortSettings) =>
-    __TAURI_INVOKE<SaveProxyPortsOutcome>('save_proxy_ports', { settings }),
-  getSysProxy: () => __TAURI_INVOKE<SystemProxyWire>('get_sys_proxy'),
-  getAutoProxy: () => __TAURI_INVOKE<AutoProxyWire>('get_auto_proxy'),
+    typedError<SaveProxyPortsOutcome, CommandFailure_Serialize>(
+      __TAURI_INVOKE('save_proxy_ports', { settings }),
+    ),
+  getSysProxy: () =>
+    typedError<SystemProxyWire, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_sys_proxy'),
+    ),
+  getAutoProxy: () =>
+    typedError<AutoProxyWire, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_auto_proxy'),
+    ),
   getEmbeddedServerPort: () =>
-    __TAURI_INVOKE<number>('get_embedded_server_port'),
-  openAppDir: () => __TAURI_INVOKE<null>('open_app_dir'),
-  openLogsDir: () => __TAURI_INVOKE<null>('open_logs_dir'),
-  openCoreDir: () => __TAURI_INVOKE<null>('open_core_dir'),
+    typedError<number, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_embedded_server_port'),
+    ),
+  openAppDir: () =>
+    typedError<null, CommandFailure_Serialize>(__TAURI_INVOKE('open_app_dir')),
+  openLogsDir: () =>
+    typedError<null, CommandFailure_Serialize>(__TAURI_INVOKE('open_logs_dir')),
+  openCoreDir: () =>
+    typedError<null, CommandFailure_Serialize>(__TAURI_INVOKE('open_core_dir')),
   getNetworkInterfaces: () =>
     __TAURI_INVOKE<string[]>('get_network_interfaces'),
   getSystemHostname: () => __TAURI_INVOKE<string>('get_system_hostname'),
-  restartApp: () => __TAURI_INVOKE<null>('restart_app'),
+  restartApp: () =>
+    typedError<null, CommandFailure_Serialize>(__TAURI_INVOKE('restart_app')),
   installUpdate: (version: string, onEvent: Channel<DownloadEvent>) =>
-    __TAURI_INVOKE<boolean>('install_update', { version, onEvent }),
+    typedError<boolean, CommandFailure_Serialize>(
+      __TAURI_INVOKE('install_update', { version, onEvent }),
+    ),
   cancelUpdateDownload: () => __TAURI_INVOKE<void>('cancel_update_download'),
-  restartCore: () => __TAURI_INVOKE<null>('restart_core'),
+  restartCore: () =>
+    typedError<null, CommandFailure_Serialize>(__TAURI_INVOKE('restart_core')),
   /**  Replaces the managed core binary atomically instead of letting mihomo overwrite itself. */
   upgradeClashCore: (force: boolean) =>
-    __TAURI_INVOKE<CoreUpgradeReport>('upgrade_clash_core', { force }),
+    typedError<CoreUpgradeReport, CommandFailure_Serialize>(
+      __TAURI_INVOKE('upgrade_clash_core', { force }),
+    ),
   /**  Returns one coherent core/service snapshot instead of independently refreshed state. */
-  getRuntimeState: () => __TAURI_INVOKE<RunStateView>('get_runtime_state'),
+  getRuntimeState: () =>
+    typedError<RunStateView, string>(__TAURI_INVOKE('get_runtime_state')),
   getPendingFailures: () =>
     __TAURI_INVOKE<PendingFailure[]>('get_pending_failures'),
   getSidecarFailure: () =>
     __TAURI_INVOKE<SidecarFailureSnapshot>('get_sidecar_failure'),
-  entryLightweightMode: () => __TAURI_INVOKE<null>('entry_lightweight_mode'),
+  entryLightweightMode: () =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('entry_lightweight_mode'),
+    ),
   installService: () =>
-    __TAURI_INVOKE<ServiceInstallOutcome>('install_service'),
-  uninstallService: () => __TAURI_INVOKE<null>('uninstall_service'),
+    typedError<ServiceInstallOutcome, CommandFailure_Serialize>(
+      __TAURI_INVOKE('install_service'),
+    ),
+  uninstallService: () =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('uninstall_service'),
+    ),
   reinstallService: () =>
-    __TAURI_INVOKE<ServiceInstallOutcome>('reinstall_service'),
-  repairService: () => __TAURI_INVOKE<ServiceInstallOutcome>('repair_service'),
-  continueWithSidecar: () => __TAURI_INVOKE<null>('continue_with_sidecar'),
+    typedError<ServiceInstallOutcome, CommandFailure_Serialize>(
+      __TAURI_INVOKE('reinstall_service'),
+    ),
+  repairService: () =>
+    typedError<ServiceInstallOutcome, CommandFailure_Serialize>(
+      __TAURI_INVOKE('repair_service'),
+    ),
+  continueWithSidecar: () =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('continue_with_sidecar'),
+    ),
   syncRuntimeProviders: () => __TAURI_INVOKE<void>('sync_runtime_providers'),
-  getClashInfo: () => __TAURI_INVOKE<ClashInfo>('get_clash_info'),
+  getClashInfo: () =>
+    typedError<ClashInfo, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_clash_info'),
+    ),
   patchClashConfig: (payload: unknown) =>
-    __TAURI_INVOKE<null>('patch_clash_config', { payload }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('patch_clash_config', { payload }),
+    ),
   patchClashMode: (payload: string) =>
-    __TAURI_INVOKE<null>('patch_clash_mode', { payload }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('patch_clash_mode', { payload }),
+    ),
   /**  Reads the saved mode without depending on strict mihomo `/configs` deserialization. */
-  getClashMode: () => __TAURI_INVOKE<string | null>('get_clash_mode'),
+  getClashMode: () =>
+    typedError<string | null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_clash_mode'),
+    ),
   changeClashCore: (clashCore: string) =>
-    __TAURI_INVOKE<{
-      /**  Stable frontend identifier, when classified. */
-      code?: string | null
-      /**  Human-readable diagnostic detail. */
-      detail: string
-      /**  Requested operation when known by the command. */
-      operation?: FailedOperation | null
-    } | null>('change_clash_core', { clashCore }),
-  getRuntimeConfig: () => __TAURI_INVOKE<unknown | null>('get_runtime_config'),
-  getProxyView: () => __TAURI_INVOKE<ProxyViewV1_Serialize>('get_proxy_view'),
-  getRuntimeYaml: () => __TAURI_INVOKE<string>('get_runtime_yaml'),
+    typedError<
+      {
+        /**  Stable frontend identifier, when classified. */
+        code?: string | null
+        /**  Human-readable diagnostic detail. */
+        detail: string
+        /**  Requested operation when known by the command. */
+        operation?: FailedOperation | null
+      } | null,
+      CommandFailure_Serialize
+    >(__TAURI_INVOKE('change_clash_core', { clashCore })),
+  getRuntimeConfig: () =>
+    typedError<unknown | null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_runtime_config'),
+    ),
+  getProxyView: () =>
+    typedError<ProxyViewV1_Serialize, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_proxy_view'),
+    ),
+  getRuntimeYaml: () =>
+    typedError<string, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_runtime_yaml'),
+    ),
   getRuntimeLogs: () =>
-    __TAURI_INVOKE<{ [key in string]: [string, string][] }>('get_runtime_logs'),
+    typedError<
+      { [key in string]: [string, string][] },
+      CommandFailure_Serialize
+    >(__TAURI_INVOKE('get_runtime_logs')),
   getRuntimeProxyChainConfig: (proxyChainExitNode: string) =>
-    __TAURI_INVOKE<string>('get_runtime_proxy_chain_config', {
-      proxyChainExitNode,
-    }),
+    typedError<string, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_runtime_proxy_chain_config', { proxyChainExitNode }),
+    ),
   updateProxyChainConfigInRuntime: (proxyChainConfig: unknown | null) =>
-    __TAURI_INVOKE<null>('update_proxy_chain_config_in_runtime', {
-      proxyChainConfig,
-    }),
-  invokeUwpTool: () => __TAURI_INVOKE<null>('invoke_uwp_tool'),
-  copyClashEnv: () => __TAURI_INVOKE<null>('copy_clash_env'),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('update_proxy_chain_config_in_runtime', {
+        proxyChainConfig,
+      }),
+    ),
+  invokeUwpTool: () =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('invoke_uwp_tool'),
+    ),
+  copyClashEnv: () =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('copy_clash_env'),
+    ),
   syncTrayProxySelection: () =>
-    __TAURI_INVOKE<null>('sync_tray_proxy_selection'),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('sync_tray_proxy_selection'),
+    ),
   /**  Merges one selection pair into fresh backend state to avoid stale-list overwrites. */
   recordSelectedNode: (groupName: string, node: string) =>
-    __TAURI_INVOKE<null>('record_selected_node', { groupName, node }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('record_selected_node', { groupName, node }),
+    ),
   forgetSelectedNode: (groupName: string) =>
-    __TAURI_INVOKE<null>('forget_selected_node', { groupName }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('forget_selected_node', { groupName }),
+    ),
   saveDnsConfig: (dnsConfig: unknown) =>
-    __TAURI_INVOKE<null>('save_dns_config', { dnsConfig }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('save_dns_config', { dnsConfig }),
+    ),
   applyDnsConfig: (apply: boolean) =>
-    __TAURI_INVOKE<null>('apply_dns_config', { apply }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('apply_dns_config', { apply }),
+    ),
   setDnsOverride: (
     profileUid: string,
     enabled: boolean,
     confirmation: string | null,
   ) =>
-    __TAURI_INVOKE<DnsOverrideOutcome>('set_dns_override', {
-      profileUid,
-      enabled,
-      confirmation,
-    }),
+    typedError<DnsOverrideOutcome, CommandFailure_Serialize>(
+      __TAURI_INVOKE('set_dns_override', { profileUid, enabled, confirmation }),
+    ),
   takeDnsOverrideNotice: () =>
     __TAURI_INVOKE<boolean>('take_dns_override_notice'),
   takeServiceFallbackNotice: () =>
@@ -115,171 +194,285 @@ export const commands = {
   takeDiscardedKeysNotice: () =>
     __TAURI_INVOKE<string | null>('take_discarded_keys_notice'),
   getDnsConfigContent: () =>
-    __TAURI_INVOKE<string | null>('get_dns_config_content'),
+    typedError<string | null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_dns_config_content'),
+    ),
   validateDnsConfig: () =>
-    __TAURI_INVOKE<ValidationOutcome>('validate_dns_config'),
-  getClashLogs: () => __TAURI_INVOKE<string[]>('get_clash_logs'),
+    typedError<ValidationOutcome, CommandFailure_Serialize>(
+      __TAURI_INVOKE('validate_dns_config'),
+    ),
+  getClashLogs: () =>
+    typedError<string[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_clash_logs'),
+    ),
   /**  获取Verge配置 */
-  getVergeConfig: () => __TAURI_INVOKE<IVerge_Serialize>('get_verge_config'),
+  getVergeConfig: () =>
+    typedError<IVerge_Serialize, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_verge_config'),
+    ),
   /**  修改Verge配置 */
   patchVergeConfig: (payload: IVerge_Deserialize) =>
-    __TAURI_INVOKE<null>('patch_verge_config', { payload }),
-  testDelay: (url: string) => __TAURI_INVOKE<number>('test_delay', { url }),
-  getAppDir: () => __TAURI_INVOKE<string>('get_app_dir'),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('patch_verge_config', { payload }),
+    ),
+  testDelay: (url: string) =>
+    typedError<number, CommandFailure_Serialize>(
+      __TAURI_INVOKE('test_delay', { url }),
+    ),
+  getAppDir: () =>
+    typedError<string, CommandFailure_Serialize>(__TAURI_INVOKE('get_app_dir')),
   copyIconFile: (path: string, iconInfo: IconInfo) =>
-    __TAURI_INVOKE<string>('copy_icon_file', { path, iconInfo }),
+    typedError<string, CommandFailure_Serialize>(
+      __TAURI_INVOKE('copy_icon_file', { path, iconInfo }),
+    ),
   downloadIconCache: (url: string, name: string) =>
-    __TAURI_INVOKE<string>('download_icon_cache', { url, name }),
+    typedError<string, CommandFailure_Serialize>(
+      __TAURI_INVOKE('download_icon_cache', { url, name }),
+    ),
   openDevtools: () => __TAURI_INVOKE<void>('open_devtools'),
   exitApp: () => __TAURI_INVOKE<void>('exit_app'),
   getNetworkInterfacesInfo: () =>
-    __TAURI_INVOKE<NetworkInterfaceWire[]>('get_network_interfaces_info'),
-  getProfiles: () => __TAURI_INVOKE<IProfiles_Serialize>('get_profiles'),
+    typedError<NetworkInterfaceWire[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_network_interfaces_info'),
+    ),
+  getProfiles: () =>
+    typedError<IProfiles_Serialize, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_profiles'),
+    ),
   clash5ListBindings: (
     source:
       | { kind: 'manual' }
       | { kind: 'subscription'; provider_id: string }
       | null,
-  ) => __TAURI_INVOKE<Binding[]>('clash5_list_bindings', { source }),
+  ) =>
+    typedError<Binding[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_bindings', { source }),
+    ),
   clash5ListPendingIdentityRebinds: (
     source:
       | { kind: 'manual' }
       | { kind: 'subscription'; provider_id: string }
       | null,
   ) =>
-    __TAURI_INVOKE<PendingIdentityRebind[]>(
-      'clash5_list_pending_identity_rebinds',
-      { source },
+    typedError<PendingIdentityRebind[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_pending_identity_rebinds', { source }),
     ),
   clash5ResolveIdentityRebind: (source: Source, oldId: string, newId: string) =>
-    __TAURI_INVOKE<null>('clash5_resolve_identity_rebind', {
-      source,
-      oldId,
-      newId,
-    }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_resolve_identity_rebind', {
+        source,
+        oldId,
+        newId,
+      }),
+    ),
   clash5IdentityStatus: () =>
-    __TAURI_INVOKE<Clash5IdentityStatus>('clash5_identity_status'),
-  clash5ResetIdentity: () => __TAURI_INVOKE<null>('clash5_reset_identity'),
-  clash5RotateIdentity: () => __TAURI_INVOKE<null>('clash5_rotate_identity'),
+    typedError<Clash5IdentityStatus, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_identity_status'),
+    ),
+  clash5ResetIdentity: () =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_reset_identity'),
+    ),
+  clash5RotateIdentity: () =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_rotate_identity'),
+    ),
   clash5ListNodes: (includeInactive: boolean | null) =>
-    __TAURI_INVOKE<NodeRecord[]>('clash5_list_nodes', { includeInactive }),
-  clash5ProbeNodes: () => __TAURI_INVOKE<ProbeBatch>('clash5_probe_nodes'),
+    typedError<NodeRecord[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_nodes', { includeInactive }),
+    ),
+  clash5ProbeNodes: () =>
+    typedError<ProbeBatch, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_probe_nodes'),
+    ),
   clash5ImportManualProxies: (proxies: unknown[]) =>
-    __TAURI_INVOKE<ManualImportResult>('clash5_import_manual_proxies', {
-      proxies,
-    }),
+    typedError<ManualImportResult, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_import_manual_proxies', { proxies }),
+    ),
   clash5BindNode: (binding: Binding) =>
-    __TAURI_INVOKE<null>('clash5_bind_node', { binding }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_bind_node', { binding }),
+    ),
   clash5PurgeOrphans: (
     source:
       | { kind: 'manual' }
       | { kind: 'subscription'; provider_id: string }
       | null,
-  ) => __TAURI_INVOKE<number | null>('clash5_purge_orphans', { source }),
+  ) =>
+    typedError<number | null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_purge_orphans', { source }),
+    ),
   clash5OrphanCleanupPreview: () =>
-    __TAURI_INVOKE<OrphanCleanupPreview>('clash5_orphan_cleanup_preview'),
+    typedError<OrphanCleanupPreview, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_orphan_cleanup_preview'),
+    ),
   clash5SetOrphanRetentionDays: (days: number) =>
-    __TAURI_INVOKE<null>('clash5_set_orphan_retention_days', { days }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_set_orphan_retention_days', { days }),
+    ),
   clash5PurgeExpiredOrphans: () =>
-    __TAURI_INVOKE<number | null>('clash5_purge_expired_orphans'),
+    typedError<number | null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_purge_expired_orphans'),
+    ),
   clash5RegisterManualNode: (node: Node) =>
-    __TAURI_INVOKE<ManualNodeIdentity>('clash5_register_manual_node', { node }),
+    typedError<ManualNodeIdentity, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_register_manual_node', { node }),
+    ),
   clash5ImportVergeData: (sourceDir: string) =>
-    __TAURI_INVOKE<VergeImportReport>('clash5_import_verge_data', {
-      sourceDir,
-    }),
-  enhanceProfiles: () => __TAURI_INVOKE<ValidationOutcome>('enhance_profiles'),
+    typedError<VergeImportReport, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_import_verge_data', { sourceDir }),
+    ),
+  enhanceProfiles: () =>
+    typedError<ValidationOutcome, CommandFailure_Serialize>(
+      __TAURI_INVOKE('enhance_profiles'),
+    ),
   patchProfilesConfig: (profiles: IProfiles_Deserialize) =>
-    __TAURI_INVOKE<ValidationOutcome>('patch_profiles_config', { profiles }),
+    typedError<ValidationOutcome, CommandFailure_Serialize>(
+      __TAURI_INVOKE('patch_profiles_config', { profiles }),
+    ),
   viewProfile: (index: string) =>
-    __TAURI_INVOKE<null>('view_profile', { index }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('view_profile', { index }),
+    ),
   patchProfile: (index: string, profile: PrfItem_Deserialize) =>
-    __TAURI_INVOKE<null>('patch_profile', { index, profile }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('patch_profile', { index, profile }),
+    ),
   createProfile: (item: PrfItem_Deserialize, fileData: string | null) =>
-    __TAURI_INVOKE<null>('create_profile', { item, fileData }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('create_profile', { item, fileData }),
+    ),
   importProfile: (
     url: string,
     option: {
-      user_agent: string | null
-      with_proxy: boolean | null
-      self_proxy: boolean | null
-      update_interval: number | null
+      user_agent?: string | null
+      with_proxy?: boolean | null
+      self_proxy?: boolean | null
+      update_interval?: number | null
       /**
        *  HTTP request timeout in seconds
        *  default is 60 seconds
        */
-      timeout_seconds: number | null
+      timeout_seconds?: number | null
       /**  default is `false` */
-      danger_accept_invalid_certs: boolean | null
-      allow_auto_update: boolean | null
-      merge: string | null
-      script: string | null
-      rules: string | null
-      proxies: string | null
-      groups: string | null
+      danger_accept_invalid_certs?: boolean | null
+      allow_auto_update?: boolean | null
+      merge?: string | null
+      script?: string | null
+      rules?: string | null
+      proxies?: string | null
+      groups?: string | null
     } | null,
-  ) => __TAURI_INVOKE<null>('import_profile', { url, option }),
+  ) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('import_profile', { url, option }),
+    ),
   reorderProfile: (activeId: string, overId: string) =>
-    __TAURI_INVOKE<null>('reorder_profile', { activeId, overId }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('reorder_profile', { activeId, overId }),
+    ),
   updateProfile: (
     index: string,
     option: {
-      user_agent: string | null
-      with_proxy: boolean | null
-      self_proxy: boolean | null
-      update_interval: number | null
+      user_agent?: string | null
+      with_proxy?: boolean | null
+      self_proxy?: boolean | null
+      update_interval?: number | null
       /**
        *  HTTP request timeout in seconds
        *  default is 60 seconds
        */
-      timeout_seconds: number | null
+      timeout_seconds?: number | null
       /**  default is `false` */
-      danger_accept_invalid_certs: boolean | null
-      allow_auto_update: boolean | null
-      merge: string | null
-      script: string | null
-      rules: string | null
-      proxies: string | null
-      groups: string | null
+      danger_accept_invalid_certs?: boolean | null
+      allow_auto_update?: boolean | null
+      merge?: string | null
+      script?: string | null
+      rules?: string | null
+      proxies?: string | null
+      groups?: string | null
     } | null,
-  ) => __TAURI_INVOKE<null>('update_profile', { index, option }),
+  ) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('update_profile', { index, option }),
+    ),
   deleteProfile: (index: string) =>
-    __TAURI_INVOKE<null>('delete_profile', { index }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('delete_profile', { index }),
+    ),
   readProfileFile: (index: string) =>
-    __TAURI_INVOKE<string>('read_profile_file', { index }),
+    typedError<string, CommandFailure_Serialize>(
+      __TAURI_INVOKE('read_profile_file', { index }),
+    ),
   /**  保存profiles的配置 */
   saveProfileFile: (index: string, fileData: string | null) =>
-    __TAURI_INVOKE<ValidationOutcome>('save_profile_file', { index, fileData }),
+    typedError<ValidationOutcome, CommandFailure_Serialize>(
+      __TAURI_INVOKE('save_profile_file', { index, fileData }),
+    ),
   getNextUpdateTime: (uid: string) =>
-    __TAURI_INVOKE<number | null>('get_next_update_time', { uid }),
-  createLocalBackup: () => __TAURI_INVOKE<null>('create_local_backup'),
-  listLocalBackup: () => __TAURI_INVOKE<LocalBackupFile[]>('list_local_backup'),
+    typedError<number | null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_next_update_time', { uid }),
+    ),
+  createLocalBackup: () =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('create_local_backup'),
+    ),
+  listLocalBackup: () =>
+    typedError<LocalBackupFile[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('list_local_backup'),
+    ),
   deleteLocalBackup: (filename: string) =>
-    __TAURI_INVOKE<null>('delete_local_backup', { filename }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('delete_local_backup', { filename }),
+    ),
   restoreLocalBackup: (filename: string) =>
-    __TAURI_INVOKE<null>('restore_local_backup', { filename }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('restore_local_backup', { filename }),
+    ),
   importLocalBackup: (source: string) =>
-    __TAURI_INVOKE<string>('import_local_backup', { source }),
+    typedError<string, CommandFailure_Serialize>(
+      __TAURI_INVOKE('import_local_backup', { source }),
+    ),
   exportLocalBackup: (filename: string, destination: string) =>
-    __TAURI_INVOKE<null>('export_local_backup', { filename, destination }),
-  createWebdavBackup: () => __TAURI_INVOKE<null>('create_webdav_backup'),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('export_local_backup', { filename, destination }),
+    ),
+  createWebdavBackup: () =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('create_webdav_backup'),
+    ),
   saveWebdavConfig: (url: string, username: string, password: string) =>
-    __TAURI_INVOKE<null>('save_webdav_config', { url, username, password }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('save_webdav_config', { url, username, password }),
+    ),
   listWebdavBackup: () =>
-    __TAURI_INVOKE<WebDavBackupEntry[]>('list_webdav_backup'),
+    typedError<WebDavBackupEntry[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('list_webdav_backup'),
+    ),
   deleteWebdavBackup: (filename: string) =>
-    __TAURI_INVOKE<null>('delete_webdav_backup', { filename }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('delete_webdav_backup', { filename }),
+    ),
   restoreWebdavBackup: (filename: string) =>
-    __TAURI_INVOKE<null>('restore_webdav_backup', { filename }),
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('restore_webdav_backup', { filename }),
+    ),
   getUnlockItems: () => __TAURI_INVOKE<UnlockItem[]>('get_unlock_items'),
   checkMediaUnlock: (onComplete: Channel<UnlockItem>) =>
-    __TAURI_INVOKE<UnlockItem[]>('check_media_unlock', { onComplete }),
+    typedError<UnlockItem[], string>(
+      __TAURI_INVOKE('check_media_unlock', { onComplete }),
+    ),
   checkMediaUnlockItem: (name: string) =>
-    __TAURI_INVOKE<UnlockItem>('check_media_unlock_item', { name }),
-  getSystemInfo: () => __TAURI_INVOKE<SystemInfo>('get_system_info'),
+    typedError<UnlockItem, string>(
+      __TAURI_INVOKE('check_media_unlock_item', { name }),
+    ),
+  getSystemInfo: () =>
+    typedError<SystemInfo, string>(__TAURI_INVOKE('get_system_info')),
   /**  获取应用的运行时间（毫秒） */
-  getAppUptime: () => __TAURI_INVOKE<number>('get_app_uptime'),
-  exportDiagnosticInfo: () => __TAURI_INVOKE<null>('export_diagnostic_info'),
+  getAppUptime: () =>
+    typedError<number, string>(__TAURI_INVOKE('get_app_uptime')),
+  exportDiagnosticInfo: () =>
+    typedError<null, string>(__TAURI_INVOKE('export_diagnostic_info')),
 }
 
 /* Types */
@@ -390,8 +583,8 @@ export type IProfiles = IProfiles_Serialize | IProfiles_Deserialize
 
 /**  Define the `profiles.yaml` schema */
 export type IProfiles_Deserialize = {
-  current: string | null
-  items: PrfItem_Deserialize[] | null
+  current?: string | null
+  items?: PrfItem_Deserialize[] | null
 }
 
 /**  Define the `profiles.yaml` schema */
@@ -404,112 +597,114 @@ export type IProfiles_Serialize = {
 export type IVerge = IVerge_Serialize | IVerge_Deserialize
 
 export type IVergeTestItem = {
-  uid: string | null
-  name: string | null
-  icon: string | null
-  url: string | null
+  uid?: string | null
+  name?: string | null
+  icon?: string | null
+  url?: string | null
 }
 
 export type IVergeTheme = {
-  primary_color: string | null
-  secondary_color: string | null
-  primary_text: string | null
-  secondary_text: string | null
-  info_color: string | null
-  error_color: string | null
-  warning_color: string | null
-  success_color: string | null
-  font_family: string | null
-  css_injection: string | null
+  primary_color?: string | null
+  secondary_color?: string | null
+  primary_text?: string | null
+  secondary_text?: string | null
+  info_color?: string | null
+  error_color?: string | null
+  warning_color?: string | null
+  success_color?: string | null
+  font_family?: string | null
+  css_injection?: string | null
 }
 
 /**  ### `verge.yaml` schema */
 export type IVerge_Deserialize = {
   /**  silent | error | warn | info | debug | trace */
-  app_log_level: string | null
+  app_log_level?: string | null
   /**  Maximum app log size in KiB. */
-  app_log_max_size: number | null
-  app_log_max_count: number | null
-  language: string | null
+  app_log_max_size?: number | null
+  app_log_max_count?: number | null
+  language?: string | null
   /**  `light` or `dark` or `system` */
-  theme_mode: string | null
-  tray_event: string | null
-  env_type: string | null
-  start_page: string | null
-  startup_script: string | null
-  traffic_graph: boolean | null
+  theme_mode?: string | null
+  tray_event?: string | null
+  env_type?: string | null
+  start_page?: string | null
+  startup_script?: string | null
+  traffic_graph?: boolean | null
   /**  show memory info (only for Clash Meta) */
-  enable_memory_usage: boolean | null
-  enable_group_icon: boolean | null
-  pause_render_traffic_stats_on_blur: boolean | null
-  common_tray_icon: boolean | null
-  menu_icon: string | null
-  menu_order: string[] | null
-  proxy_group_tools_position: string | null
-  notice_position: string | null
-  collapse_navbar: boolean | null
-  sysproxy_tray_icon: boolean | null
-  tun_tray_icon: boolean | null
-  enable_tun_mode: boolean | null
-  enable_auto_launch: boolean | null
-  enable_silent_start: boolean | null
-  enable_system_proxy: boolean | null
-  enable_proxy_guard: boolean | null
-  enable_bypass_check: boolean | null
+  enable_memory_usage?: boolean | null
+  enable_group_icon?: boolean | null
+  pause_render_traffic_stats_on_blur?: boolean | null
+  common_tray_icon?: boolean | null
+  tray_icon?: string | null
+  menu_icon?: string | null
+  menu_order?: string[] | null
+  proxy_group_tools_position?: string | null
+  notice_position?: string | null
+  collapse_navbar?: boolean | null
+  sysproxy_tray_icon?: boolean | null
+  tun_tray_icon?: boolean | null
+  enable_tun_mode?: boolean | null
+  enable_auto_launch?: boolean | null
+  enable_silent_start?: boolean | null
+  enable_system_proxy?: boolean | null
+  enable_proxy_guard?: boolean | null
+  enable_bypass_check?: boolean | null
   /**  Initial DNS override preference for profiles without a saved setting. */
-  enable_dns_settings: boolean | null
+  enable_dns_settings?: boolean | null
   profile_dns_settings?: { [key in string]: ProfileDnsSettings_Deserialize }
-  use_default_bypass: boolean | null
-  system_proxy_bypass: string | null
-  proxy_guard_duration: number | null
-  proxy_auto_config: boolean | null
-  pac_file_content: string | null
-  proxy_host: string | null
-  theme_setting: IVergeTheme | null
-  web_ui_list: string[] | null
-  clash_core: string | null
+  use_default_bypass?: boolean | null
+  system_proxy_bypass?: string | null
+  proxy_guard_duration?: number | null
+  proxy_auto_config?: boolean | null
+  pac_file_content?: string | null
+  proxy_host?: string | null
+  theme_setting?: IVergeTheme | null
+  web_ui_list?: string[] | null
+  clash_core?: string | null
   /**  format: {func},{key} */
-  hotkeys: string[] | null
-  enable_global_hotkey: boolean | null
-  home_cards: unknown | null
-  auto_close_connection: boolean | null
-  auto_check_update: boolean | null
-  default_latency_test: string | null
-  default_latency_timeout: number | null
-  enable_auto_delay_detection: boolean | null
+  hotkeys?: string[] | null
+  enable_global_hotkey?: boolean | null
+  home_cards?: unknown | null
+  auto_close_connection?: boolean | null
+  auto_check_update?: boolean | null
+  default_latency_test?: string | null
+  default_latency_timeout?: number | null
+  enable_auto_delay_detection?: boolean | null
   /**  自动检测当前节点延迟的间隔（分钟） */
-  auto_delay_detection_interval_minutes: number | null
-  enable_builtin_enhanced: boolean | null
-  proxy_layout_column: number | null
-  test_list: IVergeTestItem[] | null
+  auto_delay_detection_interval_minutes?: number | null
+  enable_builtin_enhanced?: boolean | null
+  proxy_layout_column?: number | null
+  test_list?: IVergeTestItem[] | null
   /**  0: 不清理; 1: 1天；2: 7天; 3: 30天; 4: 90天 */
-  auto_log_clean: number | null
-  enable_auto_backup_schedule: boolean | null
+  auto_log_clean?: number | null
+  enable_auto_backup_schedule?: boolean | null
   /**  Automatic backup interval in hours */
-  auto_backup_interval_hours: number | null
-  auto_backup_on_change: boolean | null
+  auto_backup_interval_hours?: number | null
+  auto_backup_on_change?: boolean | null
   /**  verge 的各种 port 用于覆盖 clash 的各种 port */
-  verge_redir_port: number | null
-  verge_redir_enabled: boolean | null
-  verge_tproxy_port: number | null
-  verge_tproxy_enabled: boolean | null
-  verge_mixed_port: number | null
-  verge_socks_port: number | null
-  verge_socks_enabled: boolean | null
-  verge_port: number | null
-  verge_http_enabled: boolean | null
+  verge_redir_port?: number | null
+  verge_redir_enabled?: boolean | null
+  verge_tproxy_port?: number | null
+  verge_tproxy_enabled?: boolean | null
+  verge_mixed_port?: number | null
+  verge_socks_port?: number | null
+  verge_socks_enabled?: boolean | null
+  verge_port?: number | null
+  verge_http_enabled?: boolean | null
   webdav_url?: string | null
   webdav_username?: string | null
   webdav_password?: string | null
-  tray_proxy_groups_display_mode: string | null
-  tray_inline_outbound_modes: boolean | null
-  enable_auto_light_weight_mode: boolean | null
+  enable_tray_speed?: boolean | null
+  tray_proxy_groups_display_mode?: string | null
+  tray_inline_outbound_modes?: boolean | null
+  enable_auto_light_weight_mode?: boolean | null
   /**  自动进入轻量模式的延迟（分钟） */
-  auto_light_weight_minutes: number | null
-  enable_hover_jump_navigator: boolean | null
+  auto_light_weight_minutes?: number | null
+  enable_hover_jump_navigator?: boolean | null
   /**  代理页面自动滚动延迟（毫秒） */
-  hover_jump_navigator_delay: number | null
-  enable_external_controller: boolean | null
+  hover_jump_navigator_delay?: number | null
+  enable_external_controller?: boolean | null
 }
 
 /**  ### `verge.yaml` schema */
@@ -532,6 +727,7 @@ export type IVerge_Serialize = {
   enable_group_icon?: boolean | null
   pause_render_traffic_stats_on_blur: boolean | null
   common_tray_icon?: boolean | null
+  tray_icon?: string | null
   menu_icon?: string | null
   menu_order?: string[] | null
   proxy_group_tools_position?: string | null
@@ -590,6 +786,7 @@ export type IVerge_Serialize = {
   webdav_url?: string | null
   webdav_username?: string | null
   webdav_password?: string | null
+  enable_tray_speed?: boolean | null
   tray_proxy_groups_display_mode?: string | null
   tray_inline_outbound_modes: boolean | null
   enable_auto_light_weight_mode: boolean | null
@@ -728,19 +925,19 @@ export type PrfExtra = {
 export type PrfItem = PrfItem_Serialize | PrfItem_Deserialize
 
 export type PrfItem_Deserialize = {
-  uid: string | null
+  uid?: string | null
   /**  enum value: remote | local | script | merge */
-  type: string | null
-  name: string | null
-  file: string | null
-  desc: string | null
-  url: string | null
-  selected: PrfSelected[] | null
-  latency_test_urls: { [key in string]: string } | null
-  extra: PrfExtra | null
-  updated: number | null
-  option: PrfOption_Deserialize | null
-  home: string | null
+  type?: string | null
+  name?: string | null
+  file?: string | null
+  desc?: string | null
+  url?: string | null
+  selected?: PrfSelected[] | null
+  latency_test_urls?: { [key in string]: string } | null
+  extra?: PrfExtra | null
+  updated?: number | null
+  option?: PrfOption_Deserialize | null
+  home?: string | null
 }
 
 export type PrfItem_Serialize = {
@@ -762,23 +959,23 @@ export type PrfItem_Serialize = {
 export type PrfOption = PrfOption_Serialize | PrfOption_Deserialize
 
 export type PrfOption_Deserialize = {
-  user_agent: string | null
-  with_proxy: boolean | null
-  self_proxy: boolean | null
-  update_interval: number | null
+  user_agent?: string | null
+  with_proxy?: boolean | null
+  self_proxy?: boolean | null
+  update_interval?: number | null
   /**
    *  HTTP request timeout in seconds
    *  default is 60 seconds
    */
-  timeout_seconds: number | null
+  timeout_seconds?: number | null
   /**  default is `false` */
-  danger_accept_invalid_certs: boolean | null
-  allow_auto_update: boolean | null
-  merge: string | null
-  script: string | null
-  rules: string | null
-  proxies: string | null
-  groups: string | null
+  danger_accept_invalid_certs?: boolean | null
+  allow_auto_update?: boolean | null
+  merge?: string | null
+  script?: string | null
+  rules?: string | null
+  proxies?: string | null
+  groups?: string | null
 }
 
 export type PrfOption_Serialize = {
@@ -802,8 +999,8 @@ export type PrfOption_Serialize = {
 }
 
 export type PrfSelected = {
-  name: string | null
-  now: string | null
+  name?: string | null
+  now?: string | null
 }
 
 export type ProbeBatch = {
@@ -1086,4 +1283,16 @@ export type WebDavBackupEntry = {
   content_length: number
   content_type: string
   tag: string | null
+}
+
+/* Tauri Specta runtime */
+async function typedError<T, E>(
+  result: Promise<T>,
+): Promise<{ status: 'ok'; data: T } | { status: 'error'; error: E }> {
+  try {
+    return { status: 'ok', data: await result }
+  } catch (e) {
+    if (e instanceof Error) throw e
+    return { status: 'error', error: e as any }
+  }
 }

@@ -5,17 +5,53 @@ import ts from 'typescript'
 const ROOT = path.resolve(import.meta.dirname, '..')
 const GENERATED = path.join(ROOT, 'src/services/tauri-commands.generated.ts')
 const FRONTEND = path.join(ROOT, 'src/services/cmds.ts')
-const program = ts.createProgram([GENERATED, FRONTEND], {
-  strict: true,
-  target: ts.ScriptTarget.Latest,
-  module: ts.ModuleKind.ESNext,
-  moduleResolution: ts.ModuleResolutionKind.Bundler,
-  skipLibCheck: true,
-})
+const config = ts.getParsedCommandLineOfConfigFile(
+  path.join(ROOT, 'tsconfig.json'),
+  {},
+  {
+    ...ts.sys,
+    onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
+      throw new Error(
+        ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+      )
+    },
+  },
+)
+const program = ts.createProgram(config.fileNames, config.options)
+const diagnostics = ts.getPreEmitDiagnostics(program)
+if (diagnostics.length) {
+  throw new Error(
+    ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+      getCurrentDirectory: () => ROOT,
+      getCanonicalFileName: (file) => file,
+      getNewLine: () => '\n',
+    }),
+  )
+}
 const checker = program.getTypeChecker()
 const generatedFile = program.getSourceFile(GENERATED)
 const frontendFile = program.getSourceFile(FRONTEND)
 const failures = []
+const invokeImport = frontendFile.statements
+  .filter(ts.isImportDeclaration)
+  .find((node) => node.moduleSpecifier.text === '@tauri-apps/api/core')
+  .importClause.namedBindings.elements.find(
+    (node) => node.name.text === 'invoke',
+  )
+const invokeSymbol = checker.getAliasedSymbol(
+  checker.getSymbolAtLocation(invokeImport.name),
+)
+
+function commandInvocation(node) {
+  if (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === '__TAURI_INVOKE'
+  ) {
+    return node
+  }
+  return ts.forEachChild(node, commandInvocation)
+}
 
 function propertyName(node) {
   if (ts.isIdentifier(node) || ts.isStringLiteral(node)) return node.text
@@ -42,7 +78,18 @@ function collectGeneratedCommands() {
           const signature = checker.getSignatureFromDeclaration(
             member.initializer,
           )
-          if (signature) commands.set(propertyName(member.name), signature)
+          const invocation = commandInvocation(member.initializer)
+          if (
+            signature &&
+            invocation &&
+            ts.isStringLiteral(invocation.arguments[0])
+          ) {
+            commands.set(invocation.arguments[0].text, signature)
+          } else {
+            throw new Error(
+              `Cannot inspect generated command ${propertyName(member.name)}`,
+            )
+          }
         }
       }
     }
@@ -55,8 +102,36 @@ function collectGeneratedCommands() {
 const generatedCommands = collectGeneratedCommands()
 const frontendCommands = new Set()
 
-function expectedCommandName(command) {
-  return command.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
+function checkRegisteredCommands() {
+  const source = fs.readFileSync(
+    path.join(ROOT, 'src-tauri/src/lib.rs'),
+    'utf8',
+  )
+  const registries = [
+    ...source.matchAll(/tauri::generate_handler!\s*\[([^\]]+)\]/g),
+  ]
+  if (!registries.length) throw new Error('No Tauri command registry found')
+  const registered = new Set()
+  for (const [, entries] of registries) {
+    for (const entry of entries
+      .replace(/\/\/[^\n]*/g, '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)) {
+      if (!/^(?:\w+::)*\w+$/.test(entry)) {
+        throw new Error(`Cannot inspect registered command: ${entry}`)
+      }
+      registered.add(entry.split('::').at(-1))
+    }
+  }
+  for (const command of registered) {
+    if (!generatedCommands.has(command))
+      failures.push(`Registered command ${command} has no generated schema`)
+  }
+  for (const command of generatedCommands.keys()) {
+    if (!registered.has(command))
+      failures.push(`Generated command ${command} is not registered`)
+  }
 }
 
 function typeDescription(type, location) {
@@ -89,18 +164,22 @@ function collectArguments(argument) {
 }
 
 function visitFrontend(node) {
-  if (
-    ts.isCallExpression(node) &&
-    ts.isIdentifier(node.expression) &&
-    node.expression.text === 'invoke' &&
-    node.arguments.length > 0 &&
-    ts.isStringLiteral(node.arguments[0])
-  ) {
+  let symbol = ts.isCallExpression(node)
+    ? checker.getSymbolAtLocation(node.expression)
+    : undefined
+  if (symbol?.flags & ts.SymbolFlags.Alias)
+    symbol = checker.getAliasedSymbol(symbol)
+  if (symbol === invokeSymbol) {
+    const source = node.getSourceFile()
+    const location = `${path.relative(ROOT, source.fileName)}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}`
+    if (!node.arguments.length || !ts.isStringLiteral(node.arguments[0])) {
+      failures.push(`${location}: invoke requires a literal command name`)
+      return
+    }
     const command = node.arguments[0].text
+    if (command.startsWith('plugin:')) return
     frontendCommands.add(command)
-    const generatedName = expectedCommandName(command)
-    const signature = generatedCommands.get(generatedName)
-    const location = `cmds.ts:${frontendFile.getLineAndCharacterOfPosition(node.getStart()).line + 1}`
+    const signature = generatedCommands.get(command)
 
     if (!signature) {
       failures.push(
@@ -133,7 +212,10 @@ function visitFrontend(node) {
             parameter,
             signature.declaration,
           )
-          if (!checker.isTypeAssignableTo(actualType, expectedType)) {
+          if (
+            actualType.flags & ts.TypeFlags.Any ||
+            !checker.isTypeAssignableTo(actualType, expectedType)
+          ) {
             failures.push(
               `${location}: ${command}.${parameter.name} frontend type ${typeDescription(actualType, valueNode)} is not assignable to backend type ${typeDescription(expectedType, signature.declaration)}`,
             )
@@ -150,10 +232,30 @@ function visitFrontend(node) {
           node.typeArguments[0],
         )
         const backendPromise = signature.getReturnType()
-        const backendResult = checker.getPromisedTypeOfPromise(backendPromise)
-        if (backendResult && !equivalentTypes(frontendResult, backendResult)) {
+        const wireResult = checker.getPromisedTypeOfPromise(backendPromise)
+        const okResult =
+          wireResult?.isUnion() &&
+          wireResult.types.find((variant) => {
+            const status = variant.getProperty('status')
+            return (
+              status &&
+              checker.getTypeOfSymbolAtLocation(status, signature.declaration)
+                .value === 'ok'
+            )
+          })
+        const backendResult = okResult
+          ? checker.getTypeOfSymbolAtLocation(
+              okResult.getProperty('data'),
+              signature.declaration,
+            )
+          : wireResult
+        if (
+          !backendResult ||
+          frontendResult.flags & ts.TypeFlags.Any ||
+          !equivalentTypes(frontendResult, backendResult)
+        ) {
           failures.push(
-            `${location}: ${command} result type differs; frontend ${typeDescription(frontendResult, node)}, backend ${typeDescription(backendResult, signature.declaration)}`,
+            `${location}: ${command} result type differs; frontend ${typeDescription(frontendResult, node)}, backend ${backendResult ? typeDescription(backendResult, signature.declaration) : 'missing Promise result'}`,
           )
         }
       }
@@ -162,7 +264,11 @@ function visitFrontend(node) {
   ts.forEachChild(node, visitFrontend)
 }
 
-visitFrontend(frontendFile)
+checkRegisteredCommands()
+for (const file of config.fileNames) {
+  if (path.resolve(file) !== GENERATED)
+    visitFrontend(program.getSourceFile(file))
+}
 
 if (failures.length > 0) {
   throw new Error(`Tauri command contract mismatch:\n${failures.join('\n')}`)
