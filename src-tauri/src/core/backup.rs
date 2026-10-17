@@ -18,6 +18,7 @@ use tokio::{fs, time::timeout};
 use zip::write::SimpleFileOptions;
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+const BACKUP_FORMAT_VERSION: u32 = 2;
 
 const TIMEOUT_UPLOAD: u64 = 300;
 const TIMEOUT_DOWNLOAD: u64 = 300;
@@ -278,6 +279,26 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
     let mut zip = zip::ZipWriter::new(file);
     zip.add_directory("profiles/", SimpleFileOptions::default())?;
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    let data_db_path = dirs::app_home_dir()?.join(dirs::CLASH5_DATA_DB);
+    let mut includes = vec![
+        "profiles/",
+        dirs::CLASH_CONFIG,
+        dirs::VERGE_CONFIG,
+        dirs::PROFILE_YAML,
+        DNS_CONFIG,
+    ];
+    if data_db_path.is_file() {
+        includes.push(dirs::CLASH5_DATA_DB);
+    }
+
+    let manifest = serde_json::json!({
+        "format_version": BACKUP_FORMAT_VERSION,
+        "product": "clash5",
+        "includes": includes,
+        "identity_key": "excluded",
+    });
+    zip.start_file(dirs::BACKUP_MANIFEST, options)?;
+    zip.write_all(serde_json::to_vec_pretty(&manifest)?.as_slice())?;
 
     if let Ok(mut entries) = fs::read_dir(dirs::app_profiles_dir()?).await {
         while let Some(entry) = entries.next_entry().await? {
@@ -315,6 +336,31 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
 
     zip.start_file(dirs::PROFILE_YAML, options)?;
     zip.write_all(fs::read(dirs::profiles_path()?).await?.as_slice())?;
+
+    if data_db_path.is_file() {
+        zip.start_file(dirs::CLASH5_DATA_DB, options)?;
+        zip.write_all(fs::read(data_db_path).await?.as_slice())?;
+    }
     zip.finish()?;
     Ok((zip_file_name, zip_path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BACKUP_FORMAT_VERSION, dirs};
+
+    #[test]
+    fn portable_backup_contract_excludes_identity_key() {
+        let manifest = serde_json::json!({
+            "format_version": BACKUP_FORMAT_VERSION,
+            "product": "clash5",
+            "identity_key": "excluded",
+            "includes": [dirs::CLASH5_DATA_DB],
+        });
+        assert_eq!(manifest["format_version"], BACKUP_FORMAT_VERSION);
+        assert_eq!(manifest["identity_key"], "excluded");
+        assert_eq!(manifest["includes"][0], dirs::CLASH5_DATA_DB);
+        assert!(serde_json::to_string(&manifest)
+            .is_ok_and(|serialized| !serialized.contains("hmac_key")));
+    }
 }
