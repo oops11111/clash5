@@ -63,6 +63,7 @@
 | 2026-10-15 | R-11 | 缓解中 | [M1 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)确认本地 429 fixture 的失败不阻断其它节点，缓存与连续失败退避生效；Mihomo 延迟接口不返回上游状态或 `Retry-After`，仍需观察真实机场限流行为。 |
 | 2026-10-15 | R-26 | 已缓解 | [Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过完整节点页面交互和桌面重启身份检查，并上传前后截图。脚本避开上游 Windows 驱动关闭阻塞；Server 2025 的 WebDriver 问题仍独立追踪。 |
 | 2026-10-17 | R-01、R-02、R-25 | 已缓解 | [PR #23](https://github.com/oops11111/clash5/pull/23) 已合并；Windows 桌面/CI 覆盖 HMAC 迁移、密钥缺失/错配/锁定、凭证轮换、显式重绑、WAL/schema 迁移及孤儿保留/清理。 |
+| 2026-10-18 | R-01、R-02、R-25 | 约束落实 | [PR #37](https://github.com/oops11111/clash5/pull/37) 的版本化导出包包含 SQLite 数据但明确排除本机 HMAC key；跨设备恢复必须走密钥恢复和显式重绑，避免把身份密钥写入迁移包。 |
 | 2026-10-17 | R-19 | 已缓解 | [PR #26](https://github.com/oops11111/clash5/pull/26) 已合并；只读导入通过 Windows 安全测试与桌面验收，导入前后源目录 SHA-256 清单一致。 |
 | 2026-10-17 | R-18 | 验收通过、待合入 | [PR #27](https://github.com/oops11111/clash5/pull/27) 的 Windows 同机安装/升级/启动/独立卸载验收及上游配置目录 SHA-256 前后比对通过；Windows/macOS/Linux 标识审计通过。PR 尚未合入 dev；macOS/Linux 运行时安装升级测试为后续覆盖。 |
 | 2026-10-17 | R-20 | 开放 | 只读复核确认 `mask_url` 保留 URL 主机及短路径段，`mask_err` 只处理错误文本中的 HTTP(S) URL，日志宏没有统一脱敏出口。`cmd/profile.rs::import_profile` 把 `{e:#}` 下载错误链直接写日志，`profile_import_error` 也将原始链放入 IPC 详情，未调用 `mask_err`。`utils/help.rs` 没有遮罩函数单测；凭证、controller secret、relay token 回归测试仍缺。该项标为 Opus-class，未宣称完成。 |

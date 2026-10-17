@@ -13,7 +13,10 @@ use clash_verge_logging::{Type, logging, logging_error};
 use reqwest_dav::list_cmd::ListFile;
 use serde::Serialize;
 use smartstring::alias::String;
-use std::path::PathBuf;
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 use tokio::fs;
 
 #[derive(Debug, Serialize, specta::Type)]
@@ -26,6 +29,43 @@ pub struct LocalBackupFile {
     pub last_modified: String,
     #[specta(type = specta_typescript::Number)]
     pub content_length: u64,
+}
+
+fn extract_backup(zip: &mut zip::ZipArchive<std::fs::File>, home: &Path) -> Result<()> {
+    let snapshot_path = std::env::temp_dir().join(format!("clash5-restore-{}.sqlite", nanoid::nanoid!()));
+    let mut has_snapshot = false;
+    let result = (|| -> Result<()> {
+        for index in 0..zip.len() {
+            let mut entry = zip.by_index(index)?;
+            let relative = entry
+                .enclosed_name()
+                .ok_or_else(|| anyhow!("Invalid backup entry path"))?;
+            let target = if relative == Path::new(crate::utils::dirs::CLASH5_DATA_DB) {
+                has_snapshot = true;
+                snapshot_path.clone()
+            } else {
+                home.join(relative)
+            };
+            if entry.is_dir() {
+                std::fs::create_dir_all(&target)?;
+            } else {
+                if let Some(parent) = target.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                let mut output = std::fs::File::create(&target)?;
+                io::copy(&mut entry, &mut output)?;
+            }
+        }
+        if has_snapshot {
+            clash5_data::BindingStore::open(home.join(crate::utils::dirs::CLASH5_DATA_DB))?
+                .restore_from(&snapshot_path)?;
+        }
+        Ok(())
+    })();
+    if has_snapshot {
+        let _ = std::fs::remove_file(snapshot_path);
+    }
+    result
 }
 
 /// Reloads restored configs into memory while preserving WebDAV credentials.
@@ -163,7 +203,7 @@ pub async fn restore_webdav_backup(filename: String) -> Result<()> {
     let file = AsyncHandler::spawn_blocking(move || std::fs::File::open(&value)).await??;
     let mut zip = zip::ZipArchive::new(file)?;
     let _profile_write = crate::config::profiles::PROFILE_WRITE_LOCK.lock().await;
-    zip.extract(app_home_dir()?)?;
+    extract_backup(&mut zip, &app_home_dir()?)?;
     let res = finalize_restored_verge_config(webdav_url, webdav_username, webdav_password).await;
     let _ = backup_storage_path.remove_if_exists().await;
     res
@@ -346,7 +386,7 @@ pub async fn restore_local_backup(filename: String) -> Result<()> {
     let file = AsyncHandler::spawn_blocking(move || std::fs::File::open(&target_path)).await??;
     let mut zip = zip::ZipArchive::new(file)?;
     let _profile_write = crate::config::profiles::PROFILE_WRITE_LOCK.lock().await;
-    zip.extract(app_home_dir()?)?;
+    extract_backup(&mut zip, &app_home_dir()?)?;
     finalize_restored_verge_config(webdav_url, webdav_username, webdav_password).await?;
     Ok(())
 }
