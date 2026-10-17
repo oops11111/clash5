@@ -2,7 +2,8 @@ use super::manual;
 use crate::{config::profiles::with_clash5_binding_store, utils::dirs};
 use anyhow::{Result, anyhow};
 use clash5_data::{
-    CompiledChain, Node, NodeRecord, NodeRef, ProxyChain, ScopedProxy, Source, compile_chains, parse_proxy_node,
+    CompiledChain, IdentityKey, Node, NodeRecord, NodeRef, ProxyChain, ScopedProxy, Source, compile_chains,
+    parse_proxy_node,
 };
 use serde_yaml_ng::{Mapping, Value};
 use std::path::Path;
@@ -52,26 +53,37 @@ fn add_proxy(
     });
 }
 
-fn matching_manual_record<'a>(proxy: &Value, node: &Node, records: &'a [NodeRecord]) -> Option<&'a NodeRecord> {
+fn matching_manual_record<'a>(
+    proxy: &Value,
+    node: &Node,
+    identity_key: &IdentityKey,
+    records: &'a [NodeRecord],
+) -> Option<&'a NodeRecord> {
     let runtime_name = proxy.get("name").and_then(Value::as_str)?;
+    let stable_id = node.stable_id_v2(identity_key).ok()?;
     records.iter().find(|record| {
         record.source == Source::Manual
+            && record.stable_id == stable_id
             && manual::runtime_name(&record.stable_id) == runtime_name
-            && record.kind == node.kind
-            && record.server == node.server
-            && record.port == node.port
     })
 }
 
 pub(crate) async fn catalog(config: &Mapping, profile_id: Option<&str>) -> Result<Vec<ScopedProxy>> {
     let mut catalog = vec![];
     let records = with_clash5_binding_store(|store| store.node_records(false)).await?;
+    let manual_identity_key = if records.iter().any(|record| record.source == Source::Manual) {
+        Some(crate::config::profiles::clash5_identity_key().await?)
+    } else {
+        None
+    };
     if let Some(proxies) = config.get("proxies").and_then(Value::as_sequence) {
         for proxy in proxies {
             let Ok(node) = parse_proxy_node(proxy) else {
                 continue;
             };
-            let manual_record = matching_manual_record(proxy, &node, &records);
+            let manual_record = manual_identity_key
+                .as_ref()
+                .and_then(|key| matching_manual_record(proxy, &node, key, &records));
             let source = if manual_record.is_some() {
                 Source::Manual
             } else if let Some(profile_id) = profile_id {
@@ -191,12 +203,18 @@ mod tests {
 
     #[test]
     fn manual_runtime_name_resolves_to_its_v2_identity() -> Result<()> {
-        let stable_id = format!("v2:{}", "a".repeat(64));
-        let runtime_name = manual::runtime_name(&stable_id);
-        let proxy: Value = serde_yaml_ng::from_str(&format!(
-            "name: {runtime_name}\ntype: socks5\nserver: 127.0.0.1\nport: 18081\n"
-        ))?;
+        let key = IdentityKey::from_bytes(&[7; 32])?;
+        let proxy: Value = serde_yaml_ng::from_str(
+            "name: fixture\ntype: socks5\nserver: 127.0.0.1\nport: 18081\nusername: user\npassword: secret\n",
+        )?;
         let node = parse_proxy_node(&proxy)?;
+        let stable_id = node.stable_id_v2(&key)?;
+        let runtime_name = manual::runtime_name(&stable_id);
+        let mut runtime_proxy = proxy
+            .as_mapping()
+            .cloned()
+            .ok_or_else(|| anyhow!("proxy fixture is not a mapping"))?;
+        runtime_proxy.insert("name".into(), runtime_name.clone().into());
         let record = NodeRecord {
             stable_id: stable_id.clone(),
             source: Source::Manual,
@@ -210,8 +228,38 @@ mod tests {
         };
 
         let records = [record];
-        let found = matching_manual_record(&proxy, &node, &records);
+        let found = matching_manual_record(&Value::Mapping(runtime_proxy), &node, &key, &records);
         assert_eq!(found.map(|record| record.stable_id.as_str()), Some(stable_id.as_str()));
+        Ok(())
+    }
+
+    #[test]
+    fn copied_manual_runtime_name_with_changed_credentials_is_not_manual() -> Result<()> {
+        let key = IdentityKey::from_bytes(&[7; 32])?;
+        let original: Value = serde_yaml_ng::from_str(
+            "name: fixture\ntype: socks5\nserver: 127.0.0.1\nport: 18081\nusername: user\npassword: original-secret\n",
+        )?;
+        let original_node = parse_proxy_node(&original)?;
+        let stable_id = original_node.stable_id_v2(&key)?;
+        let runtime_name = manual::runtime_name(&stable_id);
+        let record = NodeRecord {
+            stable_id,
+            source: Source::Manual,
+            display_name: "manual node".into(),
+            kind: original_node.kind.clone(),
+            server: original_node.server.clone(),
+            port: original_node.port,
+            active: true,
+            duplicate_count: 0,
+            quality: None,
+        };
+
+        let subscription: Value = serde_yaml_ng::from_str(&format!(
+            "name: {runtime_name}\ntype: socks5\nserver: 127.0.0.1\nport: 18081\nusername: user\npassword: substituted-secret\n"
+        ))?;
+        let subscription_node = parse_proxy_node(&subscription)?;
+
+        assert!(matching_manual_record(&subscription, &subscription_node, &key, &[record]).is_none());
         Ok(())
     }
 }
