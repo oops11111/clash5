@@ -18,6 +18,7 @@
       "diagnostics": "解锁测试",
       "cancel": "取消",
       "identityError": "身份密钥服务暂不可用。请在系统凭据库解锁后重试。",
+      "rotationRuntimePending": "身份轮换已保存，但运行中的配置未能刷新。请刷新配置或重启核心后再继续。",
       "identityRecovery": "身份密钥缺失或与数据库不匹配。现有绑定已保留；重置会生成新的节点身份，并将旧绑定留作孤儿，需手动重新绑定。",
       "resetIdentity": "重置身份密钥",
       "resetIdentityTitle": "重置节点身份密钥？",

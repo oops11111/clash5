@@ -1,6 +1,6 @@
 use clash5_data::{
-    Binding, BindingStore, DataError, IdentityKey, IdentitySourceSnapshot, Node, NodeQuality, Source,
-    parse_inline_nodes,
+    Binding, BindingStore, DataError, ExitPolicy, IdentityKey, IdentitySourceSnapshot, Node, NodeQuality, NodeRef,
+    ProxyChain, Source, parse_inline_nodes,
 };
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -139,6 +139,76 @@ fn planned_key_rotation_moves_exact_snapshots_and_preserves_unresolved_orphans()
     );
     assert_eq!(store.active_identity_key().unwrap().unwrap().0, generation);
     assert_eq!(store.identity_key().unwrap().key_id(), new_key.key_id());
+}
+
+#[test]
+fn planned_key_rotation_rekeys_saved_chain_references_atomically() {
+    let old_key = IdentityKey::from_bytes(&[13; 32]).unwrap();
+    let new_key = IdentityKey::from_bytes(&[14; 32]).unwrap();
+    let mut store = BindingStore::memory_with_identity(old_key.clone()).unwrap();
+    let manual_node = node();
+    let mut subscription_node = node();
+    subscription_node.port = 8443;
+    let manual_old_id = manual_node.stable_id_v2(&old_key).unwrap();
+    let subscription_old_id = subscription_node.stable_id_v2(&old_key).unwrap();
+    store
+        .upsert_manual_batch(std::slice::from_ref(&manual_node), &[])
+        .unwrap();
+    store
+        .refresh_provider("provider-a", std::slice::from_ref(&subscription_node))
+        .unwrap();
+    let chain = ProxyChain {
+        schema_version: 1,
+        id: "18dc0b8a-7485-49bc-8a91-f48bdc736846".into(),
+        name: "Rotation chain".into(),
+        profile_id: Some("profile-a".into()),
+        front: NodeRef {
+            source: Source::Manual,
+            stable_id: manual_old_id.clone(),
+        },
+        landing: NodeRef {
+            source: Source::Subscription {
+                provider_id: "provider-a".into(),
+            },
+            stable_id: subscription_old_id.clone(),
+        },
+        enabled: true,
+        exit_policy: ExitPolicy::Warn,
+    };
+    store.save_proxy_chain(&chain).unwrap();
+
+    store
+        .rotate_identity_key(
+            new_key.clone(),
+            &[
+                IdentitySourceSnapshot {
+                    source: Source::Manual,
+                    nodes: vec![manual_node.clone()],
+                },
+                IdentitySourceSnapshot {
+                    source: Source::Subscription {
+                        provider_id: "provider-a".into(),
+                    },
+                    nodes: vec![subscription_node.clone()],
+                },
+            ],
+        )
+        .unwrap();
+
+    let chains = store.proxy_chains().unwrap();
+    assert_eq!(chains.len(), 1);
+    assert_eq!(chains[0].front.source, Source::Manual);
+    assert_eq!(chains[0].front.stable_id, manual_node.stable_id_v2(&new_key).unwrap());
+    assert_eq!(
+        chains[0].landing.source,
+        Source::Subscription {
+            provider_id: "provider-a".into(),
+        }
+    );
+    assert_eq!(
+        chains[0].landing.stable_id,
+        subscription_node.stable_id_v2(&new_key).unwrap()
+    );
 }
 
 #[test]
