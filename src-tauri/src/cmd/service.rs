@@ -13,6 +13,7 @@ use crate::{
 pub enum ServiceInstallOutcome {
     Installed,
     /// Keep the IPC union stable across operating systems.
+    #[cfg_attr(not(any(windows, test)), allow(dead_code))]
     Sidecar {
         reason: String,
     },
