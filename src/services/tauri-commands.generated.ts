@@ -1002,6 +1002,7 @@ export type ServiceFallbackNotice =
 
 export type ServiceInstallOutcome =
   | { status: 'installed' }
+  /**  Keep the IPC union stable across operating systems. */
   | { status: 'sidecar'; reason: string }
 
 /**  A removal has a revision too, so a delayed read cannot restore a resolved failure. */

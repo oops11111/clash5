@@ -12,7 +12,7 @@ use crate::{
 #[serde(tag = "status", rename_all = "camelCase")]
 pub enum ServiceInstallOutcome {
     Installed,
-    #[cfg(any(windows, test))]
+    /// Keep the IPC union stable across operating systems.
     Sidecar {
         reason: String,
     },
