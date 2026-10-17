@@ -3,6 +3,51 @@
 
 export interface TranslationResources {
   translation: {
+    chains: {
+      activate: string
+      activated: string
+      activatedSession: string
+      create: string
+      delete: string
+      deleted: string
+      detectExit: string
+      disabled: string
+      effectiveChain: string
+      empty: string
+      enabled: string
+      exitEnabled: string
+      exitPrivacy: string
+      exitService: string
+      exitSwitched: string
+      exitWarning: string
+      failed: string
+      failurePolicy: string
+      fallback: string
+      front: string
+      inspector: string
+      landing: string
+      list: string
+      manual: string
+      missingNode: string
+      name: string
+      needNodes: string
+      pluginPending: string
+      policyGroup: string
+      routeName: string
+      save: string
+      saveBeforeTest: string
+      saved: string
+      subscription: string
+      switchVerified: string
+      templates: string
+      test: string
+      testSuccess: string
+      twoHopHint: string
+      twoHopTemplate: string
+      useTemplate: string
+      visual: string
+      warnOnly: string
+    }
     connections: {
       components: {
         actions: {
@@ -244,6 +289,7 @@ export interface TranslationResources {
           rotateIdentityConfirm: string
           rotateIdentityDescription: string
           rotateIdentityTitle: string
+          rotationRuntimePending: string
           saveOrphanRetention: string
           tabs: {
             chains: string

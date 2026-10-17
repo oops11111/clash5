@@ -11,6 +11,8 @@ import {
 } from '@wdio/tauri-service'
 import { dump, load } from 'js-yaml'
 
+import { startChainFixture } from './m2-mihomo-smoke.mjs'
+
 const binary = process.argv[2]
 if (!binary)
   throw new Error('Usage: node scripts/m1-desktop-smoke.mjs <app-binary>')
@@ -39,6 +41,7 @@ const screenshot = resolve(
       : 'target/m1-desktop-smoke.png',
 )
 const fixtures = []
+let chainFixture
 let phase = 'WebDriver startup'
 const watchdog = setTimeout(() => {
   process.stderr.write(`Desktop smoke timed out during ${phase}\n`)
@@ -98,7 +101,10 @@ async function invoke(command, args) {
       try {
         return { value: await window.__TAURI_INTERNALS__.invoke(name, input) }
       } catch (error) {
-        return { error: String(error) }
+        return {
+          error:
+            typeof error === 'object' ? JSON.stringify(error) : String(error),
+        }
       }
     },
     command,
@@ -292,6 +298,7 @@ async function importLink(link, count, expectedName) {
     }
     throw new Error(
       `Manual import acceptance failed: ${JSON.stringify(details)}`,
+      { cause: error },
     )
   }
 }
@@ -521,6 +528,7 @@ async function verifySubscriptionRefresh() {
     }
     throw new Error(
       `${String(error)}; diagnostics: ${JSON.stringify(diagnostics)}`,
+      { cause: error },
     )
   }
   const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
@@ -751,7 +759,7 @@ async function verifyNavigation() {
         last && last.top >= viewport.top && last.bottom <= viewport.bottom + 1,
       ),
       logoVisible: Boolean(
-        document.querySelector('.the-logo .MuiSvgIcon-root'),
+        document.querySelector('.the-logo img[alt="clash5"]'),
       ),
     }
   })
@@ -859,9 +867,24 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   const clickButtonIn = async (labels, selector = '.base-page') => {
     const clicked = await browser.execute(
       (values, rootSelector) => {
-        const button = [
-          ...document.querySelectorAll(`${rootSelector} button`),
-        ].find((item) => values.includes(item.textContent?.trim()))
+        const roots = [...document.querySelectorAll(rootSelector)].filter(
+          (root) => {
+            const surface = root.matches('.MuiDialog-root')
+              ? root.querySelector('[role="dialog"]')
+              : root
+            if (!surface) return false
+            const style = getComputedStyle(surface)
+            const bounds = surface.getBoundingClientRect()
+            return (
+              style.visibility !== 'hidden' &&
+              bounds.width > 0 &&
+              bounds.height > 0
+            )
+          },
+        )
+        const button = roots
+          .flatMap((root) => [...root.querySelectorAll('button')])
+          .find((item) => values.includes(item.textContent?.trim()))
         button?.click()
         return Boolean(button)
       },
@@ -872,6 +895,48 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   }
   const rotateLabels = ['Rotate identity key', '轮换身份密钥', '輪替身分金鑰']
   const cancelLabels = ['Cancel', '取消']
+  await browser.execute(() => {
+    const plugins = [
+      ...document.querySelectorAll('.the-menu .MuiListItemButton-root'),
+    ].find((item) => ['Plugins', '插件'].includes(item.textContent?.trim()))
+    plugins?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.base-page [role="tab"]')].some((tab) =>
+          ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Plugin binding tab did not render before identity recovery',
+    },
+  )
+  await browser.execute(() => {
+    const binding = [
+      ...document.querySelectorAll('.base-page [role="tab"]'),
+    ].find((tab) =>
+      ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+    )
+    binding?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        (labels) =>
+          [...document.querySelectorAll('.base-page button')].some((button) =>
+            labels.includes(button.textContent?.trim()),
+          ),
+        rotateLabels,
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Identity controls did not render on the plugin binding tab',
+    },
+  )
   await clickButtonIn(rotateLabels)
   await browser.waitUntil(
     () =>
@@ -1052,31 +1117,79 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   if (!selectedNode) throw new Error('Selected rebind target is missing')
 
   phase = 'identity rotation'
-  await clickButtonIn(rotateLabels)
-  await clickButtonIn(rotateLabels, '.MuiDialog-root')
-  let rotatedTarget
-  await browser.waitUntil(
-    async () => {
-      const currentNodes = await invoke('clash5_list_nodes', {
-        includeInactive: true,
+  await browser.execute(() => {
+    const root = document.documentElement
+    const key = 'clash5SmokeIdentityRotation'
+    root.dataset[key] = 'pending'
+    window.__TAURI_INTERNALS__
+      .invoke('clash5_rotate_identity')
+      .then(() => {
+        root.dataset[key] = 'success'
       })
-      rotatedTarget = currentNodes.find(
-        (node) =>
-          node.source.kind === selectedNode.source.kind &&
-          node.source.provider_id === selectedNode.source.provider_id &&
-          node.display_name === selectedNode.display_name &&
-          node.active,
-      )
-      return Boolean(
-        rotatedTarget && rotatedTarget.stable_id !== selectedNode.stable_id,
-      )
-    },
+      .catch((error) => {
+        root.dataset[key] =
+          `error:${typeof error === 'string' ? error : JSON.stringify(error)}`
+      })
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () =>
+          document.documentElement.dataset.clash5SmokeIdentityRotation !==
+          'pending',
+      ),
     {
-      timeout: 60_000,
-      interval: 500,
-      timeoutMsg: 'Identity rotation did not finish',
+      timeout: 180_000,
+      interval: 250,
+      timeoutMsg: 'Identity rotation command did not finish within 180 seconds',
     },
   )
+  const rotationResult = await browser.execute(
+    () => document.documentElement.dataset.clash5SmokeIdentityRotation,
+  )
+  if (rotationResult !== 'success') {
+    throw new Error(`Identity rotation command failed: ${rotationResult}`)
+  }
+  let rotatedTarget
+  try {
+    await browser.waitUntil(
+      async () => {
+        const currentNodes = await invoke('clash5_list_nodes', {
+          includeInactive: true,
+        })
+        rotatedTarget = currentNodes.find(
+          (node) =>
+            node.source.kind === selectedNode.source.kind &&
+            node.source.provider_id === selectedNode.source.provider_id &&
+            node.display_name === selectedNode.display_name &&
+            node.active,
+        )
+        return Boolean(
+          rotatedTarget && rotatedTarget.stable_id !== selectedNode.stable_id,
+        )
+      },
+      {
+        timeout: 60_000,
+        interval: 500,
+        timeoutMsg: 'Identity rotation did not finish',
+      },
+    )
+  } catch (error) {
+    const currentNodes = await invoke('clash5_list_nodes', {
+      includeInactive: true,
+    })
+    const diagnostics = currentNodes.map((node) => ({
+      source: node.source,
+      stable_id: node.stable_id,
+      display_name: node.display_name,
+      port: node.port,
+      active: node.active,
+    }))
+    throw new Error(
+      `${String(error)}; identity inventory: ${JSON.stringify(diagnostics)}`,
+      { cause: error },
+    )
+  }
   const rotatedNodes = await invoke('clash5_list_nodes', {
     includeInactive: true,
   })
@@ -1173,9 +1286,280 @@ async function verifyRecoveryResetCancellation() {
   }
 }
 
+async function verifyM2Chains() {
+  chainFixture = await startChainFixture(true)
+  const fileData = dump({
+    proxies: [
+      {
+        name: 'M2-front',
+        type: 'http',
+        server: '127.0.0.1',
+        port: chainFixture.frontPort,
+      },
+    ],
+    'proxy-providers': {
+      'M2-provider': {
+        type: 'inline',
+        payload: [
+          {
+            name: 'M2-landing',
+            type: 'http',
+            server: '127.0.0.1',
+            port: chainFixture.landingPort,
+          },
+        ],
+        override: { udp: false },
+      },
+    },
+    'proxy-groups': [
+      {
+        name: 'M2-selected',
+        type: 'select',
+        proxies: ['DIRECT', 'M2-front'],
+        use: ['M2-provider'],
+      },
+    ],
+    rules: ['MATCH,M2-selected'],
+  })
+  await invoke('create_profile', {
+    item: { type: 'local', name: 'M2-local-chain-fixture' },
+    fileData,
+  })
+  const profiles = await invoke('get_profiles')
+  const profile = profiles.items.find(
+    (item) => item.name === 'M2-local-chain-fixture',
+  )
+  if (!profile?.uid) throw new Error('M2 fixture profile was not created')
+  const switched = await invoke('patch_profiles_config', {
+    profiles: { current: profile.uid },
+  })
+  if (switched.status !== 'valid')
+    throw new Error('M2 fixture profile was rejected')
+  const activeProfiles = await invoke('get_profiles')
+  const activeRuntime = await invoke('get_runtime_config')
+  if (activeProfiles.current !== profile.uid)
+    throw new Error('M2 fixture profile did not become active')
+  if (!activeRuntime.proxies?.some((proxy) => proxy.name === 'M2-front'))
+    throw new Error(
+      `M2 fixture proxy was not generated: ${activeRuntime.proxies?.map((proxy) => proxy.name).join(', ')}`,
+    )
+  const backendWorkspace = await invoke('clash5_chain_workspace')
+  if (!backendWorkspace.nodes.some((node) => node.display_name === 'M2-front'))
+    throw new Error(
+      `M2 front node was absent from workspace: ${backendWorkspace.nodes.map((node) => node.display_name).join(', ')}`,
+    )
+  await browser.execute(() => {
+    localStorage.setItem('clash5-exit-ip-url', 'http://127.0.0.1:18090/ip')
+    window.history.pushState({}, '', '/chains')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        Boolean(
+          document.querySelector('[data-testid="chains-workspace"] input'),
+        ),
+      ),
+    { timeout: 20_000 },
+  )
+  await browser
+    .$('[data-testid="chains-workspace"] input')
+    .setValue('M2 desktop chain')
+  for (const [index, name] of [
+    [0, 'M2-front'],
+    [1, 'M2-landing'],
+  ]) {
+    const control = await browser
+      .$$('[data-testid="chains-workspace"] [role="combobox"]')
+      .then((controls) => controls[index])
+    await control.click()
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          (prefix) =>
+            [...document.querySelectorAll('[role="option"]')].some((option) =>
+              option.textContent?.startsWith(prefix),
+            ),
+          name,
+        ),
+      { timeout: 5_000 },
+    )
+    await browser.execute(
+      (prefix) =>
+        [...document.querySelectorAll('[role="option"]')]
+          .find((option) => option.textContent?.startsWith(prefix))
+          ?.click(),
+      name,
+    )
+    await browser.waitUntil(
+      () => browser.execute(() => !document.querySelector('[role="listbox"]')),
+      { timeout: 5_000 },
+    )
+  }
+  await clickButton(['Save chain', '保存链路', '儲存鏈路'])
+  let workspace
+  await browser.waitUntil(
+    async () => {
+      workspace = await invoke('clash5_chain_workspace')
+      return workspace.chains.some((chain) => chain.name === 'M2 desktop chain')
+    },
+    { timeout: 45_000, timeoutMsg: 'The desktop chain was not saved' },
+  )
+  const chain = workspace.chains.find(
+    (chain) => chain.name === 'M2 desktop chain',
+  )
+  if (!chain.landing.source.provider_id?.endsWith(':M2-provider'))
+    throw new Error('Chain did not retain its external provider source')
+  const tested = await invoke('clash5_test_chain', {
+    id: chain.id,
+    testUrl: 'http://127.0.0.1:18090/health',
+  })
+  if (
+    typeof tested.delay_ms !== 'number' ||
+    tested.group_name !== `clash5-chain-${chain.id}`
+  )
+    throw new Error('Chain connectivity bridge returned an invalid result')
+  await waitButtonReady(['Test chain', '测试链路', '測試鏈路'])
+  await clickButton(['Detect exit IP', '检测出口 IP', '偵測出口 IP'])
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.MuiAlert-root')].some((alert) =>
+          alert.textContent?.includes('203.0.113.27'),
+        ),
+      ),
+    {
+      timeout: 45_000,
+      timeoutMsg: 'Exit IP did not render through the real chain',
+    },
+  )
+  const activation = await invoke('clash5_activate_chain', {
+    id: chain.id,
+    policyGroup: 'M2-selected',
+  })
+  if (!activation.selection_persisted)
+    throw new Error('Chain selection did not persist')
+  const runtime = await invoke('get_runtime_config')
+  const original = runtime.proxies.find((proxy) => proxy.name === 'M2-front')
+  const landing = runtime.proxies.find(
+    (proxy) => proxy.name === `clash5-chain-${chain.id}-landing`,
+  )
+  if (
+    original['dialer-proxy'] ||
+    landing['dialer-proxy'] !== `clash5-chain-${chain.id}-front`
+  )
+    throw new Error(
+      'Generated chain changed the original or reversed hop direction',
+    )
+  let legacyRejected = false
+  try {
+    await invoke('update_proxy_chain_config_in_runtime', {
+      proxyChainConfig: null,
+    })
+  } catch {
+    legacyRejected = true
+  }
+  if (!legacyRejected)
+    throw new Error(
+      'Legacy chain mutation was allowed to overwrite a managed chain',
+    )
+  if (
+    runtime.listeners?.some((listener) =>
+      listener.name.startsWith('clash5-exit-probe-'),
+    )
+  )
+    throw new Error('Exit-IP probe listener leaked into the runtime')
+  const warning = await invoke('clash5_detect_exit_ip', {
+    id: chain.id,
+    serviceUrl: 'http://127.0.0.1:18090/unavailable',
+  })
+  if (warning.status !== 'warning')
+    throw new Error('Default L2 policy did not warn on service failure')
+  const afterWarning = await invoke('get_proxy_view')
+  if (
+    afterWarning.groups.find((group) => group.name === 'M2-selected')?.now !==
+    `clash5-chain-${chain.id}`
+  )
+    throw new Error('Warning unexpectedly switched the policy group')
+  const disabled = await invoke('clash5_detect_exit_ip', {
+    id: chain.id,
+    serviceUrl: null,
+  })
+  if (disabled.status !== 'disabled')
+    throw new Error('Disabled detection was not respected')
+  let rejected = false
+  try {
+    await invoke('clash5_save_chain', {
+      chain: {
+        ...chain,
+        landing: { ...chain.landing, stable_id: 'fixture-missing-node' },
+      },
+    })
+  } catch {
+    rejected = true
+  }
+  if (!rejected) throw new Error('Missing chain node was accepted')
+  workspace = await invoke('clash5_chain_workspace')
+  if (
+    JSON.stringify(workspace.chains.find((saved) => saved.id === chain.id)) !==
+    JSON.stringify(chain)
+  )
+    throw new Error('Rejected chain edit did not restore its saved definition')
+  const limited = workspace.nodes.find(
+    (node) => node.reference.source.kind === 'manual' && node.port === 18081,
+  )
+  if (!limited)
+    throw new Error(
+      'Rate-limited manual node is unavailable to the chain fixture',
+    )
+  const failing = {
+    ...chain,
+    id: '28dc0b8a-7485-49bc-8a91-f48bdc736846',
+    name: 'M2 verified fallback policy',
+    front: limited.reference,
+    exit_policy: { mode: 'switch', fallback_chain_id: chain.id },
+  }
+  await invoke('clash5_save_chain', { chain: failing })
+  const fallback = await invoke('clash5_detect_exit_ip', {
+    id: failing.id,
+    serviceUrl: 'http://127.0.0.1:18090/ip',
+  })
+  if (
+    fallback.status !== 'switched' ||
+    fallback.fallback_chain_id !== chain.id ||
+    fallback.observation.ip !== '203.0.113.27'
+  )
+    throw new Error(`Verified fallback failed: ${JSON.stringify(fallback)}`)
+  const afterFallback = await invoke('get_proxy_view')
+  if (
+    afterFallback.groups.find(
+      (group) => group.name === `clash5-chain-${failing.id}`,
+    )?.now !== `clash5-chain-${chain.id}`
+  )
+    throw new Error('Verified fallback was not selected')
+  if (!chainFixture.frontStats.length || !chainFixture.landingStats.length)
+    throw new Error('Desktop exit-IP request bypassed a hop')
+  const layout = await browser.execute(() => {
+    const content = document.querySelector('.base-content')
+    return {
+      clientWidth: content?.clientWidth ?? 0,
+      scrollWidth: content?.scrollWidth ?? 0,
+    }
+  })
+  if (layout.scrollWidth > layout.clientWidth + 1)
+    throw new Error(
+      `Chains page overflows its content area: ${JSON.stringify(layout)}`,
+    )
+  await browser.saveScreenshot(resolve('target/m2-desktop-chains.png'))
+  process.stdout.write(
+    'M2 desktop save, provider chain, exit-IP, warning, rollback and verified fallback passed\n',
+  )
+}
+
 try {
   if (persisted) {
     await startFixtures()
+    chainFixture = await startChainFixture(true)
   }
   browser = await startWdioSession(capabilities)
   phase = 'Tauri bridge'
@@ -1214,7 +1598,9 @@ try {
       },
     )
   } catch (error) {
-    throw new Error(`${String(error)}; last error: ${lastError ?? 'none'}`)
+    throw new Error(`${String(error)}; last error: ${lastError ?? 'none'}`, {
+      cause: error,
+    })
   }
   if (!persisted && !recoveryCancel && inventory.length !== 0) {
     throw new Error(`Fresh desktop session contains ${inventory.length} nodes`)
@@ -1330,7 +1716,42 @@ try {
   if (full) {
     phase = 'sidebar and plugin binding navigation'
     await verifyNavigation()
+    phase = 'M2 chain editor and exit-IP policy'
+    await verifyM2Chains()
     await verifyIdentityRotationAndAmbiguousRebind()
+  } else if (persisted) {
+    const workspace = await invoke('clash5_chain_workspace')
+    if (
+      workspace.chains.length !== 2 ||
+      !workspace.chains.some((chain) => chain.name === 'M2 desktop chain')
+    )
+      throw new Error('M2 chains did not survive a desktop restart')
+    const runtime = await invoke('get_runtime_config')
+    if (
+      !workspace.chains.every((chain) =>
+        runtime['proxy-groups']?.some(
+          (group) => group.name === `clash5-chain-${chain.id}`,
+        ),
+      )
+    )
+      throw new Error('Saved M2 chains were not regenerated after restart')
+    const view = await invoke('get_proxy_view')
+    const original = workspace.chains.find(
+      (chain) => chain.name === 'M2 desktop chain',
+    )
+    const fallback = workspace.chains.find(
+      (chain) => chain.id === '28dc0b8a-7485-49bc-8a91-f48bdc736846',
+    )
+    if (
+      view.groups.find((group) => group.name === `clash5-chain-${fallback.id}`)
+        ?.now !== `clash5-chain-${original.id}`
+    )
+      throw new Error(
+        'Verified fallback selection did not survive desktop restart',
+      )
+    process.stdout.write(
+      'M2 stable chains survived restart and regenerated their runtime groups\n',
+    )
   }
   process.stdout.write(
     persisted
@@ -1379,6 +1800,7 @@ try {
     }
   }
   phase = 'fixture cleanup'
+  await chainFixture?.close()
   for (const child of fixtures.reverse()) {
     if (child.exitCode === null && child.signalCode === null) {
       const exited = once(child, 'exit', {
