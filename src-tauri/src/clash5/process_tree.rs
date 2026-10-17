@@ -72,6 +72,10 @@ impl ProcessTree {
             };
         }
 
+        if self.active_by_pid.contains_key(&identity.key.pid) {
+            return Err(ProcessTreeError::ConflictingProcessInstance);
+        }
+
         self.members.insert(identity.key, identity.clone());
         self.parents.insert(identity.key, Some(parent));
         self.active_by_pid.insert(identity.key.pid, identity.key);
@@ -155,6 +159,21 @@ mod tests {
         assert!(tree.process_started(reused, root_key).expect("new child accepted"));
         assert!(!tree.process_exited(first_key));
         assert_eq!(tree.active_targets()[1].key, reused_key);
+    }
+
+    #[test]
+    fn refuses_two_active_instances_with_the_same_pid() {
+        let root = process(100, 1_000, "selected");
+        let root_key = root.key;
+        let mut tree = ProcessTree::new(root).expect("valid root");
+        let first = process(101, 1_100, "first-child");
+        assert!(tree.process_started(first, root_key).expect("child accepted"));
+
+        assert!(matches!(
+            tree.process_started(process(101, 2_100, "reused-pid"), root_key),
+            Err(ProcessTreeError::ConflictingProcessInstance)
+        ));
+        assert_eq!(tree.active_targets().len(), 2);
     }
 
     #[test]
