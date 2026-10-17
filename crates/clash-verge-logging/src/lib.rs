@@ -19,7 +19,7 @@ use log::{Level, LevelFilter, Record};
 use parking_lot::RwLock;
 use tracing_estuary::Pipeline;
 
-const SENSITIVE_KEYS: [&str; 10] = [
+const SENSITIVE_KEYS: [&str; 16] = [
     "password",
     "passwd",
     "secret",
@@ -29,7 +29,13 @@ const SENSITIVE_KEYS: [&str; 10] = [
     "relay-token",
     "relay_token",
     "authorization",
+    "proxy-authorization",
     "credential",
+    "api_key",
+    "api-key",
+    "x-api-key",
+    "cookie",
+    "set-cookie",
 ];
 
 /// Redacts URLs and credential-like key/value fields before they reach logs or user-facing diagnostics.
@@ -117,6 +123,9 @@ fn mask_sensitive_fields(input: &str) -> String {
             continue;
         }
         let mut separator = after_key;
+        if separator < input.len() && matches!(input.as_bytes()[separator], b'"' | b'\'') {
+            separator += 1;
+        }
         while separator < input.len() && input.as_bytes()[separator].is_ascii_whitespace() {
             separator += 1;
         }
@@ -129,14 +138,35 @@ fn mask_sensitive_fields(input: &str) -> String {
             value_start += 1;
         }
         let mut value_end = value_start;
-        while value_end < input.len()
-            && !input.as_bytes()[value_end].is_ascii_whitespace()
-            && !matches!(
-                input.as_bytes()[value_end],
-                b',' | b';' | b'&' | b'#' | b')' | b']' | b'}'
-            )
-        {
+        if value_start < input.len() && matches!(input.as_bytes()[value_start], b'"' | b'\'') {
+            let quote = input.as_bytes()[value_start];
             value_end += 1;
+            while value_end < input.len() && input.as_bytes()[value_end] != quote {
+                value_end += 1;
+            }
+            value_end = (value_end + 1).min(input.len());
+        } else {
+            while value_end < input.len()
+                && !input.as_bytes()[value_end].is_ascii_whitespace()
+                && !matches!(
+                    input.as_bytes()[value_end],
+                    b',' | b';' | b'&' | b'#' | b')' | b']' | b'}'
+                )
+            {
+                value_end += 1;
+            }
+            if key.ends_with("authorization") && matches!(&lower[value_start..value_end], "bearer" | "basic" | "token")
+            {
+                while value_end < input.len() && input.as_bytes()[value_end].is_ascii_whitespace() {
+                    value_end += 1;
+                }
+                while value_end < input.len()
+                    && !input.as_bytes()[value_end].is_ascii_whitespace()
+                    && !matches!(input.as_bytes()[value_end], b',' | b';' | b')' | b']' | b'}')
+                {
+                    value_end += 1;
+                }
+            }
         }
         output.push_str(&input[cursor..value_start]);
         output.push_str("***");
@@ -484,6 +514,17 @@ mod redaction_tests {
         assert!(!output.contains("ctrl-secret"));
         assert!(!output.contains("relay-secret"));
         assert!(!output.contains("pw"));
+    }
+
+    #[test]
+    fn masks_json_credentials_and_authorization_headers() {
+        let output = redact(
+            r#"diagnostic {"password":"json-secret","access_token": "json-token"} Authorization: Bearer header-token"#,
+        );
+        assert!(!output.contains("json-secret"));
+        assert!(!output.contains("json-token"));
+        assert!(!output.contains("header-token"));
+        assert!(output.contains("Authorization: ***"));
     }
 
     #[test]
