@@ -454,7 +454,8 @@ impl Logger {
     pub fn writer_sidecar_log(&self, level: Level, message: &str) {
         if let Some(writer) = self.sidecar_file_writer.read().as_ref() {
             let mut now = DeferredNow::default();
-            let args = format_args!("{}", message);
+            let redacted = redact(message);
+            let args = format_args!("{}", redacted);
             let record = Record::builder().args(args).level(level).target("sidecar").build();
             let _ = writer.write(&mut now, &record);
         }
