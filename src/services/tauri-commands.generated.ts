@@ -322,6 +322,30 @@ export const commands = {
     typedError<VergeImportReport, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_import_verge_data', { sourceDir }),
     ),
+  clash5ChainWorkspace: () =>
+    typedError<ChainWorkspace, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_chain_workspace'),
+    ),
+  clash5SaveChain: (chain: ProxyChain) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_save_chain', { chain }),
+    ),
+  clash5DeleteChain: (id: string) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_delete_chain', { id }),
+    ),
+  clash5TestChain: (id: string, testUrl: string | null) =>
+    typedError<ChainTestResult, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_test_chain', { id, testUrl }),
+    ),
+  clash5ActivateChain: (id: string, policyGroup: string) =>
+    typedError<ChainActivation, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_activate_chain', { id, policyGroup }),
+    ),
+  clash5DetectExitIp: (id: string, serviceUrl: string | null) =>
+    typedError<ExitIpResult, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_detect_exit_ip', { id, serviceUrl }),
+    ),
   enhanceProfiles: () =>
     typedError<ValidationOutcome, CommandFailure_Serialize>(
       __TAURI_INVOKE('enhance_profiles'),
@@ -493,6 +517,31 @@ export type Binding = {
   disappeared_at?: string | null
 }
 
+export type ChainActivation = {
+  selection_persisted: boolean
+}
+
+export type ChainNodeOption = {
+  reference: NodeRef
+  display_name: string
+  kind: string
+  server: string
+  port: number
+  source_name: string | null
+}
+
+export type ChainTestResult = {
+  delay_ms: number
+  group_name: string
+}
+
+export type ChainWorkspace = {
+  profile_id: string | null
+  chains: ProxyChain[]
+  nodes: ChainNodeOption[]
+  policy_groups: string[]
+}
+
 export type Clash5IdentityStatus = {
   recovery_mode: boolean
   pending_rebinds: number
@@ -570,6 +619,26 @@ export type DownloadEvent =
       }
     }
   | { event: 'Finished' }
+
+export type ExitIpResult =
+  | { status: 'disabled' }
+  | { status: 'healthy'; observation: ExitObservation }
+  | { status: 'warning'; code: string }
+  | {
+      status: 'switched'
+      fallback_chain_id: string
+      observation: ExitObservation
+      selection_persisted: boolean
+    }
+
+export type ExitObservation = {
+  ip: string
+  elapsed_ms: number
+}
+
+export type ExitPolicy =
+  | { mode: 'warn' }
+  | { mode: 'switch'; fallback_chain_id: string }
 
 /**  Operation associated with a pending failure. */
 export type FailedOperation =
@@ -886,6 +955,11 @@ export type NodeRecord = {
   quality: NodeQuality | null
 }
 
+export type NodeRef = {
+  source: Source
+  stable_id: string
+}
+
 export type OrphanCleanupPreview = {
   retention_days: number
   total_orphans: number
@@ -1030,6 +1104,17 @@ export type ProxyCapabilities = {
   tfo: boolean
   mptcp: boolean
   smux: boolean
+}
+
+export type ProxyChain = {
+  schema_version: number
+  id: string
+  name: string
+  profile_id: string | null
+  front: NodeRef
+  landing: NodeRef
+  enabled: boolean
+  exit_policy: ExitPolicy
 }
 
 export type ProxyExtraContract = {

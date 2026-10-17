@@ -1,5 +1,5 @@
-use crate::{DataError, IdentityKey, Node, StableId, identity::text};
-use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use crate::{DataError, IdentityKey, Node, ProxyChain, StableId, identity::text};
+use rusqlite::{Connection, DatabaseName, OptionalExtension, Transaction, backup::Progress, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, path::Path, time::Duration};
@@ -11,7 +11,7 @@ pub enum Source {
     Subscription { provider_id: String },
 }
 impl Source {
-    fn scope(&self) -> Result<(&str, &str), DataError> {
+    pub(crate) fn scope(&self) -> Result<(&str, &str), DataError> {
         match self {
             Self::Manual => Ok(("manual", "")),
             Self::Subscription { provider_id } => {
@@ -316,6 +316,16 @@ impl BindingStore {
         Ok(store)
     }
 
+    pub fn snapshot_to(&self, path: impl AsRef<Path>) -> Result<(), DataError> {
+        self.db.backup(DatabaseName::Main, path, None)?;
+        Ok(())
+    }
+
+    pub fn restore_from(&mut self, path: impl AsRef<Path>) -> Result<(), DataError> {
+        self.db.restore(DatabaseName::Main, path, None::<fn(Progress)>)?;
+        Ok(())
+    }
+
     fn install_identity_key(&mut self, key: IdentityKey) -> Result<(), DataError> {
         let active: Option<(i64, String)> = self
             .db
@@ -477,6 +487,7 @@ impl BindingStore {
         let mut migrated_nodes = 0usize;
         let mut migrated_bindings = 0usize;
         let mut unresolved_bindings = 0usize;
+        let mut rekeyed_ids = BTreeMap::<(String, String, StableId), StableId>::new();
 
         for snapshot in snapshots {
             let (kind, provider) = snapshot.source.scope()?;
@@ -484,6 +495,9 @@ impl BindingStore {
             for node in &snapshot.nodes {
                 let old_id = node.stable_id_v2(old_key)?;
                 let new_id = node.stable_id_v2(&new_key)?;
+                if old_id != new_id {
+                    rekeyed_ids.insert((kind.to_owned(), provider.to_owned(), old_id.clone()), new_id.clone());
+                }
                 next.entry(new_id)
                     .and_modify(|(selected, count, _)| {
                         *count += 1;
@@ -586,6 +600,35 @@ impl BindingStore {
             }
         }
 
+        let stored_chains = {
+            let mut statement = tx.prepare(
+                "SELECT id,definition FROM chains WHERE json_extract(definition,'$.schema_version') IS NOT NULL",
+            )?;
+            statement
+                .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+                .collect::<Result<Vec<_>, _>>()?
+        };
+        let mut chains_rekeyed = 0usize;
+        for (id, definition) in stored_chains {
+            let mut chain: ProxyChain = serde_json::from_str(&definition).map_err(|_| DataError::Database)?;
+            let mut changed = false;
+            for reference in [&mut chain.front, &mut chain.landing] {
+                let (kind, provider) = reference.source.scope()?;
+                if let Some(new_id) =
+                    rekeyed_ids.get(&(kind.to_owned(), provider.to_owned(), reference.stable_id.clone()))
+                {
+                    reference.stable_id = new_id.clone();
+                    changed = true;
+                }
+            }
+            if changed {
+                chain.validate()?;
+                let definition = serde_json::to_string(&chain).map_err(|_| DataError::InvalidInput)?;
+                tx.execute("UPDATE chains SET definition=?2 WHERE id=?1", params![id, definition])?;
+                chains_rekeyed += 1;
+            }
+        }
+
         tx.execute("UPDATE identity_keys SET active=0 WHERE active=1", [])?;
         tx.execute(
             "INSERT INTO identity_keys(generation,key_id,active) VALUES(?1,?2,1)",
@@ -611,7 +654,8 @@ impl BindingStore {
             serde_json::json!({
                 "nodes_migrated": migrated_nodes,
                 "bindings_migrated": migrated_bindings,
-                "bindings_orphaned": unresolved_bindings
+                "bindings_orphaned": unresolved_bindings,
+                "chains_rekeyed": chains_rekeyed
             }),
         )?;
         tx.commit()?;
@@ -1116,5 +1160,37 @@ PRAGMA user_version=3;
             .optional()?;
         raw.map(|s| serde_json::from_str(&s).map_err(|_| DataError::Database))
             .transpose()
+    }
+    /// Save a validated M2 definition without storing proxy credentials.
+    pub fn save_proxy_chain(&mut self, chain: &ProxyChain) -> Result<(), DataError> {
+        chain.validate()?;
+        self.save_chain(
+            &chain.id,
+            &serde_json::to_value(chain).map_err(|_| DataError::InvalidInput)?,
+        )
+    }
+    /// Return versioned M2 definitions; legacy opaque M0 records remain available through `chain`.
+    pub fn proxy_chains(&self) -> Result<Vec<ProxyChain>, DataError> {
+        let mut statement = self.db.prepare(
+            "SELECT definition FROM chains WHERE json_extract(definition,'$.schema_version') IS NOT NULL ORDER BY id",
+        )?;
+        let raw = statement.query_map([], |row| row.get::<_, String>(0))?;
+        raw.map(|raw| {
+            let chain: ProxyChain = serde_json::from_str(&raw?).map_err(|_| DataError::Database)?;
+            chain.validate()?;
+            Ok(chain)
+        })
+        .collect()
+    }
+    pub fn delete_proxy_chain(&mut self, id: &str) -> Result<(), DataError> {
+        text(id)?;
+        let tx = self.db.transaction()?;
+        let deleted = tx.execute("DELETE FROM chains WHERE id=?1", [id])?;
+        if deleted == 0 {
+            return Err(DataError::NotFound);
+        }
+        audit(&tx, "chain.delete", serde_json::json!({"chains":deleted}))?;
+        tx.commit()?;
+        Ok(())
     }
 }

@@ -22,7 +22,20 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tauri_plugin_mihomo::Error as MihomoError;
+
+const MIHOMO_RELOAD_TIMEOUT: Duration = Duration::from_secs(15);
+
+async fn await_with_timeout<T, E, Fut>(duration: Duration, operation: Fut) -> Result<T>
+where
+    E: std::fmt::Display,
+    Fut: std::future::Future<Output = std::result::Result<T, E>>,
+{
+    match tokio::time::timeout(duration, operation).await {
+        Ok(Ok(value)) => Ok(value),
+        Ok(Err(error)) => Err(anyhow!(error.to_string())),
+        Err(_) => Err(anyhow!("operation timed out after {duration:?}")),
+    }
+}
 
 /// A staging result separated from the policy that acts on it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,17 +116,18 @@ async fn ask_to_stage(path: &std::path::Path) -> StageAttempt {
     }
 }
 
-/// Confirms one silent request because the service may commit before its reply is lost.
-/// Re-staging an already committed bundle is idempotent and bounded by `confirm_within`.
+/// Confirms a silent request because the service may commit before its reply is lost.
+/// Both IPC attempts are bounded; re-staging an already committed bundle is idempotent.
 #[tracing::instrument(skip_all, level = "debug", fields(confirm_within = ?confirm_within, asks = 1))]
 async fn stage_with_confirmation<Ask, Fut>(confirm_within: Duration, ask: Ask) -> StageAttempt
 where
     Ask: Fn() -> Fut,
     Fut: std::future::Future<Output = StageAttempt>,
 {
-    let first = match ask().await {
-        StageAttempt::Unanswered(first) => first,
-        answered => return answered,
+    let first = match tokio::time::timeout(confirm_within, ask()).await {
+        Ok(StageAttempt::Unanswered(first)) => first,
+        Ok(answered) => return answered,
+        Err(_) => format!("the first ask did not answer within {confirm_within:?}").into(),
     };
     logging!(
         warn,
@@ -463,14 +477,21 @@ impl CoreManager {
         }
     }
 
-    async fn reload_config(&self, path: &str) -> Result<(), MihomoError> {
-        handle::Handle::mihomo().reload_config(true, path).await
+    async fn reload_config(&self, path: &str) -> Result<()> {
+        await_with_timeout(
+            MIHOMO_RELOAD_TIMEOUT,
+            handle::Handle::mihomo().reload_config(true, path),
+        )
+        .await
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{ConfigApplication, StageAttempt, StageRequest, plan_config_application, stage_with_confirmation};
+    use super::{
+        ConfigApplication, StageAttempt, StageRequest, await_with_timeout, plan_config_application,
+        stage_with_confirmation,
+    };
     use clash_verge_service_ipc::{StageRejection, StageRuntimeOutcome};
     use std::{cell::Cell, time::Duration};
 
@@ -636,6 +657,24 @@ mod tests {
         );
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn a_first_ask_that_keeps_working_is_bounded_before_retry() {
+        let asks = Cell::new(0);
+        let started = tokio::time::Instant::now();
+        let outcome = stage_with_confirmation(CONFIRM_WITHIN, || async {
+            asks.set(asks.get() + 1);
+            match asks.get() {
+                1 => std::future::pending().await,
+                _ => staged(),
+            }
+        })
+        .await;
+
+        assert_eq!(outcome, staged());
+        assert_eq!(asks.get(), 2);
+        assert_eq!(started.elapsed(), CONFIRM_WITHIN);
+    }
+
     #[tokio::test]
     async fn a_second_silence_still_replaces_the_core() {
         let asks = Cell::new(0);
@@ -674,5 +713,19 @@ mod tests {
             CONFIRM_WITHIN,
             "the caller must be released at the deadline, not at the service's convenience"
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_hung_mihomo_request_returns_at_its_deadline() -> anyhow::Result<()> {
+        let started = tokio::time::Instant::now();
+        let error = match await_with_timeout(Duration::from_secs(5), std::future::pending::<anyhow::Result<()>>()).await
+        {
+            Err(error) => error,
+            Ok(()) => anyhow::bail!("the pending operation unexpectedly completed"),
+        };
+
+        assert!(error.to_string().contains("timed out"));
+        assert_eq!(started.elapsed(), Duration::from_secs(5));
+        Ok(())
     }
 }

@@ -12,6 +12,7 @@ import {
 import { showNotice } from '@/services/notice-service'
 import type {
   Binding as GeneratedBinding,
+  ChainWorkspace as GeneratedChainWorkspace,
   ClashInfo,
   CommandFailure_Serialize,
   DownloadEvent as ContractDownloadEvent,
@@ -28,6 +29,11 @@ import type {
   ValidationOutcome,
   WebDavBackupEntry,
 } from '@/services/tauri-commands.generated'
+import type {
+  ChainWorkspace,
+  Clash5Chain,
+  ExitIpResult,
+} from '@/types/clash5-chain'
 import type { ProxyViewV1 } from '@/types/proxy-view'
 import { debugLog } from '@/utils/debug'
 
@@ -38,6 +44,27 @@ export async function copyClashEnv() {
 export async function getProfiles() {
   return profilesFromWire(await invoke<IProfiles_Serialize>('get_profiles'))
 }
+
+export const getClash5ChainWorkspace = () =>
+  invoke<GeneratedChainWorkspace>(
+    'clash5_chain_workspace',
+  ) as Promise<ChainWorkspace>
+export const saveClash5Chain = (chain: Clash5Chain) =>
+  invoke<null>('clash5_save_chain', { chain })
+export const deleteClash5Chain = (id: string) =>
+  invoke<null>('clash5_delete_chain', { id })
+export const testClash5Chain = (id: string, testUrl: string | null = null) =>
+  invoke<{ delay_ms: number; group_name: string }>('clash5_test_chain', {
+    id,
+    testUrl,
+  })
+export const activateClash5Chain = (id: string, policyGroup: string) =>
+  invoke<{ selection_persisted: boolean }>('clash5_activate_chain', {
+    id,
+    policyGroup,
+  })
+export const detectClash5ExitIp = (id: string, serviceUrl: string | null) =>
+  invoke<ExitIpResult>('clash5_detect_exit_ip', { id, serviceUrl })
 
 export async function listClash5Nodes(includeInactive = false) {
   return (
@@ -223,12 +250,6 @@ export async function getRuntimeYaml() {
 
 export async function getRuntimeLogs() {
   return invoke<Record<string, [string, string][]>>('get_runtime_logs')
-}
-
-export async function getRuntimeProxyChainConfig(proxyChainExitNode: string) {
-  return invoke<string>('get_runtime_proxy_chain_config', {
-    proxyChainExitNode,
-  })
 }
 
 export async function updateProxyChainConfigInRuntime(

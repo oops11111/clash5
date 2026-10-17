@@ -21,6 +21,9 @@ pub static BACKUP_DIR: &str = "clash5-backup-dev";
 pub static CLASH_CONFIG: &str = "config.yaml";
 pub static VERGE_CONFIG: &str = "verge.yaml";
 pub static PROFILE_YAML: &str = "profiles.yaml";
+/// The clash5 data package is portable data only; the HMAC identity key never enters this archive.
+pub static CLASH5_DATA_DB: &str = "clash5-nodes.sqlite";
+pub static BACKUP_MANIFEST: &str = "clash5-backup.json";
 /// Marks that the one-shot raise of too-short auto-update intervals has already run.
 pub static UPDATE_INTERVAL_MIGRATED: &str = ".update-interval-migrated";
 
