@@ -19,6 +19,134 @@ use log::{Level, LevelFilter, Record};
 use parking_lot::RwLock;
 use tracing_estuary::Pipeline;
 
+const SENSITIVE_KEYS: [&str; 10] = [
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "access_token",
+    "refresh_token",
+    "relay-token",
+    "relay_token",
+    "authorization",
+    "credential",
+];
+
+/// Redacts URLs and credential-like key/value fields before they reach logs or user-facing diagnostics.
+pub fn redact(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut cursor = 0;
+    while cursor < input.len() {
+        let rest = &input[cursor..];
+        let (offset, scheme_len) = match (rest.find("https://"), rest.find("http://")) {
+            (Some(https), Some(http)) if https <= http => (https, 8),
+            (Some(https), None) => (https, 8),
+            (None, Some(http)) => (http, 7),
+            (Some(_), Some(http)) => (http, 7),
+            (None, None) => {
+                output.push_str(rest);
+                break;
+            }
+        };
+        let start = cursor + offset;
+        output.push_str(&input[cursor..start]);
+        let end = input[start..]
+            .find(|ch: char| ch.is_whitespace() || matches!(ch, ')' | ']' | '}' | '"' | '\''))
+            .map_or(input.len(), |end| start + end);
+        output.push_str(&mask_url_token(&input[start..end], scheme_len));
+        cursor = end;
+    }
+    mask_sensitive_fields(&output)
+}
+
+fn mask_url_token(url: &str, scheme_len: usize) -> String {
+    let scheme = &url[..scheme_len];
+    let remainder = &url[scheme_len..];
+    let authority_end = remainder.find(['/', '?', '#']).unwrap_or(remainder.len());
+    let authority = &remainder[..authority_end];
+    let host = authority.rsplit('@').next().unwrap_or(authority);
+    let suffix = &remainder[authority_end..];
+    let (path_and_query, fragment) = suffix
+        .split_once('#')
+        .map_or((suffix, None), |(body, frag)| (body, Some(frag)));
+    let (path, query) = path_and_query
+        .split_once('?')
+        .map_or((path_and_query, None), |(path, query)| (path, Some(query)));
+    let masked_path = path
+        .split('/')
+        .map(|segment| if segment.is_empty() { "" } else { "***" })
+        .collect::<Vec<_>>()
+        .join("/");
+    let mut masked = format!("{scheme}{host}{masked_path}");
+    if let Some(query) = query {
+        masked.push('?');
+        masked.push_str(
+            &query
+                .split('&')
+                .map(|part| {
+                    part.split_once('=')
+                        .map_or(part.to_owned(), |(key, _)| format!("{key}=***"))
+                })
+                .collect::<Vec<_>>()
+                .join("&"),
+        );
+    }
+    if fragment.is_some() {
+        masked.push_str("#***");
+    }
+    masked
+}
+
+fn mask_sensitive_fields(input: &str) -> String {
+    let lower = input.to_ascii_lowercase();
+    let mut output = String::with_capacity(input.len());
+    let mut cursor = 0;
+    let mut search = 0;
+    while search < input.len() {
+        let Some((start, key)) = SENSITIVE_KEYS
+            .iter()
+            .filter_map(|key| lower[search..].find(key).map(|offset| (search + offset, *key)))
+            .min_by_key(|(start, _)| *start)
+        else {
+            break;
+        };
+        let before_is_word = start > 0 && lower.as_bytes()[start - 1].is_ascii_alphanumeric();
+        let after_key = start + key.len();
+        if before_is_word || after_key > input.len() {
+            search = after_key.min(input.len());
+            continue;
+        }
+        let mut separator = after_key;
+        while separator < input.len() && input.as_bytes()[separator].is_ascii_whitespace() {
+            separator += 1;
+        }
+        if separator == input.len() || !matches!(input.as_bytes()[separator], b'=' | b':') {
+            search = after_key;
+            continue;
+        }
+        let mut value_start = separator + 1;
+        while value_start < input.len() && input.as_bytes()[value_start].is_ascii_whitespace() {
+            value_start += 1;
+        }
+        let mut value_end = value_start;
+        while value_end < input.len()
+            && !input.as_bytes()[value_end].is_ascii_whitespace()
+            && !matches!(
+                input.as_bytes()[value_end],
+                b',' | b';' | b'&' | b'#' | b')' | b']' | b'}'
+            )
+        {
+            value_end += 1;
+        }
+        output.push_str(&input[cursor..value_start]);
+        output.push_str("***");
+        cursor = value_end;
+        search = value_end;
+    }
+    output.push_str(&input[cursor..]);
+    output
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Type {
     Cmd,
@@ -72,7 +200,7 @@ impl fmt::Display for Type {
 #[macro_export]
 macro_rules! logging {
     ($level:ident, $type:expr, $($arg:tt)*) => {
-        log::$level!(target: "app", "{} {}", $type, format_args!($($arg)*))
+        log::$level!(target: "app", "{} {}", $type, $crate::redact(&format!($($arg)*)))
     };
 }
 
@@ -80,12 +208,12 @@ macro_rules! logging {
 macro_rules! logging_error {
     ($type:expr, $expr:expr) => {
         if let Err(err) = $expr {
-            log::error!(target: "app", "[{}] {}", $type, err);
+            log::error!(target: "app", "[{}] {}", $type, $crate::redact(&err.to_string()));
         }
     };
 
     ($type:expr, $fmt:literal $(, $arg:expr)*) => {
-        log::error!(target: "app", "[{}] {}", $type, format_args!($fmt $(, $arg)*));
+        log::error!(target: "app", "[{}] {}", $type, $crate::redact(&format!($fmt $(, $arg)*)));
     };
 }
 
@@ -109,7 +237,7 @@ impl LogRing {
         if guard.len() >= LOGS_QUEUE_LEN {
             guard.pop_front();
         }
-        guard.push_back(log);
+        guard.push_back(redact(&log));
     }
 
     pub fn get_logs(&self) -> Vec<String> {
@@ -330,5 +458,38 @@ impl Logger {
             let record = Record::builder().args(args).level(level).target("sidecar").build();
             let _ = writer.write(&mut now, &record);
         }
+    }
+}
+
+#[cfg(test)]
+mod redaction_tests {
+    use super::redact;
+
+    #[test]
+    fn masks_url_credentials_path_query_and_fragment() {
+        let output = redact("failed https://user:pass@example.test/subscription/secret?token=abc&x=y#frag");
+
+        assert_eq!(output, "failed https://example.test/***/***?token=***&x=***#***");
+        assert!(!output.contains("user:pass"));
+        assert!(!output.contains("abc"));
+        assert!(!output.contains("frag"));
+    }
+
+    #[test]
+    fn masks_controller_and_relay_values() {
+        let output = redact("controller secret: ctrl-secret relay-token=relay-secret password=pw");
+
+        assert_eq!(output, "controller secret: *** relay-token=*** password=***");
+        assert!(!output.contains("ctrl-secret"));
+        assert!(!output.contains("relay-secret"));
+        assert!(!output.contains("pw"));
+    }
+
+    #[test]
+    fn preserves_non_sensitive_context() {
+        assert_eq!(
+            redact("node probe failed after 3 attempts"),
+            "node probe failed after 3 attempts"
+        );
     }
 }
