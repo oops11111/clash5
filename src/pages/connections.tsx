@@ -242,12 +242,7 @@ const ConnectionsPage = () => {
             </Typography>
           </Box>
           <FormControlLabel
-            control={
-              <Switch
-                checked={false}
-                disabled
-              />
-            }
+            control={<Switch checked={false} disabled />}
             label={t('connections.processProxy.off')}
           />
         </Box>
