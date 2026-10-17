@@ -41,7 +41,7 @@
 - [ ] `[标准]` R-18：服务与包名隔离、同机共存。PR #27 的 Windows 安装/升级/启动/独立卸载和源配置校验和前后比对、三平台标识审计均通过；待合入 dev。
 - [x] `[标准]` R-19：只读导入 verge-rev 数据并比较源目录前后校验和（PR #26 已合并；CI 和 Windows 桌面验收确认不修改源目录）
 - [ ] `[Opus]` R-20：统一日志/诊断脱敏；凭证、完整订阅 URL、controller secret、relay token 的泄露回归测试
-- [ ] `[标准]` 对外 `C5-*` 错误码、IPC 契约快照与 r2 CI 矩阵证据。PR #31 为 SQLite `DataError` 提供稳定码；PR #32 已将节点导入、身份重置/轮换和探测命令的错误码统一为 `C5-*`，当前头部 CI 与 Windows 桌面验收通过，待按 #31 → #32 顺序集成。所有 Tauri command 的参数/返回 schema 快照仍未完成验收
+- [ ] `[标准]` 对外 `C5-*` 错误码、IPC 契约快照与 r2 CI 矩阵证据。PR #31 为 SQLite `DataError` 提供稳定码；PR #32 已将节点导入、身份重置/轮换和探测命令的错误码统一为 `C5-*`，当前头部 CI 与 Windows 桌面验收通过，待按 #31 → #32 顺序集成。PR #34 已实现 108 个 Tauri command 的参数/成功返回/错误类型快照与前端调用校验；完整桌面验收和合并仍未完成
 - [ ] `[标准]` 首次 release-tag 同步前核对 M0 所用上游 `dev` 基线，单独 PR 记录取舍
 
 **本阶段 Opus 必做**：M0.2 全部核心逻辑。
@@ -57,7 +57,7 @@
 - [x] `[Opus]` 手动节点加入运行时后可安全探测；限流自动退避及 fixture 验证（R-11）
 - [x] `[标准]` 对照工作区外层 `src/ui-hifi` 的已确认 UI 做桌面验收，提供 r2 所需的集成测试与演示步骤
 
-**验收结果**：PR #4 的 SQLite 库存、剪贴板导入、订阅刷新与规则保留、手动节点运行时映射、外部 provider 探测、最多 16 并发、600 秒缓存和连续失败退避已通过数据层与真实 Mihomo fixture 测试。[Windows Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过 Tauri 页面导入、独立节点与 429 代理探测、缓存、来源/状态筛选、搜索、质量排序，以及桌面重启后的稳定身份检查；截图与范围见 [`M1 桌面演示步骤`](clash5/m1-acceptance.md)。M1 退出标准已达到，待 PR 合并。Windows Server 2025 的 WebDriver 问题仍由[上游 runner 问题](https://github.com/actions/runner-images/issues/14738)追踪。Mihomo 延迟接口不提供上游 HTTP 状态或 `Retry-After`，所以限流缓解是连续失败通用退避，风险 R-11 仍需观察。
+**验收结果**：PR #4 的 SQLite 库存、剪贴板导入、订阅刷新与规则保留、手动节点运行时映射、外部 provider 探测、最多 16 并发、600 秒缓存和连续失败退避已通过数据层与真实 Mihomo fixture 测试。[Windows Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过 Tauri 页面导入、独立节点与 429 代理探测、缓存、来源/状态筛选、搜索、质量排序，以及桌面重启后的稳定身份检查；截图与范围见 [`M1 桌面演示步骤`](clash5/m1-acceptance.md)。M1 退出标准已达到，PR #4 已合并至 `dev`。Windows Server 2025 的 WebDriver 问题仍由[上游 runner 问题](https://github.com/actions/runner-images/issues/14738)追踪。Mihomo 延迟接口不提供上游 HTTP 状态或 `Retry-After`，所以限流缓解是连续失败通用退避，风险 R-11 仍需观察。
 
 ---
 
