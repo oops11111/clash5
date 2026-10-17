@@ -488,6 +488,11 @@ export type IVerge_Deserialize = {
   /**  Automatic backup interval in hours */
   auto_backup_interval_hours: number | null
   auto_backup_on_change: boolean | null
+  /**  verge 的各种 port 用于覆盖 clash 的各种 port */
+  verge_redir_port: number | null
+  verge_redir_enabled: boolean | null
+  verge_tproxy_port: number | null
+  verge_tproxy_enabled: boolean | null
   verge_mixed_port: number | null
   verge_socks_port: number | null
   verge_socks_enabled: boolean | null
@@ -572,6 +577,11 @@ export type IVerge_Serialize = {
   /**  Automatic backup interval in hours */
   auto_backup_interval_hours: number | null
   auto_backup_on_change: boolean | null
+  /**  verge 的各种 port 用于覆盖 clash 的各种 port */
+  verge_redir_port?: number | null
+  verge_redir_enabled?: boolean | null
+  verge_tproxy_port?: number | null
+  verge_tproxy_enabled?: boolean | null
   verge_mixed_port: number | null
   verge_socks_port: number | null
   verge_socks_enabled: boolean | null

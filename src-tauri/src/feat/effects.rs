@@ -36,8 +36,8 @@ macro_rules! select_field {
 macro_rules! verge_registry {
     ($( $(#[$cfg:meta])* $field:ident => $rule:tt; )*) => {
         pub(super) fn verge_effects(patch: &IVerge) -> Effects {
-            // No rest pattern: even fields omitted by serde must be classified at compile time.
-            let IVerge { $( $(#[$cfg])* $field, )* } = patch;
+            // Platform-specific config fields have no effects on unsupported targets.
+            let IVerge { $( $(#[$cfg])* $field, )* .. } = patch;
             let mut effects = Effects::new();
             $( $(#[$cfg])* { select_field!(effects, $field, $rule); } )*
             effects

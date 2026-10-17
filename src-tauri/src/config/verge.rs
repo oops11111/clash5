@@ -169,16 +169,16 @@ pub struct IVerge {
     pub auto_backup_on_change: Option<bool>,
 
     /// verge 的各种 port 用于覆盖 clash 的各种 port
-    #[cfg(not(target_os = "windows"))]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_redir_port: Option<u16>,
 
-    #[cfg(not(target_os = "windows"))]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_redir_enabled: Option<bool>,
 
-    #[cfg(target_os = "linux")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_tproxy_port: Option<u16>,
 
-    #[cfg(target_os = "linux")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_tproxy_enabled: Option<bool>,
 
     pub verge_mixed_port: Option<u16>,
@@ -400,14 +400,10 @@ impl IVerge {
             proxy_auto_config: Some(false),
             pac_file_content: Some(DEFAULT_PAC.into()),
             proxy_host: Some("127.0.0.1".into()),
-            #[cfg(not(target_os = "windows"))]
-            verge_redir_port: Some(7895),
-            #[cfg(not(target_os = "windows"))]
-            verge_redir_enabled: Some(false),
-            #[cfg(target_os = "linux")]
-            verge_tproxy_port: Some(7896),
-            #[cfg(target_os = "linux")]
-            verge_tproxy_enabled: Some(false),
+            verge_redir_port: (!cfg!(target_os = "windows")).then_some(7895),
+            verge_redir_enabled: (!cfg!(target_os = "windows")).then_some(false),
+            verge_tproxy_port: cfg!(target_os = "linux").then_some(7896),
+            verge_tproxy_enabled: cfg!(target_os = "linux").then_some(false),
             verge_mixed_port: Some(network::ports::DEFAULT_MIXED),
             verge_socks_port: Some(7898),
             verge_socks_enabled: Some(false),
