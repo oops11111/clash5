@@ -10,7 +10,6 @@ import { glob } from 'glob'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 import { extract } from 'tar'
 
-import { resolveServiceRelease } from './service-release.mjs'
 import { log_debug, log_error, log_info, log_success } from './utils.mjs'
 
 /** Prepares platform resources, caching versions and unchanged files unless `--force` is used. */
@@ -278,7 +277,7 @@ function clashMetaAlpha() {
   const urlExt = isWin ? 'zip' : 'gz'
   return {
     name: 'verge-mihomo-alpha',
-    targetFile: `verge-mihomo-alpha-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
+    targetFile: `${platform === 'linux' ? 'clash5-mihomo-alpha' : 'verge-mihomo-alpha'}-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile: `${name}-${META_ALPHA_VERSION}.${urlExt}`,
     downloadURL: `${META_ALPHA_URL_PREFIX}/${name}-${META_ALPHA_VERSION}.${urlExt}`,
@@ -291,7 +290,7 @@ function clashMeta() {
   const urlExt = isWin ? 'zip' : 'gz'
   return {
     name: 'verge-mihomo',
-    targetFile: `verge-mihomo-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
+    targetFile: `${platform === 'linux' ? 'clash5-mihomo' : 'verge-mihomo'}-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile: `${name}-${META_VERSION}.${urlExt}`,
     downloadURL: `${META_URL_PREFIX}/${META_VERSION}/${name}-${META_VERSION}.${urlExt}`,
@@ -511,9 +510,9 @@ const resolvePlugin = async () => {
 // Service executable permissions
 const resolveServicePermission = async () => {
   const serviceExecutables = [
-    'clash-verge-service*',
-    'clash-verge-service-install*',
-    'clash-verge-service-uninstall*',
+    'clash5-service*',
+    'clash5-service-install*',
+    'clash5-service-uninstall*',
   ]
   const hashCache = await loadHashCache()
   let hasChanges = false
@@ -554,23 +553,11 @@ const SERVICE_BINARIES = [
 function serviceFileInfo(name) {
   const ext = platform === 'win32' ? '.exe' : ''
   const suffix = platform === 'linux' ? `-${SIDECAR_HOST}` : ''
+  const targetName = name.replace('clash-verge-service', 'clash5-service')
   return {
     sourceFile: `${name}${ext}`,
-    targetFile: `${name}${suffix}${ext}`,
+    targetFile: `${targetName}${suffix}${ext}`,
   }
-}
-
-async function findExtractedFile(dir, fileName) {
-  const entries = await fsp.readdir(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const entryPath = path.join(dir, entry.name)
-    if (entry.isFile() && entry.name === fileName) return entryPath
-    if (entry.isDirectory()) {
-      const found = await findExtractedFile(entryPath, fileName)
-      if (found) return found
-    }
-  }
-  return null
 }
 
 async function resolveServiceBundle() {
@@ -582,87 +569,66 @@ async function resolveServiceBundle() {
     }
   })
 
-  const cargoManifest = await fsp.readFile(
-    path.join(cwd, 'src-tauri', 'Cargo.toml'),
-    'utf8',
-  )
-  const serviceDependency = cargoManifest
+  const manifestPath = path.join(cwd, 'src-tauri', 'Cargo.toml')
+  const cargoManifest = await fsp.readFile(manifestPath, 'utf8')
+  const dependencyLine = cargoManifest
     .split(/\r?\n/)
     .find((line) => line.trimStart().startsWith('clash_verge_service_ipc ='))
-  const sourcePath = serviceDependency?.match(/\bpath\s*=\s*"([^"]+)"/)?.[1]
-  if (sourcePath) {
-    const manifest = path.resolve(cwd, 'src-tauri', sourcePath, 'Cargo.toml')
-    const targetDirectory = path.join(cwd, 'target', 'bundled-service')
-    execFileSync(
-      'cargo',
-      [
-        'build',
-        '--manifest-path',
-        manifest,
-        '--target-dir',
-        targetDirectory,
-        '--target',
-        SIDECAR_HOST,
-        '--release',
-        '--features',
-        'standalone,client',
-        '--bins',
-      ],
-      { stdio: 'inherit' },
-    )
-    await fsp.mkdir(SERVICE_DIR, { recursive: true })
-    for (const { sourceFile, targetPath } of files) {
-      await fsp.copyFile(
-        path.join(targetDirectory, SIDECAR_HOST, 'release', sourceFile),
-        targetPath,
-      )
-      if (platform !== 'win32') await fsp.chmod(targetPath, 0o755)
-      await updateHashCache(targetPath)
-    }
-    return
+  const packageVersion = dependencyLine?.match(/\bversion\s*=\s*"([^"]+)"/)?.[1]
+  if (!packageVersion) {
+    throw new Error('clash_verge_service_ipc must pin its package version')
   }
-  const { archiveFile, downloadURL } = resolveServiceRelease(
-    cargoManifest,
-    SIDECAR_HOST,
-    platform,
+  const sourcePath = dependencyLine?.match(/\bpath\s*=\s*"([^"]+)"/)?.[1]
+  let serviceManifest
+  if (sourcePath) {
+    serviceManifest = path.resolve(cwd, 'src-tauri', sourcePath, 'Cargo.toml')
+  } else {
+    const metadata = JSON.parse(
+      execFileSync(
+        'cargo',
+        ['metadata', '--format-version', '1', '--manifest-path', manifestPath],
+        { cwd, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
+      ),
+    )
+    serviceManifest = metadata.packages.find(
+      (pkg) =>
+        pkg.name === 'clash_verge_service_ipc' &&
+        pkg.version === packageVersion,
+    )?.manifest_path
+  }
+  if (!serviceManifest) {
+    throw new Error(
+      `Could not resolve clash_verge_service_ipc v${packageVersion} from Cargo metadata`,
+    )
+  }
+
+  const targetDirectory = path.join(cwd, 'target', 'bundled-service')
+  execFileSync(
+    'cargo',
+    [
+      'build',
+      '--manifest-path',
+      serviceManifest,
+      '--target-dir',
+      targetDirectory,
+      '--target',
+      SIDECAR_HOST,
+      '--release',
+      '--features',
+      'standalone,client,development-channel',
+      '--bins',
+    ],
+    { stdio: 'inherit' },
   )
-  const tempDir = path.join(TEMP_DIR, 'clash-verge-service-ipc')
-  const tempArchive = path.join(tempDir, archiveFile)
-
-  await fsp.mkdir(tempDir, { recursive: true })
   await fsp.mkdir(SERVICE_DIR, { recursive: true })
-
-  try {
-    await downloadFile(downloadURL, tempArchive)
-
-    if (platform === 'win32') {
-      const zip = new AdmZip(tempArchive)
-      zip
-        .getEntries()
-        .forEach(
-          (entry) =>
-            void log_debug('"clash-verge-service-ipc" entry:', entry.entryName),
-        )
-      zip.extractAllTo(tempDir, true)
-    } else {
-      await extract({ cwd: tempDir, file: tempArchive })
-    }
-
-    for (const { sourceFile, targetFile, targetPath } of files) {
-      const extractedFile = await findExtractedFile(tempDir, sourceFile)
-      if (!extractedFile) {
-        throw new Error(`Expected binary ${sourceFile} not found in archive`)
-      }
-
-      await fsp.copyFile(extractedFile, targetPath)
-      if (platform !== 'win32') await fsp.chmod(targetPath, 0o755)
-      await updateHashCache(targetPath)
-      log_success(`Extracted service file: ${targetFile}`)
-    }
-
-    log_success(`service bundle finished: ${archiveFile}`)
-  } finally {
-    await fsp.rm(tempDir, { recursive: true, force: true })
+  for (const { sourceFile, targetFile, targetPath } of files) {
+    await fsp.copyFile(
+      path.join(targetDirectory, SIDECAR_HOST, 'release', sourceFile),
+      targetPath,
+    )
+    if (platform !== 'win32') await fsp.chmod(targetPath, 0o755)
+    await updateHashCache(targetPath)
+    log_success(`Built isolated service file: ${targetFile}`)
   }
 }
 
