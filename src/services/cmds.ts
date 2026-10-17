@@ -44,6 +44,8 @@ export const activateClash5Chain = (id: string, policyGroup: string) =>
     id,
     policyGroup,
   })
+export const getClash5SingboxDegraded = () =>
+  invoke<boolean>('clash5_singbox_degraded')
 export const detectClash5ExitIp = (id: string, serviceUrl: string | null) =>
   invoke<ExitIpResult>('clash5_detect_exit_ip', { id, serviceUrl })
 

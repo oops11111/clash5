@@ -115,6 +115,10 @@ pub struct IVerge {
 
     pub auto_close_connection: Option<bool>,
 
+    /// Keep the sing-box sidecar alive after its relay becomes idle.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub singbox_persistent: Option<bool>,
+
     pub auto_check_update: Option<bool>,
 
     pub default_latency_test: Option<String>,
@@ -372,6 +376,7 @@ impl IVerge {
             use_default_bypass: Some(true),
             proxy_guard_duration: Some(30),
             auto_close_connection: Some(true),
+            singbox_persistent: Some(false),
             auto_check_update: Some(false),
             enable_builtin_enhanced: Some(true),
             auto_log_clean: Some(2), // 1: 1天, 2: 7天, 3: 30天, 4: 90天
@@ -468,6 +473,7 @@ impl IVerge {
         patch!(enable_global_hotkey);
 
         patch!(auto_close_connection);
+        patch!(singbox_persistent);
         patch!(auto_check_update);
         patch!(default_latency_test);
         patch!(default_latency_timeout);

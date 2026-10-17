@@ -411,6 +411,8 @@
         "appLogMaxSize": "應用程式日誌最大大小",
         "appLogMaxCount": "應用程式日誌最大數量",
         "autoCloseConnections": "自動關閉連線",
+        "singboxPersistent": "保持 sing-box 常駐",
+        "singboxDegraded": "sing-box 多次啟動失敗，已停止執行並回復到 Mihomo。",
         "autoCheckUpdate": "自動檢查更新",
         "enableBuiltinEnhanced": "內建增強功能",
         "proxyLayoutColumns": "代理頁面欄數",
@@ -422,6 +424,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "當代理組選中節點或代理模式變動時，關閉已建立的連線",
+        "singboxPersistent": "中轉鏈路閒置後仍保持 sing-box 執行",
         "enableBuiltinEnhanced": "配置檔案的相容性處理",
         "autoDelayDetection": "在背景定時偵測目前節點延遲",
         "defaultLatencyTest": "僅用於 HTTP 客戶端請求測試，不會對配置檔案產生影響"

@@ -411,6 +411,8 @@
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
         "autoCloseConnections": "Auto Close Connections",
+        "singboxPersistent": "Keep sing-box running",
+        "singboxDegraded": "sing-box stopped after repeated failures; traffic has returned to Mihomo.",
         "autoCheckUpdate": "Auto Check Update",
         "enableBuiltinEnhanced": "Enable Builtin Enhanced",
         "proxyLayoutColumns": "Proxy Layout Columns",
@@ -422,6 +424,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "Terminate established connections when the proxy group selection or proxy mode changes",
+        "singboxPersistent": "Keep the sidecar running after its relay has been idle",
         "enableBuiltinEnhanced": "Compatibility handling for the configuration file",
         "autoDelayDetection": "Periodically test the current node latency in the background",
         "defaultLatencyTest": "Used for HTTP client request testing only and won't make a difference to the configuration file"

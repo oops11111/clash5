@@ -1,7 +1,9 @@
 import { spawn } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import http from 'node:http'
+import net from 'node:net'
 import { join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
@@ -39,6 +41,7 @@ let m3AppDirectory
 let m3StagingPath
 let m3FixtureInstalled = false
 let m3BindingIds = []
+let m4Fixture
 const screenshot = resolve(
   persisted
     ? 'target/m1-desktop-persisted.png'
@@ -49,10 +52,13 @@ const screenshot = resolve(
 const fixtures = []
 let chainFixture
 let phase = 'WebDriver startup'
-const watchdog = setTimeout(() => {
-  process.stderr.write(`Desktop smoke timed out during ${phase}\n`)
-  process.exit(124)
-}, 8 * 60_000)
+const watchdog = setTimeout(
+  () => {
+    process.stderr.write(`Desktop smoke timed out during ${phase}\n`)
+    process.exit(124)
+  },
+  (full ? 15 : 8) * 60_000,
+)
 
 function startFixture(port, mode) {
   const child = spawn(
@@ -81,6 +87,117 @@ async function fixtureReady(port, fixture) {
     await sleep(250)
   }
   throw new Error(`Fixture did not become ready: ${fixture.output()}`)
+}
+
+async function freeLoopbackPort() {
+  const server = net.createServer()
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const port = server.address().port
+  await new Promise((done) => server.close(done))
+  return port
+}
+
+async function startM4SingboxFixture() {
+  const ssPort = await freeLoopbackPort()
+  const password = randomBytes(24).toString('base64')
+  const child = spawn(
+    process.platform === 'win32' ? 'sing-box.exe' : 'sing-box',
+    ['run', '-c', 'stdin'],
+    { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true },
+  )
+  let startupError
+  child.once('error', (error) => {
+    startupError = error
+  })
+  child.stdin.on('error', (error) => {
+    startupError ??= error
+  })
+  fixtures.push(child)
+  child.stdin.end(
+    JSON.stringify({
+      log: { level: 'error' },
+      inbounds: [
+        {
+          type: 'shadowsocks',
+          tag: 'm4-test-in',
+          listen: '127.0.0.1',
+          listen_port: ssPort,
+          method: 'aes-128-gcm',
+          password,
+        },
+      ],
+      outbounds: [{ type: 'direct', tag: 'direct' }],
+      route: { final: 'direct' },
+    }),
+  )
+
+  let ssReady = false
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    if (startupError)
+      throw new Error(
+        `M4 sing-box fixture could not start: ${startupError.message}`,
+      )
+    if (child.exitCode !== null)
+      throw new Error(
+        `M4 sing-box fixture exited early with code ${child.exitCode}`,
+      )
+    try {
+      await new Promise((done, reject) => {
+        const socket = net.connect(ssPort, '127.0.0.1')
+        socket.once('connect', () => {
+          socket.destroy()
+          done()
+        })
+        socket.once('error', reject)
+      })
+      ssReady = true
+      break
+    } catch {
+      await sleep(250)
+    }
+  }
+  if (!ssReady) throw new Error('M4 sing-box fixture did not start')
+
+  const frontStats = []
+  const sockets = new Set()
+  const front = http.createServer((_, response) =>
+    response.writeHead(502).end(),
+  )
+  front.on('connection', (socket) => {
+    sockets.add(socket)
+    socket.once('close', () => sockets.delete(socket))
+  })
+  front.on('connect', (request, client, head) => {
+    frontStats.push(request.url)
+    if (request.url !== `127.0.0.1:${ssPort}`) {
+      client.end('HTTP/1.1 403 Forbidden\r\n\r\n')
+      return
+    }
+    const upstream = net.connect(ssPort, '127.0.0.1')
+    sockets.add(upstream)
+    upstream.once('close', () => sockets.delete(upstream))
+    upstream.once('connect', () => {
+      client.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+      if (head.length) upstream.write(head)
+      client.pipe(upstream).pipe(client)
+    })
+    upstream.once('error', () => client.destroy())
+    client.once('error', () => upstream.destroy())
+    client.once('close', () => upstream.destroy())
+  })
+  front.listen(0, '127.0.0.1')
+  await once(front, 'listening')
+  return {
+    frontPort: front.address().port,
+    frontStats,
+    landingPort: ssPort,
+    password,
+    close: async () => {
+      for (const socket of sockets) socket.destroy()
+      await new Promise((done) => front.close(done))
+    },
+  }
 }
 
 async function fixtureStats(port) {
@@ -1611,6 +1728,7 @@ async function verifyRecoveryResetCancellation() {
 
 async function verifyM2Chains() {
   chainFixture = await startChainFixture(true)
+  m4Fixture = await startM4SingboxFixture()
   const fileData = dump({
     proxies: [
       {
@@ -1618,6 +1736,12 @@ async function verifyM2Chains() {
         type: 'http',
         server: '127.0.0.1',
         port: chainFixture.frontPort,
+      },
+      {
+        name: 'M4-front',
+        type: 'http',
+        server: '127.0.0.1',
+        port: m4Fixture.frontPort,
       },
     ],
     'proxy-providers': {
@@ -1629,6 +1753,14 @@ async function verifyM2Chains() {
             type: 'http',
             server: '127.0.0.1',
             port: chainFixture.landingPort,
+          },
+          {
+            name: 'M4-landing',
+            type: 'ss',
+            server: '127.0.0.1',
+            port: m4Fixture.landingPort,
+            cipher: 'aes-128-gcm',
+            password: m4Fixture.password,
           },
         ],
         override: { udp: false },
@@ -1879,6 +2011,131 @@ async function verifyM2Chains() {
   )
 }
 
+async function verifyM4SingboxRoute() {
+  phase = 'M4 real sing-box route activation'
+  const workspace = await invoke('clash5_chain_workspace')
+  const original = workspace.chains.find(
+    (chain) => chain.name === 'M2 desktop chain',
+  )
+  const front = workspace.nodes.find((node) => node.display_name === 'M4-front')
+  const landing = workspace.nodes.find(
+    (node) => node.display_name === 'M4-landing',
+  )
+  if (!original || !front || !landing)
+    throw new Error('M4 local Shadowsocks chain fixture was not generated')
+  const chain = {
+    ...original,
+    id: randomUUID(),
+    name: 'M4 real sing-box route',
+    front: front.reference,
+    landing: landing.reference,
+  }
+  await invoke('clash5_save_chain', { chain })
+  await invoke('patch_verge_config', { payload: { singbox_persistent: true } })
+  const persistentConfig = await invoke('get_verge_config')
+  if (persistentConfig.singbox_persistent !== true)
+    throw new Error(
+      `M4 keep-running preference did not persist: ${JSON.stringify(persistentConfig.singbox_persistent)}`,
+    )
+  const activation = await invoke('clash5_activate_chain', {
+    id: chain.id,
+    policyGroup: 'M2-selected',
+  })
+  if (!activation.selection_persisted)
+    throw new Error('M4 chain selection did not persist')
+
+  const landingName = `clash5-chain-${chain.id}-landing`
+  let status = await invoke('clash5_singbox_route_status', { landingName })
+  if (
+    !status.active ||
+    status.degraded ||
+    status.mihomo_proxy_type !== 'Socks5'
+  )
+    throw new Error(
+      `M4 sidecar route was not active: ${JSON.stringify(status)}`,
+    )
+
+  const observation = await invoke('clash5_detect_exit_ip', {
+    id: chain.id,
+    serviceUrl: 'http://127.0.0.1:18090/ip',
+  })
+  if (
+    observation.status !== 'healthy' ||
+    observation.observation.ip !== '203.0.113.27' ||
+    !m4Fixture.frontStats.includes(`127.0.0.1:${m4Fixture.landingPort}`)
+  )
+    throw new Error(
+      `M4 traffic did not traverse the real sing-box route: ${JSON.stringify(observation)}`,
+    )
+
+  phase = 'M4 persistent sidecar behavior'
+  const persistentDeadline = Date.now() + 135_000
+  let routeDriftRecovered = false
+  while (Date.now() < persistentDeadline) {
+    await sleep(Math.min(5_000, persistentDeadline - Date.now()))
+    status = await invoke('clash5_singbox_route_status', { landingName })
+    if (
+      status.active &&
+      !status.degraded &&
+      status.mihomo_proxy_type === 'Socks5'
+    )
+      continue
+
+    const recoveryDeadline = Date.now() + 45_000
+    while (
+      Date.now() < recoveryDeadline &&
+      (!status.active ||
+        status.degraded ||
+        status.mihomo_proxy_type !== 'Socks5')
+    ) {
+      await sleep(2_000)
+      status = await invoke('clash5_singbox_route_status', { landingName })
+    }
+    if (
+      !status.active ||
+      status.degraded ||
+      status.mihomo_proxy_type !== 'Socks5'
+    )
+      throw new Error(
+        `Persistent M4 route drift was not recovered: ${JSON.stringify(status)}`,
+      )
+    routeDriftRecovered = true
+  }
+  const persistentConfigAfterIdle = await invoke('get_verge_config')
+  if (
+    persistentConfigAfterIdle.singbox_persistent !== true ||
+    !status.active ||
+    status.mihomo_proxy_type !== 'Socks5'
+  )
+    throw new Error(
+      `Persistent M4 route changed unexpectedly: ${JSON.stringify({ persistent: persistentConfigAfterIdle.singbox_persistent, ...status })}`,
+    )
+  if (routeDriftRecovered)
+    process.stdout.write(
+      'M4 supervisor recovered Mihomo route drift while persistent mode was enabled\n',
+    )
+
+  phase = 'M4 idle sidecar shutdown and Mihomo rollback'
+  await invoke('patch_verge_config', { payload: { singbox_persistent: false } })
+  let stopped = false
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    await sleep(5_000)
+    status = await invoke('clash5_singbox_route_status', { landingName })
+    if (!status.active) {
+      stopped = true
+      break
+    }
+  }
+  if (!stopped || status.mihomo_proxy_type !== 'Shadowsocks' || status.degraded)
+    throw new Error(
+      `Idle M4 cleanup did not restore the original Mihomo landing proxy: ${JSON.stringify(status)}`,
+    )
+  process.stdout.write(
+    'M4 real sing-box traffic, persistent mode, idle shutdown, and Mihomo Shadowsocks rollback passed\n',
+  )
+  await browser.saveScreenshot(resolve('target/m4-desktop-route.png'))
+}
+
 try {
   if (persisted) {
     await startFixtures()
@@ -2042,12 +2299,16 @@ try {
     phase = 'M2 chain editor and exit-IP policy'
     await verifyM2Chains()
     await verifyIdentityRotationAndAmbiguousRebind()
+    await verifyM4SingboxRoute()
   } else if (persisted) {
     const workspace = await invoke('clash5_chain_workspace')
-    if (
-      workspace.chains.length !== 2 ||
-      !workspace.chains.some((chain) => chain.name === 'M2 desktop chain')
+    const original = workspace.chains.find(
+      (chain) => chain.name === 'M2 desktop chain',
     )
+    const fallback = workspace.chains.find(
+      (chain) => chain.id === '28dc0b8a-7485-49bc-8a91-f48bdc736846',
+    )
+    if (!original || !fallback)
       throw new Error('M2 chains did not survive a desktop restart')
     const runtime = await invoke('get_runtime_config')
     if (
@@ -2059,12 +2320,6 @@ try {
     )
       throw new Error('Saved M2 chains were not regenerated after restart')
     const view = await invoke('get_proxy_view')
-    const original = workspace.chains.find(
-      (chain) => chain.name === 'M2 desktop chain',
-    )
-    const fallback = workspace.chains.find(
-      (chain) => chain.id === '28dc0b8a-7485-49bc-8a91-f48bdc736846',
-    )
     if (
       view.groups.find((group) => group.name === `clash5-chain-${fallback.id}`)
         ?.now !== `clash5-chain-${original.id}`
@@ -2100,6 +2355,10 @@ try {
   await cleanupM3PluginFixture().catch((error) => {
     process.stderr.write(`M3 fixture cleanup failed: ${String(error)}\n`)
   })
+  if (browser)
+    await invoke('patch_verge_config', {
+      payload: { singbox_persistent: false },
+    }).catch(() => {})
   if (browser && typeof originalClipboard === 'string') {
     await invoke('plugin:clipboard-manager|write_text', {
       text: originalClipboard,
@@ -2126,6 +2385,7 @@ try {
     }
   }
   phase = 'fixture cleanup'
+  await m4Fixture?.close()
   await chainFixture?.close()
   for (const child of fixtures.reverse()) {
     if (child.exitCode === null && child.signalCode === null) {

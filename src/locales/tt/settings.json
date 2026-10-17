@@ -411,6 +411,8 @@
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
         "autoCloseConnections": "Тоташуларны автоматик ябу",
+        "singboxPersistent": "sing-box эшләвен дәвам итсен",
+        "singboxDegraded": "sing-box кабат-кабат хатадан соң туктатылды; трафик Mihomo'га кайтарылды.",
         "autoCheckUpdate": "Яңартуларны автоматик тикшерү",
         "enableBuiltinEnhanced": "Эчке камилләштерүне кабызу",
         "proxyLayoutColumns": "Прокси күрсәтү баганалары саны",
@@ -422,6 +424,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "Прокси төркеме яисә режимын үзгәрткәндә актив тоташуларны өзү",
+        "singboxPersistent": "Реле буш торганда да ярдәмче процессны эшләтеп тору",
         "enableBuiltinEnhanced": "Конфигурация файлы белән туры килә торган өстәмә оптимизация",
         "autoDelayDetection": "Фон режимында хәзерге төен тоткарлыгын периодик тикшерә",
         "defaultLatencyTest": "Бу фәкать клиентның HTTP сораулары тесты өчен кулланыла, конфигурация файлына йогынты ясамый"

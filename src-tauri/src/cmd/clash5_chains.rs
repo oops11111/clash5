@@ -261,6 +261,31 @@ pub struct ChainActivation {
 }
 
 #[tauri::command]
+pub fn clash5_singbox_degraded() -> bool {
+    CoreManager::global().singbox_degraded()
+}
+
+#[derive(Serialize)]
+pub struct SingboxRouteStatus {
+    active: bool,
+    degraded: bool,
+    mihomo_proxy_type: String,
+}
+
+#[tauri::command]
+pub async fn clash5_singbox_route_status(landing_name: String) -> CmdResult<SingboxRouteStatus> {
+    let (active, degraded, mihomo_proxy_type) = CoreManager::global()
+        .singbox_route_status_for(&landing_name)
+        .await
+        .map_err(|_| coded_error("C5-CHAIN-014", "the sing-box landing route status is unavailable"))?;
+    Ok(SingboxRouteStatus {
+        active,
+        degraded,
+        mihomo_proxy_type,
+    })
+}
+
+#[tauri::command]
 pub async fn clash5_activate_chain(id: String, policy_group: String) -> CmdResult<ChainActivation> {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
     let profile_id = Config::profiles()
@@ -275,6 +300,26 @@ pub async fn clash5_activate_chain(id: String, policy_group: String) -> CmdResul
         .into_iter()
         .find(|chain| chain.id == id && chain.enabled && chain.profile_id == profile_id)
         .ok_or_else(|| coded_error("C5-CHAIN-002", "an enabled chain in the current profile was not found"))?;
+    let runtime = Config::runtime().await.latest_arc();
+    let policy_group_exists = runtime
+        .config
+        .as_ref()
+        .and_then(|config| config.get("proxy-groups"))
+        .and_then(Value::as_sequence)
+        .into_iter()
+        .flatten()
+        .any(|group| {
+            group.get("name").and_then(Value::as_str) == Some(policy_group.as_str())
+                && group.get("type").and_then(Value::as_str) == Some("select")
+        });
+    if !policy_group_exists {
+        return Err(coded_error("C5-CHAIN-001", "select an available policy group"));
+    }
+    let landing_name = format!("{}-landing", chain.group_name());
+    CoreManager::global()
+        .set_singbox_landing(Some(&landing_name))
+        .await
+        .map_err(|_| coded_error("C5-CHAIN-014", "the sing-box landing route could not be started"))?;
     Handle::mihomo()
         .select_node_for_group(&policy_group, &chain.group_name())
         .await
