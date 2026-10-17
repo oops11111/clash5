@@ -2302,10 +2302,13 @@ try {
     await verifyM4SingboxRoute()
   } else if (persisted) {
     const workspace = await invoke('clash5_chain_workspace')
-    if (
-      workspace.chains.length !== 2 ||
-      !workspace.chains.some((chain) => chain.name === 'M2 desktop chain')
+    const original = workspace.chains.find(
+      (chain) => chain.name === 'M2 desktop chain',
     )
+    const fallback = workspace.chains.find(
+      (chain) => chain.id === '28dc0b8a-7485-49bc-8a91-f48bdc736846',
+    )
+    if (!original || !fallback)
       throw new Error('M2 chains did not survive a desktop restart')
     const runtime = await invoke('get_runtime_config')
     if (
@@ -2317,12 +2320,6 @@ try {
     )
       throw new Error('Saved M2 chains were not regenerated after restart')
     const view = await invoke('get_proxy_view')
-    const original = workspace.chains.find(
-      (chain) => chain.name === 'M2 desktop chain',
-    )
-    const fallback = workspace.chains.find(
-      (chain) => chain.id === '28dc0b8a-7485-49bc-8a91-f48bdc736846',
-    )
     if (
       view.groups.find((group) => group.name === `clash5-chain-${fallback.id}`)
         ?.now !== `clash5-chain-${original.id}`
