@@ -99,6 +99,7 @@ impl ProcessTree {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, reason = "tests assert by panicking")]
 mod tests {
     use super::*;
 
