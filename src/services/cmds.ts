@@ -11,12 +11,6 @@ import {
 } from '@/services/command-wire'
 import { showNotice } from '@/services/notice-service'
 import type {
-  ChainWorkspace,
-  Clash5Chain,
-  ExitIpResult,
-} from '@/types/clash5-chain'
-import type { Clash5NodeRecord } from '@/types/clash5-node'
-import type {
   Binding as GeneratedBinding,
   ChainWorkspace as GeneratedChainWorkspace,
   ClashInfo,
@@ -35,6 +29,11 @@ import type {
   ValidationOutcome,
   WebDavBackupEntry,
 } from '@/services/tauri-commands.generated'
+import type {
+  ChainWorkspace,
+  Clash5Chain,
+  ExitIpResult,
+} from '@/types/clash5-chain'
 import type { ProxyViewV1 } from '@/types/proxy-view'
 import { debugLog } from '@/utils/debug'
 
