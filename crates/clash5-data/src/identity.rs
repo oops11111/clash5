@@ -33,7 +33,7 @@ impl From<rusqlite::Error> for DataError {
 }
 
 // Credentials deliberately have no Debug implementation and are never persisted.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, specta::Type)]
 pub struct Node {
     pub kind: String,
     pub server: String,

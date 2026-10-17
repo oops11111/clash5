@@ -289,7 +289,7 @@ const PluginsPage = () => {
             )}
             {pendingRebinds.map((item) => (
               <Paper
-                key={`${item.source.provider_id}:${item.old_stable_id}`}
+                key={`${item.source.kind === 'subscription' ? item.source.provider_id : 'manual'}:${item.old_stable_id}`}
                 variant="outlined"
                 sx={{ p: 2, borderRadius: 2 }}
               >
@@ -340,6 +340,7 @@ const PluginsPage = () => {
                     (item) =>
                       binding.source.kind === 'subscription' &&
                       item.old_stable_id === binding.target_id &&
+                      item.source.kind === 'subscription' &&
                       item.source.provider_id === binding.source.provider_id,
                   ),
               )

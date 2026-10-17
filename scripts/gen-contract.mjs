@@ -81,8 +81,13 @@ fs.writeFileSync(OUT, content)
 
 // Match the repo's biome style so CI parity (`git diff --exit-code`) is stable.
 execFileSync(
-  process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-  ['exec', 'biome', 'format', '--write', path.relative(ROOT, OUT)],
+  process.execPath,
+  [
+    path.join(ROOT, 'node_modules', '@biomejs', 'biome', 'bin', 'biome'),
+    'format',
+    '--write',
+    path.relative(ROOT, OUT),
+  ],
   { cwd: ROOT, stdio: 'ignore' },
 )
 

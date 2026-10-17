@@ -1,42 +1,53 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
-import type { DownloadEvent } from '@tauri-apps/plugin-updater'
+import type { DownloadEvent as UpdaterDownloadEvent } from '@tauri-apps/plugin-updater'
 import dayjs from 'dayjs'
 
-import type { CommandFailure } from '@/services/notice-service'
+import {
+  nodeFromWire,
+  profilesFromWire,
+  proxyViewFromWire,
+  vergeFromWire,
+  withoutNulls,
+} from '@/services/command-wire'
 import { showNotice } from '@/services/notice-service'
-import type { Clash5NodeRecord } from '@/types/clash5-node'
+import type {
+  Binding as GeneratedBinding,
+  ClashInfo,
+  CommandFailure_Serialize,
+  DownloadEvent as ContractDownloadEvent,
+  IProfiles_Serialize,
+  IVerge_Serialize,
+  NetworkInterfaceWire,
+  NodeRecord,
+  PendingIdentityRebind as GeneratedPendingIdentityRebind,
+  ProxyViewV1_Serialize,
+  RunStateView,
+  RunningMode as GeneratedRunningMode,
+  ServiceInstallOutcome as GeneratedServiceInstallOutcome,
+  UnlockItem as GeneratedUnlockItem,
+  ValidationOutcome,
+  WebDavBackupEntry,
+} from '@/services/tauri-commands.generated'
 import type { ProxyViewV1 } from '@/types/proxy-view'
 import { debugLog } from '@/utils/debug'
 
 export async function copyClashEnv() {
-  return invoke<void>('copy_clash_env')
+  return invoke<null>('copy_clash_env')
 }
 
 export async function getProfiles() {
-  return invoke<IProfilesConfig>('get_profiles')
+  return profilesFromWire(await invoke<IProfiles_Serialize>('get_profiles'))
 }
 
 export async function listClash5Nodes(includeInactive = false) {
-  return invoke<Clash5NodeRecord[]>('clash5_list_nodes', { includeInactive })
+  return (
+    await invoke<NodeRecord[]>('clash5_list_nodes', { includeInactive })
+  ).map(nodeFromWire)
 }
 
-export interface Clash5PendingIdentityRebind {
-  source: { kind: 'subscription'; provider_id: string }
-  old_stable_id: string
-  candidate_ids: string[]
-}
-
-export interface Clash5Binding {
-  id: string
-  plugin_id: string
-  target_id: string
-  source: { kind: 'manual' } | { kind: 'subscription'; provider_id: string }
-  priority: number
-  enabled: boolean
-  config: unknown
-  orphan: boolean
-  disappeared_at: string | null
-}
+export type Clash5PendingIdentityRebind = GeneratedPendingIdentityRebind
+export type Clash5Binding = GeneratedBinding
+export type UnlockItem = GeneratedUnlockItem
 
 export interface Clash5OrphanCleanupPreview {
   retention_days: number
@@ -51,11 +62,11 @@ export async function getClash5IdentityStatus() {
 }
 
 export async function resetClash5Identity() {
-  return invoke<void>('clash5_reset_identity')
+  return invoke<null>('clash5_reset_identity')
 }
 
 export async function rotateClash5Identity() {
-  return invoke<void>('clash5_rotate_identity')
+  return invoke<null>('clash5_rotate_identity')
 }
 
 export async function listClash5PendingIdentityRebinds() {
@@ -74,15 +85,15 @@ export async function getClash5OrphanCleanupPreview() {
 }
 
 export async function setClash5OrphanRetentionDays(days: number) {
-  return invoke<void>('clash5_set_orphan_retention_days', { days })
+  return invoke<null>('clash5_set_orphan_retention_days', { days })
 }
 
 export async function purgeExpiredClash5Orphans() {
-  return invoke<number>('clash5_purge_expired_orphans')
+  return invoke<number | null>('clash5_purge_expired_orphans')
 }
 
 export async function bindClash5Node(binding: Clash5Binding) {
-  return invoke<void>('clash5_bind_node', { binding })
+  return invoke<null>('clash5_bind_node', { binding })
 }
 
 export async function resolveClash5IdentityRebind(
@@ -90,7 +101,7 @@ export async function resolveClash5IdentityRebind(
   oldId: string,
   newId: string,
 ) {
-  return invoke<void>('clash5_resolve_identity_rebind', {
+  return invoke<null>('clash5_resolve_identity_rebind', {
     source,
     oldId,
     newId,
@@ -140,11 +151,11 @@ export async function createProfile(
   item: Partial<IProfileItem>,
   fileData?: string | null,
 ) {
-  return invoke<void>('create_profile', { item, fileData })
+  return invoke<null>('create_profile', { item, fileData: fileData ?? null })
 }
 
 export async function viewProfile(index: string) {
-  return invoke<void>('view_profile', { index })
+  return invoke<null>('view_profile', { index })
 }
 
 export async function readProfileFile(index: string) {
@@ -163,36 +174,36 @@ export async function saveProfileFile(index: string, fileData: string) {
 }
 
 export async function importProfile(url: string, option?: IProfileOption) {
-  return invoke<void>('import_profile', {
+  return invoke<null>('import_profile', {
     url,
     option: option || { with_proxy: true },
   })
 }
 
 export async function reorderProfile(activeId: string, overId: string) {
-  return invoke<void>('reorder_profile', {
+  return invoke<null>('reorder_profile', {
     activeId,
     overId,
   })
 }
 
 export async function updateProfile(index: string, option?: IProfileOption) {
-  return invoke<void>('update_profile', { index, option })
+  return invoke<null>('update_profile', { index, option: option ?? null })
 }
 
 export async function deleteProfile(index: string) {
-  return invoke<void>('delete_profile', { index })
+  return invoke<null>('delete_profile', { index })
 }
 
 export async function patchProfile(
   index: string,
   profile: Partial<IProfileItem>,
 ) {
-  return invoke<void>('patch_profile', { index, profile })
+  return invoke<null>('patch_profile', { index, profile })
 }
 
 export async function getClashInfo() {
-  return invoke<IClashInfo | null>('get_clash_info')
+  return withoutNulls(await invoke<ClashInfo>('get_clash_info'))
 }
 
 // Fallback mode read independent of strict mihomo `/configs` deserialization.
@@ -201,11 +212,13 @@ export async function getClashMode() {
 }
 
 export async function getRuntimeConfig() {
-  return invoke<IConfigData | null>('get_runtime_config')
+  return (await invoke<unknown | null>(
+    'get_runtime_config',
+  )) as IConfigData | null
 }
 
 export async function getRuntimeYaml() {
-  return invoke<string | null>('get_runtime_yaml')
+  return invoke<string>('get_runtime_yaml')
 }
 
 export async function getRuntimeLogs() {
@@ -218,39 +231,39 @@ export async function getRuntimeProxyChainConfig(proxyChainExitNode: string) {
   })
 }
 
-export async function updateProxyChainConfigInRuntime(proxyChainConfig: any) {
-  return invoke<void>('update_proxy_chain_config_in_runtime', {
+export async function updateProxyChainConfigInRuntime(
+  proxyChainConfig: unknown,
+) {
+  return invoke<null>('update_proxy_chain_config_in_runtime', {
     proxyChainConfig,
   })
 }
 
 export async function patchClashConfig(payload: Partial<IConfigData>) {
-  return invoke<void>('patch_clash_config', { payload })
+  return invoke<null>('patch_clash_config', { payload })
 }
 
 export async function patchClashMode(payload: string) {
-  return invoke<void>('patch_clash_mode', { payload })
+  return invoke<null>('patch_clash_mode', { payload })
 }
 
 export async function syncTrayProxySelection() {
-  return invoke<void>('sync_tray_proxy_selection')
+  return invoke<null>('sync_tray_proxy_selection')
 }
 
 /** Sends one selection pair so the backend can merge against current profile state. */
 export async function recordSelectedNode(groupName: string, node: string) {
-  return invoke<void>('record_selected_node', { groupName, node })
+  return invoke<null>('record_selected_node', { groupName, node })
 }
 
 export async function forgetSelectedNode(groupName: string) {
-  return invoke<void>('forget_selected_node', { groupName })
+  return invoke<null>('forget_selected_node', { groupName })
 }
 
 export async function getProxyView(): Promise<ProxyViewV1> {
-  const view = await invoke<ProxyViewV1>('get_proxy_view')
-  if (view.schemaVersion !== 1) {
-    throw new Error('Unsupported proxy view schema: ' + view.schemaVersion)
-  }
-  return view
+  return proxyViewFromWire(
+    await invoke<ProxyViewV1_Serialize>('get_proxy_view'),
+  )
 }
 
 export async function getClashLogs() {
@@ -277,11 +290,11 @@ export async function getClashLogs() {
 }
 
 export async function getVergeConfig() {
-  return invoke<IVergeConfig>('get_verge_config')
+  return vergeFromWire(await invoke<IVerge_Serialize>('get_verge_config'))
 }
 
 export async function patchVergeConfig(payload: IVergeConfig) {
-  return invoke<void>('patch_verge_config', { payload })
+  return invoke<null>('patch_verge_config', { payload })
 }
 
 export async function setDnsOverride(
@@ -291,7 +304,11 @@ export async function setDnsOverride(
 ) {
   return invoke<
     { status: 'applied' } | { status: 'confirmation_required'; source: string }
-  >('set_dns_override', { profileUid, enabled, confirmation })
+  >('set_dns_override', {
+    profileUid,
+    enabled,
+    confirmation: confirmation ?? null,
+  })
 }
 
 export async function getDnsConfigContent() {
@@ -299,7 +316,7 @@ export async function getDnsConfigContent() {
 }
 
 export async function saveDnsConfig(dnsConfig: Record<string, unknown>) {
-  return invoke<void>('save_dns_config', { dnsConfig })
+  return invoke<null>('save_dns_config', { dnsConfig })
 }
 
 export async function validateDnsConfig() {
@@ -307,7 +324,7 @@ export async function validateDnsConfig() {
 }
 
 export async function applyDnsConfig(apply: boolean) {
-  return invoke<void>('apply_dns_config', { apply })
+  return invoke<null>('apply_dns_config', { apply })
 }
 
 export async function takeDnsOverrideNotice() {
@@ -375,11 +392,15 @@ export async function getEmbeddedServerPort() {
 }
 
 export async function changeClashCore(clashCore: string) {
-  return invoke<CommandFailure | null>('change_clash_core', { clashCore })
+  const failure = await invoke<CommandFailure_Serialize | null>(
+    'change_clash_core',
+    { clashCore },
+  )
+  return failure === null ? null : withoutNulls(failure)
 }
 
 export async function restartCore() {
-  return invoke<void>('restart_core')
+  return invoke<null>('restart_core')
 }
 
 export interface CoreUpgradeReport {
@@ -394,15 +415,25 @@ export async function upgradeClashCore(force = false) {
 }
 
 export async function restartApp() {
-  return invoke<void>('restart_app')
+  return invoke<null>('restart_app')
 }
 
 export async function installUpdate(
   version: string,
-  onEvent: (event: DownloadEvent) => void,
+  onEvent: (event: UpdaterDownloadEvent) => void,
 ) {
-  const channel = new Channel<DownloadEvent>()
-  channel.onmessage = onEvent
+  const channel = new Channel<ContractDownloadEvent>()
+  channel.onmessage = (event) => {
+    if (event.event === 'Started') {
+      const { contentLength } = event.data
+      onEvent({
+        event: 'Started',
+        data: contentLength == null ? {} : { contentLength },
+      })
+    } else {
+      onEvent(event)
+    }
+  }
   return invoke<boolean>('install_update', { version, onEvent: channel })
 }
 
@@ -415,15 +446,15 @@ export async function getAppDir() {
 }
 
 export async function openAppDir() {
-  return invoke<void>('open_app_dir').catch((err) => showNotice.error(err))
+  return invoke<null>('open_app_dir').catch((err) => showNotice.error(err))
 }
 
 export async function openCoreDir() {
-  return invoke<void>('open_core_dir').catch((err) => showNotice.error(err))
+  return invoke<null>('open_core_dir').catch((err) => showNotice.error(err))
 }
 
 export async function openLogsDir() {
-  return invoke<void>('open_logs_dir').catch((err) => showNotice.error(err))
+  return invoke<null>('open_logs_dir').catch((err) => showNotice.error(err))
 }
 
 export async function syncRuntimeProviders() {
@@ -437,21 +468,21 @@ export async function cmdTestDelay(url: string) {
 }
 
 export async function invoke_uwp_tool() {
-  return invoke<void>('invoke_uwp_tool').catch((err) =>
+  return invoke<null>('invoke_uwp_tool').catch((err) =>
     showNotice.error(err, 1500),
   )
 }
 
 export async function openDevTools() {
-  return invoke('open_devtools')
+  return invoke<void>('open_devtools')
 }
 
 export async function exitApp() {
-  return invoke('exit_app')
+  return invoke<void>('exit_app')
 }
 
 export async function exportDiagnosticInfo() {
-  return invoke('export_diagnostic_info')
+  return invoke<null>('export_diagnostic_info')
 }
 
 interface SystemInfo {
@@ -484,7 +515,7 @@ export async function copyIconFile(
     current_t: currentTime,
   }
 
-  return invoke<void>('copy_icon_file', { path, iconInfo })
+  return invoke<string>('copy_icon_file', { path, iconInfo })
 }
 
 export async function downloadIconCache(url: string, name: string) {
@@ -500,31 +531,33 @@ export async function getSystemHostname() {
 }
 
 export async function getNetworkInterfacesInfo() {
-  return invoke<INetworkInterface[]>('get_network_interfaces_info')
+  return withoutNulls(
+    await invoke<NetworkInterfaceWire[]>('get_network_interfaces_info'),
+  )
 }
 
 export async function createWebdavBackup() {
-  return invoke<void>('create_webdav_backup')
+  return invoke<null>('create_webdav_backup')
 }
 
 export async function createLocalBackup() {
-  return invoke<void>('create_local_backup')
+  return invoke<null>('create_local_backup')
 }
 
 export async function deleteWebdavBackup(filename: string) {
-  return invoke<void>('delete_webdav_backup', { filename })
+  return invoke<null>('delete_webdav_backup', { filename })
 }
 
 export async function deleteLocalBackup(filename: string) {
-  return invoke<void>('delete_local_backup', { filename })
+  return invoke<null>('delete_local_backup', { filename })
 }
 
 export async function restoreWebDavBackup(filename: string) {
-  return invoke<void>('restore_webdav_backup', { filename })
+  return invoke<null>('restore_webdav_backup', { filename })
 }
 
 export async function restoreLocalBackup(filename: string) {
-  return invoke<void>('restore_local_backup', { filename })
+  return invoke<null>('restore_local_backup', { filename })
 }
 
 export async function importLocalBackup(source: string) {
@@ -532,7 +565,7 @@ export async function importLocalBackup(source: string) {
 }
 
 export async function exportLocalBackup(filename: string, destination: string) {
-  return invoke<void>('export_local_backup', { filename, destination })
+  return invoke<null>('export_local_backup', { filename, destination })
 }
 
 export async function saveWebdavConfig(
@@ -540,7 +573,7 @@ export async function saveWebdavConfig(
   username: string,
   password: string,
 ) {
-  return invoke<void>('save_webdav_config', {
+  return invoke<null>('save_webdav_config', {
     url,
     username,
     password,
@@ -548,48 +581,25 @@ export async function saveWebdavConfig(
 }
 
 export async function listWebDavBackup() {
-  const list: IWebDavFile[] = await invoke<IWebDavFile[]>('list_webdav_backup')
-  list.forEach((item) => {
-    item.filename = item.href.split('/').pop() as string
-  })
-  return list
+  const list = await invoke<WebDavBackupEntry[]>('list_webdav_backup')
+  return list.map(
+    (item): IWebDavFile => ({
+      ...item,
+      filename: item.href.split('/').pop() ?? '',
+      tag: item.tag ?? '',
+    }),
+  )
 }
 
 export async function listLocalBackup() {
   return invoke<ILocalBackupFile[]>('list_local_backup')
 }
 
-export type RunningMode = 'Service' | 'Sidecar' | 'NotRunning'
-
-type ServiceHealth =
-  | 'unknown'
-  | 'ready'
-  | 'notInstalled'
-  | 'versionMismatch'
-  | 'unavailable'
-
-type PendingServiceAction =
-  | 'install'
-  | 'uninstall'
-  | 'reinstall'
-  | 'forceReinstall'
-
-/** Consistent core/service snapshot with backend-derived availability flags. */
-export interface RunState {
-  mode: RunningMode
-  service: ServiceHealth
-  serviceUnavailableReason: string | null
-  pendingAction: PendingServiceAction | null
-  sidecarAllowed: boolean
-  isAdmin: boolean
-  opInFlight: boolean
-  serviceUsable: boolean
-  tunCapable: boolean
-  serviceNeedsAttention: boolean
-}
+export type RunningMode = GeneratedRunningMode
+export type RunState = RunStateView
 
 export const getRuntimeState = async () => {
-  return invoke<RunState>('get_runtime_state')
+  return invoke<RunStateView>('get_runtime_state')
 }
 
 export type FailedOperation =
@@ -622,16 +632,14 @@ export const getAppUptime = async () => {
   return invoke<number>('get_app_uptime')
 }
 
-export type ServiceInstallOutcome =
-  | { status: 'installed' }
-  | { status: 'sidecar'; reason: string }
+export type ServiceInstallOutcome = GeneratedServiceInstallOutcome
 
 export const installService = async () => {
   return invoke<ServiceInstallOutcome>('install_service')
 }
 
 export const uninstallService = async () => {
-  return invoke<void>('uninstall_service')
+  return invoke<null>('uninstall_service')
 }
 
 export const reinstallService = async () => {
@@ -643,11 +651,11 @@ export const repairService = async () => {
 }
 
 export const continueWithSidecar = async () => {
-  return invoke<void>('continue_with_sidecar')
+  return invoke<null>('continue_with_sidecar')
 }
 
 export const entry_lightweight_mode = async () => {
-  return invoke<void>('entry_lightweight_mode')
+  return invoke<null>('entry_lightweight_mode')
 }
 
 export async function getNextUpdateTime(uid: string) {
@@ -694,13 +702,6 @@ export const probeListener = async (request: ListenerProbe) => {
 
 export const saveProxyPorts = async (settings: ProxyPortSettings) => {
   return invoke<SaveProxyPortsOutcome>('save_proxy_ports', { settings })
-}
-
-export interface UnlockItem {
-  name: string
-  status: string
-  region?: string | null
-  check_time?: string | null
 }
 
 export async function getUnlockItems() {

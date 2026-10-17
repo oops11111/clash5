@@ -308,15 +308,17 @@ impl IClashTemp {
     }
 }
 
-#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq, specta::Type)]
 pub struct ClashInfo {
     /// clash core port
     pub mixed_port: u16,
     pub socks_port: u16,
     pub port: u16,
     /// same as `external-controller`
+    #[specta(type = std::string::String)]
     pub server: String,
     /// clash secret
+    #[specta(type = Option<std::string::String>)]
     pub secret: Option<String>,
 }
 

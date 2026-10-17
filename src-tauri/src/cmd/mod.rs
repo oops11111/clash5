@@ -4,7 +4,7 @@ use smartstring::alias::String;
 pub type CmdResult<T = ()> = Result<T, CommandFailure>;
 
 /// Structured command failure returned to the frontend.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub struct CommandFailure {
     /// Stable frontend identifier, when classified.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -110,6 +110,7 @@ pub mod uwp;
 pub mod validate;
 pub mod verge;
 pub mod webdav;
+pub mod wire;
 
 // Re-export all command functions for backwards compatibility
 pub use app::*;
