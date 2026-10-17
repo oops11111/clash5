@@ -61,7 +61,7 @@ pub fn export_diagnostic_info<R: Runtime>(
     app_handle: AppHandle<R>,
     state: State<'_, RwLock<Platform>>,
 ) -> Result<(), String> {
-    let info = state.inner().read().to_string();
+    let info = clash_verge_logging::redact(&state.inner().read().to_string());
     let clipboard = app_handle.clipboard();
     clipboard.write_text(info).map_err(|error| error.to_string())
 }

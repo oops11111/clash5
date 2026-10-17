@@ -21,7 +21,7 @@ impl CommandFailure {
     pub fn coded(code: &str, detail: impl std::fmt::Display) -> Self {
         Self {
             code: Some(code.to_owned()),
-            detail: detail.to_string(),
+            detail: clash_verge_logging::redact(&detail.to_string()),
             operation: None,
         }
     }
@@ -30,7 +30,7 @@ impl CommandFailure {
     pub fn plain(detail: impl std::fmt::Display) -> Self {
         Self {
             code: None,
-            detail: detail.to_string(),
+            detail: clash_verge_logging::redact(&detail.to_string()),
             operation: None,
         }
     }
@@ -54,7 +54,7 @@ impl From<std::string::String> for CommandFailure {
     fn from(detail: std::string::String) -> Self {
         Self {
             code: None,
-            detail,
+            detail: clash_verge_logging::redact(&detail),
             operation: None,
         }
     }
