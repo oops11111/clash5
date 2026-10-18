@@ -11,26 +11,36 @@ use serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
 /// ### `verge.yaml` schema
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(default)]
 pub struct IVerge {
     /// silent | error | warn | info | debug | trace
+    #[specta(type = Option<std::string::String>)]
     pub app_log_level: Option<String>,
 
     /// Maximum app log size in KiB.
+    #[specta(type = Option<specta_typescript::Number>)]
     pub app_log_max_size: Option<u64>,
 
+    #[specta(type = Option<specta_typescript::Number>)]
     pub app_log_max_count: Option<usize>,
 
+    #[specta(type = Option<std::string::String>)]
     pub language: Option<String>,
 
     /// `light` or `dark` or `system`
+    #[specta(type = Option<std::string::String>)]
     pub theme_mode: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub tray_event: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub env_type: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub start_page: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub startup_script: Option<String>,
 
     pub traffic_graph: Option<bool>,
@@ -46,20 +56,24 @@ pub struct IVerge {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub common_tray_icon: Option<bool>,
 
-    #[cfg(target_os = "macos")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub tray_icon: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub menu_icon: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<Vec<std::string::String>>)]
     pub menu_order: Option<Vec<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub proxy_group_tools_position: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub notice_position: Option<String>,
 
     pub collapse_navbar: Option<bool>,
@@ -84,33 +98,42 @@ pub struct IVerge {
     pub enable_dns_settings: Option<bool>,
 
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    #[specta(type = std::collections::BTreeMap<std::string::String, super::dns::ProfileDnsSettings>)]
     pub profile_dns_settings: std::collections::BTreeMap<String, super::dns::ProfileDnsSettings>,
 
     pub use_default_bypass: Option<bool>,
 
+    #[specta(type = Option<std::string::String>)]
     pub system_proxy_bypass: Option<String>,
 
+    #[specta(type = Option<specta_typescript::Number>)]
     pub proxy_guard_duration: Option<u64>,
 
     pub proxy_auto_config: Option<bool>,
 
+    #[specta(type = Option<std::string::String>)]
     pub pac_file_content: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub proxy_host: Option<String>,
 
     pub theme_setting: Option<IVergeTheme>,
 
+    #[specta(type = Option<Vec<std::string::String>>)]
     pub web_ui_list: Option<Vec<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub clash_core: Option<String>,
 
     /// format: {func},{key}
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<Vec<std::string::String>>)]
     pub hotkeys: Option<Vec<String>>,
 
     pub enable_global_hotkey: Option<bool>,
 
+    #[specta(type = Option<specta_typescript::Unknown>)]
     pub home_cards: Option<serde_json::Value>,
 
     pub auto_close_connection: Option<bool>,
@@ -121,6 +144,7 @@ pub struct IVerge {
 
     pub auto_check_update: Option<bool>,
 
+    #[specta(type = Option<std::string::String>)]
     pub default_latency_test: Option<String>,
 
     pub default_latency_timeout: Option<i16>,
@@ -128,6 +152,7 @@ pub struct IVerge {
     pub enable_auto_delay_detection: Option<bool>,
 
     /// 自动检测当前节点延迟的间隔（分钟）
+    #[specta(type = Option<specta_typescript::Number>)]
     pub auto_delay_detection_interval_minutes: Option<u64>,
 
     pub enable_builtin_enhanced: Option<bool>,
@@ -142,21 +167,22 @@ pub struct IVerge {
     pub enable_auto_backup_schedule: Option<bool>,
 
     /// Automatic backup interval in hours
+    #[specta(type = Option<specta_typescript::Number>)]
     pub auto_backup_interval_hours: Option<u64>,
 
     pub auto_backup_on_change: Option<bool>,
 
     /// verge 的各种 port 用于覆盖 clash 的各种 port
-    #[cfg(not(target_os = "windows"))]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_redir_port: Option<u16>,
 
-    #[cfg(not(target_os = "windows"))]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_redir_enabled: Option<bool>,
 
-    #[cfg(target_os = "linux")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_tproxy_port: Option<u16>,
 
-    #[cfg(target_os = "linux")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_tproxy_enabled: Option<bool>,
 
     pub verge_mixed_port: Option<u16>,
@@ -175,6 +201,7 @@ pub struct IVerge {
         skip_serializing_if = "Option::is_none",
         default
     )]
+    #[specta(type = Option<std::string::String>)]
     pub webdav_url: Option<String>,
 
     #[serde(
@@ -183,6 +210,7 @@ pub struct IVerge {
         skip_serializing_if = "Option::is_none",
         default
     )]
+    #[specta(type = Option<std::string::String>)]
     pub webdav_username: Option<String>,
 
     #[serde(
@@ -191,49 +219,69 @@ pub struct IVerge {
         skip_serializing_if = "Option::is_none",
         default
     )]
+    #[specta(type = Option<std::string::String>)]
     pub webdav_password: Option<String>,
 
-    #[cfg(target_os = "macos")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_tray_speed: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub tray_proxy_groups_display_mode: Option<String>,
     pub tray_inline_outbound_modes: Option<bool>,
 
     pub enable_auto_light_weight_mode: Option<bool>,
 
     /// 自动进入轻量模式的延迟（分钟）
+    #[specta(type = Option<specta_typescript::Number>)]
     pub auto_light_weight_minutes: Option<u64>,
 
     pub enable_hover_jump_navigator: Option<bool>,
 
     /// 代理页面自动滚动延迟（毫秒）
+    #[specta(type = Option<specta_typescript::Number>)]
     pub hover_jump_navigator_delay: Option<u64>,
 
     pub enable_external_controller: Option<bool>,
 }
 
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(default)]
 pub struct IVergeTestItem {
+    #[specta(type = Option<std::string::String>)]
     pub uid: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub name: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub icon: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub url: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(default)]
 pub struct IVergeTheme {
+    #[specta(type = Option<std::string::String>)]
     pub primary_color: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub secondary_color: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub primary_text: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub secondary_text: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub info_color: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub error_color: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub warning_color: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub success_color: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub font_family: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub css_injection: Option<String>,
 }
 
@@ -342,8 +390,7 @@ impl IVerge {
             enable_memory_usage: Some(true),
             enable_group_icon: Some(true),
             pause_render_traffic_stats_on_blur: Some(true),
-            #[cfg(target_os = "macos")]
-            tray_icon: Some("monochrome".into()),
+            tray_icon: cfg!(target_os = "macos").then(|| "monochrome".into()),
             menu_icon: Some("monochrome".into()),
             notice_position: Some("top-right".into()),
             collapse_navbar: Some(false),
@@ -358,14 +405,10 @@ impl IVerge {
             proxy_auto_config: Some(false),
             pac_file_content: Some(DEFAULT_PAC.into()),
             proxy_host: Some("127.0.0.1".into()),
-            #[cfg(not(target_os = "windows"))]
-            verge_redir_port: Some(7895),
-            #[cfg(not(target_os = "windows"))]
-            verge_redir_enabled: Some(false),
-            #[cfg(target_os = "linux")]
-            verge_tproxy_port: Some(7896),
-            #[cfg(target_os = "linux")]
-            verge_tproxy_enabled: Some(false),
+            verge_redir_port: (!cfg!(target_os = "windows")).then_some(7895),
+            verge_redir_enabled: (!cfg!(target_os = "windows")).then_some(false),
+            verge_tproxy_port: cfg!(target_os = "linux").then_some(7896),
+            verge_tproxy_enabled: cfg!(target_os = "linux").then_some(false),
             verge_mixed_port: Some(network::ports::DEFAULT_MIXED),
             verge_socks_port: Some(7898),
             verge_socks_enabled: Some(false),
@@ -386,8 +429,7 @@ impl IVerge {
             webdav_url: None,
             webdav_username: None,
             webdav_password: None,
-            #[cfg(target_os = "macos")]
-            enable_tray_speed: Some(false),
+            enable_tray_speed: cfg!(target_os = "macos").then_some(false),
             tray_proxy_groups_display_mode: Some("default".into()),
             tray_inline_outbound_modes: Some(false),
             enable_global_hotkey: Some(true),

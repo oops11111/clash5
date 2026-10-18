@@ -62,7 +62,11 @@
 | 2026-10-14 | R-26 | 追踪中 | [第四次原生验收](https://github.com/oops11111/clash5/actions/runs/38542030896)确认键盘清空搜索后四条活动节点恢复；随后脚本用 DOM `click()` 未能展开 MUI 排序菜单，失败截图可见菜单关闭。脚本已改用 WebDriver 指针点击；排序、重启身份与完整视觉证据仍待重验。 |
 | 2026-10-15 | R-11 | 缓解中 | [M1 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)确认本地 429 fixture 的失败不阻断其它节点，缓存与连续失败退避生效；Mihomo 延迟接口不返回上游状态或 `Retry-After`，仍需观察真实机场限流行为。 |
 | 2026-10-15 | R-26 | 已缓解 | [Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过完整节点页面交互和桌面重启身份检查，并上传前后截图。脚本避开上游 Windows 驱动关闭阻塞；Server 2025 的 WebDriver 问题仍独立追踪。 |
-| 2026-10-17 | R-01、R-02、R-25 | 已缓解 | PR #23 已合入；本机 HMAC stable_id、版本迁移、密钥丢失恢复与同来源凭证轮换重绑通过数据层、跨平台 Clippy 和 Windows 桌面验收。issue #7 已完成。 |
-| 2026-10-17 | R-19 | 已缓解 | PR #26 已合入；只读导入的源目录前后 SHA-256、fixture 和 Windows 桌面验收通过。issue #25 已完成。 |
-| 2026-10-17 | R-18 | 缓解中 | PR #27 的 CI、Windows 安装器隔离与 shell smoke 通过；真实同机安装、启动、升级、卸载和配置校验和验收仍未完成。 |
-| 2026-10-17 | R-20 | 开放 | 仍需统一日志/诊断脱敏与凭证、完整订阅 URL、controller secret、relay token 的泄露回归证据。 |
+| 2026-10-17 | R-01、R-02、R-25 | 已缓解 | [PR #23](https://github.com/oops11111/clash5/pull/23) 已合并；Windows 桌面/CI 覆盖 HMAC 迁移、密钥缺失/错配/锁定、凭证轮换、显式重绑、WAL/schema 迁移及孤儿保留/清理。 |
+| 2026-10-18 | R-01、R-02、R-25 | 约束落实 | [PR #37](https://github.com/oops11111/clash5/pull/37) 的版本化导出包包含 SQLite 数据但明确排除本机 HMAC key；跨设备恢复必须走密钥恢复和显式重绑，避免把身份密钥写入迁移包。 |
+| 2026-10-17 | R-19 | 已缓解 | [PR #26](https://github.com/oops11111/clash5/pull/26) 已合并；只读导入通过 Windows 安全测试与桌面验收，导入前后源目录 SHA-256 清单一致。 |
+| 2026-10-17 | R-18 | 验收通过、待合入 | [PR #27](https://github.com/oops11111/clash5/pull/27) 的 Windows 同机安装/升级/启动/独立卸载验收及上游配置目录 SHA-256 前后比对通过；Windows/macOS/Linux 标识审计通过。PR 尚未合入 dev；macOS/Linux 运行时安装升级测试为后续覆盖。 |
+| 2026-10-17 | R-20 | 开放 | 只读复核确认 `mask_url` 保留 URL 主机及短路径段，`mask_err` 只处理错误文本中的 HTTP(S) URL，日志宏没有统一脱敏出口。`cmd/profile.rs::import_profile` 把 `{e:#}` 下载错误链直接写日志，`profile_import_error` 也将原始链放入 IPC 详情，未调用 `mask_err`。`utils/help.rs` 没有遮罩函数单测；凭证、controller secret、relay token 回归测试仍缺。该项标为 Opus-class，未宣称完成。 |
+| 2026-10-18 | R-20 | 验收中 | [PR #38](https://github.com/oops11111/clash5/pull/38) 接入统一脱敏出口，覆盖应用日志、Mihomo 内存日志、IPC 错误详情和诊断复制；日志 crate 回归测试覆盖 URL 凭证/路径/查询/片段、controller secret、relay token、密码与非敏感文本，待远程 CI 完成后关闭。 |
+| 2026-10-18 | R-18 | 已缓解 | [PR #27](https://github.com/oops11111/clash5/pull/27) 已合入 dev；Windows 同机安装、升级、启动、独立卸载与原配置校验和验收通过。macOS/Linux 安装运行仍需后续覆盖。 |
+| 2026-10-18 | R-20 | 已缓解 | [PR #38](https://github.com/oops11111/clash5/pull/38) 已合入 dev；统一脱敏出口与日志回归测试通过。后续新增日志调用仍需持续遵守该出口。 |

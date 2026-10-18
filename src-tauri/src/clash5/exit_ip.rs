@@ -8,9 +8,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, specta::Type)]
 pub struct ExitObservation {
     pub ip: IpAddr,
+    #[specta(type = specta_typescript::Number)]
     pub elapsed_ms: u64,
 }
 

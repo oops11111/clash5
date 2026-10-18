@@ -44,7 +44,7 @@ static PENDING_SERVICE_REPAIR_NOTICE: AtomicBool = AtomicBool::new(false);
 static PENDING_SERVICE_OWNER_NOTICE: Mutex<Option<String>> = Mutex::new(None);
 
 /// Why the Service was unavailable when the core fell back to Sidecar.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(tag = "kind", content = "reason", rename_all = "camelCase")]
 pub enum ServiceFallbackNotice {
     Unavailable,
@@ -572,6 +572,54 @@ fn shell_single_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', r"'\''"))
 }
 
+struct StagedServiceTools {
+    directory: PathBuf,
+}
+
+impl StagedServiceTools {
+    fn create(installer_source: &Path, service_source: &Path) -> Result<Self> {
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt as _;
+
+        for attempt in 0..32 {
+            let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+            let directory =
+                std::env::temp_dir().join(format!("clash5-service-tools-{}-{nonce}-{attempt}", std::process::id()));
+            match std::fs::create_dir(&directory) {
+                Ok(()) => {
+                    let staging = Self { directory };
+                    #[cfg(unix)]
+                    std::fs::set_permissions(&staging.directory, std::fs::Permissions::from_mode(0o700))?;
+                    let suffix = std::env::consts::EXE_SUFFIX;
+                    let installer = staging.directory.join(format!("clash-verge-service-install{suffix}"));
+                    let service = staging.directory.join(format!("clash-verge-service{suffix}"));
+                    std::fs::copy(installer_source, &installer)?;
+                    std::fs::copy(service_source, &service)?;
+                    #[cfg(unix)]
+                    for executable in [&installer, &service] {
+                        std::fs::set_permissions(executable, std::fs::Permissions::from_mode(0o700))?;
+                    }
+                    return Ok(staging);
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        bail!("could not allocate an isolated clash5 service-tools directory")
+    }
+
+    fn installer_path(&self) -> PathBuf {
+        self.directory
+            .join(format!("clash-verge-service-install{}", std::env::consts::EXE_SUFFIX))
+    }
+}
+
+impl Drop for StagedServiceTools {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.directory);
+    }
+}
+
 fn packaged_service_tool_path(file_name: &str, packaged_path: impl FnOnce() -> Result<PathBuf>) -> Result<PathBuf> {
     #[cfg(feature = "verge-dev")]
     {
@@ -600,8 +648,8 @@ fn uninstall_service() -> Result<()> {
     use runas::Command as RunasCommand;
     use std::os::windows::process::CommandExt as _;
 
-    let uninstall_path = packaged_service_tool_path("clash-verge-service-uninstall.exe", || {
-        Ok(dirs::service_path()?.with_file_name("clash-verge-service-uninstall.exe"))
+    let uninstall_path = packaged_service_tool_path("clash5-service-uninstall.exe", || {
+        Ok(dirs::service_path()?.with_file_name("clash5-service-uninstall.exe"))
     })?;
 
     if !uninstall_path.exists() {
@@ -629,8 +677,8 @@ fn uninstall_service() -> Result<()> {
 fn uninstall_service() -> Result<()> {
     logging!(info, Type::Service, "uninstall service");
 
-    let uninstall_path = packaged_service_tool_path("clash-verge-service-uninstall", || {
-        Ok(tauri::utils::platform::current_exe()?.with_file_name("clash-verge-service-uninstall"))
+    let uninstall_path = packaged_service_tool_path("clash5-service-uninstall", || {
+        Ok(tauri::utils::platform::current_exe()?.with_file_name("clash5-service-uninstall"))
     })?;
 
     if !uninstall_path.exists() {
@@ -688,8 +736,8 @@ fn linux_running_as_root() -> bool {
 fn uninstall_service() -> Result<()> {
     logging!(info, Type::Service, "uninstall service");
 
-    let uninstall_path = packaged_service_tool_path("clash-verge-service-uninstall", || {
-        Ok(dirs::service_path()?.with_file_name("clash-verge-service-uninstall"))
+    let uninstall_path = packaged_service_tool_path("clash5-service-uninstall", || {
+        Ok(dirs::service_path()?.with_file_name("clash5-service-uninstall"))
     })?;
 
     if !uninstall_path.exists() {
@@ -721,14 +769,30 @@ fn uninstall_service() -> Result<()> {
     Ok(())
 }
 
+const fn bundled_core_name(core: &str) -> &str {
+    #[cfg(target_os = "linux")]
+    {
+        match core.as_bytes() {
+            b"verge-mihomo" => "clash5-mihomo",
+            b"verge-mihomo-alpha" => "clash5-mihomo-alpha",
+            _ => core,
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        core
+    }
+}
+
 fn install_service() -> Result<()> {
     let executable = current_exe()?;
     let cores = crate::config::IVerge::VALID_CLASH_CORES
         .iter()
         .map(|core| {
             let name = format!("{core}{}", std::env::consts::EXE_SUFFIX);
+            let bundled_name = bundled_core_name(core);
             clash_verge_service_ipc::management::CoreSource {
-                path: executable.with_file_name(&name),
+                path: executable.with_file_name(format!("{bundled_name}{}", std::env::consts::EXE_SUFFIX)),
                 name,
             }
         })
@@ -737,7 +801,7 @@ fn install_service() -> Result<()> {
 }
 
 fn invoke_service_install(cores: &[clash_verge_service_ipc::management::CoreSource], core_only: bool) -> Result<()> {
-    let name = format!("clash-verge-service-install{}", std::env::consts::EXE_SUFFIX);
+    let name = format!("clash5-service-install{}", std::env::consts::EXE_SUFFIX);
     let installer = packaged_service_tool_path(&name, || {
         #[cfg(target_os = "linux")]
         let executable = tauri::utils::platform::current_exe()?;
@@ -749,6 +813,11 @@ fn invoke_service_install(cores: &[clash_verge_service_ipc::management::CoreSour
     let gid = Some(tauri_plugin_clash_verge_sysinfo::current_gid());
     #[cfg(windows)]
     let gid = None;
+    let staged_tools = StagedServiceTools::create(
+        &installer,
+        &installer.with_file_name(format!("clash5-service{}", std::env::consts::EXE_SUFFIX)),
+    )?;
+    let installer = staged_tools.installer_path();
     clash_verge_service_ipc::management::install(
         &installer,
         cores,
@@ -2059,6 +2128,8 @@ mod tests {
         generate_service_session_token, mark_service_unavailable_after_owner_loss, owner_recovery_policy,
         service_core_path_for, session_matches_status,
     };
+    #[cfg(target_os = "linux")]
+    use super::{StagedServiceTools, bundled_core_name};
     #[cfg(unix)]
     use super::{service_core_path_for_with_publisher, service_tool_path_for};
     use crate::core::runstate::{FakeEnv, OwnerRecoveryReason, PendingAction, RunStateStore};
@@ -2118,6 +2189,53 @@ mod tests {
     #[cfg(unix)]
     fn service_tools_staging_directory(home: &Path) -> PathBuf {
         home.join("Applications/.clash-verge-rev-dev/service-tools")
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_core_sources_use_clash5_sidecar_names_and_upstream_install_names() {
+        let executable = Path::new("/usr/bin/clash5");
+
+        for (core, sidecar) in [
+            ("verge-mihomo", "clash5-mihomo"),
+            ("verge-mihomo-alpha", "clash5-mihomo-alpha"),
+        ] {
+            let name = format!("{core}{}", std::env::consts::EXE_SUFFIX);
+            let bundled_name = bundled_core_name(core);
+            let source = executable.with_file_name(format!("{bundled_name}{}", std::env::consts::EXE_SUFFIX));
+            assert_eq!(source.file_stem().and_then(|value| value.to_str()), Some(sidecar));
+            assert_eq!(name, format!("{core}{}", std::env::consts::EXE_SUFFIX));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_service_tools_use_upstream_internal_names_in_a_private_directory() -> anyhow::Result<()> {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let root = TestDirectory::new("linux-service-tools")?;
+        let installer_source = root.path().join("clash5-service-install");
+        let service_source = root.path().join("clash5-service");
+        std::fs::write(&installer_source, b"clash5 installer")?;
+        std::fs::write(&service_source, b"clash5 service")?;
+
+        let staged = StagedServiceTools::create(&installer_source, &service_source)?;
+        let directory = staged.directory.clone();
+        let installer = staged.installer_path();
+        let service = directory.join("clash-verge-service");
+
+        assert_eq!(
+            installer.file_name().and_then(|name| name.to_str()),
+            Some("clash-verge-service-install")
+        );
+        assert_eq!(std::fs::read(&installer)?, b"clash5 installer");
+        assert_eq!(std::fs::read(&service)?, b"clash5 service");
+        assert_eq!(std::fs::metadata(&directory)?.permissions().mode() & 0o777, 0o700);
+        assert_ne!(std::fs::metadata(&installer)?.permissions().mode() & 0o111, 0);
+
+        drop(staged);
+        assert!(!directory.exists());
+        Ok(())
     }
 
     #[cfg(unix)]
