@@ -757,6 +757,7 @@ impl CoreManager {
     }
 
     async fn stop_core_unprepared_inner(&self) -> Result<()> {
+        self.set_singbox_landing(None).await?;
         CLASH_LOGGER.clear_logs();
         let result = match *self.get_running_mode() {
             RunningMode::Service => self.stop_core_by_service().await,

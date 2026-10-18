@@ -411,6 +411,8 @@
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
         "autoCloseConnections": "Cerrar conexiones automáticamente",
+        "singboxPersistent": "Mantener sing-box en ejecución",
+        "singboxDegraded": "sing-box se detuvo tras varios fallos; el tráfico volvió a Mihomo.",
         "autoCheckUpdate": "Comprobar actualizaciones automáticamente",
         "enableBuiltinEnhanced": "Habilitar funciones mejoradas integradas",
         "proxyLayoutColumns": "Número de columnas en la disposición de la página de proxy",
@@ -422,6 +424,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "Cierra las conexiones establecidas cuando se cambia el nodo seleccionado en el grupo de proxy o el modo de proxy.",
+        "singboxPersistent": "Mantener el proceso auxiliar activo cuando el relay esté inactivo",
         "enableBuiltinEnhanced": "Procesamiento de compatibilidad de archivos de configuración",
         "autoDelayDetection": "Prueba periódicamente la latencia del nodo actual en segundo plano",
         "defaultLatencyTest": "Solo se utiliza para pruebas de solicitudes de clientes HTTP y no afectará al archivo de configuración."

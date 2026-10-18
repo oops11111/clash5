@@ -1,5 +1,6 @@
 import {
   InputAdornment,
+  Alert,
   List,
   ListItem,
   ListItemText,
@@ -13,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 
 import { BaseDialog, DialogRef, Switch, TooltipIcon } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
+import { getClash5SingboxDegraded } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
 export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
@@ -25,6 +27,8 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
     appLogMaxSize: 8,
     appLogMaxCount: 12,
     autoCloseConnection: true,
+    singboxPersistent: false,
+    singboxDegraded: false,
     autoCheckUpdate: true,
     enableBuiltinEnhanced: true,
     proxyLayoutColumn: 6,
@@ -43,6 +47,8 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
         appLogMaxSize: verge?.app_log_max_size ?? 128,
         appLogMaxCount: verge?.app_log_max_count ?? 8,
         autoCloseConnection: verge?.auto_close_connection ?? true,
+        singboxPersistent: verge?.singbox_persistent ?? false,
+        singboxDegraded: false,
         autoCheckUpdate: verge?.auto_check_update ?? true,
         enableBuiltinEnhanced: verge?.enable_builtin_enhanced ?? true,
         proxyLayoutColumn: verge?.proxy_layout_column || 6,
@@ -53,6 +59,11 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
         autoLogClean: verge?.auto_log_clean || 0,
         defaultLatencyTimeout: verge?.default_latency_timeout || 10000,
       })
+      void getClash5SingboxDegraded()
+        .then((degraded) =>
+          setValues((current) => ({ ...current, singboxDegraded: degraded })),
+        )
+        .catch(() => undefined)
     },
     close: () => setOpen(false),
   }))
@@ -64,6 +75,7 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
         app_log_max_size: values.appLogMaxSize,
         app_log_max_count: values.appLogMaxCount,
         auto_close_connection: values.autoCloseConnection,
+        singbox_persistent: values.singboxPersistent,
         auto_check_update: values.autoCheckUpdate,
         enable_builtin_enhanced: values.enableBuiltinEnhanced,
         proxy_layout_column: values.proxyLayoutColumn,
@@ -92,6 +104,11 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
       onOk={onSave}
     >
       <List>
+        {values.singboxDegraded && (
+          <Alert severity="warning" sx={{ mb: 1 }}>
+            {t('settings.modals.misc.fields.singboxDegraded')}
+          </Alert>
+        )}
         <ListItem sx={{ padding: '5px 2px' }}>
           <ListItemText
             primary={t('settings.modals.misc.fields.appLogLevel')}
@@ -193,6 +210,25 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
             checked={values.autoCloseConnection}
             onChange={(_, c) =>
               setValues((v) => ({ ...v, autoCloseConnection: c }))
+            }
+            sx={{ marginLeft: 'auto' }}
+          />
+        </ListItem>
+
+        <ListItem sx={{ padding: '5px 2px' }}>
+          <ListItemText
+            primary={t('settings.modals.misc.fields.singboxPersistent')}
+            sx={{ maxWidth: 'fit-content' }}
+          />
+          <TooltipIcon
+            title={t('settings.modals.misc.tooltips.singboxPersistent')}
+            sx={{ opacity: '0.7' }}
+          />
+          <Switch
+            edge="end"
+            checked={values.singboxPersistent}
+            onChange={(_, c) =>
+              setValues((v) => ({ ...v, singboxPersistent: c }))
             }
             sx={{ marginLeft: 'auto' }}
           />

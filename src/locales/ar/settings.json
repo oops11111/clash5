@@ -411,6 +411,8 @@
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
         "autoCloseConnections": "إغلاق الاتصالات تلقائيًا",
+        "singboxPersistent": "إبقاء sing-box قيد التشغيل",
+        "singboxDegraded": "توقّف sing-box بعد إخفاقات متكررة؛ عادت الحركة إلى Mihomo.",
         "autoCheckUpdate": "فحص التحديث تلقائيًا",
         "enableBuiltinEnhanced": "تفعيل التحسين المدمج",
         "proxyLayoutColumns": "أعمدة عرض الوكيل",
@@ -422,6 +424,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "إنهاء الاتصالات القائمة عند تغيير اختيار مجموعة الوكيل أو وضع الوكيل",
+        "singboxPersistent": "إبقاء العملية المساعدة قيد التشغيل بعد خمول المرحّل",
         "enableBuiltinEnhanced": "معالجة توافق ملف التكوين",
         "autoDelayDetection": "يختبر زمن استجابة العقدة الحالية على نحو دوري في الخلفية",
         "defaultLatencyTest": "يُستخدم فقط لاختبار طلب HTTP العميل. لن يؤثر على ملف التكوين"

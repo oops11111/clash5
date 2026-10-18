@@ -410,6 +410,12 @@ export const commands = {
     typedError<ChainActivation, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_activate_chain', { id, policyGroup }),
     ),
+  clash5SingboxDegraded: () =>
+    __TAURI_INVOKE<boolean>('clash5_singbox_degraded'),
+  clash5SingboxRouteStatus: (landingName: string) =>
+    typedError<SingboxRouteStatus, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_singbox_route_status', { landingName }),
+    ),
   clash5DetectExitIp: (id: string, serviceUrl: string | null) =>
     typedError<ExitIpResult, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_detect_exit_ip', { id, serviceUrl }),
@@ -808,6 +814,8 @@ export type IVerge_Deserialize = {
   enable_global_hotkey?: boolean | null
   home_cards?: unknown | null
   auto_close_connection?: boolean | null
+  /**  Keep the sing-box sidecar alive after its relay becomes idle. */
+  singbox_persistent?: boolean | null
   auto_check_update?: boolean | null
   default_latency_test?: string | null
   default_latency_timeout?: number | null
@@ -899,6 +907,8 @@ export type IVerge_Serialize = {
   enable_global_hotkey: boolean | null
   home_cards: unknown | null
   auto_close_connection: boolean | null
+  /**  Keep the sing-box sidecar alive after its relay becomes idle. */
+  singbox_persistent?: boolean | null
   auto_check_update: boolean | null
   default_latency_test: string | null
   default_latency_timeout: number | null
@@ -1442,6 +1452,12 @@ export type ServiceInstallOutcome =
 export type SidecarFailureSnapshot = {
   revision: number
   detail: string | null
+}
+
+export type SingboxRouteStatus = {
+  active: boolean
+  degraded: boolean
+  mihomo_proxy_type: string
 }
 
 export type Source =

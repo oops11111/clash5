@@ -823,7 +823,7 @@ Section Install
 
   !include "Win\RestartManager.nsh"
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
-  
+
   ; Ensure startup folders exist
   CreateDirectory "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup"
   DetailPrint "Ensured system startup folder exists"
