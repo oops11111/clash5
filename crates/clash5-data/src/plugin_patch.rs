@@ -12,13 +12,14 @@ pub struct PluginPatch {
     pub patch: Value,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ConfigProvenance {
     Profile,
     Plugin {
         plugin_id: String,
         binding_id: String,
+        #[specta(type = specta_typescript::Number)]
         priority: i64,
     },
 }
@@ -31,14 +32,16 @@ pub struct EffectiveConfig {
     pub conflicts: Vec<PluginConflict>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 pub struct PluginConflict {
     pub path: String,
     pub winner_plugin_id: String,
     pub winner_binding_id: String,
+    #[specta(type = specta_typescript::Number)]
     pub winner_priority: i64,
     pub loser_plugin_id: String,
     pub loser_binding_id: String,
+    #[specta(type = specta_typescript::Number)]
     pub loser_priority: i64,
 }
 

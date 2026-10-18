@@ -214,15 +214,17 @@ fn nsis_language_id(app_language: &str) -> &'static str {
 }
 
 /// Same wire shape as the updater plugin's JS `DownloadEvent`.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, specta::Type)]
 #[serde(tag = "event", content = "data")]
 pub enum DownloadEvent {
     #[serde(rename_all = "camelCase")]
     Started {
+        #[specta(type = Option<specta_typescript::Number>)]
         content_length: Option<u64>,
     },
     #[serde(rename_all = "camelCase")]
     Progress {
+        #[specta(type = specta_typescript::Number)]
         chunk_length: usize,
     },
     Finished,

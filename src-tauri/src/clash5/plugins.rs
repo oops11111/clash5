@@ -65,7 +65,7 @@ pub(crate) struct VerifiedPluginPackage {
     pub manifest_bytes: Vec<u8>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub(crate) struct PluginSummary {
     pub id: String,
     pub version: String,

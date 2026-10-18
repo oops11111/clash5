@@ -36,7 +36,7 @@ macro_rules! select_field {
 macro_rules! verge_registry {
     ($( $(#[$cfg:meta])* $field:ident => $rule:tt; )*) => {
         pub(super) fn verge_effects(patch: &IVerge) -> Effects {
-            // No rest pattern: even fields omitted by serde must be classified at compile time.
+            // Every field must be classified, including platform-specific no-ops.
             let IVerge { $( $(#[$cfg])* $field, )* } = patch;
             let mut effects = Effects::new();
             $( $(#[$cfg])* { select_field!(effects, $field, $rule); } )*
@@ -62,6 +62,8 @@ verge_registry! {
     common_tray_icon => [TrayIcon];
     #[cfg(target_os = "macos")]
     tray_icon => [TrayIcon];
+    #[cfg(not(target_os = "macos"))]
+    tray_icon => NoEffect;
     menu_icon => NoEffect;
     menu_order => NoEffect;
     proxy_group_tools_position => NoEffect;
@@ -107,10 +109,18 @@ verge_registry! {
     verge_redir_port => [RestartCore];
     #[cfg(not(target_os = "windows"))]
     verge_redir_enabled => [RestartCore];
+    #[cfg(target_os = "windows")]
+    verge_redir_port => NoEffect;
+    #[cfg(target_os = "windows")]
+    verge_redir_enabled => NoEffect;
     #[cfg(target_os = "linux")]
     verge_tproxy_port => [RestartCore];
     #[cfg(target_os = "linux")]
     verge_tproxy_enabled => [RestartCore];
+    #[cfg(not(target_os = "linux"))]
+    verge_tproxy_port => NoEffect;
+    #[cfg(not(target_os = "linux"))]
+    verge_tproxy_enabled => NoEffect;
     verge_mixed_port => [RestartCore];
     verge_socks_port => [RestartCore];
     verge_socks_enabled => [RestartCore];
@@ -121,6 +131,8 @@ verge_registry! {
     webdav_password => NoEffect;
     #[cfg(target_os = "macos")]
     enable_tray_speed => [TrayIcon];
+    #[cfg(not(target_os = "macos"))]
+    enable_tray_speed => NoEffect;
     tray_proxy_groups_display_mode => [TrayMenu];
     tray_inline_outbound_modes => [TrayMenu];
     enable_auto_light_weight_mode => [Lightweight];

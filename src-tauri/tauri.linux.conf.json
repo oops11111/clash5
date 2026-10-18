@@ -6,30 +6,26 @@
     "linux": {
       "deb": {
         "depends": ["openssl", "libayatana-appindicator3-1"],
-        "desktopTemplate": "./packages/linux/clash-verge.desktop",
-        "provides": ["clash-verge"],
-        "conflicts": ["clash-verge"],
-        "replaces": ["clash-verge"],
+        "desktopTemplate": "./packages/linux/clash5.desktop",
+        "provides": ["clash5"],
         "postInstallScript": "./packages/linux/post-install.sh",
         "preRemoveScript": "./packages/linux/pre-remove.sh"
       },
       "rpm": {
         "depends": ["openssl", "libayatana-appindicator-gtk3"],
         "recommends": ["policycoreutils", "policycoreutils-python-utils"],
-        "desktopTemplate": "./packages/linux/clash-verge.desktop",
-        "provides": ["clash-verge"],
-        "conflicts": ["clash-verge"],
-        "obsoletes": ["clash-verge"],
+        "desktopTemplate": "./packages/linux/clash5.desktop",
+        "provides": ["clash5"],
         "postInstallScript": "./packages/linux/post-install-rpm.sh",
         "preRemoveScript": "./packages/linux/pre-remove.sh"
       }
     },
     "externalBin": [
-      "./sidecar/clash-verge-service",
-      "./sidecar/clash-verge-service-install",
-      "./sidecar/clash-verge-service-uninstall",
-      "./sidecar/verge-mihomo",
-      "./sidecar/verge-mihomo-alpha"
+      "./sidecar/clash5-service",
+      "./sidecar/clash5-service-install",
+      "./sidecar/clash5-service-uninstall",
+      "./sidecar/clash5-mihomo",
+      "./sidecar/clash5-mihomo-alpha"
     ]
   }
 }

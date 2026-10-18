@@ -42,7 +42,7 @@ pub enum FrontendEvent<'a> {
 
 /// Operation associated with a pending failure.
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum FailedOperation {
     SystemProxyEnable,
@@ -72,15 +72,18 @@ impl FailedOperation {
 }
 
 /// Latest unresolved failure for one stable code.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingFailure {
     /// Stable code used as the table key.
+    #[specta(type = std::string::String)]
     pub code: String,
     /// Full diagnostic context chain.
+    #[specta(type = std::string::String)]
     pub detail: String,
     pub operation: FailedOperation,
     /// Monotonic identity for repeated failures under the same code.
+    #[specta(type = specta_typescript::Number)]
     pub sequence: u64,
 }
 
@@ -241,9 +244,11 @@ pub fn what_was_asked() -> FailedOperation {
 static PENDING_FAILURES: LazyLock<FailureTable> = LazyLock::new(FailureTable::default);
 
 /// A removal has a revision too, so a delayed read cannot restore a resolved failure.
-#[derive(Debug, Default, Clone, serde::Serialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, specta::Type)]
 pub struct SidecarFailureSnapshot {
+    #[specta(type = specta_typescript::Number)]
     pub revision: u64,
+    #[specta(type = Option<std::string::String>)]
     pub detail: Option<String>,
 }
 
