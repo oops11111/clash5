@@ -739,24 +739,24 @@ mod release_source_tests {
     use super::*;
     use tauri_plugin_updater::ReleaseManifestPlatform;
 
-    fn candidate(version: &str, url: &str) -> RemoteRelease {
-        RemoteRelease {
-            version: version.parse().unwrap(),
+    fn candidate(version: &str, url: &str) -> Result<RemoteRelease, Box<dyn std::error::Error>> {
+        Ok(RemoteRelease {
+            version: version.parse()?,
             notes: None,
             pub_date: None,
             data: RemoteReleaseInner::Dynamic(ReleaseManifestPlatform {
-                url: url.parse().unwrap(),
+                url: url.parse()?,
                 signature: "signed-bundle".to_string(),
             }),
-        }
+        })
     }
 
     #[test]
-    fn stable_updates_accept_only_clash5_release_assets() {
+    fn stable_updates_accept_only_clash5_release_assets() -> Result<(), Box<dyn std::error::Error>> {
         let valid = candidate(
             "2.5.10",
             "https://github.com/oops11111/clash5/releases/download/v2.5.10/clash5_2.5.10_x64-setup.exe",
-        );
+        )?;
         assert!(is_official_stable_release(&valid));
 
         for (version, url) in [
@@ -785,7 +785,7 @@ mod release_source_tests {
                 "https://update.hwdns.net/https://github.com/oops11111/clash5/releases/download/v2.5.10/clash5_2.5.10_x64-setup.exe",
             ),
         ] {
-            assert!(!is_official_stable_release(&candidate(version, url)), "{url}");
+            assert!(!is_official_stable_release(&candidate(version, url)?), "{url}");
         }
 
         let mut missing_signature = valid.clone();
@@ -804,12 +804,12 @@ mod release_source_tests {
             "darwin-aarch64".to_string(),
             ReleaseManifestPlatform {
                 url: "https://github.com/other/repo/releases/download/v2.5.10/clash5_2.5.10_aarch64.app.tar.gz"
-                    .parse()
-                    .unwrap(),
+                    .parse()?,
                 signature: "signed-bundle".to_string(),
             },
         );
         mixed.data = RemoteReleaseInner::Static { platforms };
         assert!(!is_official_stable_release(&mixed));
+        Ok(())
     }
 }
