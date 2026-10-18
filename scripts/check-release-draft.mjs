@@ -104,6 +104,13 @@ for (const filename of readdirSync('.github/ISSUE_TEMPLATE')) {
   )
 }
 
+const updateViewer = readFileSync(
+  'src/components/setting/mods/update-viewer.tsx',
+  'utf8',
+)
+assert.doesNotMatch(updateViewer, /clash-verge-rev\/clash-verge-rev/i)
+assert.match(updateViewer, /github\.com\/oops11111\/clash5\/releases\/tag/)
+
 console.log(
   '[release-draft] tag builds can only upload clash5 candidate assets to a draft',
 )
