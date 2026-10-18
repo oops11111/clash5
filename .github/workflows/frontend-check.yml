@@ -44,6 +44,7 @@ jobs:
               - '.github/workflows/check-commit-needs-build.yml'
               - '.github/workflows/clean-old-assets.yml'
               - '.github/workflows/telegram-notify.yml'
+              - '.github/ISSUE_TEMPLATE/*.yml'
               - 'scripts/check-release-draft.mjs'
               - 'scripts/release-version.mjs'
               - 'src-tauri/webview2.*.json'

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 
 import { load } from 'js-yaml'
 
@@ -91,6 +91,16 @@ for (const configPath of [
     tauri.plugins.updater.endpoints,
     [],
     `${configPath}: unsigned updater feeds must remain disabled`,
+  )
+}
+
+for (const filename of readdirSync('.github/ISSUE_TEMPLATE')) {
+  if (!filename.endsWith('.yml')) continue
+  const templatePath = `.github/ISSUE_TEMPLATE/${filename}`
+  assert.doesNotMatch(
+    readFileSync(templatePath, 'utf8'),
+    /clash-verge-rev|Clash Verge Rev|AutoBuild|CVR Version/i,
+    `${templatePath}: issue guidance must point to clash5`,
   )
 }
 
