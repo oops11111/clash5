@@ -9,6 +9,7 @@ import {
   vergeFromWire,
   withoutNulls,
 } from '@/services/command-wire'
+import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
 import type {
   Binding as GeneratedBinding,
@@ -21,6 +22,8 @@ import type {
   NetworkInterfaceWire,
   NodeRecord,
   PendingIdentityRebind as GeneratedPendingIdentityRebind,
+  PluginAuditEvent as GeneratedPluginAuditEvent,
+  PluginEffectiveConfig as GeneratedPluginEffectiveConfig,
   ProxyViewV1_Serialize,
   RunStateView,
   RunningMode as GeneratedRunningMode,
@@ -34,6 +37,15 @@ import type {
   Clash5Chain,
   ExitIpResult,
 } from '@/types/clash5-chain'
+import type {
+  Clash5PluginBinding,
+  Clash5PluginBindingInput,
+  Clash5PluginBindingBatchInput,
+  Clash5PluginAuditEvent,
+  Clash5PluginEffectiveConfig,
+  Clash5PluginPackagePreview,
+  Clash5PluginSummary,
+} from '@/types/clash5-plugin'
 import type { ProxyViewV1 } from '@/types/proxy-view'
 import { debugLog } from '@/utils/debug'
 
@@ -71,6 +83,89 @@ export async function listClash5Nodes(includeInactive = false) {
     await invoke<NodeRecord[]>('clash5_list_nodes', { includeInactive })
   ).map(nodeFromWire)
 }
+
+function pluginRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  throw new Error('Invalid plugin data')
+}
+
+export const listClash5PluginBindings = () =>
+  invoke<Clash5PluginBinding[]>('clash5_list_plugin_bindings')
+export const listClash5PluginAuditEvents = async (
+  limit = 50,
+): Promise<Clash5PluginAuditEvent[]> =>
+  (
+    await invoke<GeneratedPluginAuditEvent[]>(
+      'clash5_list_plugin_audit_events',
+      { limit },
+    )
+  ).map((event) => ({ ...event, details: pluginRecord(event.details) }))
+export const getClash5PluginBindingConfig = (
+  target: Clash5PluginBinding['target'],
+  bindingId: string,
+) =>
+  invoke<unknown>('clash5_get_plugin_binding_config', {
+    target,
+    bindingId,
+  }).then(pluginRecord)
+export const saveClash5PluginBinding = (binding: Clash5PluginBindingInput) =>
+  mutate(() => invoke<null>('clash5_save_plugin_binding', { binding }), {
+    id: `clash5.plugin.binding.${JSON.stringify(binding.target)}`,
+  })
+export const saveClash5PluginBindings = (
+  bindings: Clash5PluginBindingBatchInput,
+) =>
+  mutate(() => invoke<null>('clash5_save_plugin_bindings', { bindings }), {
+    id: 'clash5.plugin.bindings.batch',
+  })
+export const deleteClash5PluginBinding = (
+  target: Clash5PluginBinding['target'],
+  bindingId: string,
+) =>
+  mutate(
+    () => invoke<null>('clash5_delete_plugin_binding', { target, bindingId }),
+    {
+      id: `clash5.plugin.binding.delete.${bindingId}`,
+    },
+  )
+export const setClash5PluginBindingEnabled = (
+  target: Clash5PluginBinding['target'],
+  bindingId: string,
+  enabled: boolean,
+) =>
+  mutate(
+    () =>
+      invoke<null>('clash5_set_plugin_binding_enabled', {
+        target,
+        bindingId,
+        enabled,
+      }),
+    { id: `clash5.plugin.binding.enabled.${bindingId}` },
+  )
+export const getClash5PluginEffectiveConfig =
+  async (): Promise<Clash5PluginEffectiveConfig> => {
+    const result = await invoke<GeneratedPluginEffectiveConfig>(
+      'clash5_get_plugin_effective_config',
+    )
+    return {
+      ...result,
+      config: result.config === null ? null : pluginRecord(result.config),
+    }
+  }
+export const listClash5Plugins = () =>
+  invoke<Clash5PluginSummary[]>('clash5_list_plugins')
+export const stageClash5PluginPackage = () =>
+  invoke<Clash5PluginPackagePreview | null>('clash5_stage_plugin_package')
+export const installStagedClash5Plugin = (
+  stagingId: string,
+  confirmedSigner: string,
+) =>
+  invoke<Clash5PluginSummary>('clash5_install_staged_plugin', {
+    stagingId,
+    confirmedSigner,
+  })
 
 export type Clash5PendingIdentityRebind = GeneratedPendingIdentityRebind
 export type Clash5Binding = GeneratedBinding

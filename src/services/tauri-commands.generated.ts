@@ -248,6 +248,74 @@ export const commands = {
     typedError<Binding[], CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_list_bindings', { source }),
     ),
+  clash5ListPluginBindings: () =>
+    typedError<PluginBindingSummary[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_plugin_bindings'),
+    ),
+  clash5GetPluginBindingConfig: (
+    target: PluginBindingTarget,
+    bindingId: string,
+  ) =>
+    typedError<unknown, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_get_plugin_binding_config', { target, bindingId }),
+    ),
+  clash5GetPluginEffectiveConfig: () =>
+    typedError<PluginEffectiveConfig, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_get_plugin_effective_config'),
+    ),
+  clash5SavePluginBinding: (binding: PluginBinding) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_save_plugin_binding', { binding }),
+    ),
+  clash5SavePluginBindings: (bindings: PluginBinding[]) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_save_plugin_bindings', { bindings }),
+    ),
+  clash5DeletePluginBinding: (target: PluginBindingTarget, bindingId: string) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_delete_plugin_binding', { target, bindingId }),
+    ),
+  clash5SetPluginBindingEnabled: (
+    target: PluginBindingTarget,
+    bindingId: string,
+    enabled: boolean,
+  ) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_set_plugin_binding_enabled', {
+        target,
+        bindingId,
+        enabled,
+      }),
+    ),
+  clash5StagePluginPackage: () =>
+    typedError<
+      {
+        staging_id: string
+        id: string
+        version: string
+        name: string
+        description: string
+        permissions: string[]
+        signer_fingerprint: string
+        signer: string
+      } | null,
+      CommandFailure_Serialize
+    >(__TAURI_INVOKE('clash5_stage_plugin_package')),
+  clash5InstallStagedPlugin: (stagingId: string, confirmedSigner: string) =>
+    typedError<PluginSummary, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_install_staged_plugin', {
+        stagingId,
+        confirmedSigner,
+      }),
+    ),
+  clash5ListPluginAuditEvents: (limit: number | null) =>
+    typedError<PluginAuditEvent[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_plugin_audit_events', { limit }),
+    ),
+  clash5ListPlugins: () =>
+    typedError<PluginSummary[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_plugins'),
+    ),
   clash5ListPendingIdentityRebinds: (
     source:
       | { kind: 'manual' }
@@ -582,6 +650,10 @@ export type CommandFailure_Serialize = {
   /**  Requested operation when known by the command. */
   operation?: FailedOperation | null
 }
+
+export type ConfigProvenance =
+  | { kind: 'profile' }
+  | { kind: 'plugin'; plugin_id: string; binding_id: string; priority: number }
 
 /**  Why the Core is not running, kept until a Core starts again. */
 export type CoreFailure =
@@ -987,6 +1059,75 @@ export type PendingIdentityRebind = {
   source: Source
   old_stable_id: string
   candidate_ids: string[]
+}
+
+export type PluginAuditEvent = {
+  id: number
+  event: string
+  created_at: string
+  details: unknown
+}
+
+export type PluginBinding = {
+  id: string
+  plugin_id: string
+  target: PluginBindingTarget
+  priority: number
+  enabled: boolean
+  config: unknown
+  orphan?: boolean
+  disappeared_at?: string | null
+}
+
+export type PluginBindingSummary = {
+  id: string
+  plugin_id: string
+  target: PluginBindingTarget
+  priority: number
+  enabled: boolean
+  orphan: boolean
+  disappeared_at: string | null
+}
+
+export type PluginBindingTarget =
+  | { kind: 'node'; source: Source; stable_id: string }
+  | { kind: 'chain'; chain_id: string }
+
+export type PluginConflict = {
+  path: string
+  winner_plugin_id: string
+  winner_binding_id: string
+  winner_priority: number
+  loser_plugin_id: string
+  loser_binding_id: string
+  loser_priority: number
+}
+
+export type PluginEffectiveConfig = {
+  config: unknown
+  provenance: { [key in string]: ConfigProvenance }
+  conflicts: PluginConflict[]
+}
+
+export type PluginPackagePreview = {
+  staging_id: string
+  id: string
+  version: string
+  name: string
+  description: string
+  permissions: string[]
+  signer_fingerprint: string
+  signer: string
+}
+
+export type PluginSummary = {
+  id: string
+  version: string
+  name: string
+  description: string
+  permissions: string[]
+  writable_paths: string[]
+  signer_fingerprint: string
 }
 
 export type PrfExtra = {

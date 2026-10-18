@@ -129,7 +129,7 @@ fn v1_database_migrates_without_discarding_nodes() {
     let version: i64 = migrated
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 4);
+    assert_eq!(version, 5);
     let columns: Vec<String> = migrated
         .prepare("PRAGMA table_info(nodes)")
         .unwrap()
@@ -215,7 +215,7 @@ fn orphan_retention_is_configurable_and_expired_cleanup_preserves_recent_binding
 }
 
 #[test]
-fn v2_identity_schema_migration_rolls_back_all_ddl_on_failure() {
+fn v2_plugin_migration_commits_before_identity_migration_rolls_back() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("rollback.sqlite");
     let db = rusqlite::Connection::open(&path).unwrap();
@@ -229,7 +229,7 @@ fn v2_identity_schema_migration_rolls_back_all_ddl_on_failure() {
     assert!(BindingStore::open(&path).is_err());
     let db = rusqlite::Connection::open(&path).unwrap();
     let version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
-    assert_eq!(version, 2);
+    assert_eq!(version, 3);
     let columns: Vec<String> = db
         .prepare("PRAGMA table_info(nodes)")
         .unwrap()
@@ -238,6 +238,14 @@ fn v2_identity_schema_migration_rolls_back_all_ddl_on_failure() {
         .collect::<Result<_, _>>()
         .unwrap();
     assert!(!columns.iter().any(|column| column == "stable_id_version"));
+    let plugin_table_exists: bool = db
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='plugin_bindings')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(plugin_table_exists);
     let id: String = db
         .query_row("SELECT stable_id FROM nodes", [], |row| row.get(0))
         .unwrap();

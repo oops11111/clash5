@@ -2,7 +2,11 @@ use crate::{DataError, IdentityKey, Node, ProxyChain, StableId, identity::text};
 use rusqlite::{Connection, DatabaseName, OptionalExtension, Transaction, backup::Progress, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::BTreeMap, path::Path, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+    time::Duration,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -36,6 +40,36 @@ pub struct Binding {
     pub orphan: bool,
     #[serde(default)]
     pub disappeared_at: Option<String>,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PluginBindingTarget {
+    Node { source: Source, stable_id: StableId },
+    Chain { chain_id: String },
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+pub struct PluginBinding {
+    pub id: String,
+    pub plugin_id: String,
+    pub target: PluginBindingTarget,
+    #[specta(type = specta_typescript::Number)]
+    pub priority: i64,
+    pub enabled: bool,
+    #[specta(type = specta_typescript::Unknown)]
+    pub config: Value,
+    #[serde(default)]
+    pub orphan: bool,
+    #[serde(default)]
+    pub disappeared_at: Option<String>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, specta::Type)]
+pub struct PluginAuditEvent {
+    #[specta(type = specta_typescript::Number)]
+    pub id: i64,
+    pub event: String,
+    pub created_at: String,
+    #[specta(type = specta_typescript::Unknown)]
+    pub details: Value,
 }
 #[derive(Default, Debug, PartialEq, Eq, Serialize)]
 pub struct ProviderDiff {
@@ -163,6 +197,7 @@ fn write_node(
     let (kind, provider) = source.scope()?;
     tx.execute("INSERT INTO nodes(source_kind,provider_id,stable_id,display_name,active,kind,server,port,duplicate_count,stable_id_version,key_generation,transport,sni,identity_context_known) VALUES(?1,?2,?3,?4,1,?5,?6,?7,?8,?9,?10,?11,?12,1) ON CONFLICT(source_kind,provider_id,stable_id) DO UPDATE SET display_name=excluded.display_name,active=1,kind=excluded.kind,server=excluded.server,port=excluded.port,duplicate_count=excluded.duplicate_count,stable_id_version=excluded.stable_id_version,key_generation=excluded.key_generation,transport=excluded.transport,sni=excluded.sni,identity_context_known=1",params![kind,provider,id,node.display_name,node.kind,node.server,node.port,duplicate_count,if id.starts_with("v2:") {2} else {1},identity_generation,node.transport,node.sni])?;
     tx.execute("UPDATE bindings SET orphan=0,disappeared_at=NULL WHERE source_kind=?1 AND provider_id=?2 AND target_id=?3 AND orphan=1",params![kind,provider,id])?;
+    tx.execute("UPDATE plugin_bindings SET orphan=0,disappeared_at=NULL WHERE target_type='node' AND source_kind=?1 AND provider_id=?2 AND target_id=?3 AND orphan=1",params![kind,provider,id])?;
     Ok(())
 }
 
@@ -672,9 +707,10 @@ impl BindingStore {
         db.pragma_update(None, "foreign_keys", true)?;
         db.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if !(0..=4).contains(&version) {
+        if !(0..=5).contains(&version) {
             return Err(DataError::SchemaVersion);
         }
+        let mut version = version;
         if version == 0 {
             let tx = db.transaction()?;
             tx.execute_batch(
@@ -702,6 +738,20 @@ CREATE TABLE bindings (
  FOREIGN KEY(source_kind,provider_id,target_id) REFERENCES nodes(source_kind,provider_id,stable_id)
 ) STRICT;
 CREATE INDEX bindings_target ON bindings(source_kind,provider_id,target_id);
+CREATE TABLE plugin_bindings(
+ target_type TEXT NOT NULL CHECK(target_type IN ('node','chain')),
+ source_kind TEXT NOT NULL CHECK(source_kind IN ('manual','subscription','profile')),
+ provider_id TEXT NOT NULL, target_id TEXT NOT NULL, binding_id TEXT NOT NULL,
+ plugin_id TEXT NOT NULL, priority INTEGER NOT NULL,
+ enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
+ config TEXT NOT NULL CHECK(json_valid(config)),
+ orphan INTEGER NOT NULL CHECK(orphan IN (0,1)), disappeared_at TEXT,
+ CHECK((orphan=0 AND disappeared_at IS NULL) OR (orphan=1 AND disappeared_at IS NOT NULL)),
+ CHECK((target_type='node' AND source_kind IN ('manual','subscription')) OR (target_type='chain' AND source_kind='profile')),
+ CHECK((source_kind='manual' AND provider_id='') OR (source_kind='subscription' AND length(provider_id)>0) OR source_kind='profile'),
+ PRIMARY KEY(target_type,source_kind,provider_id,target_id,binding_id)
+) STRICT;
+CREATE INDEX plugin_bindings_target ON plugin_bindings(target_type,source_kind,provider_id,target_id,enabled,orphan);
 CREATE TABLE chains(id TEXT PRIMARY KEY, definition TEXT NOT NULL CHECK(json_valid(definition))) STRICT;
 CREATE TABLE quality_cache(
  source_kind TEXT NOT NULL, provider_id TEXT NOT NULL, stable_id TEXT NOT NULL,
@@ -723,10 +773,11 @@ CREATE TABLE pending_identity_rebinds (
  created_at TEXT NOT NULL DEFAULT(strftime('%Y-%m-%dT%H:%M:%fZ','now')),
  PRIMARY KEY(source_kind,provider_id,old_stable_id)
 ) STRICT;
-PRAGMA user_version=3;
+PRAGMA user_version=4;
 "#,
             )?;
             tx.commit()?;
+            version = 4;
         } else if version == 1 {
             let tx = db.transaction()?;
             tx.execute_batch(
@@ -737,8 +788,32 @@ PRAGMA user_version=3;
                  PRAGMA user_version=2;",
             )?;
             tx.commit()?;
+            version = 2;
         }
-        if version > 0 && version < 3 {
+        if version == 2 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE plugin_bindings(
+ target_type TEXT NOT NULL CHECK(target_type IN ('node','chain')),
+ source_kind TEXT NOT NULL CHECK(source_kind IN ('manual','subscription','profile')),
+ provider_id TEXT NOT NULL, target_id TEXT NOT NULL, binding_id TEXT NOT NULL,
+ plugin_id TEXT NOT NULL, priority INTEGER NOT NULL,
+ enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
+ config TEXT NOT NULL CHECK(json_valid(config)),
+ orphan INTEGER NOT NULL CHECK(orphan IN (0,1)), disappeared_at TEXT,
+ CHECK((orphan=0 AND disappeared_at IS NULL) OR (orphan=1 AND disappeared_at IS NOT NULL)),
+ CHECK((target_type='node' AND source_kind IN ('manual','subscription')) OR (target_type='chain' AND source_kind='profile')),
+ CHECK((source_kind='manual' AND provider_id='') OR (source_kind='subscription' AND length(provider_id)>0) OR source_kind='profile'),
+ PRIMARY KEY(target_type,source_kind,provider_id,target_id,binding_id)
+) STRICT;
+CREATE INDEX plugin_bindings_target ON plugin_bindings(target_type,source_kind,provider_id,target_id,enabled,orphan);
+PRAGMA user_version=3;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version > 0 && version < 4 {
             let tx = db.transaction()?;
             tx.execute_batch(
                 r#"
@@ -762,17 +837,33 @@ CREATE TABLE pending_identity_rebinds (
  created_at TEXT NOT NULL DEFAULT(strftime('%Y-%m-%dT%H:%M:%fZ','now')),
  PRIMARY KEY(source_kind,provider_id,old_stable_id)
 ) STRICT;
-PRAGMA user_version=3;
+PRAGMA user_version=4;
 "#,
             )?;
             tx.commit()?;
         }
-        if version < 4 {
+        if version < 5 {
             let tx = db.transaction()?;
             tx.execute_batch(
-                "CREATE TABLE app_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL) STRICT;\
-                 INSERT INTO app_settings(setting_key,setting_value) VALUES('orphan_retention_days','30');\
-                 PRAGMA user_version=4;",
+                r#"
+CREATE TABLE IF NOT EXISTS app_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL) STRICT;
+INSERT OR IGNORE INTO app_settings(setting_key,setting_value) VALUES('orphan_retention_days','30');
+CREATE TABLE IF NOT EXISTS plugin_bindings(
+ target_type TEXT NOT NULL CHECK(target_type IN ('node','chain')),
+ source_kind TEXT NOT NULL CHECK(source_kind IN ('manual','subscription','profile')),
+ provider_id TEXT NOT NULL, target_id TEXT NOT NULL, binding_id TEXT NOT NULL,
+ plugin_id TEXT NOT NULL, priority INTEGER NOT NULL,
+ enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
+ config TEXT NOT NULL CHECK(json_valid(config)),
+ orphan INTEGER NOT NULL CHECK(orphan IN (0,1)), disappeared_at TEXT,
+ CHECK((orphan=0 AND disappeared_at IS NULL) OR (orphan=1 AND disappeared_at IS NOT NULL)),
+ CHECK((target_type='node' AND source_kind IN ('manual','subscription')) OR (target_type='chain' AND source_kind='profile')),
+ CHECK((source_kind='manual' AND provider_id='') OR (source_kind='subscription' AND length(provider_id)>0) OR source_kind='profile'),
+ PRIMARY KEY(target_type,source_kind,provider_id,target_id,binding_id)
+) STRICT;
+CREATE INDEX IF NOT EXISTS plugin_bindings_target ON plugin_bindings(target_type,source_kind,provider_id,target_id,enabled,orphan);
+PRAGMA user_version=5;
+"#,
             )?;
             tx.commit()?;
         }
@@ -898,6 +989,7 @@ PRAGMA user_version=3;
                     params![provider_id, id],
                 )?;
                 tx.execute("UPDATE bindings SET orphan=1,disappeared_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE source_kind='subscription' AND provider_id=?1 AND target_id=?2 AND orphan=0",params![provider_id,id])?;
+                tx.execute("UPDATE plugin_bindings SET orphan=1,disappeared_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE target_type='node' AND source_kind='subscription' AND provider_id=?1 AND target_id=?2 AND orphan=0",params![provider_id,id])?;
             }
         }
         audit(
@@ -931,6 +1023,177 @@ PRAGMA user_version=3;
         audit(&tx, "binding.upsert", serde_json::json!({"bindings":1}))?;
         tx.commit()?;
         Ok(())
+    }
+    pub fn upsert_plugin_binding(&mut self, binding: &PluginBinding) -> Result<(), DataError> {
+        self.upsert_plugin_bindings(std::slice::from_ref(binding))
+    }
+    pub fn upsert_plugin_bindings(&mut self, bindings: &[PluginBinding]) -> Result<(), DataError> {
+        if bindings.is_empty() || bindings.len() > 32 {
+            return Err(DataError::InvalidInput);
+        }
+        let tx = self.db.transaction()?;
+        let mut keys = BTreeSet::new();
+        for binding in bindings {
+            text(&binding.id)?;
+            text(&binding.plugin_id)?;
+            if !binding.config.is_object() {
+                return Err(DataError::InvalidInput);
+            }
+            let (target_type, source_kind, provider_id, target_id) = match &binding.target {
+                PluginBindingTarget::Node { source, stable_id } => {
+                    text(stable_id)?;
+                    let (source_kind, provider_id) = source.scope()?;
+                    let active: Option<bool> = tx
+                        .query_row(
+                            "SELECT active FROM nodes WHERE source_kind=?1 AND provider_id=?2 AND stable_id=?3",
+                            params![source_kind, provider_id, stable_id],
+                            |row| row.get(0),
+                        )
+                        .optional()?;
+                    if active != Some(true) {
+                        return Err(DataError::NotFound);
+                    }
+                    ("node", source_kind, provider_id.to_owned(), stable_id.as_str())
+                }
+                PluginBindingTarget::Chain { chain_id } => {
+                    text(chain_id)?;
+                    let raw: Option<String> = tx
+                        .query_row("SELECT definition FROM chains WHERE id=?1", [chain_id], |row| {
+                            row.get(0)
+                        })
+                        .optional()?;
+                    let raw = raw.ok_or(DataError::NotFound)?;
+                    let chain: ProxyChain = serde_json::from_str(&raw).map_err(|_| DataError::Database)?;
+                    chain.validate()?;
+                    (
+                        "chain",
+                        "profile",
+                        chain.profile_id.unwrap_or_default(),
+                        chain_id.as_str(),
+                    )
+                }
+            };
+            if !keys.insert((
+                target_type,
+                source_kind,
+                provider_id.clone(),
+                target_id.to_owned(),
+                binding.id.clone(),
+            )) {
+                return Err(DataError::InvalidInput);
+            }
+            tx.execute(
+                "INSERT INTO plugin_bindings(target_type,source_kind,provider_id,target_id,binding_id,plugin_id,priority,enabled,config,orphan,disappeared_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,0,NULL) ON CONFLICT(target_type,source_kind,provider_id,target_id,binding_id) DO UPDATE SET plugin_id=excluded.plugin_id,priority=excluded.priority,enabled=excluded.enabled,config=excluded.config,orphan=0,disappeared_at=NULL",
+                params![target_type, source_kind, provider_id, target_id, binding.id, binding.plugin_id, binding.priority, binding.enabled, binding.config.to_string()],
+            )?;
+        }
+        audit(
+            &tx,
+            "plugin_binding.upsert",
+            serde_json::json!({"bindings":bindings.len()}),
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+    pub fn delete_plugin_binding(&mut self, target: &PluginBindingTarget, binding_id: &str) -> Result<(), DataError> {
+        self.delete_plugin_bindings(&[(target.clone(), binding_id.to_owned())])?;
+        Ok(())
+    }
+    pub fn delete_plugin_bindings(&mut self, bindings: &[(PluginBindingTarget, String)]) -> Result<usize, DataError> {
+        let tx = self.db.transaction()?;
+        let mut changed = 0;
+        for (target, binding_id) in bindings {
+            text(binding_id)?;
+            changed += match target {
+                PluginBindingTarget::Node { source, stable_id } => {
+                    let (source_kind, provider_id) = source.scope()?;
+                    tx.execute(
+                        "DELETE FROM plugin_bindings WHERE target_type='node' AND source_kind=?1 AND provider_id=?2 AND target_id=?3 AND binding_id=?4",
+                        params![source_kind, provider_id, stable_id, binding_id],
+                    )?
+                }
+                PluginBindingTarget::Chain { chain_id } => tx.execute(
+                    "DELETE FROM plugin_bindings WHERE target_type='chain' AND target_id=?1 AND binding_id=?2",
+                    params![chain_id, binding_id],
+                )?,
+            };
+        }
+        if changed > 0 {
+            audit(&tx, "plugin_binding.delete", serde_json::json!({"bindings":changed}))?;
+        }
+        tx.commit()?;
+        Ok(changed)
+    }
+    pub fn plugin_bindings(&self, target: Option<&PluginBindingTarget>) -> Result<Vec<PluginBinding>, DataError> {
+        let scope = target
+            .map(|target| -> Result<(&str, String, Option<String>, String), DataError> {
+                match target {
+                    PluginBindingTarget::Node { source, stable_id } => {
+                        let (source_kind, provider_id) = source.scope()?;
+                        Ok((
+                            "node",
+                            source_kind.to_owned(),
+                            Some(provider_id.to_owned()),
+                            stable_id.clone(),
+                        ))
+                    }
+                    PluginBindingTarget::Chain { chain_id } => {
+                        text(chain_id)?;
+                        let raw: Option<String> = self
+                            .db
+                            .query_row("SELECT definition FROM chains WHERE id=?1", [chain_id], |row| {
+                                row.get(0)
+                            })
+                            .optional()?;
+                        let provider_id = raw
+                            .map(|raw| -> Result<String, DataError> {
+                                let chain: ProxyChain = serde_json::from_str(&raw).map_err(|_| DataError::Database)?;
+                                chain.validate()?;
+                                Ok(chain.profile_id.unwrap_or_default())
+                            })
+                            .transpose()?;
+                        Ok(("chain", "profile".into(), provider_id, chain_id.clone()))
+                    }
+                }
+            })
+            .transpose()?;
+        let (target_type, source_kind, provider_id, target_id) =
+            scope.as_ref().map_or(("", "", None, ""), |(a, b, c, d)| {
+                (*a, b.as_str(), c.as_deref(), d.as_str())
+            });
+        let mut statement = self.db.prepare("SELECT target_type,source_kind,provider_id,target_id,binding_id,plugin_id,priority,enabled,config,orphan,disappeared_at FROM plugin_bindings WHERE (?1='' OR (target_type=?1 AND source_kind=?2 AND (?3 IS NULL OR provider_id=?3) AND target_id=?4)) ORDER BY source_kind,provider_id,target_type,target_id,binding_id")?;
+        let rows = statement.query_map(params![target_type, source_kind, provider_id, target_id], |row| {
+            let target_type: String = row.get(0)?;
+            let source_kind: String = row.get(1)?;
+            let provider_id: String = row.get(2)?;
+            let target_id: String = row.get(3)?;
+            let config: String = row.get(8)?;
+            let target = if target_type == "node" {
+                PluginBindingTarget::Node {
+                    source: if source_kind == "manual" {
+                        Source::Manual
+                    } else {
+                        Source::Subscription { provider_id }
+                    },
+                    stable_id: target_id,
+                }
+            } else {
+                PluginBindingTarget::Chain { chain_id: target_id }
+            };
+            Ok(PluginBinding {
+                target,
+                id: row.get(4)?,
+                plugin_id: row.get(5)?,
+                priority: row.get(6)?,
+                enabled: row.get(7)?,
+                config: serde_json::from_str(&config).map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(8, rusqlite::types::Type::Text, Box::new(error))
+                })?,
+                orphan: row.get(9)?,
+                disappeared_at: row.get(10)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
     pub fn bindings(&self, source: Option<&Source>) -> Result<Vec<Binding>, DataError> {
         let scope = source.map(Source::scope).transpose()?;
@@ -1021,6 +1284,65 @@ PRAGMA user_version=3;
             .filter(|b| b.target_id == id && b.enabled && !b.orphan)
             .collect())
     }
+    pub fn effective_plugin_bindings(&self, target: &PluginBindingTarget) -> Result<Vec<PluginBinding>, DataError> {
+        Ok(self
+            .plugin_bindings(Some(target))?
+            .into_iter()
+            .filter(|binding| binding.enabled && !binding.orphan)
+            .collect())
+    }
+    pub fn record_plugin_audit(&mut self, event: &str, details: &Value) -> Result<(), DataError> {
+        if !matches!(
+            event,
+            "plugin.install" | "plugin.permission.use" | "plugin.execute" | "plugin.failure"
+        ) || !details.is_object()
+        {
+            return Err(DataError::InvalidInput);
+        }
+        let tx = self.db.transaction()?;
+        audit(&tx, event, details.clone())?;
+        tx.commit()?;
+        Ok(())
+    }
+    pub fn record_plugin_audit_batch(&mut self, events: &[(String, Value)]) -> Result<(), DataError> {
+        if events.is_empty() || events.len() > 32 {
+            return Err(DataError::InvalidInput);
+        }
+        if events.iter().any(|(event, details)| {
+            !matches!(
+                event.as_str(),
+                "plugin.install" | "plugin.permission.use" | "plugin.execute" | "plugin.failure"
+            ) || !details.is_object()
+        }) {
+            return Err(DataError::InvalidInput);
+        }
+        let tx = self.db.transaction()?;
+        for (event, details) in events {
+            audit(&tx, event, details.clone())?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+    pub fn plugin_audit_events(&self, limit: usize) -> Result<Vec<PluginAuditEvent>, DataError> {
+        if !(1..=200).contains(&limit) {
+            return Err(DataError::InvalidInput);
+        }
+        let mut statement = self.db.prepare(
+            "SELECT id,event,created_at,counts FROM audit_log WHERE event LIKE 'plugin.%' ORDER BY id DESC LIMIT ?1",
+        )?;
+        let rows = statement.query_map([limit as i64], |row| {
+            let details: String = row.get(3)?;
+            Ok(PluginAuditEvent {
+                id: row.get(0)?,
+                event: row.get(1)?,
+                created_at: row.get(2)?,
+                details: serde_json::from_str(&details).map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(error))
+                })?,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
     pub fn purge_orphans(&mut self, source: Option<&Source>) -> Result<usize, DataError> {
         self.ensure_writable()?;
         let (kind, provider) = source.map(Source::scope).transpose()?.unwrap_or(("", ""));
@@ -1029,9 +1351,19 @@ PRAGMA user_version=3;
             "DELETE FROM bindings WHERE orphan=1 AND (?1='' OR (source_kind=?1 AND provider_id=?2))",
             params![kind, provider],
         )?;
-        audit(&tx, "orphan.purge", serde_json::json!({"bindings":count}))?;
+        let plugin_count = tx.execute(
+            "DELETE FROM plugin_bindings WHERE orphan=1 AND target_type='node' AND (?1='' OR (source_kind=?1 AND provider_id=?2))",
+            params![kind, provider],
+        )?;
+        let chain_count = if kind.is_empty() {
+            tx.execute("DELETE FROM plugin_bindings WHERE orphan=1 AND target_type='chain'", [])?
+        } else {
+            0
+        };
+        let total = count + plugin_count + chain_count;
+        audit(&tx, "orphan.purge", serde_json::json!({"bindings":total}))?;
         tx.commit()?;
-        Ok(count)
+        Ok(total)
     }
     pub fn orphan_retention_days(&self) -> Result<u16, DataError> {
         let value: String = self.db.query_row(
@@ -1164,10 +1496,19 @@ PRAGMA user_version=3;
     /// Save a validated M2 definition without storing proxy credentials.
     pub fn save_proxy_chain(&mut self, chain: &ProxyChain) -> Result<(), DataError> {
         chain.validate()?;
-        self.save_chain(
-            &chain.id,
-            &serde_json::to_value(chain).map_err(|_| DataError::InvalidInput)?,
-        )
+        let definition = serde_json::to_value(chain).map_err(|_| DataError::InvalidInput)?;
+        let tx = self.db.transaction()?;
+        tx.execute(
+            "INSERT INTO chains VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET definition=excluded.definition",
+            params![chain.id, definition.to_string()],
+        )?;
+        tx.execute(
+            "UPDATE plugin_bindings SET provider_id=?1,orphan=0,disappeared_at=NULL WHERE target_type='chain' AND target_id=?2",
+            params![chain.profile_id.as_deref().unwrap_or_default(), chain.id],
+        )?;
+        audit(&tx, "chain.upsert", serde_json::json!({"chains":1}))?;
+        tx.commit()?;
+        Ok(())
     }
     /// Return versioned M2 definitions; legacy opaque M0 records remain available through `chain`.
     pub fn proxy_chains(&self) -> Result<Vec<ProxyChain>, DataError> {
@@ -1189,6 +1530,7 @@ PRAGMA user_version=3;
         if deleted == 0 {
             return Err(DataError::NotFound);
         }
+        tx.execute("UPDATE plugin_bindings SET orphan=1,disappeared_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE target_type='chain' AND target_id=?1 AND orphan=0", [id])?;
         audit(&tx, "chain.delete", serde_json::json!({"chains":deleted}))?;
         tx.commit()?;
         Ok(())

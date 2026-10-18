@@ -26,4 +26,3 @@ remains the recovery copy.
 The IPC failure family is `C5-IMPORT-001` through `C5-IMPORT-007`: directory
 separation/inspection, source parsing, manifest verification, concurrent
 source changes, target write failure, and post-import source preservation.
-

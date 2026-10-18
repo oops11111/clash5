@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { once } from 'node:events'
-import { mkdir } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 import {
@@ -9,6 +10,7 @@ import {
   createTauriCapabilities,
   startWdioSession,
 } from '@wdio/tauri-service'
+import AdmZip from 'adm-zip'
 import { dump, load } from 'js-yaml'
 
 import { startChainFixture } from './m2-mihomo-smoke.mjs'
@@ -33,6 +35,10 @@ const capabilities = createTauriCapabilities(resolve(binary), {
 let browser
 let originalClipboard
 let testError
+let m3AppDirectory
+let m3StagingPath
+let m3FixtureInstalled = false
+let m3BindingIds = []
 const screenshot = resolve(
   persisted
     ? 'target/m1-desktop-persisted.png'
@@ -755,7 +761,307 @@ async function capture() {
   await browser.saveScreenshot(screenshot)
 }
 
-async function verifyNavigation() {
+async function prepareM3PluginFixture() {
+  if (
+    (await invoke('clash5_list_plugins')).some(
+      (plugin) => plugin.id === 'm3.smoke.plugin',
+    )
+  ) {
+    throw new Error(
+      'Refusing to replace a pre-existing m3.smoke.plugin installation',
+    )
+  }
+  const fixturePath = resolve('scripts/fixtures/m3-acceptance-plugin.c5p')
+  const packageArchive = new AdmZip(await readFile(fixturePath))
+  const signer = packageArchive.readAsText('signer.pub').trim()
+  m3AppDirectory = await invoke('get_app_dir')
+  const stagingId = randomBytes(16).toString('base64url').slice(0, 21)
+  const stagingDirectory = join(m3AppDirectory, 'plugins', '.staging')
+  await mkdir(stagingDirectory, { recursive: true })
+  m3StagingPath = join(stagingDirectory, `${stagingId}.c5p`)
+  await writeFile(m3StagingPath, await readFile(fixturePath))
+  const installed = await invoke('clash5_install_staged_plugin', {
+    stagingId,
+    confirmedSigner: signer,
+  })
+  if (installed.id !== 'm3.smoke.plugin')
+    throw new Error(
+      `Unexpected M3 fixture plugin: ${JSON.stringify(installed)}`,
+    )
+  m3FixtureInstalled = true
+
+  const node = (
+    await invoke('clash5_list_nodes', { includeInactive: true })
+  ).find((item) => item.active && item.source.kind === 'manual')
+  if (!node)
+    throw new Error('M3 desktop test requires an active stored manual node')
+
+  const suffix = randomBytes(8).toString('hex')
+  const target = {
+    kind: 'node',
+    source: node.source,
+    stable_id: node.stable_id,
+  }
+  m3BindingIds = [`m3-smoke-${suffix}-high`, `m3-smoke-${suffix}-low`]
+  await invoke('clash5_save_plugin_binding', {
+    binding: {
+      id: m3BindingIds[0],
+      plugin_id: installed.id,
+      target,
+      priority: 80,
+      enabled: true,
+      config: { acceptance: true },
+    },
+  })
+  await invoke('clash5_save_plugin_binding', {
+    binding: {
+      id: m3BindingIds[1],
+      plugin_id: installed.id,
+      target,
+      priority: 20,
+      enabled: true,
+      config: { acceptance: true },
+    },
+  })
+
+  const effective = await invoke('clash5_get_plugin_effective_config')
+  const source = effective.provenance['/tun/mtu']
+  if (
+    effective.config?.tun?.mtu !== 1360 ||
+    source?.kind !== 'plugin' ||
+    source.plugin_id !== installed.id ||
+    source.binding_id !== m3BindingIds[0] ||
+    !effective.conflicts.some(
+      (conflict) =>
+        conflict.path === '/tun/mtu' &&
+        conflict.winner_binding_id === m3BindingIds[0] &&
+        conflict.loser_binding_id === m3BindingIds[1],
+    )
+  ) {
+    throw new Error(
+      `M3 plugin merge or provenance failed: ${JSON.stringify(effective)}`,
+    )
+  }
+  const audit = await invoke('clash5_list_plugin_audit_events', { limit: 50 })
+  if (
+    !audit.some((event) => event.event === 'plugin.install') ||
+    !audit.some((event) => event.event === 'plugin.permission.use') ||
+    !audit.some(
+      (event) =>
+        event.event === 'plugin.execute' &&
+        event.details.plugin_id === installed.id,
+    )
+  ) {
+    throw new Error(
+      `M3 plugin audit events are incomplete: ${JSON.stringify(audit)}`,
+    )
+  }
+}
+
+async function clickBindingAction(bindingId, labels) {
+  const priority = bindingId.endsWith('-high') ? '80' : '20'
+  const priorityLabels = [
+    `Priority ${priority}`,
+    `优先级 ${priority}`,
+    `優先級 ${priority}`,
+  ]
+  const findEnabledBindingAction = ({
+    buttonLabels,
+    bindingPriorityLabels,
+  }) => {
+    const cards = [...document.querySelectorAll('.base-page .MuiPaper-root')]
+      .filter(
+        (card) =>
+          card.textContent?.includes('m3.smoke.plugin') &&
+          [...card.querySelectorAll('.MuiChip-root')].some((chip) =>
+            bindingPriorityLabels.includes(chip.textContent?.trim()),
+          ) &&
+          [...card.querySelectorAll('button')].some((button) =>
+            buttonLabels.includes(button.textContent?.trim()),
+          ),
+      )
+      .sort((left, right) => left.textContent.length - right.textContent.length)
+    const button = [...(cards[0]?.querySelectorAll('button') ?? [])].find(
+      (item) =>
+        buttonLabels.includes(item.textContent?.trim()) && !item.disabled,
+    )
+    return Boolean(button)
+  }
+  const args = { bindingPriorityLabels: priorityLabels, buttonLabels: labels }
+  await browser.waitUntil(
+    () => browser.execute(findEnabledBindingAction, args).then(Boolean),
+    {
+      timeout: 10_000,
+      interval: 100,
+      timeoutMsg: `${labels[0]} did not become enabled for ${bindingId}`,
+    },
+  )
+  const clicked = await browser.execute(
+    ({ buttonLabels, bindingPriorityLabels }) => {
+      const cards = [...document.querySelectorAll('.base-page .MuiPaper-root')]
+        .filter(
+          (card) =>
+            card.textContent?.includes('m3.smoke.plugin') &&
+            [...card.querySelectorAll('.MuiChip-root')].some((chip) =>
+              bindingPriorityLabels.includes(chip.textContent?.trim()),
+            ),
+        )
+        .sort(
+          (left, right) => left.textContent.length - right.textContent.length,
+        )
+      const button = [...(cards[0]?.querySelectorAll('button') ?? [])].find(
+        (item) =>
+          buttonLabels.includes(item.textContent?.trim()) && !item.disabled,
+      )
+      button?.click()
+      return Boolean(button)
+    },
+    args,
+  )
+  if (!clicked) throw new Error(`Could not find ${labels[0]} for ${bindingId}`)
+}
+
+async function verifyM3PluginUi() {
+  await browser.waitUntil(
+    () =>
+      browser.execute(() => {
+        const text = document.querySelector('.base-page')?.textContent ?? ''
+        const priorities = [
+          ...document.querySelectorAll('.base-page .MuiChip-root'),
+        ].map((chip) => chip.textContent?.trim())
+        return (
+          text.includes('m3.smoke.plugin') &&
+          text.includes('/tun/mtu') &&
+          text.includes('1360') &&
+          ['Priority 80', '优先级 80', '優先級 80'].some((label) =>
+            priorities.includes(label),
+          ) &&
+          ['Priority 20', '优先级 20', '優先級 20'].some((label) =>
+            priorities.includes(label),
+          )
+        )
+      }),
+    {
+      timeout: 30_000,
+      interval: 250,
+      timeoutMsg: 'Stored M3 plugin bindings did not render',
+    },
+  )
+  const pageText = await browser.execute(
+    () => document.querySelector('.base-page')?.textContent ?? '',
+  )
+  if (
+    !pageText.includes('m3.smoke.plugin') ||
+    !pageText.includes('/tun/mtu') ||
+    !pageText.includes('1360')
+  ) {
+    throw new Error(
+      `Plugins page did not render the stored plugin state: ${pageText}`,
+    )
+  }
+  await browser.saveScreenshot(resolve('target/m3-desktop-plugin-binding.png'))
+
+  await browser.execute(() => {
+    const settings = [
+      ...document.querySelectorAll('.base-page [role="tab"]'),
+    ].find((tab) =>
+      ['Settings', '设置', '設定'].includes(tab.textContent?.trim()),
+    )
+    settings?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(() => {
+        const text = document.querySelector('.base-page')?.textContent ?? ''
+        return ['Recent plugin activity', '近期插件活动', '近期外掛活動'].some(
+          (title) => text.includes(title),
+        )
+      }),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Plugin audit panel did not render',
+    },
+  )
+  const settingsText = await browser.execute(
+    () => document.querySelector('.base-page')?.textContent ?? '',
+  )
+  if (!settingsText.includes('m3.smoke.plugin'))
+    throw new Error(`Plugin audit activity did not render: ${settingsText}`)
+
+  await browser.execute(() => {
+    const binding = [
+      ...document.querySelectorAll('.base-page [role="tab"]'),
+    ].find((tab) =>
+      ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+    )
+    binding?.click()
+  })
+  await clickBindingAction(m3BindingIds[1], ['Disable', '停用'])
+  await browser.waitUntil(
+    async () =>
+      (await invoke('clash5_list_plugin_bindings')).find(
+        (item) => item.id === m3BindingIds[1],
+      )?.enabled === false,
+    {
+      timeout: 20_000,
+      interval: 250,
+      timeoutMsg: 'Plugin binding did not disable from the UI',
+    },
+  )
+  await clickBindingAction(m3BindingIds[0], ['Remove', '移除'])
+  await browser.waitUntil(
+    async () =>
+      !(await invoke('clash5_list_plugin_bindings')).some(
+        (item) => item.id === m3BindingIds[0],
+      ),
+    {
+      timeout: 20_000,
+      interval: 250,
+      timeoutMsg: 'Plugin binding did not remove from the UI',
+    },
+  )
+  await clickBindingAction(m3BindingIds[1], ['Remove', '移除'])
+  await browser.waitUntil(
+    async () =>
+      !(await invoke('clash5_list_plugin_bindings')).some((item) =>
+        m3BindingIds.includes(item.id),
+      ),
+    {
+      timeout: 20_000,
+      interval: 250,
+      timeoutMsg: 'Disabled plugin binding did not remove from the UI',
+    },
+  )
+  process.stdout.write(
+    'M3 signed plugin install, SQLite bindings, deterministic merge, provenance, audit, UI disable/remove passed\n',
+  )
+}
+
+async function cleanupM3PluginFixture() {
+  if (!m3AppDirectory) return
+  if (browser && m3BindingIds.length) {
+    const remaining = await invoke('clash5_list_plugin_bindings').catch(
+      () => [],
+    )
+    for (const binding of remaining.filter((item) =>
+      m3BindingIds.includes(item.id),
+    )) {
+      await invoke('clash5_delete_plugin_binding', {
+        target: binding.target,
+        bindingId: binding.id,
+      }).catch(() => {})
+    }
+  }
+  if (m3StagingPath) await rm(m3StagingPath, { force: true }).catch(() => {})
+  if (m3FixtureInstalled) {
+    const pluginDirectory = join(m3AppDirectory, 'plugins', 'm3.smoke.plugin')
+    await rm(pluginDirectory, { recursive: true, force: true })
+  }
+}
+
+async function verifyNavigation({ includePluginFixture = true } = {}) {
+  if (includePluginFixture) await prepareM3PluginFixture()
   const sidebar = await browser.execute(() => {
     const menu = document.querySelector('.the-menu')
     const items = [...menu.querySelectorAll('.MuiListItemButton-root')]
@@ -815,6 +1121,22 @@ async function verifyNavigation() {
       timeoutMsg: 'Plugin binding tab did not render',
     },
   )
+  if (includePluginFixture) {
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            document
+              .querySelector('.base-page')
+              ?.textContent?.includes('M3 Acceptance Plugin') ?? false,
+        ),
+      {
+        timeout: 20_000,
+        interval: 250,
+        timeoutMsg: 'The signed M3 plugin was not listed in the installed page',
+      },
+    )
+  }
   await browser.execute(() => {
     const binding = [
       ...document.querySelectorAll('.base-page [role="tab"]'),
@@ -861,6 +1183,7 @@ async function verifyNavigation() {
     throw new Error('Orphan retention summary did not render')
   }
   await browser.saveScreenshot(resolve('target/nav-plugins-binding.png'))
+  if (includePluginFixture) await verifyM3PluginUi()
 }
 
 async function verifyIdentityRotationAndAmbiguousRebind() {
@@ -1671,7 +1994,7 @@ try {
     await verifySubscriptionRefresh()
     await verifyWorkspaceControls()
   } else if (recoveryCancel) {
-    await verifyNavigation()
+    await verifyNavigation({ includePluginFixture: false })
     await verifyRecoveryResetCancellation()
   } else if (persisted) {
     phase = 'manual node persistence'
@@ -1767,6 +2090,9 @@ try {
   throw error
 } finally {
   phase = 'WebDriver cleanup'
+  await cleanupM3PluginFixture().catch((error) => {
+    process.stderr.write(`M3 fixture cleanup failed: ${String(error)}\n`)
+  })
   if (browser && typeof originalClipboard === 'string') {
     await invoke('plugin:clipboard-manager|write_text', {
       text: originalClipboard,

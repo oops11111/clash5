@@ -1,10 +1,12 @@
 use super::{CmdResult, coded_error, wire::JsonValue};
 use clash5_data::{
-    Binding, DataError, Node, NodeQuality, NodeRecord, PendingIdentityRebind, QualityStatus, Source, parse_inline_nodes,
+    Binding, DataError, Node, NodeQuality, NodeRecord, PendingIdentityRebind, PluginAuditEvent, PluginBinding,
+    PluginBindingTarget, QualityStatus, Source, parse_inline_nodes,
 };
 use futures::{StreamExt as _, stream};
 use serde::Serialize;
 use serde_yaml_ng::Value;
+use sha2::Digest as _;
 use std::{
     collections::{HashMap, HashSet},
     future::Future,
@@ -13,12 +15,18 @@ use std::{
 };
 
 use crate::{
-    clash5::{import, manual},
+    clash5::{
+        import, manual,
+        plugins::{self, PluginFailure},
+    },
     config::{
         Config, PrfItem,
         profiles::{PROFILE_WRITE_LOCK, profiles_append_item_with_filedata_safe, profiles_save_file_safe},
     },
-    core::{CoreManager, handle::Handle, proxy_view::ProxyNodeSource, runtime_bundle::remote_providers_of},
+    core::{
+        CoreManager, handle::Handle, proxy_view::ProxyNodeSource, runtime_bundle::remote_providers_of,
+        validate::ValidationOutcome,
+    },
     utils::dirs,
 };
 
@@ -27,6 +35,8 @@ const HANDSHAKE_PROBE_MS: u32 = 10_000;
 const PROBE_CONCURRENCY: usize = 16;
 const SHORT_PROBE_URL: &str = "http://cp.cloudflare.com/generate_204";
 const HANDSHAKE_PROBE_URL: &str = "https://cp.cloudflare.com/generate_204";
+const PLUGIN_CONFIG_BUSY_TIMEOUT: Duration = Duration::from_secs(15);
+const PLUGIN_CONFIG_BUSY_POLL: Duration = Duration::from_millis(50);
 static PROBE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 fn failure(error: DataError) -> super::CommandFailure {
@@ -38,6 +48,60 @@ fn failure(error: DataError) -> super::CommandFailure {
         DataError::IdentityRecovery => "C5-IDENTITY-001",
     };
     coded_error(code, "clash5 node data operation failed")
+}
+
+async fn apply_plugin_change_with_rollback<Update, UpdateFuture, Restore, RestoreFuture, Outcome>(
+    mut update: Update,
+    restore: Restore,
+    is_valid: impl Fn(&Outcome) -> bool,
+) -> CmdResult
+where
+    Update: FnMut() -> UpdateFuture,
+    UpdateFuture: Future<Output = anyhow::Result<Outcome>>,
+    Restore: FnOnce() -> RestoreFuture,
+    RestoreFuture: Future<Output = Result<(), DataError>>,
+{
+    if matches!(update().await, Ok(ref outcome) if is_valid(outcome)) {
+        return Ok(());
+    }
+    restore()
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "plugin binding could not be restored"))?;
+    if !matches!(update().await, Ok(ref outcome) if is_valid(outcome)) {
+        return Err(coded_error("C5-PLUGIN-004", "previous runtime could not be restored"));
+    }
+    Err(coded_error(
+        "C5-PLUGIN-005",
+        "plugin configuration was rejected; the previous binding was restored",
+    ))
+}
+
+async fn retry_plugin_config_while_busy<Update, UpdateFuture>(
+    mut update: Update,
+    timeout: Duration,
+    poll_interval: Duration,
+) -> anyhow::Result<ValidationOutcome>
+where
+    Update: FnMut() -> UpdateFuture,
+    UpdateFuture: Future<Output = anyhow::Result<ValidationOutcome>>,
+{
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        let outcome = update().await?;
+        if !matches!(outcome, ValidationOutcome::Busy) || tokio::time::Instant::now() >= deadline {
+            return Ok(outcome);
+        }
+        tokio::time::sleep(poll_interval).await;
+    }
+}
+
+async fn update_plugin_configuration() -> anyhow::Result<ValidationOutcome> {
+    retry_plugin_config_while_busy(
+        || CoreManager::global().update_config_forced(),
+        PLUGIN_CONFIG_BUSY_TIMEOUT,
+        PLUGIN_CONFIG_BUSY_POLL,
+    )
+    .await
 }
 
 #[derive(Serialize, specta::Type)]
@@ -235,6 +299,18 @@ pub async fn clash5_list_bindings(source: Option<Source>) -> CmdResult<Vec<Bindi
 
 #[tauri::command]
 #[specta::specta]
+pub async fn clash5_list_plugin_bindings() -> CmdResult<Vec<PluginBindingSummary>> {
+    crate::config::profiles::with_clash5_binding_store(|store| {
+        store
+            .plugin_bindings(None)
+            .map(|bindings| bindings.into_iter().map(PluginBindingSummary::from).collect())
+    })
+    .await
+    .map_err(failure)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn clash5_list_pending_identity_rebinds(source: Option<Source>) -> CmdResult<Vec<PendingIdentityRebind>> {
     crate::config::profiles::with_clash5_binding_store(move |store| store.pending_identity_rebinds(source.as_ref()))
         .await
@@ -273,6 +349,143 @@ pub async fn clash5_identity_status() -> CmdResult<Clash5IdentityStatus> {
 
 #[tauri::command]
 #[specta::specta]
+pub async fn clash5_get_plugin_binding_config(target: PluginBindingTarget, binding_id: String) -> CmdResult<JsonValue> {
+    let binding = crate::config::profiles::with_clash5_binding_store(move |store| {
+        store
+            .plugin_bindings(Some(&target))?
+            .into_iter()
+            .find(|binding| binding.id == binding_id)
+            .ok_or(DataError::NotFound)
+    })
+    .await
+    .map_err(failure)?;
+    if let Some(encrypted) = binding
+        .config
+        .get("__clash5_encrypted")
+        .and_then(serde_json::Value::as_str)
+    {
+        let clear = crate::config::decrypt_data(encrypted)
+            .map_err(|_| coded_error("C5-PLUGIN-004", "plugin settings could not be decrypted"))?;
+        serde_json::from_str(&clear)
+            .map(JsonValue)
+            .map_err(|_| coded_error("C5-PLUGIN-004", "plugin settings are invalid"))
+    } else {
+        Ok(JsonValue(binding.config))
+    }
+}
+
+#[derive(Serialize, specta::Type)]
+pub struct PluginEffectiveConfig {
+    #[specta(type = specta_typescript::Unknown)]
+    config: serde_json::Value,
+    provenance: std::collections::BTreeMap<String, clash5_data::ConfigProvenance>,
+    conflicts: Vec<clash5_data::PluginConflict>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_get_plugin_effective_config() -> CmdResult<PluginEffectiveConfig> {
+    let runtime = Config::runtime().await.latest_arc();
+    let mut config = serde_json::to_value(runtime.config.as_ref())
+        .map_err(|_| coded_error("C5-PLUGIN-004", "effective configuration could not be read"))?;
+    redact_plugin_config(&mut config, None);
+    Ok(PluginEffectiveConfig {
+        config,
+        provenance: runtime.plugin_provenance.clone(),
+        conflicts: runtime.plugin_conflicts.clone(),
+    })
+}
+
+fn redact_plugin_config(value: &mut serde_json::Value, key: Option<&str>) {
+    if key.is_some_and(|key| {
+        let key = key.to_ascii_lowercase().replace('_', "-");
+        [
+            "password",
+            "secret",
+            "token",
+            "credential",
+            "authorization",
+            "auth",
+            "uuid",
+            "username",
+            "private",
+            "url",
+        ]
+        .iter()
+        .any(|sensitive| key.contains(sensitive))
+    }) {
+        *value = serde_json::Value::String("[redacted]".into());
+        return;
+    }
+    match value {
+        serde_json::Value::Object(object) => {
+            for (key, child) in object {
+                redact_plugin_config(child, Some(key));
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                redact_plugin_config(item, key);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_save_plugin_binding(mut binding: PluginBinding) -> CmdResult {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    if !binding.config.is_object() {
+        return Err(coded_error(
+            "C5-PLUGIN-001",
+            "plugin binding settings must be an object",
+        ));
+    }
+    let plugin_root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    let installed = tokio::task::spawn_blocking(move || plugins::installed_plugins(&plugin_root))
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "installed plugins could not be checked"))?
+        .map_err(plugin_failure)?;
+    if !installed.iter().any(|plugin| plugin.id == binding.plugin_id) {
+        return Err(coded_error("C5-PLUGIN-001", "plugin is not installed"));
+    }
+    let clear_config = serde_json::to_string(&binding.config)
+        .map_err(|_| coded_error("C5-PLUGIN-001", "plugin binding settings are invalid"))?;
+    let encrypted = crate::config::encrypt_data(&clear_config)
+        .map_err(|_| coded_error("C5-PLUGIN-004", "plugin binding settings could not be protected"))?;
+    binding.config = serde_json::json!({"__clash5_encrypted": encrypted});
+    let target = binding.target.clone();
+    let binding_id = binding.id.clone();
+    let previous = crate::config::profiles::with_clash5_binding_store(move |store| {
+        let previous = store
+            .plugin_bindings(Some(&binding.target))?
+            .into_iter()
+            .find(|item| item.id == binding.id);
+        store.upsert_plugin_binding(&binding)?;
+        Ok(previous)
+    })
+    .await
+    .map_err(failure)?;
+    apply_plugin_change_with_rollback(
+        update_plugin_configuration,
+        move || {
+            crate::config::profiles::with_clash5_binding_store(move |store| match previous {
+                Some(previous) => store.upsert_plugin_binding(&previous),
+                None => store.delete_plugin_binding(&target, &binding_id),
+            })
+        },
+        |result| result.is_valid(),
+    )
+    .await?;
+    Handle::refresh_clash();
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn clash5_reset_identity() -> CmdResult {
     let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
     crate::config::profiles::reset_clash5_identity()
@@ -286,6 +499,301 @@ pub async fn clash5_reset_identity() -> CmdResult {
         ));
     }
     Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_save_plugin_bindings(bindings: Vec<PluginBinding>) -> CmdResult {
+    save_plugin_bindings(bindings).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_delete_plugin_binding(target: PluginBindingTarget, binding_id: String) -> CmdResult {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let previous = crate::config::profiles::with_clash5_binding_store({
+        let target = target.clone();
+        let binding_id = binding_id.clone();
+        move |store| {
+            let previous = store
+                .plugin_bindings(Some(&target))?
+                .into_iter()
+                .find(|binding| binding.id == binding_id)
+                .ok_or(DataError::NotFound)?;
+            store.delete_plugin_binding(&target, &binding_id)?;
+            Ok(previous)
+        }
+    })
+    .await
+    .map_err(failure)?;
+    if previous.orphan {
+        Handle::refresh_clash();
+        return Ok(());
+    }
+    apply_plugin_change_with_rollback(
+        update_plugin_configuration,
+        move || crate::config::profiles::with_clash5_binding_store(move |store| store.upsert_plugin_binding(&previous)),
+        |result| result.is_valid(),
+    )
+    .await?;
+    Handle::refresh_clash();
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_set_plugin_binding_enabled(
+    target: PluginBindingTarget,
+    binding_id: String,
+    enabled: bool,
+) -> CmdResult {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let target_for_store = target.clone();
+    let id_for_store = binding_id.clone();
+    let previous = crate::config::profiles::with_clash5_binding_store(move |store| {
+        let previous = store
+            .plugin_bindings(Some(&target_for_store))?
+            .into_iter()
+            .find(|binding| binding.id == id_for_store)
+            .ok_or(DataError::NotFound)?;
+        if previous.orphan {
+            return Err(DataError::InvalidInput);
+        }
+        let mut updated = previous.clone();
+        updated.enabled = enabled;
+        store.upsert_plugin_binding(&updated)?;
+        Ok(previous)
+    })
+    .await
+    .map_err(failure)?;
+    apply_plugin_change_with_rollback(
+        update_plugin_configuration,
+        move || crate::config::profiles::with_clash5_binding_store(move |store| store.upsert_plugin_binding(&previous)),
+        |result| result.is_valid(),
+    )
+    .await?;
+    Handle::refresh_clash();
+    Ok(())
+}
+
+async fn save_plugin_bindings(mut bindings: Vec<PluginBinding>) -> CmdResult {
+    if bindings.is_empty() || bindings.len() > 32 {
+        return Err(coded_error("C5-PLUGIN-001", "plugin binding batch size is invalid"));
+    }
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let plugin_root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    let plugins = tokio::task::spawn_blocking(move || plugins::installed_plugins(&plugin_root))
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "installed plugins could not be checked"))?
+        .map_err(plugin_failure)?;
+    for binding in &mut bindings {
+        if !plugins.iter().any(|plugin| plugin.id == binding.plugin_id) {
+            return Err(coded_error("C5-PLUGIN-001", "plugin is not installed"));
+        }
+        if !binding.config.is_object() {
+            return Err(coded_error(
+                "C5-PLUGIN-001",
+                "plugin binding settings must be an object",
+            ));
+        }
+        let clear_config = serde_json::to_string(&binding.config)
+            .map_err(|_| coded_error("C5-PLUGIN-001", "plugin binding settings are invalid"))?;
+        let encrypted = crate::config::encrypt_data(&clear_config)
+            .map_err(|_| coded_error("C5-PLUGIN-004", "plugin binding settings could not be protected"))?;
+        binding.config = serde_json::json!({"__clash5_encrypted": encrypted});
+    }
+    let removals = bindings
+        .iter()
+        .map(|binding| (binding.target.clone(), binding.id.clone()))
+        .collect::<Vec<_>>();
+    let rollback_keys = removals.clone();
+    let saved = crate::config::profiles::with_clash5_binding_store(move |store| {
+        for (target, binding_id) in &removals {
+            if store
+                .plugin_bindings(Some(target))?
+                .iter()
+                .any(|existing| existing.id == *binding_id)
+            {
+                return Err(DataError::InvalidInput);
+            }
+        }
+        store.upsert_plugin_bindings(&bindings)
+    })
+    .await;
+    saved.map_err(failure)?;
+    apply_plugin_change_with_rollback(
+        update_plugin_configuration,
+        move || {
+            crate::config::profiles::with_clash5_binding_store(move |store| {
+                store.delete_plugin_bindings(&rollback_keys).map(|_| ())
+            })
+        },
+        |result| result.is_valid(),
+    )
+    .await?;
+    Handle::refresh_clash();
+    Ok(())
+}
+
+#[derive(Serialize, specta::Type)]
+pub struct PluginPackagePreview {
+    staging_id: String,
+    id: String,
+    version: String,
+    name: String,
+    description: String,
+    permissions: Vec<String>,
+    signer_fingerprint: String,
+    signer: String,
+}
+
+fn plugin_failure(error: PluginFailure) -> super::CommandFailure {
+    coded_error(error.code(), "plugin package could not be verified or installed")
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_stage_plugin_package() -> CmdResult<Option<PluginPackagePreview>> {
+    let path = tokio::task::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .add_filter("clash5 plugin package", &["c5p"])
+            .pick_file()
+    })
+    .await
+    .map_err(|_| coded_error("C5-PLUGIN-004", "plugin package selection failed"))?;
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let metadata = tokio::fs::metadata(&path)
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-001", "plugin package could not be read"))?;
+    if metadata.len() > 10 * 1024 * 1024 {
+        return Err(coded_error("C5-PLUGIN-001", "plugin package is too large"));
+    }
+    let bytes = tokio::fs::read(path)
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-001", "plugin package could not be read"))?;
+    let package = plugins::inspect_package(&bytes).map_err(plugin_failure)?;
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins")
+        .join(".staging");
+    tokio::fs::create_dir_all(&root)
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "plugin staging is unavailable"))?;
+    let staging_id = nanoid::nanoid!();
+    tokio::fs::write(root.join(format!("{staging_id}.c5p")), bytes)
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "plugin package could not be staged"))?;
+    let signer_fingerprint = sha2::Sha256::digest(package.signer.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    Ok(Some(PluginPackagePreview {
+        staging_id,
+        id: package.manifest.id,
+        version: package.manifest.version,
+        name: package.manifest.name,
+        description: package.manifest.description,
+        permissions: package.manifest.permissions,
+        signer_fingerprint,
+        signer: package.signer,
+    }))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_install_staged_plugin(
+    staging_id: String,
+    confirmed_signer: String,
+) -> CmdResult<plugins::PluginSummary> {
+    if staging_id.len() != 21
+        || !staging_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        || confirmed_signer.len() > 1_024
+    {
+        return Err(coded_error("C5-PLUGIN-001", "staged plugin reference is invalid"));
+    }
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    let staged = root.join(".staging").join(format!("{staging_id}.c5p"));
+    let bytes = tokio::fs::read(&staged)
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-001", "staged plugin package is unavailable"))?;
+    let package = plugins::verify_package(&bytes, &[confirmed_signer]).map_err(plugin_failure)?;
+    let audit_details = serde_json::json!({
+        "plugin_id": package.manifest.id.clone(),
+        "version": package.manifest.version.clone(),
+        "permissions": package.manifest.permissions.clone(),
+        "signer_fingerprint": sha2::Sha256::digest(package.signer.as_bytes())
+            .iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+    });
+    let plugin_root = root.clone();
+    let installed = tokio::task::spawn_blocking(move || plugins::install_package(package, &plugin_root))
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "plugin installation failed"))?
+        .map_err(plugin_failure)?;
+    let _ = tokio::fs::remove_file(staged).await;
+    let audit_result = crate::config::profiles::with_clash5_binding_store(move |store| {
+        store.record_plugin_audit("plugin.install", &audit_details)
+    })
+    .await;
+    if audit_result.is_err() {
+        tracing::warn!(plugin_id = %installed.id, "plugin installation audit event could not be persisted");
+    }
+    Ok(installed)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_list_plugin_audit_events(limit: Option<u32>) -> CmdResult<Vec<PluginAuditEvent>> {
+    crate::config::profiles::with_clash5_binding_store(move |store| {
+        store.plugin_audit_events(limit.unwrap_or(50) as usize)
+    })
+    .await
+    .map_err(failure)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_list_plugins() -> CmdResult<Vec<plugins::PluginSummary>> {
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    tokio::task::spawn_blocking(move || plugins::installed_plugins(&root))
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "installed plugins could not be listed"))?
+        .map_err(plugin_failure)
+}
+
+#[derive(Serialize, specta::Type)]
+pub struct PluginBindingSummary {
+    id: String,
+    plugin_id: String,
+    target: PluginBindingTarget,
+    #[specta(type = specta_typescript::Number)]
+    priority: i64,
+    enabled: bool,
+    orphan: bool,
+    disappeared_at: Option<String>,
+}
+
+impl From<PluginBinding> for PluginBindingSummary {
+    fn from(binding: PluginBinding) -> Self {
+        Self {
+            id: binding.id,
+            plugin_id: binding.plugin_id,
+            target: binding.target,
+            priority: binding.priority,
+            enabled: binding.enabled,
+            orphan: binding.orphan,
+            disappeared_at: binding.disappeared_at,
+        }
+    }
 }
 
 #[tauri::command]
@@ -893,5 +1401,136 @@ mod tests {
         assert_eq!(results.len(), PROBE_CONCURRENCY * 3);
         assert!(peak.load(Ordering::SeqCst) > 1);
         assert!(peak.load(Ordering::SeqCst) <= PROBE_CONCURRENCY);
+    }
+
+    #[tokio::test]
+    async fn plugin_config_update_retries_when_another_update_is_running() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let outcome = retry_plugin_config_while_busy(
+            {
+                let attempts = Arc::clone(&attempts);
+                move || {
+                    let attempt = attempts.fetch_add(1, Ordering::SeqCst);
+                    async move {
+                        Ok(if attempt == 0 {
+                            ValidationOutcome::Busy
+                        } else {
+                            ValidationOutcome::Valid
+                        })
+                    }
+                }
+            },
+            Duration::from_secs(1),
+            Duration::from_millis(1),
+        )
+        .await;
+
+        assert_eq!(outcome.ok(), Some(ValidationOutcome::Valid));
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn effective_configuration_redacts_credentials_and_provider_urls() {
+        let mut config = serde_json::json!({
+            "proxies": [{"name": "edge", "server": "edge.example.invalid", "password": "secret", "uuid": "private-id"}],
+            "proxy-providers": {"remote": {"url": "https://user:pass@example.invalid/sub?token=secret", "path": "providers/remote.yaml"}}
+        });
+
+        redact_plugin_config(&mut config, None);
+
+        assert_eq!(config["proxies"][0]["server"], "edge.example.invalid");
+        assert_eq!(config["proxies"][0]["password"], "[redacted]");
+        assert_eq!(config["proxies"][0]["uuid"], "[redacted]");
+        assert_eq!(config["proxy-providers"]["remote"]["url"], "[redacted]");
+        assert_eq!(config["proxy-providers"]["remote"]["path"], "providers/remote.yaml");
+    }
+
+    #[tokio::test]
+    async fn rejected_plugin_update_restores_binding_and_previous_runtime() {
+        let update_count = Arc::new(AtomicUsize::new(0));
+        let restore_count = Arc::new(AtomicUsize::new(0));
+        let result = apply_plugin_change_with_rollback(
+            {
+                let update_count = Arc::clone(&update_count);
+                move || {
+                    let attempt = update_count.fetch_add(1, Ordering::SeqCst);
+                    std::future::ready(Ok(attempt > 0))
+                }
+            },
+            {
+                let restore_count = Arc::clone(&restore_count);
+                move || {
+                    restore_count.fetch_add(1, Ordering::SeqCst);
+                    std::future::ready(Ok(()))
+                }
+            },
+            |valid| *valid,
+        )
+        .await;
+
+        assert!(result.is_err());
+        let Some(error) = result.err() else {
+            return;
+        };
+        assert_eq!(error.code.as_deref(), Some("C5-PLUGIN-005"));
+        assert!(error.detail.contains("previous binding was restored"));
+        assert_eq!(restore_count.load(Ordering::SeqCst), 1);
+        assert_eq!(update_count.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn failed_plugin_rollback_reports_recovery_error_without_claiming_success() {
+        let update_count = Arc::new(AtomicUsize::new(0));
+        let result = apply_plugin_change_with_rollback(
+            {
+                let update_count = Arc::clone(&update_count);
+                move || {
+                    update_count.fetch_add(1, Ordering::SeqCst);
+                    std::future::ready(Ok(false))
+                }
+            },
+            || std::future::ready(Err(DataError::Database)),
+            |valid| *valid,
+        )
+        .await;
+
+        assert!(result.is_err());
+        let Some(error) = result.err() else {
+            return;
+        };
+        assert_eq!(error.code.as_deref(), Some("C5-PLUGIN-004"));
+        assert_eq!(update_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn failed_previous_runtime_reload_reports_recovery_error() {
+        let update_count = Arc::new(AtomicUsize::new(0));
+        let restore_count = Arc::new(AtomicUsize::new(0));
+        let result = apply_plugin_change_with_rollback(
+            {
+                let update_count = Arc::clone(&update_count);
+                move || {
+                    update_count.fetch_add(1, Ordering::SeqCst);
+                    std::future::ready(Ok(false))
+                }
+            },
+            {
+                let restore_count = Arc::clone(&restore_count);
+                move || {
+                    restore_count.fetch_add(1, Ordering::SeqCst);
+                    std::future::ready(Ok(()))
+                }
+            },
+            |valid| *valid,
+        )
+        .await;
+
+        assert!(result.is_err());
+        let Some(error) = result.err() else {
+            return;
+        };
+        assert_eq!(error.code.as_deref(), Some("C5-PLUGIN-004"));
+        assert_eq!(restore_count.load(Ordering::SeqCst), 1);
+        assert_eq!(update_count.load(Ordering::SeqCst), 2);
     }
 }

@@ -13,4 +13,3 @@ items:
     name: External provider profile
     url: https://example.invalid/provider-token
     file: external.yaml
-
