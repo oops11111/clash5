@@ -181,7 +181,7 @@ jobs:
           releaseBody: 'clash5 candidate build. Publication requires signed artifacts and desktop acceptance.'
           tauriScript: pnpm
           args: --target ${{ matrix.target }}
-          includeUpdaterJson: true
+          uploadUpdaterJson: false
 
       - name: Attest Windows bundles
         if: matrix.os == 'windows-latest'
@@ -414,6 +414,7 @@ jobs:
         with:
           tauriScript: pnpm
           args: --target ${{ matrix.target }}
+          uploadUpdaterJson: false
 
       - name: Rename
         run: |

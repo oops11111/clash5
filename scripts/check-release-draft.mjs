@@ -46,6 +46,13 @@ assert.equal(buildStep.with.releaseDraft, true)
 assert.ok(
   buildStep.with.releaseId.includes('needs.prepare_release.outputs.release_id'),
 )
+for (const job of Object.values(jobs)) {
+  for (const step of job.steps) {
+    if (!step.uses?.startsWith('tauri-apps/tauri-action@')) continue
+    assert.equal(step.with.uploadUpdaterJson, false)
+    assert.equal(step.with.includeUpdaterJson, undefined)
+  }
+}
 
 for (const forbidden of [
   /Clash Verge Rev/i,
