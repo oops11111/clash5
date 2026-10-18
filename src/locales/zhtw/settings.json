@@ -203,7 +203,7 @@
           "openDevTools": "開發人員工具",
           "liteModeSettings": "輕量模式設定",
           "exit": "離開",
-          "exportDiagnostics": "匯出診斷資訊",
+          "exportDiagnostics": "複製已脫敏診斷資訊",
           "vergeVersion": "Verge 版本"
         }
       },

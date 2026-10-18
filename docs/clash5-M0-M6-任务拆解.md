@@ -40,8 +40,8 @@
 - [x] `[Opus]` SQLite WAL 与版本迁移方案：schema v4 从现有版本逐级迁移；孤儿默认 30 天、可设 1–365 天，并提供清理预览、确认和到期清理。PR #23 已合并；CI、Windows 桌面验收及迁移回滚/保留期数据测试通过
 - [x] `[标准]` R-18：服务与包名隔离、同机共存。PR #27 的 Windows 安装/升级/启动/独立卸载和源配置校验和前后比对、三平台标识审计均通过，已合入 dev；macOS/Linux 安装运行仍留作后续覆盖。
 - [x] `[标准]` R-19：只读导入 verge-rev 数据并比较源目录前后校验和（PR #26 已合并；CI 和 Windows 桌面验收确认不修改源目录）
-- [ ] `[Opus]` R-20：统一日志/诊断脱敏；凭证、完整订阅 URL、controller secret、relay token 的泄露回归测试
-- [x] `[标准]` 对外 `C5-*` 错误码、IPC 契约快照与 r2 CI 矩阵证据。PR #31、#32 已依次合入 dev；PR #34 已实现 108 个 Tauri command 的参数/成功返回/错误类型快照与前端调用校验，并通过完整六项 CI（含 Windows 桌面 smoke）后合入 dev。日志/诊断脱敏仍未完成验收，R-20 保持开放
+- [x] `[Opus]` R-20：统一日志/诊断脱敏（PR #38）。统一出口覆盖 URL 凭证、路径/查询/片段、controller secret、relay token、密码与 IPC 错误详情，并通过日志 crate 回归测试。
+- [x] `[标准]` 对外 `C5-*` 错误码、IPC 契约快照与 r2 CI 矩阵证据。PR #31、#32 已依次合入 dev；PR #34 已实现 108 个 Tauri command 的参数/成功返回/错误类型快照与前端调用校验，并通过完整六项 CI（含 Windows 桌面 smoke）后合入 dev。
 - [ ] `[标准]` 首次 release-tag 同步前核对 M0 所用上游 `dev` 基线，单独 PR 记录取舍
 
 **本阶段 Opus 必做**：M0.2 全部核心逻辑。
