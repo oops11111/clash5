@@ -182,6 +182,7 @@ jobs:
           tauriScript: pnpm
           args: --target ${{ matrix.target }}
           uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
 
       - name: Attest Windows bundles
         if: matrix.os == 'windows-latest'
@@ -415,6 +416,7 @@ jobs:
           tauriScript: pnpm
           args: --target ${{ matrix.target }}
           uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
 
       - name: Rename
         run: |

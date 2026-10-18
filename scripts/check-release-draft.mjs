@@ -50,6 +50,7 @@ for (const job of Object.values(jobs)) {
   for (const step of job.steps) {
     if (!step.uses?.startsWith('tauri-apps/tauri-action@')) continue
     assert.equal(step.with.uploadUpdaterJson, false)
+    assert.equal(step.with.uploadUpdaterSignatures, false)
     assert.equal(step.with.includeUpdaterJson, undefined)
   }
 }
