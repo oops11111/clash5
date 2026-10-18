@@ -3,7 +3,7 @@
 > 产品名：**clash5**
 > 基线：Fork [clash-verge-rev](https://github.com/clash-verge-rev/clash-verge-rev) · GPL-3.0 · 上游 tag 跟踪（见 §1.2）
 > 配套：[`clash5-M0-M6-任务拆解.md`](clash5-M0-M6-任务拆解.md)、[`clash5-风险登记.md`](clash5-风险登记.md)、[`clash5-AI协作规范.md`](clash5-AI协作规范.md)
-> 状态：r2 修订稿，待整体评审冻结。M0 已按原验收基线合并；新增标准的实现差距见下文，不视为已通过验收。身份恢复与迁移方案已在 [PR #8](https://github.com/oops11111/clash5/pull/8) 决定，实现仍待验收。
+> 状态：r2 修订稿，待整体评审冻结。M0 原验收基线已合并；新增标准的实现差距见下文，不视为已通过验收。身份迁移方案由 PR #8 确认，代码迁移、fixture 与 Windows 桌面验收已由 [PR #23](https://github.com/oops11111/clash5/pull/23) 合并通过；R-25 已缓解。
 
 ## 变更说明（相对 r1）
 
@@ -110,21 +110,21 @@ clash5 新增代码尽量集中于独立模块，减少上游 merge 冲突。现
 
 发版：GitHub Release + 应用内检查更新；稳定/测试通道，测试默认关（U2/W1）。
 
-### r2 与现有实现的差距（2026-10-14）
+### r2 与现有实现的差距（2026-10-17）
 
 M0 的原验收已完成并合并至 `dev`。以下是本草案新增或收紧的要求，需作为后续改进单独验收，不追认成 M0 的已完成项：
 
 | 范围 | 已核对现状 | r2 待补齐 |
 | --- | --- | --- |
-| 身份与孤儿 | `crates/clash5-data` 使用无密钥的版本前缀 SHA-256，输入为类型、服务器、端口及凭证，未单列 transport/SNI；同一 stable_id 返回时恢复绑定 | §4.1 的本机密钥 HMAC、规范字段与版本迁移、凭证轮换候选重绑、保留期与提醒（R-01/R-02/R-25） |
-| SQLite | M1 草稿使用 `PRAGMA user_version` 的 v2 迁移，已有失败回滚测试 | r2 身份迁移继续以 `PRAGMA user_version` 为唯一版本标记；WAL、分代元数据与失败回滚仍需实现和验证 |
-| 共存与导入 | app identifier、目录、deep link 已隔离；服务/包名仍有上游遗留 | 同机安装验证；只读迁移向导与源目录校验（R-18/R-19） |
-| 安全与契约 | M0 IPC 已返回结构化错误 | 统一 `C5-*` 码、脱敏测试和所有 command 契约快照；尚无证据证明全面覆盖（R-20） |
+| 身份与孤儿 | PR #23 已将身份迁移为本机密钥 HMAC，包含版本/密钥代次、同来源凭证轮换候选重绑、多候选确认、密钥异常恢复，以及 WAL/schema v4 和孤儿保留期/清理 | R-01/R-02/R-25 的迁移与回滚 fixture、CI 和 Windows 桌面验收均通过并已合并；PR #37 将 SQLite 数据纳入版本化导出包，但本机 HMAC key 仍排除并需显式恢复/重绑 |
+| SQLite | PR #23 已将 SQLite schema 升至 v4，启用 WAL、分代元数据与逐级迁移 | 迁移失败回滚及孤儿保留期测试通过 CI/Windows 验收；PR #23 已合并 |
+| 共存与导入 | PR #27 已通过 Windows 同机安装/升级/启动/独立卸载及上游配置目录 SHA-256 前后比对，Windows/macOS/Linux 标识审计通过；PR #26 已只读导入 verge-rev 数据 | R-18 已随 PR #27 合入 dev；R-19 的源目录完整性和 Windows 桌面验收已通过并随 PR #26 合并。macOS/Linux 安装运行测试为后续覆盖 |
+| 安全与契约 | M0 IPC 返回结构化错误；PR #31、#32 已依次合入 dev，完成稳定 SQLite 错误码和节点数据命令 `C5-*` 统一；当前契约生成器由 CI 校验 | `dev` 注册 108 个 Tauri 命令；事件契约覆盖 11 个事件 payload 与 34 个通知状态。PR #34 已实现全部命令的参数、成功返回与错误类型快照，并通过完整六项 CI（含 Windows 桌面 smoke）后合入 dev。PR #38 已接入统一日志/诊断脱敏与回归测试，待远程 CI 验收后关闭 R-20 |
 | 上游同步 | M0 文档及仓库基线来自上游 `dev` | 本草案将后续同步改为 release tag 的独立 PR；首次采用前核对目标 tag 与当前基线关系 |
-| M1 节点池 | PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；[Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过页面交互、外部 provider 健康检查、筛选、搜索、质量排序与重启身份检查，附桌面截图 | 已达到 M1 退出标准并合并至 `dev`。截图覆盖默认 940 × 700 窗口，未单独截图验证 1600 × 900 布局；完整合并配置/插件来源属于后续里程碑。Mihomo 接口未暴露上游 HTTP 状态及 `Retry-After`，当前为连续失败通用退避（R-11/R-26） |
+| M1 节点池 | PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；[Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过页面交互、外部 provider 健康检查、筛选、搜索、质量排序与重启身份检查，附桌面截图 | M1 已达到退出标准并合并至 `dev`。截图覆盖默认 940 × 700 窗口，未单独截图验证 1600 × 900 布局；完整合并配置/插件来源属于后续里程碑。Mihomo 接口未暴露上游 HTTP 状态及 `Retry-After`，当前为连续失败通用退避（R-11/R-26） |
 | M2 链路编排 | PR #18 实现稳定两跳生成、来源隔离、保存和回滚、出口 IP 检测与 L2 策略；[Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38701837292)通过默认窗口无横向溢出检查、桌面交互和重启恢复 | 退出标准已达到，待 PR #18 合并。当前 UI 页面、provider 缓存路径限制与 Mihomo 官方行为见 [`M2 链路说明`](clash5/m2-chains.md) |
 
-M0 现有实现见 [`clash5/implementation.md`](clash5/implementation.md)；M1 已合并至 `dev`；M2 变更和限制见[草稿 PR #18](https://github.com/oops11111/clash5/pull/18)。
+M0 原始实现说明见 [`clash5/implementation.md`](clash5/implementation.md)；M1 已合入 `dev`；M2 链路变更及限制见[PR #18](https://github.com/oops11111/clash5/pull/18)。
 
 ---
 
@@ -150,7 +150,7 @@ OrphanBinding   = PluginBinding + disappeared_at + last_stable_id + candidates[]
 
 - 凭证轮换（UUID/密码变化）导致的 stable_id 变化，视为「同一节点的新身份」。`reattach` 仅在**同一订阅来源内**对失活身份按 type、server、port、transport、SNI 匹配：候选唯一时自动重绑，多候选时进入人工确认；手动节点与不同 provider 不跨来源自动重绑。
 - 本机密钥丢失、锁定或不匹配时，保持现有节点与绑定可读，暂停刷新和身份写入；须由用户确认重置后逐项显式重绑，不得生成替代密钥后静默迁移。计划内轮换在旧密钥仍可用时才可精确迁移。
-- r2 的密钥分代、`v1`→`v2` 迁移、规范字段及崩溃恢复顺序以 [`clash5/r2-identity-migration.md`](clash5/r2-identity-migration.md) 为准；代码与 fixture 验收仍由 [Issue #7](https://github.com/oops11111/clash5/issues/7) 跟踪（R-01/R-02/R-25）。
+- r2 的密钥分代、`v1`→`v2` 迁移、规范字段及崩溃恢复顺序以 [`clash5/r2-identity-migration.md`](clash5/r2-identity-migration.md) 为准；代码与 fixture 验收已随 [PR #23](https://github.com/oops11111/clash5/pull/23) 完成并合并（R-01/R-02/R-25）。
 - 同机同端口不同 transport/SNI 的节点，因 canonical 字段包含 transport 与 sni，不会碰撞；若仍碰撞，diff 阶段报错而非静默合并。
 
 **孤儿策略（A2 补充）**：

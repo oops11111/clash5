@@ -203,7 +203,7 @@
           "openDevTools": "Dev Tools",
           "liteModeSettings": "LightWeight Mode Settings",
           "exit": "Exit",
-          "exportDiagnostics": "Export Diagnostic Info",
+          "exportDiagnostics": "Copy Redacted Diagnostic Info",
           "vergeVersion": "Verge Version"
         }
       },

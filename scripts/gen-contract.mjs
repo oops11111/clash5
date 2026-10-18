@@ -4,9 +4,9 @@ import path from 'node:path'
 
 /**
  * Regenerates src/services/contract.ts from the backend wire contract.
- * Source of truth: `cargo run -p clash-verge --bin frontend-contract` inside
- * src-tauri, which serializes the same enum variants and event payloads the
- * app emits at runtime. CI reruns this and fails on a non-empty diff.
+ * Source of truth: the frontend-contract binary in src-tauri, which serializes
+ * the same enum variants and event payloads the app emits at runtime. CI reruns
+ * this and fails on a non-empty diff.
  */
 
 const ROOT = path.resolve(import.meta.dirname, '..')
@@ -15,9 +15,16 @@ const OUT = path.join(ROOT, 'src/services/contract.ts')
 const contract = JSON.parse(
   execFileSync(
     'cargo',
-    ['run', '-p', 'clash-verge', '--bin', 'frontend-contract', '-q'],
+    [
+      'run',
+      '--manifest-path',
+      path.join(ROOT, 'src-tauri', 'Cargo.toml'),
+      '--bin',
+      'frontend-contract',
+      '-q',
+    ],
     {
-      cwd: path.join(ROOT, 'src-tauri'),
+      cwd: ROOT,
       encoding: 'utf8',
       maxBuffer: 16 * 1024 * 1024,
     },
@@ -81,8 +88,13 @@ fs.writeFileSync(OUT, content)
 
 // Match the repo's biome style so CI parity (`git diff --exit-code`) is stable.
 execFileSync(
-  process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-  ['exec', 'biome', 'format', '--write', path.relative(ROOT, OUT)],
+  process.execPath,
+  [
+    path.join(ROOT, 'node_modules', '@biomejs', 'biome', 'bin', 'biome'),
+    'format',
+    '--write',
+    path.relative(ROOT, OUT),
+  ],
   { cwd: ROOT, stdio: 'ignore' },
 )
 

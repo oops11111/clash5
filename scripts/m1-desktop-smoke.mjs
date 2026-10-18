@@ -261,7 +261,15 @@ async function importLink(link, count, expectedName) {
         const nodes = await invoke('clash5_list_nodes', {
           includeInactive: true,
         })
+        const importFinished = await browser.execute(() =>
+          [...document.querySelectorAll('.MuiAlert-root')].some((alert) =>
+            /Imported 1 standalone proxy link|已导入 1 个独立节点链接/.test(
+              alert.textContent ?? '',
+            ),
+          ),
+        )
         return (
+          importFinished &&
           nodes.length === count &&
           nodes.some((node) => node.display_name === expectedName)
         )
@@ -1997,21 +2005,6 @@ try {
       'http://127.0.0.1:18080/#M1-renamed',
       inventory.length,
       'M1-renamed',
-    )
-    await browser.waitUntil(
-      () =>
-        browser.execute(() =>
-          [...document.querySelectorAll('.MuiAlert-root')].some((alert) =>
-            /Imported 1 standalone proxy link|已导入 1 个独立节点链接/.test(
-              alert.textContent ?? '',
-            ),
-          ),
-        ),
-      {
-        timeout: 30_000,
-        interval: 250,
-        timeoutMsg: 'Persisted manual link was not reimported through the page',
-      },
     )
     const reimported = (
       await invoke('clash5_list_nodes', { includeInactive: true })

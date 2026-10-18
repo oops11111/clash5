@@ -18,7 +18,8 @@
   "ignoreDependencies": ["lint-staged"],
   "ignoreIssues": {
     "src/types/generated/**": ["exports", "types"],
-    "src/services/contract.ts": ["exports", "types"]
+    "src/services/contract.ts": ["exports", "types"],
+    "src/services/tauri-commands.generated.ts": ["exports", "types"]
   },
   "cycles": {
     "dynamicImports": true

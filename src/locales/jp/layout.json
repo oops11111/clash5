@@ -18,6 +18,7 @@
       "diagnostics": "Unlock tests",
       "cancel": "Cancel",
       "identityError": "The identity service is unavailable. Try again after the system credential store is unlocked.",
+      "rotationRuntimePending": "Identity rotation was saved, but the running configuration could not be refreshed. Refresh or restart the core before continuing.",
       "identityRecovery": "The identity key is missing or does not match this database. Existing bindings remain preserved; reset creates new node IDs and leaves old bindings orphaned for manual rebinding.",
       "resetIdentity": "Reset identity key",
       "resetIdentityTitle": "Reset node identity key?",

@@ -15,7 +15,7 @@ fn storage_failure() -> CommandFailure {
     coded_error("C5-CHAIN-006", "chain storage is unavailable")
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub struct ChainNodeOption {
     reference: NodeRef,
     display_name: String,
@@ -25,7 +25,7 @@ pub struct ChainNodeOption {
     source_name: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub struct ChainWorkspace {
     profile_id: Option<String>,
     chains: Vec<ProxyChain>,
@@ -34,6 +34,7 @@ pub struct ChainWorkspace {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_chain_workspace() -> CmdResult<ChainWorkspace> {
     let profiles = Config::profiles().await.latest_arc();
     let profile_id = profiles.current.as_ref().map(ToString::to_string);
@@ -134,6 +135,7 @@ async fn restore_definition(id: String, previous: Option<ProxyChain>) -> CmdResu
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_save_chain(chain: ProxyChain) -> CmdResult {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
     chain
@@ -181,6 +183,7 @@ pub async fn clash5_save_chain(chain: ProxyChain) -> CmdResult {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_delete_chain(id: String) -> CmdResult {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
     let definitions = chains::definitions().await.map_err(|_| storage_failure())?;
@@ -215,13 +218,14 @@ pub async fn clash5_delete_chain(id: String) -> CmdResult {
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub struct ChainTestResult {
     delay_ms: u32,
     group_name: String,
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_test_chain(id: String, test_url: Option<String>) -> CmdResult<ChainTestResult> {
     let url = exit_ip::service_url(test_url.as_deref().unwrap_or("https://cp.cloudflare.com/generate_204"))
         .map_err(|_| coded_error("C5-CHAIN-001", "connectivity test URL is invalid"))?;
@@ -255,12 +259,13 @@ pub async fn clash5_test_chain(id: String, test_url: Option<String>) -> CmdResul
     })
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 pub struct ChainActivation {
     selection_persisted: bool,
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_activate_chain(id: String, policy_group: String) -> CmdResult<ChainActivation> {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
     let profile_id = Config::profiles()
@@ -286,7 +291,7 @@ pub async fn clash5_activate_chain(id: String, policy_group: String) -> CmdResul
     Ok(ChainActivation { selection_persisted })
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, specta::Type)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum ExitIpResult {
     Disabled,
@@ -304,6 +309,7 @@ pub enum ExitIpResult {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub async fn clash5_detect_exit_ip(id: String, service_url: Option<String>) -> CmdResult<ExitIpResult> {
     let Some(service_url) = service_url else {
         return Ok(ExitIpResult::Disabled);

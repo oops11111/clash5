@@ -1,6 +1,7 @@
 import {
   Alert,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -50,6 +51,8 @@ export const IdentityRecoveryPanel = () => {
   const [selections, setSelections] = useState<Record<string, string>>({})
   const [resetOpen, setResetOpen] = useState(false)
   const [rotationOpen, setRotationOpen] = useState(false)
+  const [rotationBusy, setRotationBusy] = useState(false)
+  const [rotationRuntimePending, setRotationRuntimePending] = useState(false)
   const [identityError, setIdentityError] = useState(false)
   const [orphanCleanup, setOrphanCleanup] =
     useState<Clash5OrphanCleanupPreview | null>(null)
@@ -97,12 +100,27 @@ export const IdentityRecoveryPanel = () => {
   }
 
   const confirmRotation = async () => {
+    setIdentityError(false)
+    setRotationRuntimePending(false)
+    setRotationBusy(true)
     try {
       await rotateClash5Identity()
       setRotationOpen(false)
       await refreshIdentity()
-    } catch {
-      setIdentityError(true)
+    } catch (error) {
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? error.code
+          : undefined
+      if (code === 'IDENTITY_ROTATION_RUNTIME_PENDING') {
+        setRotationOpen(false)
+        await refreshIdentity()
+        setRotationRuntimePending(true)
+      } else {
+        setIdentityError(true)
+      }
+    } finally {
+      setRotationBusy(false)
     }
   }
 
@@ -175,6 +193,14 @@ export const IdentityRecoveryPanel = () => {
         {identityError && (
           <Alert severity="error">
             {t('layout.components.navigation.identityError')}
+          </Alert>
+        )}
+        {rotationRuntimePending && (
+          <Alert
+            data-testid="identity-rotation-runtime-pending"
+            severity="warning"
+          >
+            {t('layout.components.navigation.rotationRuntimePending')}
           </Alert>
         )}
         {orphanCleanup && (
@@ -255,7 +281,7 @@ export const IdentityRecoveryPanel = () => {
         )}
         {pendingRebinds.map((item) => (
           <Paper
-            key={`${item.source.provider_id}:${item.old_stable_id}`}
+            key={`${item.source.kind === 'subscription' ? item.source.provider_id : 'manual'}:${item.old_stable_id}`}
             variant="outlined"
             sx={{ p: 2, borderRadius: 2 }}
           >
@@ -305,6 +331,7 @@ export const IdentityRecoveryPanel = () => {
               !pendingRebinds.some(
                 (item) =>
                   binding.source.kind === 'subscription' &&
+                  item.source.kind === 'subscription' &&
                   item.old_stable_id === binding.target_id &&
                   item.source.provider_id === binding.source.provider_id,
               ),
@@ -404,7 +431,13 @@ export const IdentityRecoveryPanel = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      <Dialog open={rotationOpen} onClose={() => setRotationOpen(false)}>
+      <Dialog
+        aria-busy={rotationBusy}
+        open={rotationOpen}
+        onClose={() => {
+          if (!rotationBusy) setRotationOpen(false)
+        }}
+      >
         <DialogTitle>
           {t('layout.components.navigation.rotateIdentityTitle')}
         </DialogTitle>
@@ -414,12 +447,21 @@ export const IdentityRecoveryPanel = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRotationOpen(false)}>
+          <Button
+            disabled={rotationBusy}
+            onClick={() => setRotationOpen(false)}
+          >
             {t('layout.components.navigation.cancel')}
           </Button>
           <Button
             color="warning"
             variant="contained"
+            disabled={rotationBusy}
+            startIcon={
+              rotationBusy ? (
+                <CircularProgress color="inherit" size={16} />
+              ) : null
+            }
             onClick={() => void confirmRotation()}
           >
             {t('layout.components.navigation.rotateIdentity')}
