@@ -46,14 +46,39 @@ assert.equal(buildStep.with.releaseDraft, true)
 assert.ok(
   buildStep.with.releaseId.includes('needs.prepare_release.outputs.release_id'),
 )
+let actionBuilds = 0
 for (const job of Object.values(jobs)) {
   for (const step of job.steps) {
     if (!step.uses?.startsWith('tauri-apps/tauri-action@')) continue
+    actionBuilds++
+    assert.match(
+      step.with.args,
+      /--config src-tauri\/release-draft\.conf\.json/,
+    )
     assert.equal(step.with.uploadUpdaterJson, false)
     assert.equal(step.with.uploadUpdaterSignatures, false)
     assert.equal(step.with.includeUpdaterJson, undefined)
   }
 }
+assert.equal(actionBuilds, 1, 'only the main release job may use tauri-action')
+assert.match(
+  jobs['release-for-linux-arm'].steps.find((step) =>
+    step.name?.startsWith('Build for Linux'),
+  ).run,
+  /--config src-tauri\/release-draft\.conf\.json/,
+)
+assert.match(
+  jobs['release-for-fixed-webview2'].steps.find((step) =>
+    step.name?.startsWith('Build fixed WebView2 installer'),
+  ).run,
+  /--config src-tauri\/release-draft\.conf\.json/,
+)
+assert.equal(
+  JSON.parse(readFileSync('src-tauri/release-draft.conf.json', 'utf8')).bundle
+    .createUpdaterArtifacts,
+  false,
+)
+assert.doesNotMatch(source, /TAURI_SIGNING_PRIVATE_KEY/)
 
 for (const forbidden of [
   /Clash Verge Rev/i,
