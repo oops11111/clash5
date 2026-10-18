@@ -37,6 +37,15 @@ jobs:
               - 'eslint.config.ts'
               - 'tsconfig.json'
               - 'vite.config.*'
+              - '.github/workflows/release.yml'
+              - '.github/workflows/updater.yml'
+              - '.github/workflows/autobuild.yml'
+              - '.github/workflows/autobuild-check-test.yml'
+              - '.github/workflows/check-commit-needs-build.yml'
+              - '.github/workflows/clean-old-assets.yml'
+              - '.github/workflows/telegram-notify.yml'
+              - 'scripts/check-release-draft.mjs'
+              - 'scripts/release-version.mjs'
 
       - name: Skip if no frontend changes
         if: steps.check_frontend.outputs.frontend != 'true'
@@ -81,6 +90,10 @@ jobs:
       - name: Run tests
         if: steps.check_frontend.outputs.frontend == 'true'
         run: pnpm test
+
+      - name: Check release draft boundary
+        if: steps.check_frontend.outputs.frontend == 'true'
+        run: node scripts/check-release-draft.mjs
 
       - name: Run Knip
         if: steps.check_frontend.outputs.frontend == 'true'
