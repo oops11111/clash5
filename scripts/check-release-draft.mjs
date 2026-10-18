@@ -79,6 +79,10 @@ for (const workflowPath of [
   )
 }
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
+assert.match(
+  readFileSync('src-tauri/Cargo.toml', 'utf8'),
+  /repository = "https:\/\/github\.com\/oops11111\/clash5\.git"/,
+)
 for (const script of [
   'updater',
   'updater-fixed-webview2',

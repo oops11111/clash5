@@ -9,7 +9,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Duration,
 };
-use tauri_plugin_updater::{Update, UpdaterExt as _};
+use tauri_plugin_updater::{RemoteRelease, RemoteReleaseInner, Update, UpdaterExt as _};
 use tokio_util::sync::CancellationToken;
 
 pub struct SilentUpdater {
@@ -172,6 +172,42 @@ pub fn is_build_to_stable(current: &str, remote: &str) -> bool {
         return false;
     };
     !build.is_empty() && !base.contains('-') && base == remote.trim_start_matches('v')
+}
+
+/// The updater accepts only signed stable artifacts owned by this repository.
+pub fn is_official_stable_release(release: &RemoteRelease) -> bool {
+    if !release.version.pre.is_empty() || !release.version.build.is_empty() {
+        return false;
+    }
+
+    let expected_version = release.version.to_string();
+    let expected_tag = format!("v{expected_version}");
+    let valid_platform = |platform: &tauri_plugin_updater::ReleaseManifestPlatform| {
+        let url = &platform.url;
+        if platform.signature.is_empty()
+            || url.scheme() != "https"
+            || url.host_str() != Some("github.com")
+            || url.port().is_some()
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.query().is_some()
+            || url.fragment().is_some()
+        {
+            return false;
+        }
+        let Some(parts) = url.path_segments() else {
+            return false;
+        };
+        let parts: Vec<_> = parts.collect();
+        matches!(parts.as_slice(), ["oops11111", "clash5", "releases", "download", tag, asset]
+            if *tag == expected_tag.as_str() && asset.contains(expected_version.as_str())
+                && (asset.starts_with("clash5_") || asset.starts_with("clash5-")))
+    };
+
+    match &release.data {
+        RemoteReleaseInner::Dynamic(platform) => valid_platform(platform),
+        RemoteReleaseInner::Static { platforms } => !platforms.is_empty() && platforms.values().all(valid_platform),
+    }
 }
 
 /// Compares numeric version components after stripping version suffixes.
@@ -695,5 +731,85 @@ impl SilentUpdater {
 
             tokio::time::sleep(std::time::Duration::from_secs(24 * 60 * 60)).await;
         }
+    }
+}
+
+#[cfg(test)]
+mod release_source_tests {
+    use super::*;
+    use tauri_plugin_updater::ReleaseManifestPlatform;
+
+    fn candidate(version: &str, url: &str) -> RemoteRelease {
+        RemoteRelease {
+            version: version.parse().unwrap(),
+            notes: None,
+            pub_date: None,
+            data: RemoteReleaseInner::Dynamic(ReleaseManifestPlatform {
+                url: url.parse().unwrap(),
+                signature: "signed-bundle".to_string(),
+            }),
+        }
+    }
+
+    #[test]
+    fn stable_updates_accept_only_clash5_release_assets() {
+        let valid = candidate(
+            "2.5.10",
+            "https://github.com/oops11111/clash5/releases/download/v2.5.10/clash5_2.5.10_x64-setup.exe",
+        );
+        assert!(is_official_stable_release(&valid));
+
+        for (version, url) in [
+            (
+                "2.5.10-rc.1",
+                "https://github.com/oops11111/clash5/releases/download/v2.5.10-rc.1/clash5_2.5.10_x64-setup.exe",
+            ),
+            (
+                "2.5.10",
+                "https://github.com/clash-verge-rev/clash-verge-rev/releases/download/v2.5.10/clash5_2.5.10_x64-setup.exe",
+            ),
+            (
+                "2.5.10",
+                "https://github.com/oops11111/clash5/releases/download/v2.5.9/clash5_2.5.10_x64-setup.exe",
+            ),
+            (
+                "2.5.10",
+                "https://github.com/oops11111/clash5/releases/download/v2.5.10/clash5_2.5.9_x64-setup.exe",
+            ),
+            (
+                "2.5.10",
+                "https://github.com/oops11111/clash5/releases/download/v2.5.10/Clash.Verge_2.5.10_x64-setup.exe",
+            ),
+            (
+                "2.5.10",
+                "https://update.hwdns.net/https://github.com/oops11111/clash5/releases/download/v2.5.10/clash5_2.5.10_x64-setup.exe",
+            ),
+        ] {
+            assert!(!is_official_stable_release(&candidate(version, url)), "{url}");
+        }
+
+        let mut missing_signature = valid.clone();
+        if let RemoteReleaseInner::Dynamic(platform) = &mut missing_signature.data {
+            platform.signature.clear();
+        }
+        assert!(!is_official_stable_release(&missing_signature));
+
+        let mut mixed = valid.clone();
+        let RemoteReleaseInner::Dynamic(valid_platform) = &valid.data else {
+            unreachable!()
+        };
+        let mut platforms = std::collections::HashMap::new();
+        platforms.insert("windows-x86_64".to_string(), valid_platform.clone());
+        platforms.insert(
+            "darwin-aarch64".to_string(),
+            ReleaseManifestPlatform {
+                url: "https://github.com/other/repo/releases/download/v2.5.10/clash5_2.5.10_aarch64.app.tar.gz"
+                    .parse()
+                    .unwrap(),
+                signature: "signed-bundle".to_string(),
+            },
+        );
+        mixed.data = RemoteReleaseInner::Static { platforms };
+        assert!(!is_official_stable_release(&mixed));
     }
 }
