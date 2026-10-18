@@ -46,6 +46,8 @@ jobs:
               - '.github/workflows/telegram-notify.yml'
               - 'scripts/check-release-draft.mjs'
               - 'scripts/release-version.mjs'
+              - 'src-tauri/webview2.*.json'
+              - 'src-tauri/tauri.conf.json'
 
       - name: Skip if no frontend changes
         if: steps.check_frontend.outputs.frontend != 'true'

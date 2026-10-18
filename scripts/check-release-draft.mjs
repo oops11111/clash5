@@ -80,12 +80,19 @@ for (const script of [
 ]) {
   assert.equal(pkg.scripts[script], undefined)
 }
-const tauri = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8'))
-assert.deepEqual(
-  tauri.plugins.updater.endpoints,
-  [],
-  'unsigned updater feeds must remain disabled',
-)
+for (const configPath of [
+  'src-tauri/tauri.conf.json',
+  'src-tauri/webview2.x64.json',
+  'src-tauri/webview2.x86.json',
+  'src-tauri/webview2.arm64.json',
+]) {
+  const tauri = JSON.parse(readFileSync(configPath, 'utf8'))
+  assert.deepEqual(
+    tauri.plugins.updater.endpoints,
+    [],
+    `${configPath}: unsigned updater feeds must remain disabled`,
+  )
+}
 
 console.log(
   '[release-draft] tag builds can only upload clash5 candidate assets to a draft',
