@@ -129,6 +129,11 @@ for (const configPath of [
     [],
     `${configPath}: unsigned updater feeds must remain disabled`,
   )
+  assert.equal(
+    tauri.plugins.updater.requireSignedVersion,
+    true,
+    `${configPath}: updater signatures must bind the release version`,
+  )
 }
 
 for (const filename of readdirSync('.github/ISSUE_TEMPLATE')) {

@@ -343,7 +343,8 @@ trait ProcessProxyEngine {
 
 - **Tauri updater 签名密钥**：私钥仅存放于 CI 的加密密钥库，不入仓库；由指定负责人保管，并记录轮换流程。
 - **平台签名**：Windows 使用代码签名证书，macOS 进行 Developer ID 签名与公证。证书来源与费用在 M6 前确定。
-- **发布流程**：tag → CI 构建 → 签名 → 生成 Release 草稿 → 人工确认后发布；测试通道与稳定通道使用不同的更新端点。
+- **发布流程**：tag → CI 建立 Release 草稿并构建候选包 → 独立签名与平台验收 → 人工确认后发布；测试通道与稳定通道使用不同的更新端点。当前 tag 流程只上传无签名草稿，不能直接发布。
+- **候选包门槛**：`clash5 Release Candidate Gate` 可对已有草稿执行只读验收，核对 tag/版本、仓库 URL、Win/macOS 四个平台的更新资产、sidecar 与本机配置公钥的签名和签名版本；验收不发布 Release，也不替代 Windows 代码签名、macOS 公证及安装/更新桌面测试。缺少独立 updater 密钥时此门槛保持失败。
 - **回滚**：若某版本出现严重问题，撤回 Release 并在更新端点指回上一稳定版本。
 
 ---
