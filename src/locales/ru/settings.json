@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "Язык",
+          "followSystemLanguage": "Следовать языку системы",
+          "followSystemLanguageDescription": "Отключите, чтобы выбрать язык интерфейса вручную",
           "themeMode": "Цветовая тема",
           "trayClickEvent": "Событие при щелчке по иконке в трее",
           "copyEnvType": "Скопировать тип Env",

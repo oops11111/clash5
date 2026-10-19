@@ -54,7 +54,7 @@ async fn ensure_effect(
         Effect::Autostart => autostart::update_launch().await?,
         Effect::Language => {
             if let Some(language) = &patch.language {
-                clash_verge_i18n::set_locale(language.as_str());
+                clash_verge_i18n::sync_locale(Some(language));
             }
         }
         Effect::SystemProxy => {

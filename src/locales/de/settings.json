@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "Spracheinstellungen",
+          "followSystemLanguage": "Systemsprache verwenden",
+          "followSystemLanguageDescription": "Deaktivieren, um die Sprache der Oberfläche selbst zu wählen",
           "themeMode": "Thema",
           "trayClickEvent": "Tray-Klickereignis",
           "copyEnvType": "Umgebungsvariablentyp kopieren",

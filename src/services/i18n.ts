@@ -24,7 +24,7 @@ const LANGUAGE_STORAGE_KEY = 'verge-language'
 const normalizeLanguage = (language?: string) =>
   language?.toLowerCase().replace(/_/g, '-')
 
-export const resolveLanguage = (language?: string) => {
+const resolveLanguage = (language?: string) => {
   const normalized = normalizeLanguage(language)
   if (!normalized) {
     return FALLBACK_LANGUAGE
@@ -44,6 +44,17 @@ export const resolveLanguage = (language?: string) => {
 
   return FALLBACK_LANGUAGE
 }
+
+export const resolvePreferredLanguage = (
+  preference?: string | null,
+  systemLanguage?: string,
+) =>
+  resolveLanguage(
+    !preference || preference === 'system'
+      ? (systemLanguage ??
+          (typeof navigator !== 'undefined' ? navigator.language : undefined))
+      : preference,
+  )
 
 const getLanguageStorage = () => {
   if (typeof window === 'undefined') return null

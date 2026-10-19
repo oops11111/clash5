@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "زبان",
+          "followSystemLanguage": "پیروی از زبان سیستم",
+          "followSystemLanguageDescription": "برای انتخاب دستی زبان رابط، آن را خاموش کنید",
           "themeMode": "حالت تم",
           "trayClickEvent": "رویداد کلیک در سینی سیستم",
           "copyEnvType": "کپی نوع محیط",

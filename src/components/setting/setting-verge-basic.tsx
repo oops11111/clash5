@@ -4,11 +4,11 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { DialogRef, TooltipIcon } from '@/components/base'
+import { DialogRef, Switch, TooltipIcon } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
 import { navigationItems } from '@/pages/_navigation-meta'
 import { copyClashEnv } from '@/services/cmds'
-import { supportedLanguages } from '@/services/i18n'
+import { resolvePreferredLanguage, supportedLanguages } from '@/services/i18n'
 import { showNotice } from '@/services/notice-service'
 import getSystem from '@/utils/get-system'
 
@@ -62,6 +62,10 @@ const SettingVergeBasic = ({ onError }: Props) => {
     startup_script,
     start_page,
   } = verge ?? {}
+  const manualLanguage =
+    language && language !== 'system'
+      ? language
+      : resolvePreferredLanguage('system')
   const configRef = useRef<DialogRef>(null)
   const hotkeyRef = useRef<DialogRef>(null)
   const miscRef = useRef<DialogRef>(null)
@@ -89,15 +93,49 @@ const SettingVergeBasic = ({ onError }: Props) => {
       <UpdateViewer ref={updateRef} />
       <BackupViewer ref={backupRef} />
 
+      <SettingItem
+        label={t('settings.components.verge.basic.fields.followSystemLanguage')}
+        secondary={t(
+          'settings.components.verge.basic.fields.followSystemLanguageDescription',
+        )}
+      >
+        <GuardState
+          value={!language || language === 'system'}
+          valueProps="checked"
+          onCatch={onError}
+          onFormat={(_, checked: boolean) => checked}
+          onChange={(checked) =>
+            onChangeData({
+              language: checked ? 'system' : manualLanguage,
+            })
+          }
+          onGuard={(checked) =>
+            patchVerge({
+              language: checked ? 'system' : manualLanguage,
+            })
+          }
+        >
+          <Switch />
+        </GuardState>
+      </SettingItem>
+
       <SettingItem label={t('settings.components.verge.basic.fields.language')}>
         <GuardState
-          value={language ?? 'en'}
+          value={
+            !language || language === 'system'
+              ? resolvePreferredLanguage('system')
+              : language
+          }
           onCatch={onError}
           onFormat={(e: any) => e.target.value}
           onChange={(e) => onChangeData({ language: e })}
           onGuard={(e) => patchVerge({ language: e })}
         >
-          <Select size="small" sx={{ width: 110, '> div': { py: '7.5px' } }}>
+          <Select
+            size="small"
+            disabled={!language || language === 'system'}
+            sx={{ width: 110, '> div': { py: '7.5px' } }}
+          >
             {languageOptions.map(({ code, label }) => (
               <MenuItem key={code} value={code}>
                 {label}

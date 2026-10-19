@@ -909,6 +909,8 @@ export interface TranslationResources {
             }
             fields: {
               copyEnvType: string
+              followSystemLanguage: string
+              followSystemLanguageDescription: string
               hotkeySetting: string
               language: string
               layoutSetting: string
