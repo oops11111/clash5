@@ -6,18 +6,14 @@
  *
  * <version> can be:
  *   - A full semver version (e.g., 1.2.3, v1.2.3, 1.2.3-beta, v1.2.3+build)
- *   - A tag: "alpha", "beta", "rc", "autobuild", "autobuild-latest", or "deploytest"
+ *   - A tag: "alpha", "beta", "rc", or "deploytest"
  *     - "alpha", "beta", "rc": Appends the tag to the current base version (e.g., 1.2.3-beta)
- *     - "autobuild": Appends a timestamped autobuild tag (e.g., 1.2.3+autobuild.2406101530)
- *     - "autobuild-latest": Appends an autobuild tag with latest Tauri commit (e.g., 1.2.3+autobuild.0614.a1b2c3d)
  *     - "deploytest": Appends a timestamped deploytest tag (e.g., 1.2.3+deploytest.2406101530)
  *
  * Examples:
  *   pnpm release-version 1.2.3
  *   pnpm release-version v1.2.3-beta
  *   pnpm release-version beta
- *   pnpm release-version autobuild
- *   pnpm release-version autobuild-latest
  *   pnpm release-version deploytest
  *
  */
@@ -163,7 +159,7 @@ async function updateCargoLockVersion(newVersion) {
     ? newVersion.slice(1)
     : newVersion
   const packageVersionPattern =
-    /(\[\[package\]\]\r?\nname = "clash-verge"\r?\nversion = )"[^"]+"/
+    /(\[\[package\]\]\r?\nname = "clash5"\r?\nversion = )"[^"]+"/
 
   try {
     const data = await fs.readFile(cargoLockPath, 'utf8')
@@ -173,7 +169,7 @@ async function updateCargoLockVersion(newVersion) {
     )
 
     if (updatedData === data) {
-      throw new Error('clash-verge package entry was not found in Cargo.lock')
+      throw new Error('clash5 package entry was not found in Cargo.lock')
     }
 
     await fs.writeFile(cargoLockPath, updatedData, 'utf8')
@@ -239,25 +235,13 @@ async function main(versionArg) {
 
   try {
     let newVersion
-    const validTags = [
-      'alpha',
-      'beta',
-      'rc',
-      'autobuild',
-      'autobuild-latest',
-      'deploytest',
-    ]
+    const validTags = ['alpha', 'beta', 'rc', 'deploytest']
 
     if (validTags.includes(versionArg.toLowerCase())) {
       const currentVersion = await getCurrentVersion()
       const baseVersion = getBaseVersion(currentVersion)
 
-      if (versionArg.toLowerCase() === 'autobuild') {
-        newVersion = `${baseVersion}+autobuild.${generateShortTimestamp(true, true)}`
-      } else if (versionArg.toLowerCase() === 'autobuild-latest') {
-        const latestTauriCommit = getLatestTauriCommit()
-        newVersion = `${baseVersion}+autobuild.${generateShortTimestamp()}.${latestTauriCommit}`
-      } else if (versionArg.toLowerCase() === 'deploytest') {
+      if (versionArg.toLowerCase() === 'deploytest') {
         newVersion = `${baseVersion}+deploytest.${generateShortTimestamp(true, true)}`
       } else {
         newVersion = `${baseVersion}-${versionArg.toLowerCase()}`
