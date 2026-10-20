@@ -93,7 +93,7 @@ export const PerformancePresetSettings = () => {
           </Button>
         ))}
       </Box>
-      {memoryMitigation?.active && (
+      {runningMode !== 'NotRunning' && memoryMitigation?.active && (
         <Typography
           variant="caption"
           color="warning.main"
