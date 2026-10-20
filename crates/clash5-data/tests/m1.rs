@@ -309,6 +309,15 @@ fn consecutive_probe_failures_back_off_and_success_resets_interval() {
 }
 
 #[test]
+fn quality_cache_respects_performance_interval() {
+    let quality = NodeQuality::from_probe(Some(45), Some(120), 1_000);
+    assert!(quality.is_fresh_with_interval(300_999, 300_000));
+    assert!(!quality.is_fresh_with_interval(301_000, 300_000));
+    assert!(quality.is_fresh_with_interval(1_200_999, 1_200_000));
+    assert!(!quality.is_fresh_with_interval(1_201_000, 1_200_000));
+}
+
+#[test]
 fn older_quality_cache_without_failure_streak_still_deserializes() {
     let old = r#"{"status":"failed","short_delay_ms":null,"handshake_delay_ms":null,"checked_at_ms":1000}"#;
     let quality: NodeQuality = serde_json::from_str(old).unwrap();

@@ -10,6 +10,33 @@ use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, specta::Type, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PerformancePreset {
+    #[default]
+    Balanced,
+    Performance,
+    PowerSaving,
+}
+
+impl PerformancePreset {
+    pub const fn probe_concurrency(self) -> usize {
+        match self {
+            Self::Balanced => 12,
+            Self::Performance => 16,
+            Self::PowerSaving => 4,
+        }
+    }
+
+    pub const fn probe_interval_ms(self) -> u64 {
+        match self {
+            Self::Balanced => 600_000,
+            Self::Performance => 300_000,
+            Self::PowerSaving => 1_200_000,
+        }
+    }
+}
+
 /// ### `verge.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
 #[serde(default)]
@@ -143,6 +170,8 @@ pub struct IVerge {
     pub singbox_persistent: Option<bool>,
 
     pub auto_check_update: Option<bool>,
+
+    pub performance_preset: Option<PerformancePreset>,
 
     #[specta(type = Option<std::string::String>)]
     pub default_latency_test: Option<String>,
@@ -421,6 +450,7 @@ impl IVerge {
             auto_close_connection: Some(true),
             singbox_persistent: Some(false),
             auto_check_update: Some(false),
+            performance_preset: Some(PerformancePreset::Balanced),
             enable_builtin_enhanced: Some(true),
             auto_log_clean: Some(2), // 1: 1天, 2: 7天, 3: 30天, 4: 90天
             enable_auto_backup_schedule: Some(false),
@@ -517,6 +547,7 @@ impl IVerge {
         patch!(auto_close_connection);
         patch!(singbox_persistent);
         patch!(auto_check_update);
+        patch!(performance_preset);
         patch!(default_latency_test);
         patch!(default_latency_timeout);
         patch!(enable_auto_delay_detection);
@@ -557,5 +588,24 @@ impl IVerge {
         } else {
             LevelFilter::Info
         }
+    }
+}
+
+#[cfg(test)]
+mod performance_preset_tests {
+    use super::*;
+
+    #[test]
+    fn preset_persists_in_verge_config() -> Result<(), serde_yaml_ng::Error> {
+        let mut config = IVerge::template();
+        assert_eq!(config.performance_preset, Some(PerformancePreset::Balanced));
+        config.patch_config(&IVerge {
+            performance_preset: Some(PerformancePreset::PowerSaving),
+            ..IVerge::default()
+        });
+        let yaml = serde_yaml_ng::to_string(&config)?;
+        let restored: IVerge = serde_yaml_ng::from_str(&yaml)?;
+        assert_eq!(restored.performance_preset, Some(PerformancePreset::PowerSaving));
+        Ok(())
     }
 }
