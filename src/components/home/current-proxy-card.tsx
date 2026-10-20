@@ -38,6 +38,7 @@ import { useNavigate } from 'react-router'
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import type { ProxySortType } from '@/components/proxy/use-filter-sort'
 import { useGroupDelays } from '@/hooks/use-group-delays'
+import { useMemoryMitigation } from '@/hooks/use-memory-mitigation'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { useVerge } from '@/hooks/use-verge'
@@ -68,6 +69,7 @@ const STORAGE_KEY_SORT_TYPE = 'clash-verge-proxy-sort-type'
 
 const AUTO_CHECK_DEFAULT_INTERVAL_MINUTES = 5
 const AUTO_CHECK_INITIAL_DELAY_MS = 100
+const AUTO_CHECK_PRESSURE_INTERVAL_MINUTES = 15
 const PROXY_MENU_MAX_HEIGHT = 500
 const PROXY_MENU_VIEWPORT_MARGIN = 8
 
@@ -545,6 +547,7 @@ export const CurrentProxyCard = () => {
   const { refreshProxy } = useAppRefreshers()
   const { isCoreDataPending } = useCoreDataStatus()
   const { verge } = useVerge()
+  const memoryMitigation = useMemoryMitigation()
   const { current: currentProfile } = useProfiles()
   const autoDelayEnabled = verge?.enable_auto_delay_detection ?? false
   const defaultLatencyTimeout = verge?.default_latency_timeout
@@ -554,8 +557,11 @@ export const CurrentProxyCard = () => {
       typeof rawInterval === 'number' && rawInterval > 0
         ? rawInterval
         : AUTO_CHECK_DEFAULT_INTERVAL_MINUTES
-    return Math.max(1, Math.round(intervalMinutes)) * 60 * 1000
-  }, [verge?.auto_delay_detection_interval_minutes])
+    const effectiveMinutes = memoryMitigation?.active
+      ? Math.max(intervalMinutes, AUTO_CHECK_PRESSURE_INTERVAL_MINUTES)
+      : intervalMinutes
+    return Math.max(1, Math.round(effectiveMinutes)) * 60 * 1000
+  }, [memoryMitigation?.active, verge?.auto_delay_detection_interval_minutes])
   const currentProfileId = currentProfile?.uid || null
 
   const getProfileStorageKey = useCallback(
@@ -869,11 +875,16 @@ export const CurrentProxyCard = () => {
       intervalTimer = setTimeout(runAndSchedule, autoDelayIntervalMs)
     }
 
-    initialTimer = setTimeout(async () => {
-      await checkCurrentProxyDelay()
-      if (disposed) return
-      intervalTimer = setTimeout(runAndSchedule, autoDelayIntervalMs)
-    }, AUTO_CHECK_INITIAL_DELAY_MS)
+    initialTimer = setTimeout(
+      async () => {
+        await checkCurrentProxyDelay()
+        if (disposed) return
+        intervalTimer = setTimeout(runAndSchedule, autoDelayIntervalMs)
+      },
+      memoryMitigation?.active
+        ? autoDelayIntervalMs
+        : AUTO_CHECK_INITIAL_DELAY_MS,
+    )
 
     return () => {
       disposed = true
@@ -883,6 +894,7 @@ export const CurrentProxyCard = () => {
   }, [
     checkCurrentProxyDelay,
     autoDelayIntervalMs,
+    memoryMitigation?.active,
     isDirectMode,
     selectedGroupName,
     selectedProxyName,

@@ -685,6 +685,8 @@ export const translationKeys = [
   'settings.components.verge.performance.power_saving',
   'settings.components.verge.performance.power_savingDescription',
   'settings.components.verge.performance.manualInterval',
+  'settings.components.verge.performance.memoryProtectionActive',
+  'settings.components.verge.performance.memoryTelemetryUnavailable',
   'settings.components.verge.advanced.title',
   'settings.components.verge.advanced.tooltips.backupInfo',
   'settings.components.verge.advanced.tooltips.openConfDir',

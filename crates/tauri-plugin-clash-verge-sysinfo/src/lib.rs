@@ -109,6 +109,13 @@ impl Platform {
     }
 }
 
+pub fn memory_capacity() -> Option<(u64, u64)> {
+    let mut system = System::new();
+    system.refresh_memory();
+    let total = system.total_memory();
+    let available = system.available_memory();
+    (total > 0 && available <= total).then_some((total, available))
+}
 #[inline]
 fn is_binary_admin() -> bool {
     #[cfg(not(windows))]

@@ -50,6 +50,8 @@ export const commands = {
   /**  Returns one coherent core/service snapshot instead of independently refreshed state. */
   getRuntimeState: () =>
     typedError<RunStateView, string>(__TAURI_INVOKE('get_runtime_state')),
+  clash5MemoryMitigationStatus: () =>
+    __TAURI_INVOKE<MemoryMitigationStatus>('clash5_memory_mitigation_status'),
   getPendingFailures: () =>
     __TAURI_INVOKE<PendingFailure[]>('get_pending_failures'),
   getSidecarFailure: () =>
@@ -983,6 +985,12 @@ export type ManualImportResult = {
 
 export type ManualNodeIdentity = {
   stable_id: string
+}
+
+export type MemoryMitigationStatus = {
+  active: boolean
+  monitoring: boolean
+  availablePercent: number | null
 }
 
 export type NetworkAddressWire =
