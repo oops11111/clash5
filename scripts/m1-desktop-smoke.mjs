@@ -1303,6 +1303,62 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
   if (includePluginFixture) await verifyM3PluginUi()
 }
 
+async function verifyThemeScreenshots() {
+  const settingsOpened = await browser.execute(() => {
+    const settings = [
+      ...document.querySelectorAll('.the-menu .MuiListItemButton-root'),
+    ].find((item) =>
+      ['Settings', '设置', '設定'].includes(item.textContent?.trim()),
+    )
+    settings?.click()
+    return Boolean(settings)
+  })
+  if (!settingsOpened) throw new Error('Settings navigation is missing')
+
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        ['Settings', '设置', '設定'].includes(
+          document
+            .querySelector('.base-page > header .MuiTypography-root')
+            ?.textContent?.trim() ?? '',
+        ),
+      ),
+    { timeout: 10_000, interval: 250, timeoutMsg: 'Settings did not render' },
+  )
+
+  const selectTheme = async (labels, mode, canvasColor) => {
+    const clicked = await browser.execute((values) => {
+      const button = [...document.querySelectorAll('.base-page button')].find(
+        (item) => values.includes(item.textContent?.trim()),
+      )
+      button?.click()
+      return Boolean(button)
+    }, labels)
+    if (!clicked) throw new Error(`${mode} theme control is missing`)
+    await browser.waitUntil(
+      async () =>
+        (await invoke('get_verge_config')).theme_mode === mode &&
+        (await browser.execute(() =>
+          document.documentElement.style
+            .getPropertyValue('--background-color')
+            .trim(),
+        )) === canvasColor,
+      {
+        timeout: 10_000,
+        interval: 250,
+        timeoutMsg: `${mode} theme did not apply`,
+      },
+    )
+  }
+
+  await selectTheme(['Light', '浅色', '淺色'], 'light', '#F0F4FA')
+  await browser.saveScreenshot(resolve('target/m6-settings-light.png'))
+  await selectTheme(['Dark', '深色'], 'dark', '#2E303D')
+  await browser.saveScreenshot(resolve('target/m6-settings-dark.png'))
+  await selectTheme(['Light', '浅色', '淺色'], 'light', '#F0F4FA')
+}
+
 async function verifyIdentityRotationAndAmbiguousRebind() {
   phase = 'identity rotation cancellation'
   const beforeCancel = {
@@ -2289,11 +2345,17 @@ try {
   if (full) {
     phase = 'sidebar and plugin binding navigation'
     await verifyNavigation()
+    phase = 'M6 light and dark settings appearance'
+    await verifyThemeScreenshots()
     phase = 'M2 chain editor and exit-IP policy'
     await verifyM2Chains()
     await verifyIdentityRotationAndAmbiguousRebind()
     await verifyM4SingboxRoute()
   } else if (persisted) {
+    const savedTheme = await invoke('get_verge_config')
+    if (savedTheme.theme_mode !== 'light')
+      throw new Error('Selected light theme did not survive desktop restart')
+    await invoke('patch_verge_config', { payload: { theme_mode: 'system' } })
     const workspace = await invoke('clash5_chain_workspace')
     const original = workspace.chains.find(
       (chain) => chain.name === 'M2 desktop chain',

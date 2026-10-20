@@ -3,16 +3,16 @@ const OS = getSystem()
 
 // default theme setting
 export const defaultTheme = {
-  primary_color: '#007AFF',
-  secondary_color: '#FC9B76',
-  primary_text: '#000000',
-  secondary_text: '#3C3C4399',
-  info_color: '#007AFF',
-  error_color: '#FF3B30',
-  warning_color: '#FF9500',
-  success_color: '#06943D',
-  background_color: '#F5F5F5',
-  font_family: `-apple-system, BlinkMacSystemFont,"Microsoft YaHei UI", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji"${
+  primary_color: '#2F6BFF',
+  secondary_color: '#8B5CF6',
+  primary_text: '#1A2332',
+  secondary_text: '#5A6B82',
+  info_color: '#2F6BFF',
+  error_color: '#EF4444',
+  warning_color: '#F59E0B',
+  success_color: '#22C55E',
+  background_color: '#FFFFFF',
+  font_family: `"Segoe UI", "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji"${
     OS === 'windows' ? ', twemoji mozilla' : ''
   }`,
 }

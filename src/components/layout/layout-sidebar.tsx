@@ -128,7 +128,9 @@ export const LayoutSidebar = (props: LayoutSidebarProps) => {
           style={{
             height: '27px',
             display: 'flex',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-start',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
           <img
@@ -145,9 +147,9 @@ export const LayoutSidebar = (props: LayoutSidebarProps) => {
           <span
             style={{
               color: isDark ? 'white' : '#111827',
-              fontSize: 22,
+              fontSize: 16,
               fontWeight: 700,
-              letterSpacing: '-0.04em',
+              letterSpacing: '0.01em',
               lineHeight: '27px',
             }}
           >
