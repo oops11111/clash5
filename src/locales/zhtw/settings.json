@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "語言設定",
+          "followSystemLanguage": "語言跟隨系統",
+          "followSystemLanguageDescription": "關閉後可手動選擇介面語言",
           "themeMode": "主題模式",
           "trayClickEvent": "系統匣點擊事件",
           "copyEnvType": "複製環境變數類型",

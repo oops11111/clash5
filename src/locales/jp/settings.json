@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "言語設定",
+          "followSystemLanguage": "システムの言語に合わせる",
+          "followSystemLanguageDescription": "オフにすると表示言語を手動で選択できます",
           "themeMode": "テーマモード",
           "trayClickEvent": "トレイアイコンクリックイベント",
           "copyEnvType": "環境変数タイプをコピー",

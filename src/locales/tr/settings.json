@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "Dil",
+          "followSystemLanguage": "Sistem dilini kullan",
+          "followSystemLanguageDescription": "Arayüz dilini elle seçmek için kapatın",
           "themeMode": "Tema Modu",
           "trayClickEvent": "Sistem Tepsisi Tıklama Olayı",
           "copyEnvType": "Env Tipini Kopyala",

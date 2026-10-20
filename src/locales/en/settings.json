@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "Language",
+          "followSystemLanguage": "Follow system language",
+          "followSystemLanguageDescription": "Turn off to choose an interface language",
           "themeMode": "Theme Mode",
           "trayClickEvent": "Tray Click Event",
           "copyEnvType": "Copy Env Type",

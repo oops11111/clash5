@@ -85,3 +85,14 @@ macro_rules! t {
         }
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn system_preference_uses_current_os_locale() {
+        assert_eq!(current_language(Some("system")), system_language());
+        assert_eq!(current_language(Some("en")), "en");
+    }
+}

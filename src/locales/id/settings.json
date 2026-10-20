@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "Bahasa",
+          "followSystemLanguage": "Ikuti bahasa sistem",
+          "followSystemLanguageDescription": "Nonaktifkan untuk memilih bahasa antarmuka secara manual",
           "themeMode": "Mode Tema",
           "trayClickEvent": "Acara Klik Tray",
           "copyEnvType": "Salin Jenis Env",
