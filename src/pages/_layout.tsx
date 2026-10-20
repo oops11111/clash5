@@ -18,6 +18,7 @@ import { useI18n } from '@/hooks/use-i18n'
 import { useVerge } from '@/hooks/use-verge'
 import { useWindowDecorations } from '@/hooks/use-window'
 import { useEventBus } from '@/services/bus'
+import { resolvePreferredLanguage } from '@/services/i18n'
 import { handleNoticeMessage } from '@/services/notice-handlers'
 import { useThemeMode } from '@/services/states'
 import getSystem from '@/utils/get-system'
@@ -81,9 +82,16 @@ const Layout = () => {
   usePendingFailures()
 
   useEffect(() => {
-    if (language) {
-      dayjs.locale(language === 'zh' ? 'zh-cn' : language)
-      switchLanguage(language)
+    const syncLanguage = () => {
+      const active = resolvePreferredLanguage(language)
+      dayjs.locale(active === 'zh' ? 'zh-cn' : active)
+      void switchLanguage(language ?? 'system')
+    }
+
+    syncLanguage()
+    if (!language || language === 'system') {
+      window.addEventListener('languagechange', syncLanguage)
+      return () => window.removeEventListener('languagechange', syncLanguage)
     }
   }, [language, switchLanguage])
 

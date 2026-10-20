@@ -670,6 +670,8 @@ export const translationKeys = [
   'settings.components.verge.basic.trayOptions.showTrayMenu',
   'settings.components.verge.basic.trayOptions.disable',
   'settings.components.verge.basic.fields.language',
+  'settings.components.verge.basic.fields.followSystemLanguage',
+  'settings.components.verge.basic.fields.followSystemLanguageDescription',
   'settings.components.verge.basic.fields.themeMode',
   'settings.components.verge.basic.fields.trayClickEvent',
   'settings.components.verge.basic.fields.copyEnvType',

@@ -1,0 +1,73 @@
+name: clash5 Release Candidate Gate
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/clash5-release-candidate.yml'
+      - 'scripts/release-gate/**'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing clash5 draft release tag (for example v2.5.10)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  fixture:
+    name: Verify release gate fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: scripts/release-gate -> target
+      - run: cargo test --locked --manifest-path scripts/release-gate/Cargo.toml
+
+  verify-draft:
+    name: Verify draft assets and updater signatures
+    if: github.event_name == 'workflow_dispatch'
+    needs: fixture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: scripts/release-gate -> target
+      - name: Check tag origin and version
+        env:
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid release tag"
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "$TAG")"
+          test "$TAG" = "v$(node -p 'require("./package.json").version')"
+          if [[ "$TAG" == *-* ]]; then branch=dev; else branch=main; fi
+          git fetch origin "$branch"
+          git merge-base --is-ancestor HEAD "origin/$branch"
+      - name: Download draft metadata and assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/clash5-release-assets"
+          gh api "repos/oops11111/clash5/releases/tags/$TAG" > "$RUNNER_TEMP/clash5-release.json"
+          gh release download "$TAG" -R oops11111/clash5 -D "$RUNNER_TEMP/clash5-release-assets"
+      - name: Verify release candidate
+        shell: bash
+        run: |
+          cargo run --locked --manifest-path scripts/release-gate/Cargo.toml -- \
+            "$RUNNER_TEMP/clash5-release.json" \
+            "$RUNNER_TEMP/clash5-release-assets" \
+            package.json src-tauri/tauri.conf.json

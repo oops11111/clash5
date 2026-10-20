@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "Configuración de idioma",
+          "followSystemLanguage": "Seguir el idioma del sistema",
+          "followSystemLanguageDescription": "Desactívalo para elegir el idioma de la interfaz",
           "themeMode": "Modo de tema",
           "trayClickEvent": "Evento de clic en el icono de la bandeja",
           "copyEnvType": "Copiar tipo de variable de entorno",

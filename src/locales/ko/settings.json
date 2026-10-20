@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "언어",
+          "followSystemLanguage": "시스템 언어 따르기",
+          "followSystemLanguageDescription": "끄면 인터페이스 언어를 직접 선택할 수 있습니다",
           "themeMode": "테마 모드",
           "trayClickEvent": "트레이 클릭 이벤트",
           "copyEnvType": "환경 유형 복사",

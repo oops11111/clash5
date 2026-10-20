@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "Тел",
+          "followSystemLanguage": "Система телен куллану",
+          "followSystemLanguageDescription": "Интерфейс телен кулдан сайлау өчен сүндерегез",
           "themeMode": "Теманың режимы",
           "trayClickEvent": "Трейдагы басу вакыйгасы",
           "copyEnvType": "Env төрен күчереп алу",

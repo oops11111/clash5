@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "اللغة",
+          "followSystemLanguage": "اتباع لغة النظام",
+          "followSystemLanguageDescription": "أوقفه لاختيار لغة الواجهة يدويًا",
           "themeMode": "وضع السمة",
           "trayClickEvent": "حدث النقر على الأيقونة في شريط المهام",
           "copyEnvType": "نسخ نوع البيئة",
