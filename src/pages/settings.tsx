@@ -10,8 +10,15 @@ import SettingSystem from '@/components/setting/setting-system'
 import SettingVergeAdvanced from '@/components/setting/setting-verge-advanced'
 import SettingVergeBasic from '@/components/setting/setting-verge-basic'
 import { showNotice } from '@/services/notice-service'
-import { useThemeMode } from '@/services/states'
 import { openExternalUrl } from '@/utils/open-external-url'
+
+const settingCardSx = {
+  borderRadius: '14px',
+  border: '1px solid',
+  borderColor: 'divider',
+  backgroundColor: 'background.paper',
+  boxShadow: '0 1px 3px rgba(26, 35, 50, 0.04)',
+}
 
 const SettingPage = () => {
   const { t } = useTranslation()
@@ -35,9 +42,6 @@ const SettingPage = () => {
   const toTelegramChannel = useLockFn(() =>
     openExternalUrl('https://t.me/clash_verge_re').catch(onError),
   )
-
-  const mode = useThemeMode()
-  const isDark = mode === 'light' ? false : true
 
   return (
     <BasePage
@@ -80,38 +84,26 @@ const SettingPage = () => {
         <Grid size={6}>
           <Box
             sx={{
-              borderRadius: 2,
+              ...settingCardSx,
               marginBottom: 1.5,
-              backgroundColor: isDark ? '#282a36' : '#ffffff',
             }}
           >
             <SettingSystem onError={onError} />
           </Box>
-          <Box
-            sx={{
-              borderRadius: 2,
-              backgroundColor: isDark ? '#282a36' : '#ffffff',
-            }}
-          >
+          <Box sx={settingCardSx}>
             <SettingClash onError={onError} />
           </Box>
         </Grid>
         <Grid size={6}>
           <Box
             sx={{
-              borderRadius: 2,
+              ...settingCardSx,
               marginBottom: 1.5,
-              backgroundColor: isDark ? '#282a36' : '#ffffff',
             }}
           >
             <SettingVergeBasic onError={onError} />
           </Box>
-          <Box
-            sx={{
-              borderRadius: 2,
-              backgroundColor: isDark ? '#282a36' : '#ffffff',
-            }}
-          >
+          <Box sx={settingCardSx}>
             <SettingVergeAdvanced onError={onError} />
           </Box>
         </Grid>

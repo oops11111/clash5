@@ -4,16 +4,18 @@
   display: flex;
   flex-direction: column;
   > header {
-    flex: 0 0 58px;
+    flex: 0 0 64px;
     width: 100%;
     // max-width: 850px;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: 0 24px;
     box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--divider-color);
+    background: var(--header-background);
+    backdrop-filter: var(--glass-filter);
   }
 
   .base-container {
@@ -28,11 +30,11 @@
       width: 100%;
       height: 100%;
       overflow: auto;
-      padding: 10px 0;
+      padding: 18px 0;
       box-sizing: border-box;
       scrollbar-gutter: stable;
       .base-content {
-        width: calc(100% - 10px * 2);
+        width: calc(100% - 24px * 2);
         margin: 0 auto;
       }
     }
