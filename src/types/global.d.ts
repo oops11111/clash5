@@ -930,6 +930,7 @@ interface IVergeConfig {
   auto_close_connection?: boolean
   singbox_persistent?: boolean
   auto_check_update?: boolean
+  performance_preset?: 'balanced' | 'performance' | 'power_saving'
   default_latency_test?: string
   default_latency_timeout?: number
   enable_auto_delay_detection?: boolean

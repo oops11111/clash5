@@ -4,6 +4,7 @@ import { useLockFn } from 'ahooks'
 import { useTranslation } from 'react-i18next'
 
 import { BasePage } from '@/components/base'
+import { PerformancePresetSettings } from '@/components/setting/performance-preset-settings'
 import SettingClash from '@/components/setting/setting-clash'
 import SettingSystem from '@/components/setting/setting-system'
 import SettingVergeAdvanced from '@/components/setting/setting-verge-advanced'
@@ -74,6 +75,7 @@ const SettingPage = () => {
         </ButtonGroup>
       }
     >
+      <PerformancePresetSettings />
       <Grid container spacing={1.5} columns={{ xs: 6, sm: 6, md: 12 }}>
         <Grid size={6}>
           <Box

@@ -94,6 +94,7 @@ verge_registry! {
     auto_close_connection => NoEffect;
     singbox_persistent => NoEffect;
     auto_check_update => NoEffect;
+    performance_preset => NoEffect;
     default_latency_test => NoEffect;
     default_latency_timeout => NoEffect;
     enable_auto_delay_detection => NoEffect;

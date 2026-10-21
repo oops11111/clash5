@@ -166,7 +166,11 @@ impl NodeQuality {
     }
 
     pub fn is_fresh(&self, now_ms: u64) -> bool {
-        let interval = Self::MIN_INTERVAL_MS
+        self.is_fresh_with_interval(now_ms, Self::MIN_INTERVAL_MS)
+    }
+
+    pub fn is_fresh_with_interval(&self, now_ms: u64, base_interval_ms: u64) -> bool {
+        let interval = base_interval_ms
             .saturating_mul(1_u64 << self.failure_streak.min(3))
             .min(Self::MAX_INTERVAL_MS);
         now_ms >= self.checked_at_ms && now_ms - self.checked_at_ms < interval

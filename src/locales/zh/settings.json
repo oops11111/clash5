@@ -181,6 +181,16 @@
           "hotkeySetting": "热键设置"
         }
       },
+      "performance": {
+        "title": "性能预设",
+        "balanced": "均衡",
+        "balancedDescription": "最多 12 个并发探测，缓存 10 分钟；启用自动检测时每 5 分钟检查当前节点",
+        "performance": "性能优先",
+        "performanceDescription": "最多 16 个并发探测，缓存 5 分钟；启用自动检测时每 2 分钟检查当前节点",
+        "power_saving": "省电",
+        "power_savingDescription": "最多 4 个并发探测，缓存 20 分钟；启用自动检测时每 15 分钟检查当前节点",
+        "manualInterval": "启用自动检测时，当前节点按高级设置中的 {{minutes}} 分钟间隔检查"
+      },
       "advanced": {
         "title": "Verge 高级设置",
         "tooltips": {
