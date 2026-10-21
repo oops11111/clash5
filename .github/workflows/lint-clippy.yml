@@ -16,8 +16,8 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-          # Keep the ARM target check while using the Intel macOS runner.
-          - os: macos-13
+          # Cross-compile the Apple ARM target on available Ubuntu hosted capacity.
+          - os: ubuntu-22.04
             target: aarch64-apple-darwin
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
