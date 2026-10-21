@@ -84,7 +84,7 @@ static NTSTATUS C5RegisterCallout(PDEVICE_OBJECT deviceObject, const GUID *callo
     return FwpsCalloutRegister1(deviceObject, &callout, calloutId);
 }
 
-static void C5DetachSession(C5_DRIVER_STATE *state)
+static void C5ClearSession(C5_DRIVER_STATE *state)
 {
     KIRQL oldIrql;
 
@@ -94,6 +94,30 @@ static void C5DetachSession(C5_DRIVER_STATE *state)
     RtlZeroMemory(&state->session, sizeof(state->session));
     RtlZeroMemory(state->targetPids, sizeof(state->targetPids));
     KeReleaseSpinLock(&state->sessionLock, oldIrql);
+}
+
+static NTSTATUS C5DetachSession(C5_DRIVER_STATE *state, const C5_DETACH_REQUEST *request)
+{
+    KIRQL oldIrql;
+    NTSTATUS status = STATUS_SUCCESS;
+
+    if (request->version != C5_SESSION_PROTOCOL_VERSION || request->size != sizeof(*request) ||
+        request->sessionId == 0) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    KeAcquireSpinLock(&state->sessionLock, &oldIrql);
+    if (!state->sessionActive) {
+        status = STATUS_NOT_FOUND;
+    } else if (state->session.sessionId != request->sessionId) {
+        status = STATUS_ACCESS_DENIED;
+    } else {
+        state->sessionActive = FALSE;
+        state->targetCount = 0;
+        RtlZeroMemory(&state->session, sizeof(state->session));
+        RtlZeroMemory(state->targetPids, sizeof(state->targetPids));
+    }
+    KeReleaseSpinLock(&state->sessionLock, oldIrql);
+    return status;
 }
 
 static NTSTATUS C5AttachSession(C5_DRIVER_STATE *state, const C5_ATTACH_REQUEST *request)
@@ -154,12 +178,7 @@ static NTSTATUS C5Dispatch(PDEVICE_OBJECT deviceObject, PIRP irp)
     } else if (stack->Parameters.DeviceIoControl.IoControlCode == IOCTL_C5_DETACH_SESSION &&
                stack->Parameters.DeviceIoControl.InputBufferLength == sizeof(C5_DETACH_REQUEST)) {
         const C5_DETACH_REQUEST *request = (const C5_DETACH_REQUEST *)irp->AssociatedIrp.SystemBuffer;
-        if (request->version != C5_SESSION_PROTOCOL_VERSION || request->size != sizeof(*request)) {
-            status = STATUS_INVALID_PARAMETER;
-        } else {
-            C5DetachSession(state);
-            status = STATUS_SUCCESS;
-        }
+        status = C5DetachSession(state, request);
     } else {
         status = STATUS_INVALID_DEVICE_REQUEST;
     }
@@ -176,7 +195,7 @@ static void C5Unload(PDRIVER_OBJECT driverObject)
     UNICODE_STRING dosDeviceName = RTL_CONSTANT_STRING(C5_DOS_DEVICE_NAME);
 
     if (state != NULL) {
-        C5DetachSession(state);
+        C5ClearSession(state);
         if (state->calloutV6Id != 0) {
             FwpsCalloutUnregisterById0(state->calloutV6Id);
         }
