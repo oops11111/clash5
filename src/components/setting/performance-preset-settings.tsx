@@ -2,6 +2,8 @@ import { Box, Button, Typography } from '@mui/material'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useMemoryMitigation } from '@/hooks/use-memory-mitigation'
+import { useSystemState } from '@/hooks/use-system-state'
 import { useVerge } from '@/hooks/use-verge'
 import { showNotice } from '@/services/notice-service'
 
@@ -15,6 +17,8 @@ import {
 export const PerformancePresetSettings = () => {
   const { t } = useTranslation()
   const { verge, mutateVerge, patchVerge } = useVerge()
+  const memoryMitigation = useMemoryMitigation()
+  const { runningMode } = useSystemState()
   const [saving, setSaving] = useState(false)
   const selected = verge?.performance_preset ?? 'balanced'
   const selectedPreset = performancePresets.find(
@@ -89,6 +93,28 @@ export const PerformancePresetSettings = () => {
           </Button>
         ))}
       </Box>
+      {runningMode !== 'NotRunning' && memoryMitigation?.active && (
+        <Typography
+          variant="caption"
+          color="warning.main"
+          sx={{ display: 'block', mt: 1 }}
+        >
+          {t('settings.components.verge.performance.memoryProtectionActive')}
+        </Typography>
+      )}
+      {runningMode !== 'NotRunning' &&
+        memoryMitigation &&
+        !memoryMitigation.monitoring && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: 'block', mt: 1 }}
+          >
+            {t(
+              'settings.components.verge.performance.memoryTelemetryUnavailable',
+            )}
+          </Typography>
+        )}
       {customInterval != null &&
         customInterval !== selectedPreset?.intervalMinutes && (
           <Typography

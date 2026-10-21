@@ -2246,6 +2246,19 @@ try {
       cause: error,
     })
   }
+  const memoryStatus = await invoke('clash5_memory_mitigation_status')
+  if (
+    typeof memoryStatus?.active !== 'boolean' ||
+    typeof memoryStatus.monitoring !== 'boolean' ||
+    (memoryStatus.availablePercent != null &&
+      (!Number.isInteger(memoryStatus.availablePercent) ||
+        memoryStatus.availablePercent < 0 ||
+        memoryStatus.availablePercent > 100))
+  ) {
+    throw new Error(
+      `Invalid memory mitigation status: ${JSON.stringify(memoryStatus)}`,
+    )
+  }
   if (!persisted && !recoveryCancel && inventory.length !== 0) {
     throw new Error(`Fresh desktop session contains ${inventory.length} nodes`)
   }

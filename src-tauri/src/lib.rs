@@ -52,6 +52,7 @@ pub fn export_frontend_command_contract() -> Result<(), Box<dyn std::error::Erro
             cmd::restart_core,
             cmd::upgrade_clash_core,
             cmd::get_runtime_state,
+            cmd::clash5_memory_mitigation_status,
             cmd::get_pending_failures,
             cmd::get_sidecar_failure,
             cmd::entry_lightweight_mode,
@@ -293,6 +294,7 @@ mod app_init {
             cmd::restart_core,
             cmd::upgrade_clash_core,
             cmd::get_runtime_state,
+            cmd::clash5_memory_mitigation_status,
             cmd::get_pending_failures,
             cmd::get_sidecar_failure,
             cmd::entry_lightweight_mode,
@@ -504,6 +506,7 @@ pub fn run() -> std::process::ExitCode {
                 resolve::resolve_setup_async();
                 resolve::resolve_setup_sync();
                 resolve::init_signal();
+                core::memory_mitigation::start_monitor();
             })) {
                 log_setup_panic("window-core", panic);
             }

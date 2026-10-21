@@ -189,7 +189,9 @@
         "performanceDescription": "16 parallel checks, 5-minute reuse; current-node checks every 2 minutes when enabled",
         "power_saving": "Power saving",
         "power_savingDescription": "4 parallel checks, 20-minute reuse; current-node checks every 15 minutes when enabled",
-        "manualInterval": "When enabled, current-node checks use the advanced interval of {{minutes}} minutes"
+        "manualInterval": "When enabled, current-node checks use the advanced interval of {{minutes}} minutes",
+        "memoryProtectionActive": "記憶體壓力保護已啟用。探測工作暫時減少，已儲存的性能預設不變。",
+        "memoryTelemetryUnavailable": "無法取得系統記憶體資訊；自動保護暫時無法更新。"
       },
       "advanced": {
         "title": "Verge 進階設定",

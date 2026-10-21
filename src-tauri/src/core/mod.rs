@@ -6,6 +6,7 @@ pub mod lightweight;
 pub mod listener;
 pub mod logger;
 pub mod manager;
+pub mod memory_mitigation;
 #[cfg(target_os = "macos")]
 pub mod network_watch;
 pub mod notify;

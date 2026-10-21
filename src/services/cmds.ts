@@ -19,6 +19,7 @@ import type {
   DownloadEvent as ContractDownloadEvent,
   IProfiles_Serialize,
   IVerge_Serialize,
+  MemoryMitigationStatus,
   NetworkInterfaceWire,
   NodeRecord,
   PendingIdentityRebind as GeneratedPendingIdentityRebind,
@@ -52,6 +53,9 @@ import { debugLog } from '@/utils/debug'
 export async function copyClashEnv() {
   return invoke<null>('copy_clash_env')
 }
+
+export const getMemoryMitigationStatus = () =>
+  invoke<MemoryMitigationStatus>('clash5_memory_mitigation_status')
 
 export async function getProfiles() {
   return profilesFromWire(await invoke<IProfiles_Serialize>('get_profiles'))

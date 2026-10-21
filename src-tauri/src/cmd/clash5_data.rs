@@ -1177,6 +1177,7 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
         .latest_arc()
         .performance_preset
         .unwrap_or_default();
+    let preset = crate::core::memory_mitigation::effective_preset(preset);
     let current = Config::profiles().await.latest_arc().current.clone();
     let view = super::proxy::get_proxy_view().await?;
     let mut name_count = HashMap::new();

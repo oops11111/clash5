@@ -977,6 +977,8 @@ export interface TranslationResources {
             balanced: string
             balancedDescription: string
             manualInterval: string
+            memoryProtectionActive: string
+            memoryTelemetryUnavailable: string
             performance: string
             performanceDescription: string
             power_saving: string
