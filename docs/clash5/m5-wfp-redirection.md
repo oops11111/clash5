@@ -34,6 +34,21 @@ Injection stays off after install and after every restart. Attach requires expli
 
 No test fixture can establish that Windows route state was restored. Release acceptance must inspect WFP state and TUN route/config snapshots before attach, while attached, after detach, after forced app/service termination, and after next-start recovery.
 
+## Controlled service IPC
+
+M5 does not depend on a future upstream service-protocol release. clash5 pins its
+own `clash5-service-ipc` fork to a reviewed commit. The fork exposes an authenticated,
+capability-gated `process-proxy/session` API for attach, status, and detach. It accepts
+only the active owner session, a loopback relay PID and port, and exact targets with a
+creation timestamp. The chain credential stays inside the relay and never crosses the
+privileged service boundary.
+
+The service records an accepted session before reporting it active and treats a missing,
+foreign, unreadable, or uncleared record as recovery-required. At service startup it
+detaches a surviving recorded driver session before normal work resumes. This supplies
+the control and recovery boundary only: it does not establish WFP filters, relay
+behavior, TUN exclusion, driver packaging, or release readiness.
+
 ## Gating questions before implementation
 
 - Choose and package the signed WFP callout driver and privileged service; this repository currently has no driver project or installer lifecycle for one.
