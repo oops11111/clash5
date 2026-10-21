@@ -185,6 +185,8 @@ jobs:
             target/nav-plugins-binding.png
             target/m2-desktop-chains.png
             target/m4-desktop-route.png
+            target/m6-settings-light.png
+            target/m6-settings-dark.png
           if-no-files-found: warn
       - name: Upload test shell
         if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

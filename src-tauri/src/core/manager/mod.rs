@@ -216,6 +216,7 @@ impl CoreManager {
         }
         self.invalidate_core_readiness();
         self.run_state.core_stopped();
+        crate::core::memory_mitigation::reset();
     }
 
     /// A start attempt is under way and the Core is not serving yet.

@@ -1138,6 +1138,7 @@ async fn measure(target: &RuntimeProbeTarget, url: &str, timeout_ms: u32) -> Opt
 async fn probe_targets<F, Fut>(
     targets: Vec<(NodeRecord, RuntimeProbeTarget)>,
     now_ms: u64,
+    concurrency: usize,
     test: F,
 ) -> Vec<(Source, String, NodeQuality)>
 where
@@ -1152,7 +1153,7 @@ where
             (record.source, record.stable_id, quality)
         }
     }))
-    .buffer_unordered(PROBE_CONCURRENCY)
+    .buffer_unordered(concurrency.min(PROBE_CONCURRENCY))
     .collect()
     .await
 }
@@ -1171,6 +1172,12 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
     let records = crate::config::profiles::with_clash5_binding_store(|store| store.node_records(false))
         .await
         .map_err(failure)?;
+    let preset = Config::verge()
+        .await
+        .latest_arc()
+        .performance_preset
+        .unwrap_or_default();
+    let preset = crate::core::memory_mitigation::effective_preset(preset);
     let current = Config::profiles().await.latest_arc().current.clone();
     let view = super::proxy::get_proxy_view().await?;
     let mut name_count = HashMap::new();
@@ -1223,13 +1230,17 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
             batch.unavailable += 1;
             continue;
         }
-        if record.quality.as_ref().is_some_and(|quality| quality.is_fresh(now_ms)) {
+        if record
+            .quality
+            .as_ref()
+            .is_some_and(|quality| quality.is_fresh_with_interval(now_ms, preset.probe_interval_ms()))
+        {
             batch.cached += 1;
             continue;
         }
         targets.push((record, target));
     }
-    let results = probe_targets(targets, now_ms, |target| async move {
+    let results = probe_targets(targets, now_ms, preset.probe_concurrency(), |target| async move {
         let short = measure(&target, SHORT_PROBE_URL, SHORT_PROBE_MS).await;
         let handshake = measure(&target, HANDSHAKE_PROBE_URL, HANDSHAKE_PROBE_MS).await;
         (short, handshake)
@@ -1288,6 +1299,7 @@ pub async fn clash5_purge_expired_orphans() -> CmdResult<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::PerformancePreset;
     use std::sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -1355,6 +1367,7 @@ mod tests {
                 (node("healthy"), RuntimeProbeTarget::Core("healthy".into())),
             ],
             1_000,
+            PerformancePreset::Balanced.probe_concurrency(),
             |target| async move {
                 if matches!(target, RuntimeProbeTarget::Core(name) if name == "failed") {
                     (None, None)
@@ -1382,7 +1395,7 @@ mod tests {
                 )
             })
             .collect();
-        let results = probe_targets(targets, 1_000, {
+        let results = probe_targets(targets, 1_000, PerformancePreset::Performance.probe_concurrency(), {
             let active = Arc::clone(&active);
             let peak = Arc::clone(&peak);
             move |_| {
@@ -1401,6 +1414,19 @@ mod tests {
         assert_eq!(results.len(), PROBE_CONCURRENCY * 3);
         assert!(peak.load(Ordering::SeqCst) > 1);
         assert!(peak.load(Ordering::SeqCst) <= PROBE_CONCURRENCY);
+    }
+
+    #[test]
+    fn performance_presets_stay_within_probe_limit() {
+        assert_eq!(PerformancePreset::Balanced.probe_concurrency(), 12);
+        assert_eq!(PerformancePreset::Performance.probe_concurrency(), PROBE_CONCURRENCY);
+        assert_eq!(PerformancePreset::PowerSaving.probe_concurrency(), 4);
+        assert_eq!(
+            PerformancePreset::Balanced.probe_interval_ms(),
+            NodeQuality::MIN_INTERVAL_MS
+        );
+        assert!(PerformancePreset::Performance.probe_interval_ms() < NodeQuality::MIN_INTERVAL_MS);
+        assert!(PerformancePreset::PowerSaving.probe_interval_ms() > NodeQuality::MIN_INTERVAL_MS);
     }
 
     #[tokio::test]

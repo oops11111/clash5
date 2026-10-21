@@ -40,29 +40,27 @@ export const LayoutItem = (props: Props) => {
         selected={!!match}
         sx={[
           {
-            borderRadius: 2,
+            borderRadius: '10px',
             marginLeft: 1.25,
             paddingLeft: 1,
             paddingRight: 1,
             marginRight: 1.25,
             cursor: 'pointer',
             '& .MuiListItemText-primary': {
-              color: 'text.primary',
-              fontWeight: '700',
+              color: 'text.secondary',
+              fontWeight: 600,
             },
           },
-          ({ palette: { mode, primary } }) => {
-            const bgcolor =
-              mode === 'light'
-                ? alpha(primary.main, 0.15)
-                : alpha(primary.main, 0.35)
-            const color = mode === 'light' ? '#1f1f1f' : '#ffffff'
-            return {
-              '&.Mui-selected': { bgcolor },
-              '&.Mui-selected:hover': { bgcolor },
-              '&.Mui-selected .MuiListItemText-primary': { color },
-            }
-          },
+          ({ palette }) => ({
+            '&:hover': { bgcolor: palette.action.hover },
+            '&.Mui-selected': {
+              bgcolor: palette.primary.main,
+              boxShadow: `0 4px 12px ${alpha(palette.primary.main, 0.28)}`,
+            },
+            '&.Mui-selected:hover': { bgcolor: palette.primary.dark },
+            '&.Mui-selected .MuiListItemText-primary': { color: '#fff' },
+            '&.Mui-selected .MuiListItemIcon-root': { color: '#fff' },
+          }),
         ]}
         title={navCollapsed ? children : undefined}
         aria-label={navCollapsed ? children : undefined}
@@ -71,7 +69,7 @@ export const LayoutItem = (props: Props) => {
         {(effectiveMenuIcon === 'monochrome' || !effectiveMenuIcon) && (
           <ListItemIcon
             sx={{
-              color: 'text.primary',
+              color: 'text.secondary',
               minWidth: '44px',
               marginLeft: '6px',
               cursor: 'inherit',

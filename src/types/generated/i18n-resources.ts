@@ -979,6 +979,18 @@ export interface TranslationResources {
               hoverNavigatorDelay: string
             }
           }
+          performance: {
+            balanced: string
+            balancedDescription: string
+            manualInterval: string
+            memoryProtectionActive: string
+            memoryTelemetryUnavailable: string
+            performance: string
+            performanceDescription: string
+            power_saving: string
+            power_savingDescription: string
+            title: string
+          }
           theme: {
             actions: {
               editCss: string

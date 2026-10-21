@@ -15,3 +15,9 @@ pub async fn get_runtime_state() -> Result<RunStateView, String> {
 pub async fn get_pending_failures() -> Vec<PendingFailure> {
     notification::pending_failures()
 }
+
+#[tauri::command]
+#[specta::specta]
+pub fn clash5_memory_mitigation_status() -> crate::core::memory_mitigation::MemoryMitigationStatus {
+    crate::core::memory_mitigation::status()
+}

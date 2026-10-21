@@ -50,6 +50,8 @@ export const commands = {
   /**  Returns one coherent core/service snapshot instead of independently refreshed state. */
   getRuntimeState: () =>
     typedError<RunStateView, string>(__TAURI_INVOKE('get_runtime_state')),
+  clash5MemoryMitigationStatus: () =>
+    __TAURI_INVOKE<MemoryMitigationStatus>('clash5_memory_mitigation_status'),
   getPendingFailures: () =>
     __TAURI_INVOKE<PendingFailure[]>('get_pending_failures'),
   getSidecarFailure: () =>
@@ -817,6 +819,7 @@ export type IVerge_Deserialize = {
   /**  Keep the sing-box sidecar alive after its relay becomes idle. */
   singbox_persistent?: boolean | null
   auto_check_update?: boolean | null
+  performance_preset?: PerformancePreset | null
   default_latency_test?: string | null
   default_latency_timeout?: number | null
   enable_auto_delay_detection?: boolean | null
@@ -910,6 +913,7 @@ export type IVerge_Serialize = {
   /**  Keep the sing-box sidecar alive after its relay becomes idle. */
   singbox_persistent?: boolean | null
   auto_check_update: boolean | null
+  performance_preset: PerformancePreset | null
   default_latency_test: string | null
   default_latency_timeout: number | null
   enable_auto_delay_detection: boolean | null
@@ -981,6 +985,12 @@ export type ManualImportResult = {
 
 export type ManualNodeIdentity = {
   stable_id: string
+}
+
+export type MemoryMitigationStatus = {
+  active: boolean
+  monitoring: boolean
+  availablePercent: number | null
 }
 
 export type NetworkAddressWire =
@@ -1070,6 +1080,8 @@ export type PendingIdentityRebind = {
   old_stable_id: string
   candidate_ids: string[]
 }
+
+export type PerformancePreset = 'balanced' | 'performance' | 'power_saving'
 
 export type PluginAuditEvent = {
   id: number
