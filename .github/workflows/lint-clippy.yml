@@ -16,7 +16,8 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-          - os: macos-latest
+          # Keep the ARM target check while using the Intel macOS runner.
+          - os: macos-13
             target: aarch64-apple-darwin
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -76,7 +77,7 @@ jobs:
 
       - name: Run Clippy
         working-directory: ./src-tauri
-        run: cargo clippy-all
+        run: cargo clippy --all-targets --all-features --target ${{ matrix.target }} -- -D warnings
 
       - name: Run Windows security tests
         if: matrix.os == 'windows-latest' && (github.event_name == 'workflow_dispatch' || steps.check_changes.outputs.rust == 'true')
