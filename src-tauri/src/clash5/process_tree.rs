@@ -8,20 +8,23 @@ struct ProcessKey {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct ImageFileIdentity {
-    volume_serial_number: u32,
-    file_index: u64,
+    volume_serial_number: u64,
+    file_id: [u8; 16],
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct ProcessIdentity {
     key: ProcessKey,
     image_path: String,
-    image_file: ImageFileIdentity,
+    image_file: Option<ImageFileIdentity>,
 }
 
 impl ProcessIdentity {
     fn is_valid(&self) -> bool {
-        self.key.pid != 0 && self.key.creation_time_100ns != 0 && !self.image_path.is_empty()
+        self.key.pid != 0
+            && self.key.creation_time_100ns != 0
+            && !self.image_path.is_empty()
+            && self.image_file.is_some()
     }
 }
 
@@ -29,6 +32,7 @@ impl ProcessIdentity {
 enum ProcessTreeError {
     InvalidIdentity,
     SelfParent,
+    InvalidLineage,
     ConflictingProcessInstance,
 }
 
@@ -62,6 +66,9 @@ impl ProcessTree {
         }
         if !self.parents.contains_key(&parent) || self.active_by_pid.get(&parent.pid) != Some(&parent) {
             return Ok(false);
+        }
+        if identity.key.creation_time_100ns < parent.creation_time_100ns {
+            return Err(ProcessTreeError::InvalidLineage);
         }
 
         if let Some(existing) = self.members.get(&identity.key) {
@@ -110,10 +117,10 @@ mod tests {
                 creation_time_100ns,
             },
             image_path: format!(r"C:\Apps\{name}.exe"),
-            image_file: ImageFileIdentity {
+            image_file: Some(ImageFileIdentity {
                 volume_serial_number: 7,
-                file_index: u64::from(pid),
-            },
+                file_id: u128::from(pid).to_le_bytes(),
+            }),
         }
     }
 
@@ -225,5 +232,24 @@ mod tests {
             ProcessTree::new(invalid),
             Err(ProcessTreeError::InvalidIdentity)
         ));
+
+        let mut missing_file_id = process(100, 1_000, "selected");
+        missing_file_id.image_file = None;
+        assert!(matches!(
+            ProcessTree::new(missing_file_id),
+            Err(ProcessTreeError::InvalidIdentity)
+        ));
+    }
+
+    #[test]
+    fn child_cannot_predate_the_selected_parent_instance() {
+        let root = process(100, 2_000, "selected");
+        let root_key = root.key;
+        let mut tree = ProcessTree::new(root).expect("valid root");
+        assert!(matches!(
+            tree.process_started(process(101, 1_000, "stale-child"), root_key),
+            Err(ProcessTreeError::InvalidLineage)
+        ));
+        assert_eq!(tree.active_targets().len(), 1);
     }
 }
