@@ -16,10 +16,12 @@ session and redirect handle with rundown protection for the entire call.
 The service attaches one in-memory session through an administrator-only IOCTL,
 including a session ID, loopback relay PID and port, and up to 128 target PIDs.
 The callout snapshots that state under a spin lock and ignores any process that
-is not in the selected set. Detach requires the same nonzero session ID, so a
-stale controller cannot clear a newer session. The driver does not create WFP provider, callout, or
-filter policy objects: the privileged service must do so transactionally and use
-the documented callout keys in `driver.h`. Closing the control device is not
+is not in the selected set. It redirects only TCP; other protocols continue
+unchanged until the UDP path is implemented. Detach requires the same nonzero
+session ID, so a stale controller cannot clear a newer session. The driver does
+not create WFP provider, callout, or filter policy objects: the privileged
+service must do so transactionally and use the documented callout keys in
+`driver.h`. Closing the control device is not
 crash recovery; a service watchdog still has to remove its WFP filters and TUN
 exclusions after a failure.
 

@@ -47,14 +47,25 @@ static void NTAPI C5ClassifyConnect(
     FWPS_CLASSIFY_OUT0 *classifyOut)
 {
     C5_REDIRECT_SESSION session;
+    UINT32 protocolField;
 
-    UNREFERENCED_PARAMETER(fixedValues);
     UNREFERENCED_PARAMETER(layerData);
     UNREFERENCED_PARAMETER(flowContext);
     if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0 ||
         !FWPS_IS_METADATA_FIELD_PRESENT(metadata, FWPS_METADATA_FIELD_PROCESS_ID) ||
         gC5State == NULL ||
         !C5SnapshotSessionForProcess(gC5State, metadata->processId, &session)) {
+        return;
+    }
+
+    if (fixedValues->layerId == FWPS_LAYER_ALE_CONNECT_REDIRECT_V4) {
+        protocolField = FWPS_FIELD_ALE_CONNECT_REDIRECT_V4_IP_PROTOCOL;
+    } else if (fixedValues->layerId == FWPS_LAYER_ALE_CONNECT_REDIRECT_V6) {
+        protocolField = FWPS_FIELD_ALE_CONNECT_REDIRECT_V6_IP_PROTOCOL;
+    } else {
+        return;
+    }
+    if (fixedValues->incomingValue[protocolField].value.uint8 != IPPROTO_TCP) {
         return;
     }
 
