@@ -14,14 +14,16 @@ instance and TCP protocol, initialize the action to CONTINUE, and retain the
 session and redirect handle with rundown protection for the entire call.
 
 The service attaches one in-memory session through an administrator-only IOCTL,
-including a session ID, loopback relay PID and port, and up to 128 target PIDs.
-The callout snapshots that state under a spin lock and ignores any process that
-is not in the selected set. It redirects only TCP; other protocols continue
-unchanged until the UDP path is implemented. Detach requires the same nonzero
-session ID, so a stale controller cannot clear a newer session. The driver does
-not create WFP provider, callout, or filter policy objects: the privileged
-service must do so transactionally and use the documented callout keys in
-`driver.h`. Closing the control device is not
+including a session ID, loopback relay PID and port, and up to 128 target
+PID/creation-time pairs. The driver verifies each live process instance before
+publishing the session. A process notification removes a selected PID when that
+instance exits, before the PID can be reused. The callout snapshots that state
+under a spin lock and redirects only selected TCP traffic; other protocols
+continue unchanged until the UDP path is implemented. Detach requires the same
+nonzero session ID, so a stale controller cannot clear a newer session. The
+driver does not create WFP provider, callout, or filter policy objects: the
+privileged service must do so transactionally and use the documented callout
+keys in `driver.h`. Closing the control device is not
 crash recovery; a service watchdog still has to remove its WFP filters and TUN
 exclusions after a failure.
 

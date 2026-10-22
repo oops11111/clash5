@@ -51,15 +51,17 @@ behavior, TUN exclusion, driver packaging, or release readiness.
 
 ## Controlled Windows driver validation
 
-On 2026-10-22, the current callout binary was built with the WDK 26100 toolchain
+On 2026-10-22, the protocol-v1 callout binary was built with the WDK 26100 toolchain
 and exercised on Windows 10 with test signing enabled. A short-lived local test
 certificate signed the binary. The `c5wfptest` demand-start kernel service loaded
 successfully, an authenticated administrator probe attached a session, rejected a
 detach request with a different session ID, and detached the original session.
 The service and test certificate were removed after the probe.
 
-This verifies the driver entry path and its control-device session ownership
-boundary only. It did not install WFP policy, redirect live traffic, start a
+This verifies the earlier driver entry path and its control-device session ownership
+boundary only. Protocol v2 now passes target creation times to the driver and
+invalidates targets on process exit; its runtime attach behavior has not yet been
+validated on Windows. The earlier test did not install WFP policy, redirect live traffic, start a
 relay, change TUN configuration, or validate a target process tree. The feature
 therefore remains unavailable to product users until the gates below are met.
 ## Gating questions before implementation
