@@ -38,6 +38,7 @@ typedef struct C5_DETACH_REQUEST {
 typedef struct C5_DRIVER_STATE {
     FAST_MUTEX processLock;
     KSPIN_LOCK sessionLock;
+    EX_RUNDOWN_REF sessionRundown;
     BOOLEAN sessionActive;
     BOOLEAN processNotifyRegistered;
     C5_REDIRECT_SESSION session;
