@@ -26,7 +26,8 @@ static BOOLEAN C5SnapshotSessionForProcess(C5_DRIVER_STATE *state, UINT64 proces
     KeAcquireSpinLock(&state->sessionLock, &oldIrql);
     if (state->sessionActive) {
         for (index = 0; index < state->targetCount; index++) {
-            if (state->targets[index].pid == processId) {
+            if (state->targets[index].pid == processId &&
+                ExAcquireRundownProtection(&state->sessionRundown)) {
                 *session = state->session;
                 found = TRUE;
                 break;
@@ -74,6 +75,7 @@ static void NTAPI C5ClassifyConnect(
     UINT64 flowContext,
     FWPS_CLASSIFY_OUT0 *classifyOut)
 {
+    C5_DRIVER_STATE *state = gC5State;
     C5_REDIRECT_SESSION session;
     UINT32 protocolField;
 
@@ -81,8 +83,7 @@ static void NTAPI C5ClassifyConnect(
     UNREFERENCED_PARAMETER(flowContext);
     if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0 ||
         !FWPS_IS_METADATA_FIELD_PRESENT(metadata, FWPS_METADATA_FIELD_PROCESS_ID) ||
-        gC5State == NULL ||
-        !C5SnapshotSessionForProcess(gC5State, metadata->processId, &session)) {
+        state == NULL) {
         return;
     }
 
@@ -96,9 +97,13 @@ static void NTAPI C5ClassifyConnect(
     if (fixedValues->incomingValue[protocolField].value.uint8 != IPPROTO_TCP) {
         return;
     }
+    if (!C5SnapshotSessionForProcess(state, metadata->processId, &session)) {
+        return;
+    }
 
     classifyOut->actionType = FWP_ACTION_CONTINUE;
     (void)C5RedirectTcp(classifyContext, metadata, filter->filterId, &session, classifyOut);
+    ExReleaseRundownProtection(&state->sessionRundown);
 }
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
@@ -130,9 +135,10 @@ static void C5ClearSession(C5_DRIVER_STATE *state)
     KeAcquireSpinLock(&state->sessionLock, &oldIrql);
     state->sessionActive = FALSE;
     state->targetCount = 0;
-    RtlZeroMemory(&state->session, sizeof(state->session));
     RtlZeroMemory(state->targets, sizeof(state->targets));
     KeReleaseSpinLock(&state->sessionLock, oldIrql);
+    ExWaitForRundownProtectionRelease(&state->sessionRundown);
+    RtlZeroMemory(&state->session, sizeof(state->session));
 }
 
 static NTSTATUS C5DetachSession(C5_DRIVER_STATE *state, const C5_DETACH_REQUEST *request)
@@ -144,6 +150,10 @@ static NTSTATUS C5DetachSession(C5_DRIVER_STATE *state, const C5_DETACH_REQUEST 
         request->sessionId == 0) {
         return STATUS_INVALID_PARAMETER;
     }
+    if (KeGetCurrentIrql() > APC_LEVEL) {
+        return STATUS_INVALID_DEVICE_STATE;
+    }
+    ExAcquireFastMutex(&state->processLock);
     KeAcquireSpinLock(&state->sessionLock, &oldIrql);
     if (!state->sessionActive) {
         status = STATUS_NOT_FOUND;
@@ -152,10 +162,15 @@ static NTSTATUS C5DetachSession(C5_DRIVER_STATE *state, const C5_DETACH_REQUEST 
     } else {
         state->sessionActive = FALSE;
         state->targetCount = 0;
-        RtlZeroMemory(&state->session, sizeof(state->session));
         RtlZeroMemory(state->targets, sizeof(state->targets));
     }
     KeReleaseSpinLock(&state->sessionLock, oldIrql);
+    if (NT_SUCCESS(status)) {
+        ExWaitForRundownProtectionRelease(&state->sessionRundown);
+        RtlZeroMemory(&state->session, sizeof(state->session));
+        ExReInitializeRundownProtection(&state->sessionRundown);
+    }
+    ExReleaseFastMutex(&state->processLock);
     return status;
 }
 
@@ -311,6 +326,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT driverObject, PUNICODE_STRING registryPath)
     RtlZeroMemory(state, sizeof(*state));
     ExInitializeFastMutex(&state->processLock);
     KeInitializeSpinLock(&state->sessionLock);
+    ExInitializeRundownProtection(&state->sessionRundown);
     gC5State = state;
     status = FwpsRedirectHandleCreate0(&C5_WFP_PROVIDER_KEY, 0, &state->redirectHandle);
     if (!NT_SUCCESS(status)) {
