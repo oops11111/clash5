@@ -49,6 +49,19 @@ detaches a surviving recorded driver session before normal work resumes. This su
 the control and recovery boundary only: it does not establish WFP filters, relay
 behavior, TUN exclusion, driver packaging, or release readiness.
 
+## Controlled Windows driver validation
+
+On 2026-10-22, the current callout binary was built with the WDK 26100 toolchain
+and exercised on Windows 10 with test signing enabled. A short-lived local test
+certificate signed the binary. The `c5wfptest` demand-start kernel service loaded
+successfully, an authenticated administrator probe attached a session, rejected a
+detach request with a different session ID, and detached the original session.
+The service and test certificate were removed after the probe.
+
+This verifies the driver entry path and its control-device session ownership
+boundary only. It did not install WFP policy, redirect live traffic, start a
+relay, change TUN configuration, or validate a target process tree. The feature
+therefore remains unavailable to product users until the gates below are met.
 ## Gating questions before implementation
 
 - Choose and package the signed WFP callout driver and privileged service; this repository currently has no driver project or installer lifecycle for one.
