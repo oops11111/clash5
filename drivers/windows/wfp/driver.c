@@ -1,3 +1,4 @@
+#include <ntifs.h>
 #include <initguid.h>
 #include "driver.h"
 
@@ -25,7 +26,7 @@ static BOOLEAN C5SnapshotSessionForProcess(C5_DRIVER_STATE *state, UINT64 proces
     KeAcquireSpinLock(&state->sessionLock, &oldIrql);
     if (state->sessionActive) {
         for (index = 0; index < state->targetCount; index++) {
-            if (state->targetPids[index] == processId) {
+            if (state->targets[index].pid == processId) {
                 *session = state->session;
                 found = TRUE;
                 break;
@@ -34,6 +35,33 @@ static BOOLEAN C5SnapshotSessionForProcess(C5_DRIVER_STATE *state, UINT64 proces
     }
     KeReleaseSpinLock(&state->sessionLock, oldIrql);
     return found;
+}
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+static void NTAPI C5ProcessNotify(HANDLE parentId, HANDLE processId, BOOLEAN create)
+{
+    C5_DRIVER_STATE *state = gC5State;
+    KIRQL oldIrql;
+    UINT16 index;
+
+    UNREFERENCED_PARAMETER(parentId);
+    UNREFERENCED_PARAMETER(create);
+    if (state == NULL) {
+        return;
+    }
+    /* Serialize exit notification with identity validation and publication. */
+    ExAcquireFastMutex(&state->processLock);
+    KeAcquireSpinLock(&state->sessionLock, &oldIrql);
+    if (state->sessionActive) {
+        for (index = 0; index < state->targetCount; index++) {
+            if (state->targets[index].pid == (UINT64)(ULONG_PTR)processId) {
+                RtlZeroMemory(&state->targets[index], sizeof(state->targets[index]));
+                break;
+            }
+        }
+    }
+    KeReleaseSpinLock(&state->sessionLock, oldIrql);
+    ExReleaseFastMutex(&state->processLock);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -103,7 +131,7 @@ static void C5ClearSession(C5_DRIVER_STATE *state)
     state->sessionActive = FALSE;
     state->targetCount = 0;
     RtlZeroMemory(&state->session, sizeof(state->session));
-    RtlZeroMemory(state->targetPids, sizeof(state->targetPids));
+    RtlZeroMemory(state->targets, sizeof(state->targets));
     KeReleaseSpinLock(&state->sessionLock, oldIrql);
 }
 
@@ -125,7 +153,7 @@ static NTSTATUS C5DetachSession(C5_DRIVER_STATE *state, const C5_DETACH_REQUEST 
         state->sessionActive = FALSE;
         state->targetCount = 0;
         RtlZeroMemory(&state->session, sizeof(state->session));
-        RtlZeroMemory(state->targetPids, sizeof(state->targetPids));
+        RtlZeroMemory(state->targets, sizeof(state->targets));
     }
     KeReleaseSpinLock(&state->sessionLock, oldIrql);
     return status;
@@ -134,9 +162,11 @@ static NTSTATUS C5DetachSession(C5_DRIVER_STATE *state, const C5_DETACH_REQUEST 
 static NTSTATUS C5AttachSession(C5_DRIVER_STATE *state, const C5_ATTACH_REQUEST *request)
 {
     C5_REDIRECT_SESSION session;
+    PEPROCESS processes[C5_MAX_TARGET_PIDS];
     KIRQL oldIrql;
     UINT16 index;
     UINT16 candidate;
+    UINT16 referencedCount = 0;
     NTSTATUS status = STATUS_SUCCESS;
 
     if (request->version != C5_SESSION_PROTOCOL_VERSION || request->size != sizeof(*request) ||
@@ -144,14 +174,40 @@ static NTSTATUS C5AttachSession(C5_DRIVER_STATE *state, const C5_ATTACH_REQUEST 
         request->targetCount == 0 || request->targetCount > C5_MAX_TARGET_PIDS) {
         return STATUS_INVALID_PARAMETER;
     }
+    if (KeGetCurrentIrql() > APC_LEVEL) {
+        return STATUS_INVALID_DEVICE_STATE;
+    }
+    RtlZeroMemory(processes, sizeof(processes));
     for (index = 0; index < request->targetCount; index++) {
-        if (request->targetPids[index] == 0) {
-            return STATUS_INVALID_PARAMETER;
+        if (request->targets[index].pid == 0 || request->targets[index].createdAt == 0 ||
+            request->targets[index].pid == request->relayPid) {
+            status = STATUS_INVALID_PARAMETER;
+            goto cleanup;
+        }
+        status = PsLookupProcessByProcessId((HANDLE)(ULONG_PTR)request->targets[index].pid,
+                                            &processes[index]);
+        if (!NT_SUCCESS(status)) {
+            goto cleanup;
+        }
+        referencedCount++;
+        if ((UINT64)PsGetProcessCreateTimeQuadPart(processes[index]) != request->targets[index].createdAt) {
+            status = STATUS_INVALID_PARAMETER;
+            goto cleanup;
         }
         for (candidate = 0; candidate < index; candidate++) {
-            if (request->targetPids[index] == request->targetPids[candidate]) {
-                return STATUS_INVALID_PARAMETER;
+            if (request->targets[index].pid == request->targets[candidate].pid) {
+                status = STATUS_INVALID_PARAMETER;
+                goto cleanup;
             }
+        }
+    }
+    /* Exit callbacks cannot pass this lock between the final liveness check and
+     * publication. References keep the queried process objects available. */
+    ExAcquireFastMutex(&state->processLock);
+    for (index = 0; index < request->targetCount; index++) {
+        if (PsGetProcessExitStatus(processes[index]) != STATUS_PENDING) {
+            status = STATUS_INVALID_PARAMETER;
+            goto unlock;
         }
     }
     RtlZeroMemory(&session, sizeof(session));
@@ -166,11 +222,18 @@ static NTSTATUS C5AttachSession(C5_DRIVER_STATE *state, const C5_ATTACH_REQUEST 
     } else {
         state->session = session;
         state->targetCount = request->targetCount;
-        RtlCopyMemory(state->targetPids, request->targetPids,
-                      request->targetCount * sizeof(request->targetPids[0]));
+        RtlCopyMemory(state->targets, request->targets,
+                      request->targetCount * sizeof(request->targets[0]));
         state->sessionActive = TRUE;
     }
     KeReleaseSpinLock(&state->sessionLock, oldIrql);
+
+unlock:
+    ExReleaseFastMutex(&state->processLock);
+cleanup:
+    for (index = 0; index < referencedCount; index++) {
+        ObDereferenceObject(processes[index]);
+    }
     return status;
 }
 
@@ -206,6 +269,9 @@ static void C5Unload(PDRIVER_OBJECT driverObject)
     UNICODE_STRING dosDeviceName = RTL_CONSTANT_STRING(C5_DOS_DEVICE_NAME);
 
     if (state != NULL) {
+        if (state->processNotifyRegistered) {
+            PsSetCreateProcessNotifyRoutine(C5ProcessNotify, TRUE);
+        }
         C5ClearSession(state);
         if (state->calloutV6Id != 0) {
             FwpsCalloutUnregisterById0(state->calloutV6Id);
@@ -243,6 +309,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT driverObject, PUNICODE_STRING registryPath)
     }
     state = (C5_DRIVER_STATE *)deviceObject->DeviceExtension;
     RtlZeroMemory(state, sizeof(*state));
+    ExInitializeFastMutex(&state->processLock);
     KeInitializeSpinLock(&state->sessionLock);
     gC5State = state;
     status = FwpsRedirectHandleCreate0(&C5_WFP_PROVIDER_KEY, 0, &state->redirectHandle);
@@ -257,6 +324,11 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT driverObject, PUNICODE_STRING registryPath)
     if (!NT_SUCCESS(status)) {
         goto fail;
     }
+    status = PsSetCreateProcessNotifyRoutine(C5ProcessNotify, FALSE);
+    if (!NT_SUCCESS(status)) {
+        goto fail;
+    }
+    state->processNotifyRegistered = TRUE;
     status = IoCreateSymbolicLink(&dosDeviceName, &deviceName);
     if (!NT_SUCCESS(status)) {
         goto fail;
