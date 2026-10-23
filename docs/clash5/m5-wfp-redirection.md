@@ -40,8 +40,10 @@ M5 does not depend on a future upstream service-protocol release. clash5 pins it
 own `clash5-service-ipc` fork to a reviewed commit. The fork exposes an authenticated,
 capability-gated `process-proxy/session` API for attach, status, and detach. It accepts
 only the active owner session, a claimed relay PID and port, and exact targets with a
-creation timestamp. The privileged service does not yet verify the relay listener's
-identity or loopback bind; that is required before product activation. The chain
+creation timestamp. The privileged service now checks that the claimed relay PID
+owns listeners on both IPv4 and IPv6 loopback at the requested port before attach.
+This check does not keep the listeners alive after attach; the app must own their
+lifecycle and react to relay failure before product activation. The chain
 credential stays outside the privileged service boundary.
 
 The service persists a pending recovery intent before driver attach, installs IPv4
