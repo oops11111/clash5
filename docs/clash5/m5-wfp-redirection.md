@@ -73,6 +73,12 @@ were removed and independently confirmed absent. This does not establish
 app-owned relay lifecycle, a Mihomo Chain binding, TUN exclusion, or release
 readiness.
 
+A separate Windows smoke test starts the bundled Mihomo core with a listener
+pinned to the generated two-hop Chain. It rejects anonymous CONNECT with 407;
+an authenticated CONNECT reaches the target through both configured hops. This
+checks the listener and Chain adapter independently of WFP, not the complete
+process-proxy route.
+
 ## Controlled Windows driver validation
 
 On 2026-10-23, the protocol-v2 driver built with WDK 26100/MSVC x64 static analysis

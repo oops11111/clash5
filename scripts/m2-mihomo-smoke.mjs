@@ -15,6 +15,8 @@ let directory
 let core
 let output = ''
 const controllerSecret = 'fixture-controller-secret'
+const listenerToken = 'a'.repeat(64)
+const listenerAuthorization = `Basic ${Buffer.from(`clash5:${listenerToken}`).toString('base64')}`
 
 async function listen(server, port = 0) {
   servers.push(server)
@@ -68,7 +70,10 @@ function viaProbe(port, url) {
         hostname: '127.0.0.1',
         port,
         path: url,
-        headers: { Host: new URL(url).host },
+        headers: {
+          Host: new URL(url).host,
+          'Proxy-Authorization': listenerAuthorization,
+        },
         timeout: 10_000,
       },
       (response) => {
@@ -81,6 +86,49 @@ function viaProbe(port, url) {
     )
     request.on('timeout', () => request.destroy(new Error('probe timed out')))
     request.on('error', reject)
+  })
+}
+
+function viaConnect(port, target, authorized) {
+  return new Promise((done, reject) => {
+    const request = http.request({
+      hostname: '127.0.0.1',
+      port,
+      method: 'CONNECT',
+      path: target,
+      headers: authorized
+        ? { 'Proxy-Authorization': listenerAuthorization }
+        : {},
+      timeout: 10_000,
+    })
+    request.on('connect', (response, socket) => {
+      if (response.statusCode !== 200) {
+        socket.destroy()
+        done({ status: response.statusCode, body: '' })
+        return
+      }
+      let body = ''
+      socket.setTimeout(10_000, () =>
+        socket.destroy(new Error('tunnel timeout')),
+      )
+      socket.on('data', (chunk) => {
+        body += chunk
+        if (body.includes('203.0.113.27')) {
+          socket.destroy()
+          done({ status: response.statusCode, body })
+        }
+      })
+      socket.on('error', reject)
+      socket.write(
+        `GET /ip HTTP/1.1\r\nHost: ${target}\r\nConnection: close\r\n\r\n`,
+      )
+    })
+    request.on('response', (response) =>
+      done({ status: response.statusCode, body: '' }),
+    )
+    request.on('timeout', () => request.destroy(new Error('CONNECT timeout')))
+    request.on('error', reject)
+    request.end()
   })
 }
 
@@ -149,7 +197,12 @@ async function runSmoke(binary) {
       { encoding: 'utf8' },
     )
     const config = join(directory, 'config.yaml')
-    await writeFile(config, yaml)
+    const group = 'clash5-chain-18dc0b8a-7485-49bc-8a91-f48bdc736846'
+    assert(yaml.endsWith(`  proxy: ${group}\n`))
+    await writeFile(
+      config,
+      `${yaml}  users:\n  - username: clash5\n    password: ${listenerToken}\n`,
+    )
     core = spawn(resolve(binary), ['-d', directory, '-f', config], {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
@@ -177,6 +230,11 @@ async function runSmoke(binary) {
     assert(ready, `Mihomo did not become ready: ${output}`)
     const ip = await viaProbe(probePort, `http://127.0.0.1:${targetPort}/ip`)
     assert.deepEqual(ip, { status: 200, body: '203.0.113.27' })
+    const target = `127.0.0.1:${targetPort}`
+    assert.equal((await viaConnect(probePort, target, false)).status, 407)
+    const tunnel = await viaConnect(probePort, target, true)
+    assert.equal(tunnel.status, 200)
+    assert(tunnel.body.includes('203.0.113.27'))
     assert(frontStats.length > 0, 'front proxy was bypassed')
     assert(landingStats.length > 0, 'landing proxy was bypassed')
     assert(frontStats.every((target) => target === `127.0.0.1:${landingPort}`))
@@ -186,7 +244,6 @@ async function runSmoke(binary) {
       `http://127.0.0.1:${targetPort}/unavailable`,
     )
     assert.equal(failed.status, 503)
-    const group = 'clash5-chain-18dc0b8a-7485-49bc-8a91-f48bdc736846'
     const delayUrl = new URL(`${controller}/proxies/${group}/delay`)
     delayUrl.searchParams.set('url', `http://127.0.0.1:${targetPort}/health`)
     delayUrl.searchParams.set('timeout', '5000')
