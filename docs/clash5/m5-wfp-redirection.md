@@ -30,7 +30,7 @@ Connected UDP is a separate compatibility gate. Microsoft documents a failure mo
 
 ## Lifecycle and failure policy
 
-Injection stays off after install and after every restart. Attach requires explicit user confirmation and administrator-capability validation. The service creates a per-session authenticated control channel and dynamic WFP policy, records only clash5-owned filter identifiers, then publishes the persistent active state. Any failed stage rolls back completed stages in reverse order. Detach, application shutdown, sidecar failure, service restart, or stale-state recovery removes the session filters and releases TUN exclusions before reporting idle. If cleanup cannot be verified, do not start a new injection session and show a recovery-required state.
+Injection stays off after install and after every restart. Attach requires explicit user confirmation and administrator-capability validation. The service creates a per-session authenticated control channel and dynamic WFP policy, then publishes the persistent active state. The WFP session owns its filters and releases them when its engine handle closes, including after a service crash. Any failed stage rolls back completed stages in reverse order. Detach, application shutdown, sidecar failure, service restart, or stale-state recovery removes the session filters and releases TUN exclusions before reporting idle. If cleanup cannot be verified, do not start a new injection session and show a recovery-required state.
 
 No test fixture can establish that Windows route state was restored. Release acceptance must inspect WFP state and TUN route/config snapshots before attach, while attached, after detach, after forced app/service termination, and after next-start recovery.
 
@@ -43,12 +43,16 @@ only the active owner session, a loopback relay PID and port, and exact targets 
 creation timestamp. The chain credential stays inside the relay and never crosses the
 privileged service boundary.
 
-The service persists a pending recovery intent before driver attach, marks the record
-active only after attach succeeds, and treats an interrupted, foreign, unreadable,
-or uncleared record as recovery-required. At service startup it
-detaches a surviving recorded driver session before normal work resumes. This supplies
-the control and recovery boundary only: it does not establish WFP filters, relay
-behavior, TUN exclusion, driver packaging, or release readiness.
+The service persists a pending recovery intent before driver attach, installs IPv4
+and IPv6 TCP redirect filters in a dynamic WFP transaction after driver attach,
+and marks the record active only after both stages succeed. It treats an interrupted,
+foreign, unreadable, or uncleared record as recovery-required. At service startup it
+detaches a surviving recorded driver session before normal work resumes. A filter
+permits traffic when its kernel callout is unregistered, avoiding a machine-wide
+TCP outage if the driver unloads while the service is still running. This remains
+a control boundary: the WFP policy has compiled but has not been exercised with
+live redirected traffic. It does not establish relay behavior, TUN exclusion,
+driver packaging, or release readiness.
 
 ## Controlled Windows driver validation
 
