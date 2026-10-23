@@ -82,11 +82,12 @@ so no update request is sent until a release channel is configured.
 Updating the mihomo core downloads it from the mihomo GitHub releases page,
 only when you start the update.
 
-### 4.5 Home page IP card: **on by default, can be hidden**
+### 4.5 Home page IP card: **off by default, opt-in**
 
 The Home page card shows your apparent public IP address and its approximate
-location. It is on by default. While the card is visible and the window is in
-use, clash5 refreshes it every 5 minutes. Each refresh asks one service, chosen
+location. It is off by default; enable it in the Home page card settings. A
+saved setting from an earlier version is kept. While the card is visible and
+the window is in use, clash5 refreshes it every 5 minutes. Each refresh asks one service, chosen
 at random, from:
 
 `api.ip.sb`, `ipapi.co`, `api.ipapi.is`, `ipwho.is`, `ip.api.skk.moe`,
@@ -94,7 +95,7 @@ at random, from:
 
 These services are independent third parties with their own privacy policies.
 Requests are sent by the application itself, not through clash5's proxy port,
-so the service sees the address the request leaves from. Hide the card from the
+so the service sees the address the request leaves from. Disable the card in the
 Home page settings to stop these requests.
 Routing this request through the selected route is tracked in
 [#52](https://github.com/oops11111/clash5/issues/52).
@@ -171,7 +172,7 @@ settings or configuration values.
 | Behavior | Default | How to turn it off |
 | --- | --- | --- |
 | Update check | Off | *Settings → Miscellaneous → Auto Check Update* |
-| Home IP card | On | Hide the card in Home page settings |
+| Home IP card | Off | Keep it disabled, or change it in Home page card settings |
 | Exit IP detection | Only when started | Do not start it, or change the service in the chain editor |
 | WebDAV backup | Off until configured | Remove the WebDAV settings |
 | Log retention | 7 days | *Settings → Miscellaneous → Auto Log Clean* |

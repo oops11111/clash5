@@ -96,7 +96,7 @@ const DEFAULT_HOME_CARDS: HomeCardsSettings = {
   clashinfo: true,
   systeminfo: true,
   test: true,
-  ip: true,
+  ip: false,
 }
 
 const serializeCardFlags = (cards: HomeCardsSettings) =>
