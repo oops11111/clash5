@@ -750,6 +750,36 @@ pub async fn clash5_install_staged_plugin(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn clash5_set_plugin_enabled(plugin_id: String, enabled: bool) -> CmdResult {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    let previous = plugins::plugin_enabled(&root, &plugin_id);
+    plugins::set_plugin_enabled(&root, &plugin_id, enabled).map_err(plugin_failure)?;
+    let restore_root = root.clone();
+    let restore_id = plugin_id.clone();
+    apply_plugin_change_with_rollback(
+        update_plugin_configuration,
+        move || async move {
+            plugins::set_plugin_enabled(&restore_root, &restore_id, previous).map_err(|_| DataError::InvalidInput)
+        },
+        |result| result.is_valid(),
+    )
+    .await?;
+    let event = if enabled { "plugin.enable" } else { "plugin.disable" };
+    let details = serde_json::json!({ "plugin_id": plugin_id });
+    let audit_result =
+        crate::config::profiles::with_clash5_binding_store(move |store| store.record_plugin_audit(event, &details))
+            .await;
+    if audit_result.is_err() {
+        tracing::warn!(event, "plugin enable state audit event could not be persisted");
+    }
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn clash5_list_plugin_audit_events(limit: Option<u32>) -> CmdResult<Vec<PluginAuditEvent>> {
     crate::config::profiles::with_clash5_binding_store(move |store| {
         store.plugin_audit_events(limit.unwrap_or(50) as usize)

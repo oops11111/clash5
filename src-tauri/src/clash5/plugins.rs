@@ -75,6 +75,7 @@ pub(crate) struct PluginSummary {
     pub permissions: Vec<String>,
     pub writable_paths: Vec<String>,
     pub signer_fingerprint: String,
+    pub enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -128,6 +129,9 @@ pub(crate) async fn apply_bound_plugins(
     let mut patches = Vec::with_capacity(applicable.len());
     let mut executed = Vec::with_capacity(applicable.len());
     for binding in applicable {
+        if !plugin_enabled(&plugin_root, &binding.plugin_id) {
+            continue;
+        }
         let audit_identity = serde_json::json!({
             "plugin_id": binding.plugin_id.clone(),
             "binding_id": binding.id.clone(),
@@ -227,13 +231,44 @@ pub(crate) async fn apply_bound_plugins(
     })
 }
 
-fn load_installed_plugin(plugin_root: &Path, id: &str) -> Result<(PluginManifest, Vec<u8>), PluginFailure> {
-    if id.is_empty()
-        || id.len() > 64
-        || !id
+const DISABLED_MARKER: &str = "disabled";
+
+fn valid_plugin_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'_' | b'-'))
-    {
+}
+
+/// A plugin is enabled unless its directory carries the disabled marker. Bindings are kept either way.
+pub(crate) fn plugin_enabled(plugin_root: &Path, id: &str) -> bool {
+    !valid_plugin_id(id) || !plugin_root.join(id).join(DISABLED_MARKER).exists()
+}
+
+pub(crate) fn set_plugin_enabled(plugin_root: &Path, id: &str, enabled: bool) -> Result<(), PluginFailure> {
+    if !valid_plugin_id(id) {
+        return Err(PluginFailure::InvalidPackage);
+    }
+    let directory = plugin_root.join(id);
+    let metadata = fs::symlink_metadata(&directory).map_err(|_| PluginFailure::InvalidPackage)?;
+    if !metadata.file_type().is_dir() {
+        return Err(PluginFailure::InvalidPackage);
+    }
+    let marker = directory.join(DISABLED_MARKER);
+    if enabled {
+        match fs::remove_file(&marker) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(_) => Err(PluginFailure::ExecutionFailed),
+        }
+    } else {
+        fs::write(&marker, b"").map_err(|_| PluginFailure::ExecutionFailed)
+    }
+}
+
+fn load_installed_plugin(plugin_root: &Path, id: &str) -> Result<(PluginManifest, Vec<u8>), PluginFailure> {
+    if !valid_plugin_id(id) {
         return Err(PluginFailure::InvalidPackage);
     }
     let directory = plugin_root.join(id);
@@ -526,7 +561,9 @@ pub(crate) fn installed_plugins(plugin_root: &Path) -> Result<Vec<PluginSummary>
         {
             return Err(PluginFailure::InvalidPackage);
         }
-        plugins.push(summary(&manifest, signer));
+        let mut item = summary(&manifest, signer);
+        item.enabled = plugin_enabled(plugin_root, &manifest.id);
+        plugins.push(item);
     }
     plugins.sort_by(|left, right| left.name.cmp(&right.name).then_with(|| left.id.cmp(&right.id)));
     Ok(plugins)
@@ -541,6 +578,7 @@ fn summary(manifest: &PluginManifest, signer: &str) -> PluginSummary {
         permissions: manifest.permissions.clone(),
         writable_paths: manifest.writable_paths.clone(),
         signer_fingerprint: hex_digest(signer.as_bytes()),
+        enabled: true,
     }
 }
 
@@ -784,6 +822,28 @@ mod tests {
             7, 10, 1, 6, b'm', b'e', b'm', b'o', b'r', b'y', 2, 0, // exported memory
         ];
         assert!(execute_blocking(module.to_vec(), b"{}".to_vec(), vec![]).is_err());
+    }
+
+    #[test]
+    fn disabled_marker_toggles_only_the_named_plugin() -> Result<(), PluginFailure> {
+        let root = std::env::temp_dir().join(format!("clash5-plugin-state-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("sample.plugin")).map_err(|_| PluginFailure::ExecutionFailed)?;
+        fs::create_dir_all(root.join("other.plugin")).map_err(|_| PluginFailure::ExecutionFailed)?;
+
+        set_plugin_enabled(&root, "sample.plugin", false)?;
+        assert!(!plugin_enabled(&root, "sample.plugin"));
+        assert!(plugin_enabled(&root, "other.plugin"));
+
+        set_plugin_enabled(&root, "sample.plugin", true)?;
+        set_plugin_enabled(&root, "sample.plugin", true)?;
+        assert!(plugin_enabled(&root, "sample.plugin"));
+        assert_eq!(
+            set_plugin_enabled(&root, "../escape", false),
+            Err(PluginFailure::InvalidPackage)
+        );
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
     }
 
     #[test]

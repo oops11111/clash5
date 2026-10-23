@@ -186,7 +186,13 @@ pub struct BindingStore {
 fn is_plugin_audit_event(event: &str) -> bool {
     matches!(
         event,
-        "plugin.install" | "plugin.apply" | "plugin.permission.use" | "plugin.execute" | "plugin.failure"
+        "plugin.install"
+            | "plugin.enable"
+            | "plugin.disable"
+            | "plugin.apply"
+            | "plugin.permission.use"
+            | "plugin.execute"
+            | "plugin.failure"
     )
 }
 
