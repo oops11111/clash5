@@ -51,8 +51,10 @@ foreign, unreadable, or uncleared record as recovery-required. At service startu
 detaches a surviving recorded driver session before normal work resumes. A filter
 permits traffic when its kernel callout is unregistered, avoiding a machine-wide
 TCP outage if the driver unloads while the service is still running. This remains
-a control boundary: the WFP policy has compiled but has not been exercised with
-live redirected traffic. It does not establish relay behavior, TUN exclusion,
+a control boundary: an elevated Windows 10 test installed and read back both
+dynamic filters through an independent WFP engine connection, then verified
+that both disappeared after closing the session. Live redirected traffic has
+not been exercised. This does not establish relay behavior, TUN exclusion,
 driver packaging, or release readiness.
 
 ## Controlled Windows driver validation
