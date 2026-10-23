@@ -1,208 +1,180 @@
 # Privacy Policy
 
-**Applies to:** the Clash Verge Rev desktop application for Windows, macOS and
-Linux, distributed from
-<https://github.com/clash-verge-rev/clash-verge-rev/releases>.
+**Applies to:** clash5, a desktop client for the mihomo proxy core, built from
+this repository (Windows, macOS and Linux).
 
-**Last updated:** 2026-09-09
+**Last updated:** 2026-10-23
 
-Clash Verge Rev is a free and open-source graphical client for the
-[mihomo](https://github.com/MetaCubeX/mihomo) proxy core, maintained by
-volunteers. The project has no company behind it, no user accounts, and no
-server of its own that the application talks to.
+clash5 is a fork of Clash Verge Rev. This document describes clash5's own
+behavior and defaults. Where clash5 still inherits upstream behavior, that is
+stated below and tracked in the issues linked from each section.
 
 ## 1. Summary
 
-- The project **collects nothing**. There is no telemetry, no analytics, no
-  crash or usage reporting, no advertising or tracking SDK, and no registration.
-  No data of any kind is sent to the maintainers or to infrastructure operated
-  by this project.
-- Your configuration, credentials and logs are stored **only on your own
-  device**, in plain files you can read, back up or delete at any time
-  (Section 3).
-- The application connects only to endpoints that you configure (proxy servers,
-  subscription URLs, backup server) or to the third-party services listed in
-  Section 4. None of them are operated by this project.
-- Two connections are enabled by default and are not part of your own proxy
-  configuration: the **application update check** (Section 4.3) and the **IP
-  information card** on the Home page (Section 4.5). Both are described below,
-  and Section 6 explains how to turn them off.
+- clash5 has **no telemetry, analytics, crash reporting or accounts**, and it
+  does not send data to the maintainers or to any server operated by this
+  project.
+- Your subscriptions, proxy credentials and settings stay on your device.
+- The application contacts only the endpoints you configure, the proxy
+  servers you use, and the third-party services listed in section 4. Some of
+  those are enabled by default; section 4 says which, and how to turn each one
+  off.
 
 ## 2. Who is responsible
 
-The Clash Verge Rev maintainers, reachable through the project's issue tracker
-at <https://github.com/clash-verge-rev/clash-verge-rev/issues>. Because the
-application performs no data collection, there is no data controller
-relationship, no processing agreement, and no data to request or erase from us.
+The clash5 maintainers, reachable through the issue tracker of this repository.
+The project has no data controller relationship with users and holds no user
+data.
 
 ## 3. Data stored on your device
 
-All application data lives in a single directory:
+All application data is kept in the application data directory of your system,
+named after the application identifier `io.github.oops11111.clash5`. It
+contains:
 
-| Platform | Location |
-| --- | --- |
-| Windows | `%APPDATA%\io.github.clash-verge-rev.clash-verge-rev` |
-| macOS | `~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev` |
-| Linux | `$XDG_DATA_HOME/io.github.clash-verge-rev.clash-verge-rev` (usually `~/.local/share/…`) |
+- **Settings** (`verge` settings). WebDAV URL, user name and password are
+  stored encrypted with the application's local key. Anyone who can read the
+  application data directory as your user account can also read that key.
+- **Profiles and subscriptions** (`profiles/`, `profiles.yaml`). These usually
+  include subscription URLs, which often embed a personal token, and proxy
+  server addresses and credentials.
+- **Node inventory** (SQLite database). Node identities, display names,
+  server addresses, ports, bindings and probe results. Node credentials are not
+  stored in this database. Identity keys for node fingerprints are kept in the
+  operating system credential store.
+- **Plugin binding settings.** Encrypted with the application's local key, as
+  for WebDAV settings (tracked in [#58](https://github.com/oops11111/clash5/issues/58)).
+- **Logs.** Application and core logs can contain requested domain names,
+  IP addresses and connection metadata, depending on the log level. Logs are
+  deleted after a retention period you choose under
+  *Settings → Miscellaneous → Auto Log Clean*. The default is 7 days.
+- **Runtime files** used by the core, such as its cache and GeoIP/GeoSite
+  databases.
 
-It contains:
+Data leaves the device only when you enable WebDAV backup, export a backup, or
+attach files to a bug report. Review logs and configuration before sharing
+them: they can reveal proxy servers, tokens and visited domains.
 
-- `verge.yaml` — application settings. If you configure WebDAV backup, the
-  server URL, user name and password are stored here **in plain text**.
-- `config.yaml`, `profiles.yaml` and `profiles/` — your proxy configuration and
-  downloaded subscriptions. These normally contain **subscription URLs (which
-  often embed a personal token), proxy server addresses, ports, passwords and
-  UUIDs**.
-- `logs/` and `service-logs/` — application and privileged-service logs. Core
-  logs can contain requested domain names, IP addresses and connection metadata,
-  depending on the log level you select.
-- Core runtime files (for example mihomo's `cache.db` and GeoIP/GeoSite
-  databases) used by the proxy core.
-
-None of this leaves your device unless you enable WebDAV backup (Section 4.9),
-export a backup yourself, or attach these files to a bug report.
-
-Application logs are deleted automatically after a retention period you choose
-in *Settings → Miscellaneous → Auto Log Clean* (default: 7 days; `Never Clean` keeps
-them indefinitely). Uninstalling the application and removing the directory
-above deletes everything else.
-
-**When reporting a bug**, review logs and configuration before attaching them:
-they may reveal your proxy servers, subscription tokens and browsing
-destinations.
-
-## 4. Network connections the application makes
+## 4. Network connections
 
 ### 4.1 Proxy traffic
 
-Traffic you route through the application is handled by the bundled mihomo core
-and goes to the proxy servers **you** configured. It is not inspected, recorded
-or forwarded anywhere by this project. Your proxy provider can see this traffic
-to the extent any proxy operator can; their privacy policy applies.
+Traffic routed through clash5 goes to the proxy servers you configured. clash5
+does not inspect, record or forward it. Your proxy operator can see this
+traffic as any proxy operator can.
 
-### 4.2 Subscription (profile) updates
+### 4.2 Subscription downloads
 
-When you add a remote profile, the application downloads it from the URL you
-supplied, sending a `User-Agent` of `clash-verge/v<version>` unless you set a
-different one for that profile. If you enable automatic updates for a profile,
-this request repeats on the interval you choose. The subscription provider sees
-your IP address and this request; it is the same request your browser would
-make. Requests can be sent directly, through the system proxy, or through the
-application's own proxy port, as configured per profile.
+You add subscriptions by URL. clash5 downloads them when you import or refresh
+them, and again on the interval you set for automatic updates. Requests carry
+the User-Agent `clash-verge/v<version>`, inherited from upstream and tracked in
+[#53](https://github.com/oops11111/clash5/issues/53). The subscription provider
+sees your IP address and this request.
 
-### 4.3 Application update check — *enabled by default*
+### 4.3 Application update check: **off by default**
 
-On startup the application asks whether a newer release exists, in order, from:
+When enabled, clash5 checks for updates on startup. The default is off
+(`auto_check_update: false`). The updater endpoint list in this build is empty,
+so no update request is sent until a release channel is configured.
 
-- `https://update.hwdns.net/…` and `https://gh-proxy.org/…` (third-party GitHub
-  mirrors, used for reachability in restricted networks)
-- `https://github.com/clash-verge-rev/clash-verge-rev/releases/…`
+### 4.4 Proxy core update: user-initiated
 
-The request carries only what any HTTP request carries: your IP address, the
-`User-Agent` and the requested file. No identifier is generated or sent, and no
-result is reported back to the project. Downloaded updates are verified against
-a Minisign public key compiled into the application.
+Updating the mihomo core downloads it from the mihomo GitHub releases page,
+only when you start the update.
 
-Disable it in *Settings → Miscellaneous → Auto Check Update*.
+### 4.5 Home page IP card: **on by default, can be hidden**
 
-### 4.4 Proxy core update — *user-initiated*
+The Home page card shows your apparent public IP address and its approximate
+location. It is on by default. While the card is visible and the window is in
+use, clash5 refreshes it every 5 minutes. Each refresh asks one service, chosen
+at random, from:
 
-Updating the mihomo core downloads it from GitHub Releases
-(`https://github.com/MetaCubeX/mihomo/releases/…`) only when you start the
-update.
-
-### 4.5 IP information card — *enabled by default*
-
-The Home page shows your apparent public IP address and its geolocation. To do
-this it queries one randomly chosen service from:
 `api.ip.sb`, `ipapi.co`, `api.ipapi.is`, `ipwho.is`, `ip.api.skk.moe`,
-`get.geojs.io`. The query is refreshed about every 5 minutes while the card is
-visible and the window is shown; it is not sent while the window is hidden or
-the Home page is not in view.
+`get.geojs.io`.
 
-By design these services see and return the IP address the request came from —
-that is the feature. If a proxy is active, they see the proxy's address.
-Each service is operated by an independent third party under its own privacy
-policy; the project has no agreement with any of them. Keep the Home page
-closed (or the application minimised) if you do not want these requests.
+These services are independent third parties with their own privacy policies.
+Requests are sent by the application itself, not through clash5's proxy port,
+so the service sees the address the request leaves from. Hide the card from the
+Home page settings to stop these requests.
+Routing this request through the selected route is tracked in
+[#52](https://github.com/oops11111/clash5/issues/52).
 
-### 4.6 Latency tests — *user-initiated*
+### 4.6 Exit IP detection: user-initiated
 
-Testing a proxy or group sends an HTTP request through that proxy to
-`http://cp.cloudflare.com/generate_204`, or to the test URL you configure.
+Detection is started from the chain editor. clash5 starts a temporary listener
+on `127.0.0.1` pinned to the chain you test, and asks the configured service
+(by default `https://api64.ipify.org`) for your address through that listener.
+No node credentials or subscription URL are sent. Detection runs only when you
+start it; there is no background polling.
 
-### 4.7 Streaming availability test — *user-initiated*
+### 4.7 Latency tests and probes: user-initiated
 
-The unlock test sends requests through your local proxy port to the streaming
-and AI services being tested (Netflix, Disney+, YouTube, Spotify, OpenAI and
-similar). It runs only when you start it, and only through the proxy you have
-selected.
+Testing a proxy or group sends HTTP requests through that proxy to
+`http://cp.cloudflare.com/generate_204` or to the test URL you configure. Node
+probes in the node pool send requests through the running core to the same
+kind of test URL, and run only when you start them.
 
-### 4.8 DNS
+### 4.8 Streaming availability test: user-initiated
 
-The generated core configuration uses public DoH resolvers by default
-(`doh.pub`, `dns.alidns.com`), and your proxy configuration may define others.
-Resolvers see the domain names being resolved. You can change or replace them in
-the DNS settings and in your own configuration.
+The unlock test sends requests through your selected proxy to the streaming and
+AI services it tests. It runs only when you start it.
 
-### 4.9 WebDAV backup — *disabled until you configure it*
+### 4.9 DNS
 
-If you set up backup, the application uploads a ZIP archive to the WebDAV server
-you specify. The archive contains your profiles, `profiles.yaml`, `config.yaml`,
-the DNS configuration and `verge.yaml`; **WebDAV credentials are stripped from
-`verge.yaml` before upload, but proxy servers, passwords and subscription URLs
-inside your profiles are not**. Treat a backup as sensitive and use a server you
-trust. Backups are only transferred to that server.
+The default DNS configuration for new installations uses encrypted DNS over
+HTTPS to `doh.pub` and `dns.alidns.com`. Only the names of these two DNS
+services are resolved in plain DNS, through the fixed addresses `223.6.6.6` and
+`2400:3200::1`. Those are the only plain-DNS requests in the default
+configuration.
 
-### 4.10 Local listeners
+Resolvers see the domain names you look up. Existing DNS configuration files
+are not changed by an upgrade; they keep the values you saved.
 
-The proxy ports and the internal control port bind to `127.0.0.1` only. They are
-not exposed to your network unless you deliberately configure the core to allow
-LAN access.
+The DNS listener is configured on port 53 by default. Whether it is reachable
+from other devices depends on the core's binding and on *Allow LAN*, and is
+being verified in [#51](https://github.com/oops11111/clash5/issues/51).
 
-## 5. Third-party components and services
+### 4.10 Controller
 
-The application bundles or depends on software with its own behaviour and
-policies:
+The mihomo controller listens on `127.0.0.1` only. Each run generates a new
+random secret, which the application uses to talk to the controller. The
+secret is not a constant and is not stored in the source tree
+([#50](https://github.com/oops11111/clash5/issues/50)). Other programs running
+as your user account can still connect if they can read the runtime
+configuration.
 
-- **mihomo (Clash.Meta) core** — <https://github.com/MetaCubeX/mihomo>.
-  Performs the actual proxying and DNS resolution.
-- **Tauri and the system WebView** — the user interface renders in the
-  operating system's web engine: Microsoft Edge WebView2 on Windows (subject to
-  the [Microsoft Privacy Statement](https://privacy.microsoft.com/privacystatement)),
-  WKWebView on macOS, WebKitGTK on Linux.
-- **External dashboards** — opening a web dashboard (metacubexd, Yacd, Zash
-  Board) loads a third-party site in your browser; it then talks to your local
-  core.
-- **GitHub** — hosts the source, releases and update metadata; it sees download
-  requests, and anything you post in issues is public.
-- **Your proxy and subscription providers**, and any WebDAV or DNS provider you
-  configure, are independent of this project and govern their own data handling.
+### 4.11 WebDAV backup: disabled until you configure it
 
-## 6. Your controls
+If you configure WebDAV, clash5 uploads backup archives to the server you
+entered, and only when you start a backup or enable scheduled backup.
 
-- *Settings → Miscellaneous → Auto Check Update* — turn off the update check.
-- *Settings → Miscellaneous → Auto Log Clean* — set log retention, or `Never Clean`.
-- Per-profile update interval — turn off automatic subscription refresh.
-- WebDAV backup is inactive until you enter server details, and can be cleared
-  at any time.
-- The IP information card only queries while the Home page is visible
-  (Section 4.5).
-- Everything else is a plain file on your disk: delete the application data
-  directory to remove all stored data.
+### 4.12 System notifications
 
-## 7. Children
+Desktop notifications use generic text (for example, that the system proxy was
+turned on). They never include node names, addresses or domains.
 
-The application is a network tool with no content directed at children and no
-data collection of any kind.
+## 5. Plugins
 
-## 8. Changes
+Plugins run in a sandbox with no network access, no file system access and no
+host imports. A plugin can only change the fields its manifest declares, and
+its audit records contain identifiers, permissions and results, not binding
+settings or configuration values.
 
-Changes to this policy are made in the repository and are visible in its Git
-history. The date at the top reflects the most recent change.
+## 6. What clash5 does not do
 
-## 9. Contact
+- It does not run analytics, telemetry or crash uploads.
+- It does not contact the project's servers.
+- It does not send your subscriptions, credentials or node lists anywhere.
 
-Open an issue at
-<https://github.com/clash-verge-rev/clash-verge-rev/issues>. Please do not
-include logs or configuration files containing credentials in public issues.
+## 7. Turning things off
+
+| Behavior | Default | How to turn it off |
+| --- | --- | --- |
+| Update check | Off | *Settings → Miscellaneous → Auto Check Update* |
+| Home IP card | On | Hide the card in Home page settings |
+| Exit IP detection | Only when started | Do not start it, or change the service in the chain editor |
+| WebDAV backup | Off until configured | Remove the WebDAV settings |
+| Log retention | 7 days | *Settings → Miscellaneous → Auto Log Clean* |
+
+Uninstalling clash5 and deleting its application data directory removes
+everything it stored.
