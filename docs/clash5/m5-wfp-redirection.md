@@ -4,7 +4,7 @@ Status: proposal; requires the Opus-class design review specified by Issue #24 a
 
 ## Decision
 
-Use Windows Filtering Platform (WFP) ALE connect redirection with a signed kernel callout and a user-mode redirect relay. Do not inject DLLs or hooks into target processes. WFP's connect-redirect layer can redirect TCP and UDP connect requests to a local proxy, but local redirection requires a callout driver, a redirect handle, redirect-loop checks, and a target PID for the local service. The relay must retrieve the original destination and opaque redirect records. Windows expects a redirect record on the proxy socket that connects toward the final destination for cooperation with other WFP redirectors. Because this design delegates that socket to Mihomo, record propagation is unresolved and external redirector coexistence is not supported by the proposal yet.
+Use Windows Filtering Platform (WFP) ALE connect redirection with a signed kernel callout and a user-mode redirect relay. Do not inject DLLs or hooks into target processes. WFP's connect-redirect layer can redirect TCP and UDP connect requests to a local proxy, but local redirection requires a callout driver, a redirect handle, redirect-loop checks, and a target PID for the local service. The relay retrieves the original destination and opaque redirect records and applies the record to its new socket toward the HTTP listener. Mihomo then creates the final outbound socket, so propagation across that boundary remains unresolved and external redirector coexistence is not supported yet.
 
 The relay is a required protocol adapter between WFP and clash5's selected Chain. It accepts redirected sockets, extracts the original destination and redirect context, then forwards the flow to a session-authenticated Mihomo listener pinned to the selected generated chain group. A direct redirect to Mihomo's global SOCKS port is insufficient because it does not pin a flow to the selected Chain. clash5 already creates temporary authenticated, chain-pinned HTTP listeners for exit-IP checks; the process-proxy session can build on that runtime-only pattern. TCP can use HTTP CONNECT to a pinned HTTP listener. UDP needs a pinned SOCKS listener with UDP enabled and its own WFP redirect-record handling. Neither transport is supported until its redirect context, chain selection, and teardown are verified end to end.
 
@@ -24,7 +24,7 @@ The current Mihomo TUN schema documents UID inclusion/exclusion as Linux-only an
 
 The chain-pinned listener must be created in runtime configuration with a random session credential, bound to loopback, and removed on every detach or failed attach. Its `proxy` field must name the selected generated chain group. This reuses the existing `exit_ip::probe_listener` pattern without persisting session credentials or listeners.
 
-WFP redirect records are opaque and normally need to be transferred to the socket that the proxy service opens toward the final destination. In this design Mihomo owns that final socket, so clash5's relay cannot itself attach the record to it. Coexistence with other WFP redirectors therefore remains unproven; the relay and Mihomo must be excluded from clash5's own target filters, and external redirector coexistence must not be claimed until tested on Windows.
+WFP redirect records are opaque. The relay transfers the record to its socket toward the chain-pinned HTTP listener before connecting, which passed a Windows 10 test with a fixture listener. Mihomo owns the subsequent socket toward the final destination, so clash5's relay cannot attach the record there. Coexistence with other WFP redirectors therefore remains unproven; the relay and Mihomo must be excluded from clash5's own target filters, and external redirector coexistence must not be claimed until tested on Windows.
 
 Connected UDP is a separate compatibility gate. Microsoft documents a failure mode when a redirected local proxy uses connected UDP with redirect records; the documented workaround uses connectionless `sendto`. The relay must either implement and test that path or report UDP as unsupported while preserving TCP functionality.
 
@@ -63,8 +63,15 @@ a loopback listener owned by a different process. The listener recovered
 the original TEST-NET destination 198.51.100.10:443 and matching session ID
 from the driver context, and read a nonempty WFP redirect record. The probe
 removed the WFP session, temporary driver service, and one-day test certificate.
-It does not establish outbound record propagation, relay forwarding, Chain
-binding, TUN exclusion, or release readiness.
+The fork now also provides a session-bound dual-stack TCP relay. It rejects
+connections without matching WFP context, reads the original destination and
+redirect record, applies the record to its socket toward an authenticated HTTP
+listener, and forwards traffic after CONNECT succeeds. On the Windows 10 test
+host, an exact target sent `C5!` through WFP and this relay to a fixture HTTP
+listener, then received `OK!` back; the temporary driver service and certificate
+were removed and independently confirmed absent. This does not establish
+app-owned relay lifecycle, a Mihomo Chain binding, TUN exclusion, or release
+readiness.
 
 ## Controlled Windows driver validation
 
@@ -78,11 +85,12 @@ Microsoft-root `/kp` check failed for the self-signed test certificate, so this
 does not establish release-signing readiness.
 
 The WFP policy was separately installed, read back through an independent engine
-connection, and removed on the same host. The live IPv4 TCP probe reads the
-driver context and redirect record from the accepted socket. It does not
-validate process-exit invalidation, IPv6 or UDP traffic, outbound record
-propagation, Mihomo Chain forwarding, TUN coordination, or a selected process
-tree. The feature remains unavailable to product users.
+connection, and removed on the same host. The live IPv4 TCP probes read the
+driver context and redirect record, and the newer probe passed the record to
+the relay's HTTP proxy socket before completing a bidirectional transfer. They
+do not validate process-exit invalidation, IPv6 or UDP traffic, the final Mihomo
+outbound socket's redirect record, Chain forwarding, TUN coordination, or a
+selected process tree. The feature remains unavailable to product users.
 
 ## Remaining gates
 
