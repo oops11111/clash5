@@ -289,10 +289,6 @@ export const commands = {
         enabled,
       }),
     ),
-  clash5SetPluginEnabled: (pluginId: string, enabled: boolean) =>
-    typedError<null, CommandFailure_Serialize>(
-      __TAURI_INVOKE('clash5_set_plugin_enabled', { pluginId, enabled }),
-    ),
   clash5StagePluginPackage: () =>
     typedError<
       {
@@ -313,6 +309,14 @@ export const commands = {
         stagingId,
         confirmedSigner,
       }),
+    ),
+  clash5SetPluginEnabled: (pluginId: string, enabled: boolean) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_set_plugin_enabled', { pluginId, enabled }),
+    ),
+  clash5RevokePluginSigner: (signerFingerprint: string) =>
+    typedError<number, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_revoke_plugin_signer', { signerFingerprint }),
     ),
   clash5ListPluginAuditEvents: (limit: number | null) =>
     typedError<PluginAuditEvent[], CommandFailure_Serialize>(

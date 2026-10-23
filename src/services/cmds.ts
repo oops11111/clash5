@@ -155,6 +155,11 @@ export const setClash5PluginEnabled = (pluginId: string, enabled: boolean) =>
     () => invoke<null>('clash5_set_plugin_enabled', { pluginId, enabled }),
     { id: `clash5.plugin.enabled.${pluginId}` },
   )
+export const revokeClash5PluginSigner = (signerFingerprint: string) =>
+  mutate(
+    () => invoke<number>('clash5_revoke_plugin_signer', { signerFingerprint }),
+    { id: `clash5.plugin.signer.revoke.${signerFingerprint}` },
+  )
 export const getClash5PluginEffectiveConfig =
   async (): Promise<Clash5PluginEffectiveConfig> => {
     const result = await invoke<GeneratedPluginEffectiveConfig>(

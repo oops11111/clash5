@@ -302,6 +302,11 @@ export interface TranslationResources {
           pluginSelect: string
           pluginSettingsHint: string
           pluginSigner: string
+          pluginSignerRevoke: string
+          pluginSignerRevokeConfirm: string
+          pluginSignerRevokeDescription: string
+          pluginSignerRevokeTitle: string
+          pluginSignersTitle: string
           pluginTabs: {
             binding: string
             installed: string

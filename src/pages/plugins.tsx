@@ -32,6 +32,7 @@ import {
   listClash5PluginBindings,
   listClash5PluginAuditEvents,
   listClash5Plugins,
+  revokeClash5PluginSigner,
   setClash5PluginEnabled,
   stageClash5PluginPackage,
   saveClash5PluginBindings,
@@ -90,6 +91,7 @@ const PluginsPage = () => {
   const [packagePreview, setPackagePreview] =
     useState<Clash5PluginPackagePreview | null>(null)
   const [busy, setBusy] = useState(false)
+  const [signerToRevoke, setSignerToRevoke] = useState<string | null>(null)
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false)
   const [targetOptions, setTargetOptions] = useState<BindingTargetOption[]>([])
   const [bindingPluginId, setBindingPluginId] = useState('')
@@ -208,6 +210,20 @@ const PluginsPage = () => {
     setBusy(true)
     try {
       await setClash5PluginEnabled(plugin.id, !plugin.enabled)
+      setPlugins(await listClash5Plugins())
+    } catch {
+      setPluginError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const revokeSigner = async () => {
+    if (!signerToRevoke) return
+    setBusy(true)
+    try {
+      await revokeClash5PluginSigner(signerToRevoke)
+      setSignerToRevoke(null)
       setPlugins(await listClash5Plugins())
     } catch {
       setPluginError(true)
@@ -557,6 +573,75 @@ const PluginsPage = () => {
         <Typography color="text.secondary">
           {t('layout.components.navigation.pluginSettingsHint')}
         </Typography>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          <Stack spacing={1}>
+            <Typography sx={{ fontWeight: 600 }}>
+              {t('layout.components.navigation.pluginSignersTitle')}
+            </Typography>
+            {Array.from(
+              new Set(plugins.map((plugin) => plugin.signer_fingerprint)),
+            ).map((fingerprint) => (
+              <Stack
+                key={fingerprint}
+                direction="row"
+                sx={{ justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                  {t('layout.components.navigation.pluginSigner', {
+                    fingerprint,
+                  })}
+                  {` (${plugins.filter((plugin) => plugin.signer_fingerprint === fingerprint).length})`}
+                </Typography>
+                <Button
+                  size="small"
+                  color="error"
+                  disabled={busy}
+                  onClick={() => setSignerToRevoke(fingerprint)}
+                >
+                  {t('layout.components.navigation.pluginSignerRevoke')}
+                </Button>
+              </Stack>
+            ))}
+          </Stack>
+        </Paper>
+        <Dialog
+          open={signerToRevoke !== null}
+          onClose={() => !busy && setSignerToRevoke(null)}
+        >
+          <DialogTitle>
+            {t('layout.components.navigation.pluginSignerRevokeTitle')}
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={1}>
+              <Typography>
+                {t(
+                  'layout.components.navigation.pluginSignerRevokeDescription',
+                )}
+              </Typography>
+              {plugins
+                .filter(
+                  (plugin) => plugin.signer_fingerprint === signerToRevoke,
+                )
+                .map((plugin) => (
+                  <Typography key={plugin.id} variant="body2">
+                    {plugin.name}
+                  </Typography>
+                ))}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setSignerToRevoke(null)} disabled={busy}>
+              {t('shared.actions.cancel')}
+            </Button>
+            <Button
+              color="error"
+              onClick={() => void revokeSigner()}
+              disabled={busy}
+            >
+              {t('layout.components.navigation.pluginSignerRevokeConfirm')}
+            </Button>
+          </DialogActions>
+        </Dialog>
         {plugins.map((plugin) => (
           <Paper
             key={plugin.id}
