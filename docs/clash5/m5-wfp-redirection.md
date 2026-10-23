@@ -43,8 +43,9 @@ only the active owner session, a loopback relay PID and port, and exact targets 
 creation timestamp. The chain credential stays inside the relay and never crosses the
 privileged service boundary.
 
-The service records an accepted session before reporting it active and treats a missing,
-foreign, unreadable, or uncleared record as recovery-required. At service startup it
+The service persists a pending recovery intent before driver attach, marks the record
+active only after attach succeeds, and treats an interrupted, foreign, unreadable,
+or uncleared record as recovery-required. At service startup it
 detaches a surviving recorded driver session before normal work resumes. This supplies
 the control and recovery boundary only: it does not establish WFP filters, relay
 behavior, TUN exclusion, driver packaging, or release readiness.

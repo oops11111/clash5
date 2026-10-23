@@ -156,7 +156,8 @@ static NTSTATUS C5DetachSession(C5_DRIVER_STATE *state, const C5_DETACH_REQUEST 
     ExAcquireFastMutex(&state->processLock);
     KeAcquireSpinLock(&state->sessionLock, &oldIrql);
     if (!state->sessionActive) {
-        status = STATUS_NOT_FOUND;
+        /* Recovery may follow a persisted intent that crashed before attach. */
+        status = STATUS_SUCCESS;
     } else if (state->session.sessionId != request->sessionId) {
         status = STATUS_ACCESS_DENIED;
     } else {
