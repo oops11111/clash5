@@ -46,8 +46,7 @@ static void NTAPI C5ProcessNotify(HANDLE parentId, HANDLE processId, BOOLEAN cre
     UINT16 index;
 
     UNREFERENCED_PARAMETER(parentId);
-    UNREFERENCED_PARAMETER(create);
-    if (state == NULL) {
+    if (create || state == NULL) {
         return;
     }
     /* Serialize exit notification with identity validation and publication. */
