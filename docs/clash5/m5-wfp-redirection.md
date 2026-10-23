@@ -50,8 +50,11 @@ The service persists a pending recovery intent before driver attach, installs IP
 and IPv6 TCP redirect filters in a dynamic WFP transaction after driver attach,
 and marks the record active only after both stages succeed. Status reads back both
 WFP filter IDs and confirms that the claimed relay still owns both loopback
-listeners before reporting an active session. It treats an interrupted,
-foreign, unreadable, or uncleared record as recovery-required. At service startup it
+listeners before reporting an active session. Normal core stop detaches the
+recorded WFP session before stopping the core; a core crash also detaches it
+before the watchdog attempts a restart, and cleanup failure stops recovery.
+The service treats an interrupted, foreign, unreadable, or uncleared record as
+recovery-required. At service startup it
 detaches a surviving recorded driver session before normal work resumes. A filter
 permits traffic when its kernel callout is unregistered, avoiding a machine-wide
 TCP outage if the driver unloads while the service is still running. This remains
@@ -94,8 +97,10 @@ does not establish release-signing readiness.
 The WFP policy was separately installed, read back through an independent engine
 connection, and removed on the same host. Live IPv4 and IPv6 TCP probes read the
 driver context and redirect record, passed the record to the relay's HTTP proxy
-socket, and completed a bidirectional transfer through a fixture listener. They
-do not validate process-exit invalidation, UDP traffic, the final Mihomo outbound
+socket, and completed a bidirectional transfer through a fixture listener. The
+same elevated probe then used the normal core-stop path and confirmed that the
+WFP filters and recovery record disappeared. These probes do not validate
+process-exit invalidation, UDP traffic, the final Mihomo outbound
 socket's redirect record, Chain forwarding, TUN coordination, or a selected
 process tree. The feature remains unavailable to product users.
 
