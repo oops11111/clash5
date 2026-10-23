@@ -330,10 +330,11 @@ async fn migrate_legacy_macos_logs() -> Result<()> {
     Ok(())
 }
 
-pub(super) async fn init_dns_config() -> Result<()> {
+/// Default DNS section written for new installations.
+fn default_dns_section() -> serde_yaml_ng::Mapping {
     use serde_yaml_ng::Value;
 
-    let dns_config = serde_yaml_ng::Mapping::from_iter([
+    serde_yaml_ng::Mapping::from_iter([
         ("enable".into(), Value::Bool(true)),
         // Must match the frontend default used for authoritative `dns.ipv6`.
         ("ipv6".into(), Value::Bool(true)),
@@ -364,17 +365,13 @@ pub(super) async fn init_dns_config() -> Result<()> {
         (
             "default-nameserver".into(),
             Value::Sequence(vec![
-                Value::String("system".into()),
                 Value::String("223.6.6.6".into()),
-                Value::String("8.8.8.8".into()),
                 Value::String("2400:3200::1".into()),
-                Value::String("2001:4860:4860::8888".into()),
             ]),
         ),
         (
             "nameserver".into(),
             Value::Sequence(vec![
-                Value::String("8.8.8.8".into()),
                 Value::String("https://doh.pub/dns-query".into()),
                 Value::String("https://dns.alidns.com/dns-query".into()),
             ]),
@@ -409,7 +406,13 @@ pub(super) async fn init_dns_config() -> Result<()> {
                 ),
             ])),
         ),
-    ]);
+    ])
+}
+
+pub(super) async fn init_dns_config() -> Result<()> {
+    use serde_yaml_ng::Value;
+
+    let dns_config = default_dns_section();
 
     let default_dns_config = serde_yaml_ng::Mapping::from_iter([
         ("dns".into(), Value::Mapping(dns_config)),
@@ -650,4 +653,29 @@ async fn handle_copy(src: &PathBuf, dest: &PathBuf, file: &str) {
             );
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_yaml_ng::Value;
+
+    #[test]
+    fn default_dns_uses_no_plaintext_upstream_and_no_system_bootstrap() {
+        let dns = default_dns_section();
+        let servers = |key: &str| -> Vec<String> {
+            dns.get(key)
+                .and_then(Value::as_sequence)
+                .map(|values| values.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+                .unwrap_or_default()
+        };
+
+        assert!(!servers("nameserver").is_empty());
+        assert!(
+            servers("nameserver")
+                .iter()
+                .all(|server| server.starts_with("https://"))
+        );
+        assert!(!servers("default-nameserver").iter().any(|server| server == "system"));
+    }
 }
