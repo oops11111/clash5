@@ -292,24 +292,31 @@ const MODULE_CACHE_CAPACITY: usize = 8;
 // Keyed by content hash, so an entry can only be reused for the exact bytes it was compiled from.
 static MODULE_CACHE: Mutex<VecDeque<(String, Module)>> = Mutex::new(VecDeque::new());
 
-fn compiled_module(engine: &Engine, module_bytes: &[u8]) -> Result<Module, PluginFailure> {
-    let digest = hex_digest(module_bytes);
-    {
-        let mut cache = MODULE_CACHE.lock();
-        if let Some(position) = cache.iter().position(|(key, _)| *key == digest)
-            && let Some(entry) = cache.remove(position)
-        {
-            let module = entry.1.clone();
-            cache.push_back(entry);
-            return Ok(module);
-        }
-    }
-    let module = Module::new(engine, module_bytes).map_err(|_| PluginFailure::InvalidPackage)?;
+fn cached_module(digest: &str) -> Option<Module> {
     let mut cache = MODULE_CACHE.lock();
-    cache.push_back((digest, module.clone()));
+    let position = cache.iter().position(|(key, _)| key == digest)?;
+    let entry = cache.remove(position)?;
+    let module = entry.1.clone();
+    cache.push_back(entry);
+    drop(cache);
+    Some(module)
+}
+
+fn remember_module(digest: String, module: Module) {
+    let mut cache = MODULE_CACHE.lock();
+    cache.push_back((digest, module));
     if cache.len() > MODULE_CACHE_CAPACITY {
         cache.pop_front();
     }
+}
+
+fn compiled_module(engine: &Engine, module_bytes: &[u8]) -> Result<Module, PluginFailure> {
+    let digest = hex_digest(module_bytes);
+    if let Some(module) = cached_module(&digest) {
+        return Ok(module);
+    }
+    let module = Module::new(engine, module_bytes).map_err(|_| PluginFailure::InvalidPackage)?;
+    remember_module(digest, module.clone());
     Ok(module)
 }
 
@@ -780,16 +787,20 @@ mod tests {
     }
 
     #[test]
-    fn module_cache_stays_within_capacity_and_keys_by_content() {
+    fn module_cache_stays_within_capacity_and_keys_by_content() -> Result<(), PluginFailure> {
         // Tests share the process-wide cache, so only invariants that hold under concurrency are asserted.
-        let engine = engine().unwrap();
+        let engine = engine()?;
         for name in b'a'..=b'k' {
             // A header followed by one custom section; the name byte makes each module distinct.
             let module = [0, 97, 115, 109, 1, 0, 0, 0, 0, 2, 1, name];
-            assert!(compiled_module(engine, &module).is_ok());
+            compiled_module(engine, &module)?;
         }
         assert!(MODULE_CACHE.lock().len() <= MODULE_CACHE_CAPACITY);
-        assert!(compiled_module(engine, b"not wasm").is_err());
+        assert_eq!(
+            compiled_module(engine, b"not wasm").err(),
+            Some(PluginFailure::InvalidPackage)
+        );
+        Ok(())
     }
 
     #[test]
