@@ -21,7 +21,9 @@ instance exits, before the PID can be reused. The callout snapshots that state
 under a spin lock and redirects only selected TCP traffic; other protocols
 continue unchanged until the UDP path is implemented. Detach requires the same
 nonzero session ID, so a stale controller cannot clear a newer session. The
-driver waits for in-flight selected classifications before detach returns. The
+driver waits for in-flight selected classifications before detach returns. Detach
+is idempotent when no session exists, so startup recovery can clear an intent
+written before driver attach. The
 driver does not create WFP provider, callout, or filter policy objects: the
 privileged service must do so transactionally and use the documented callout
 keys in `driver.h`. Closing the control device is not
