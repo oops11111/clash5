@@ -157,6 +157,34 @@ fn plugin_audit_records_metadata_without_binding_settings() {
 }
 
 #[test]
+fn plugin_audit_keeps_only_allowlisted_fields_at_any_depth() {
+    let mut store = BindingStore::memory().unwrap();
+    store
+        .record_plugin_audit(
+            "plugin.apply",
+            &json!({
+                "result": "success",
+                "bindings": 1,
+                "duration_ms": 4,
+                "config": {"password": "secret"},
+                "executed": [{
+                    "plugin_id": "plugin-a",
+                    "binding_id": "b1",
+                    "permissions": ["config.patch"],
+                    "url": "https://edge.example.invalid/token"
+                }]
+            }),
+        )
+        .unwrap();
+
+    let details = &store.plugin_audit_events(10).unwrap()[0].details;
+
+    assert_eq!(details["executed"][0]["plugin_id"], "plugin-a");
+    assert!(details.get("config").is_none());
+    assert!(details["executed"][0].get("url").is_none());
+}
+
+#[test]
 fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
     std::fs::create_dir_all(&root).unwrap();

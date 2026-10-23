@@ -183,6 +183,41 @@ pub struct BindingStore {
     identity_recovery: bool,
 }
 
+fn is_plugin_audit_event(event: &str) -> bool {
+    matches!(
+        event,
+        "plugin.install" | "plugin.apply" | "plugin.permission.use" | "plugin.execute" | "plugin.failure"
+    )
+}
+
+// Plugin audit records keep identifiers, permissions and outcomes only. Binding settings,
+// effective configuration values and credentials are dropped at any depth.
+const PLUGIN_AUDIT_KEYS: [&str; 10] = [
+    "plugin_id",
+    "binding_id",
+    "version",
+    "permissions",
+    "signer_fingerprint",
+    "result",
+    "code",
+    "bindings",
+    "executed",
+    "duration_ms",
+];
+
+fn sanitize_plugin_audit(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .filter(|(key, _)| PLUGIN_AUDIT_KEYS.contains(&key.as_str()))
+                .map(|(key, value)| (key.clone(), sanitize_plugin_audit(value)))
+                .collect(),
+        ),
+        Value::Array(values) => Value::Array(values.iter().map(sanitize_plugin_audit).collect()),
+        other => other.clone(),
+    }
+}
+
 fn audit(tx: &Transaction<'_>, event: &str, counts: Value) -> Result<(), DataError> {
     tx.execute(
         "INSERT INTO audit_log(event,counts) VALUES(?1,?2)",
@@ -1296,15 +1331,11 @@ PRAGMA user_version=5;
             .collect())
     }
     pub fn record_plugin_audit(&mut self, event: &str, details: &Value) -> Result<(), DataError> {
-        if !matches!(
-            event,
-            "plugin.install" | "plugin.permission.use" | "plugin.execute" | "plugin.failure"
-        ) || !details.is_object()
-        {
+        if !is_plugin_audit_event(event) || !details.is_object() {
             return Err(DataError::InvalidInput);
         }
         let tx = self.db.transaction()?;
-        audit(&tx, event, details.clone())?;
+        audit(&tx, event, sanitize_plugin_audit(details))?;
         tx.commit()?;
         Ok(())
     }
@@ -1312,17 +1343,15 @@ PRAGMA user_version=5;
         if events.is_empty() || events.len() > 32 {
             return Err(DataError::InvalidInput);
         }
-        if events.iter().any(|(event, details)| {
-            !matches!(
-                event.as_str(),
-                "plugin.install" | "plugin.permission.use" | "plugin.execute" | "plugin.failure"
-            ) || !details.is_object()
-        }) {
+        if events
+            .iter()
+            .any(|(event, details)| !is_plugin_audit_event(event) || !details.is_object())
+        {
             return Err(DataError::InvalidInput);
         }
         let tx = self.db.transaction()?;
         for (event, details) in events {
-            audit(&tx, event, details.clone())?;
+            audit(&tx, event, sanitize_plugin_audit(details))?;
         }
         tx.commit()?;
         Ok(())

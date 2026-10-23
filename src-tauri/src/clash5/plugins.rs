@@ -1,9 +1,10 @@
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_yaml_ng::{Mapping, Value};
 use sha2::{Digest as _, Sha256};
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashSet, VecDeque},
     fs,
     io::{Cursor, Read as _},
     path::Path,
@@ -121,9 +122,11 @@ pub(crate) async fn apply_bound_plugins(
         anyhow::bail!("too many active plugin bindings");
     }
 
+    let started = Instant::now();
     let base = serde_json::to_value(&*config)?;
     let plugin_root = crate::utils::dirs::app_home_dir()?.join("plugins");
     let mut patches = Vec::with_capacity(applicable.len());
+    let mut executed = Vec::with_capacity(applicable.len());
     for binding in applicable {
         let audit_identity = serde_json::json!({
             "plugin_id": binding.plugin_id.clone(),
@@ -182,19 +185,11 @@ pub(crate) async fn apply_bound_plugins(
                 return Err(anyhow::anyhow!(error.code()));
             }
         };
-        let mut details = audit_identity;
-        details["result"] = JsonValue::String("success".into());
-        details["permissions"] = serde_json::json!(manifest.permissions.clone());
-        record_plugin_audit(
-            "plugin.permission.use",
-            serde_json::json!({
-                "plugin_id": binding.plugin_id.clone(),
-                "binding_id": binding.id.clone(),
-                "permissions": manifest.permissions,
-            }),
-        )
-        .await;
-        record_plugin_audit("plugin.execute", details).await;
+        executed.push(serde_json::json!({
+            "plugin_id": binding.plugin_id.clone(),
+            "binding_id": binding.id.clone(),
+            "permissions": manifest.permissions.clone(),
+        }));
         patches.push(clash5_data::PluginPatch {
             binding_id: binding.id,
             plugin_id: binding.plugin_id,
@@ -202,6 +197,21 @@ pub(crate) async fn apply_bound_plugins(
             writable_paths: manifest.writable_paths,
             patch,
         });
+    }
+
+    // One summary per configuration generation; failures are still recorded one by one above.
+    if !executed.is_empty() {
+        let bindings = executed.len();
+        record_plugin_audit(
+            "plugin.apply",
+            serde_json::json!({
+                "result": "success",
+                "bindings": bindings,
+                "executed": executed,
+                "duration_ms": started.elapsed().as_millis() as u64,
+            }),
+        )
+        .await;
     }
 
     let effective = clash5_data::merge_plugin_patches(&base, &patches)?;
@@ -278,6 +288,30 @@ struct HostState {
 
 static ENGINE: OnceLock<Result<Engine, String>> = OnceLock::new();
 static EPOCH_TICKER: OnceLock<()> = OnceLock::new();
+const MODULE_CACHE_CAPACITY: usize = 8;
+// Keyed by content hash, so an entry can only be reused for the exact bytes it was compiled from.
+static MODULE_CACHE: Mutex<VecDeque<(String, Module)>> = Mutex::new(VecDeque::new());
+
+fn compiled_module(engine: &Engine, module_bytes: &[u8]) -> Result<Module, PluginFailure> {
+    let digest = hex_digest(module_bytes);
+    {
+        let mut cache = MODULE_CACHE.lock();
+        if let Some(position) = cache.iter().position(|(key, _)| *key == digest)
+            && let Some(entry) = cache.remove(position)
+        {
+            let module = entry.1.clone();
+            cache.push_back(entry);
+            return Ok(module);
+        }
+    }
+    let module = Module::new(engine, module_bytes).map_err(|_| PluginFailure::InvalidPackage)?;
+    let mut cache = MODULE_CACHE.lock();
+    cache.push_back((digest, module.clone()));
+    if cache.len() > MODULE_CACHE_CAPACITY {
+        cache.pop_front();
+    }
+    Ok(module)
+}
 
 fn engine() -> Result<&'static Engine, PluginFailure> {
     let engine = ENGINE
@@ -570,7 +604,7 @@ fn execute_blocking(
     writable_paths: Vec<String>,
 ) -> Result<JsonValue, PluginFailure> {
     let engine = engine()?;
-    let module = Module::new(engine, &module_bytes).map_err(|_| PluginFailure::InvalidPackage)?;
+    let module = compiled_module(engine, &module_bytes)?;
     if module.imports().next().is_some() {
         return Err(PluginFailure::PermissionDenied);
     }
@@ -743,6 +777,19 @@ mod tests {
             7, 10, 1, 6, b'm', b'e', b'm', b'o', b'r', b'y', 2, 0, // exported memory
         ];
         assert!(execute_blocking(module.to_vec(), b"{}".to_vec(), vec![]).is_err());
+    }
+
+    #[test]
+    fn module_cache_stays_within_capacity_and_keys_by_content() {
+        // Tests share the process-wide cache, so only invariants that hold under concurrency are asserted.
+        let engine = engine().unwrap();
+        for name in b'a'..=b'k' {
+            // A header followed by one custom section; the name byte makes each module distinct.
+            let module = [0, 97, 115, 109, 1, 0, 0, 0, 0, 2, 1, name];
+            assert!(compiled_module(engine, &module).is_ok());
+        }
+        assert!(MODULE_CACHE.lock().len() <= MODULE_CACHE_CAPACITY);
+        assert!(compiled_module(engine, b"not wasm").is_err());
     }
 
     #[test]
