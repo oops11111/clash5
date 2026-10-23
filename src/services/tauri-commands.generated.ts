@@ -289,6 +289,10 @@ export const commands = {
         enabled,
       }),
     ),
+  clash5SetPluginEnabled: (pluginId: string, enabled: boolean) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_set_plugin_enabled', { pluginId, enabled }),
+    ),
   clash5StagePluginPackage: () =>
     typedError<
       {
@@ -1150,6 +1154,7 @@ export type PluginSummary = {
   permissions: string[]
   writable_paths: string[]
   signer_fingerprint: string
+  enabled: boolean
 }
 
 export type PrfExtra = {

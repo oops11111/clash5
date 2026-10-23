@@ -32,6 +32,7 @@ import {
   listClash5PluginBindings,
   listClash5PluginAuditEvents,
   listClash5Plugins,
+  setClash5PluginEnabled,
   stageClash5PluginPackage,
   saveClash5PluginBindings,
   deleteClash5PluginBinding,
@@ -195,6 +196,18 @@ const PluginsPage = () => {
         packagePreview.signer,
       )
       setPackagePreview(null)
+      setPlugins(await listClash5Plugins())
+    } catch {
+      setPluginError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const togglePlugin = async (plugin: Clash5PluginSummary) => {
+    setBusy(true)
+    try {
+      await setClash5PluginEnabled(plugin.id, !plugin.enabled)
       setPlugins(await listClash5Plugins())
     } catch {
       setPluginError(true)
@@ -421,6 +434,19 @@ const PluginsPage = () => {
                       label={path}
                     />
                   ))}
+                </Stack>
+                <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+                  <Button
+                    size="small"
+                    disabled={busy}
+                    onClick={() => void togglePlugin(plugin)}
+                  >
+                    {t(
+                      plugin.enabled
+                        ? 'layout.components.navigation.pluginDisableBinding'
+                        : 'layout.components.navigation.pluginEnableBinding',
+                    )}
+                  </Button>
                 </Stack>
               </Stack>
             </Paper>

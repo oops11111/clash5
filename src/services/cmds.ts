@@ -150,6 +150,11 @@ export const setClash5PluginBindingEnabled = (
       }),
     { id: `clash5.plugin.binding.enabled.${bindingId}` },
   )
+export const setClash5PluginEnabled = (pluginId: string, enabled: boolean) =>
+  mutate(
+    () => invoke<null>('clash5_set_plugin_enabled', { pluginId, enabled }),
+    { id: `clash5.plugin.enabled.${pluginId}` },
+  )
 export const getClash5PluginEffectiveConfig =
   async (): Promise<Clash5PluginEffectiveConfig> => {
     const result = await invoke<GeneratedPluginEffectiveConfig>(
