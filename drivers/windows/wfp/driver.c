@@ -81,8 +81,11 @@ static void NTAPI C5ClassifyConnect(
 
     UNREFERENCED_PARAMETER(layerData);
     UNREFERENCED_PARAMETER(flowContext);
-    if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0 ||
-        !FWPS_IS_METADATA_FIELD_PRESENT(metadata, FWPS_METADATA_FIELD_PROCESS_ID) ||
+    if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) {
+        return;
+    }
+    classifyOut->actionType = FWP_ACTION_CONTINUE;
+    if (!FWPS_IS_METADATA_FIELD_PRESENT(metadata, FWPS_METADATA_FIELD_PROCESS_ID) ||
         state == NULL) {
         return;
     }
@@ -101,7 +104,6 @@ static void NTAPI C5ClassifyConnect(
         return;
     }
 
-    classifyOut->actionType = FWP_ACTION_CONTINUE;
     (void)C5RedirectTcp(classifyContext, metadata, filter->filterId, &session, classifyOut);
     ExReleaseRundownProtection(&state->sessionRundown);
 }
