@@ -33,6 +33,7 @@ import {
   listClash5PluginAuditEvents,
   listClash5Plugins,
   revokeClash5PluginSigner,
+  uninstallClash5Plugin,
   setClash5PluginEnabled,
   stageClash5PluginPackage,
   saveClash5PluginBindings,
@@ -92,6 +93,8 @@ const PluginsPage = () => {
     useState<Clash5PluginPackagePreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [signerToRevoke, setSignerToRevoke] = useState<string | null>(null)
+  const [pluginToUninstall, setPluginToUninstall] =
+    useState<Clash5PluginSummary | null>(null)
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false)
   const [targetOptions, setTargetOptions] = useState<BindingTargetOption[]>([])
   const [bindingPluginId, setBindingPluginId] = useState('')
@@ -210,6 +213,20 @@ const PluginsPage = () => {
     setBusy(true)
     try {
       await setClash5PluginEnabled(plugin.id, !plugin.enabled)
+      setPlugins(await listClash5Plugins())
+    } catch {
+      setPluginError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const uninstallPlugin = async () => {
+    if (!pluginToUninstall) return
+    setBusy(true)
+    try {
+      await uninstallClash5Plugin(pluginToUninstall.id)
+      setPluginToUninstall(null)
       setPlugins(await listClash5Plugins())
     } catch {
       setPluginError(true)
@@ -462,6 +479,14 @@ const PluginsPage = () => {
                         ? 'layout.components.navigation.pluginDisableBinding'
                         : 'layout.components.navigation.pluginEnableBinding',
                     )}
+                  </Button>
+                  <Button
+                    size="small"
+                    color="error"
+                    disabled={busy}
+                    onClick={() => setPluginToUninstall(plugin)}
+                  >
+                    {t('layout.components.navigation.pluginUninstall')}
                   </Button>
                 </Stack>
               </Stack>
@@ -942,6 +967,31 @@ const PluginsPage = () => {
           </Paper>
         )}
       </Stack>
+      <Dialog
+        open={pluginToUninstall !== null}
+        onClose={() => !busy && setPluginToUninstall(null)}
+      >
+        <DialogTitle>
+          {t('layout.components.navigation.pluginUninstallTitle')}
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            {t('layout.components.navigation.pluginUninstallDescription')}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPluginToUninstall(null)} disabled={busy}>
+            {t('shared.actions.cancel')}
+          </Button>
+          <Button
+            color="error"
+            onClick={() => void uninstallPlugin()}
+            disabled={busy}
+          >
+            {t('layout.components.navigation.pluginUninstallConfirm')}
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Dialog
         open={Boolean(packagePreview)}
         onClose={() => !busy && setPackagePreview(null)}

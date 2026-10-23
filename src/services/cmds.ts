@@ -160,6 +160,10 @@ export const revokeClash5PluginSigner = (signerFingerprint: string) =>
     () => invoke<number>('clash5_revoke_plugin_signer', { signerFingerprint }),
     { id: `clash5.plugin.signer.revoke.${signerFingerprint}` },
   )
+export const uninstallClash5Plugin = (pluginId: string) =>
+  mutate(() => invoke<null>('clash5_uninstall_plugin', { pluginId }), {
+    id: `clash5.plugin.uninstall.${pluginId}`,
+  })
 export const getClash5PluginEffectiveConfig =
   async (): Promise<Clash5PluginEffectiveConfig> => {
     const result = await invoke<GeneratedPluginEffectiveConfig>(

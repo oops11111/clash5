@@ -316,6 +316,10 @@ export interface TranslationResources {
           pluginTarget: string
           pluginTrustInstall: string
           pluginTrustWarning: string
+          pluginUninstall: string
+          pluginUninstallConfirm: string
+          pluginUninstallDescription: string
+          pluginUninstallTitle: string
           proxyGroups: string
           purgeExpiredOrphans: string
           purgeExpiredOrphansConfirm: string
