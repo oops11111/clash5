@@ -49,7 +49,8 @@ credential stays outside the privileged service boundary.
 The service persists a pending recovery intent before driver attach, installs IPv4
 and IPv6 TCP redirect filters in a dynamic WFP transaction after driver attach,
 and marks the record active only after both stages succeed. Status reads back both
-WFP filter IDs before reporting an active session. It treats an interrupted,
+WFP filter IDs and confirms that the claimed relay still owns both loopback
+listeners before reporting an active session. It treats an interrupted,
 foreign, unreadable, or uncleared record as recovery-required. At service startup it
 detaches a surviving recorded driver session before normal work resumes. A filter
 permits traffic when its kernel callout is unregistered, avoiding a machine-wide
