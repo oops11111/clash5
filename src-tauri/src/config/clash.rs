@@ -9,10 +9,25 @@ use std::{
     borrow::Cow,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     str::FromStr as _,
+    sync::OnceLock,
 };
+
+const LEGACY_CONTROLLER_SECRET: &str = "set-your-secret";
 
 #[derive(Default, Debug, Clone)]
 pub struct IClashTemp(pub Mapping);
+
+/// Random per process: Mihomo's configuration is regenerated on every start, so nothing persists it.
+/// A constant secret would let any local process read connections and switch nodes.
+#[allow(clippy::expect_used)] // OS random source failure must stop startup rather than fall back to a known value.
+fn controller_secret() -> &'static str {
+    static SECRET: OnceLock<String> = OnceLock::new();
+    SECRET.get_or_init(|| {
+        let mut bytes = [0_u8; 32];
+        getrandom::fill(&mut bytes).expect("OS random source is unavailable");
+        bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    })
+}
 
 impl IClashTemp {
     pub async fn new() -> Self {
@@ -32,12 +47,12 @@ impl IClashTemp {
                     }
                 }
 
-                // 确保 secret 字段存在且不为空
+                // Replace the empty value and the legacy constant that older builds wrote to disk.
                 if let Some(val) = map.get_mut("secret")
                     && let Value::String(s) = val
-                    && s.is_empty()
+                    && (s.is_empty() || s == LEGACY_CONTROLLER_SECRET)
                 {
-                    *s = "set-your-secret".into();
+                    *s = controller_secret().into();
                 }
 
                 Self(Self::guard(map))
@@ -107,7 +122,7 @@ impl IClashTemp {
             ]
             .into(),
         );
-        map.insert("secret".into(), "set-your-secret".into());
+        map.insert("secret".into(), controller_secret().into());
         map.insert("external-controller-cors".into(), cors_map.into());
         map.insert("unified-delay".into(), true.into());
         Self(map)
@@ -423,4 +438,21 @@ pub struct IClashFallbackFilter {
     pub geoip_code: Option<String>,
     pub ipcidr: Option<Vec<String>>,
     pub domain: Option<Vec<String>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn controller_secret_is_random_and_shared_with_the_template() {
+        let secret = controller_secret();
+
+        assert_eq!(secret.len(), 64);
+        assert_ne!(secret, LEGACY_CONTROLLER_SECRET);
+        assert_eq!(
+            IClashTemp::template().0.get("secret").and_then(Value::as_str),
+            Some(secret)
+        );
+    }
 }
