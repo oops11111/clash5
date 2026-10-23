@@ -778,6 +778,40 @@ pub async fn clash5_set_plugin_enabled(plugin_id: String, enabled: bool) -> CmdR
     Ok(())
 }
 
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_uninstall_plugin(plugin_id: String) -> CmdResult {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let id_for_store = plugin_id.clone();
+    let bound = crate::config::profiles::with_clash5_binding_store(move |store| {
+        Ok(store
+            .plugin_bindings(None)?
+            .iter()
+            .any(|binding| binding.plugin_id == id_for_store))
+    })
+    .await
+    .map_err(failure)?;
+    if bound {
+        return Err(coded_error(
+            "C5-PLUGIN-006",
+            "remove the plugin's bindings before uninstalling it",
+        ));
+    }
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    plugins::uninstall_plugin(&root, &plugin_id).map_err(plugin_failure)?;
+    let details = serde_json::json!({ "plugin_id": plugin_id });
+    let audit_result = crate::config::profiles::with_clash5_binding_store(move |store| {
+        store.record_plugin_audit("plugin.uninstall", &details)
+    })
+    .await;
+    if audit_result.is_err() {
+        tracing::warn!("plugin uninstall audit event could not be persisted");
+    }
+    Ok(())
+}
+
 fn set_plugin_states(root: &std::path::Path, states: &[(String, bool)]) -> Result<(), plugins::PluginFailure> {
     for (id, enabled) in states {
         plugins::set_plugin_enabled(root, id, *enabled)?;

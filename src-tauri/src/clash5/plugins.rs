@@ -267,6 +267,19 @@ pub(crate) fn set_plugin_enabled(plugin_root: &Path, id: &str, enabled: bool) ->
     }
 }
 
+/// Removes an installed plugin directory. Callers must ensure no binding still refers to it.
+pub(crate) fn uninstall_plugin(plugin_root: &Path, id: &str) -> Result<(), PluginFailure> {
+    if !valid_plugin_id(id) {
+        return Err(PluginFailure::InvalidPackage);
+    }
+    let directory = plugin_root.join(id);
+    let metadata = fs::symlink_metadata(&directory).map_err(|_| PluginFailure::InvalidPackage)?;
+    if !metadata.file_type().is_dir() {
+        return Err(PluginFailure::InvalidPackage);
+    }
+    fs::remove_dir_all(&directory).map_err(|_| PluginFailure::ExecutionFailed)
+}
+
 fn load_installed_plugin(plugin_root: &Path, id: &str) -> Result<(PluginManifest, Vec<u8>), PluginFailure> {
     if !valid_plugin_id(id) {
         return Err(PluginFailure::InvalidPackage);
@@ -842,6 +855,24 @@ mod tests {
             set_plugin_enabled(&root, "../escape", false),
             Err(PluginFailure::InvalidPackage)
         );
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn uninstall_removes_only_the_named_plugin_directory() -> Result<(), PluginFailure> {
+        let root = std::env::temp_dir().join(format!("clash5-plugin-uninstall-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("sample.plugin")).map_err(|_| PluginFailure::ExecutionFailed)?;
+        fs::create_dir_all(root.join("other.plugin")).map_err(|_| PluginFailure::ExecutionFailed)?;
+
+        assert_eq!(
+            uninstall_plugin(&root, "../sample.plugin"),
+            Err(PluginFailure::InvalidPackage)
+        );
+        uninstall_plugin(&root, "sample.plugin")?;
+        assert!(!root.join("sample.plugin").exists());
+        assert!(root.join("other.plugin").exists());
         let _ = fs::remove_dir_all(&root);
         Ok(())
     }
