@@ -54,9 +54,13 @@ permits traffic when its kernel callout is unregistered, avoiding a machine-wide
 TCP outage if the driver unloads while the service is still running. This remains
 a control boundary: an elevated Windows 10 test installed and read back both
 dynamic filters through an independent WFP engine connection, then verified
-that both disappeared after closing the session. Live redirected traffic has
-not been exercised. This does not establish relay behavior, TUN exclusion,
-driver packaging, or release readiness.
+that both disappeared after closing the session. A separate elevated IPv4 TCP
+probe attached an exact child PID and creation time through the service's
+driver IOCTL, installed the WFP filters, and observed its `C5!` payload at
+a loopback listener owned by a different process. The destination was in
+TEST-NET space. The probe removed the WFP session, temporary driver service,
+and one-day test certificate. It does not establish original-destination
+recovery, relay forwarding, Chain binding, TUN exclusion, or release readiness.
 
 ## Controlled Windows driver validation
 
@@ -70,9 +74,10 @@ Microsoft-root `/kp` check failed for the self-signed test certificate, so this
 does not establish release-signing readiness.
 
 The WFP policy was separately installed, read back through an independent engine
-connection, and removed on the same host. These checks do not validate process-exit
-invalidation, live traffic redirection, relay behavior, TUN coordination, or a
-selected process tree. The feature remains unavailable to product users.
+connection, and removed on the same host. The live IPv4 TCP probe does not
+validate process-exit invalidation, IPv6 or UDP traffic, destination context or
+redirect records, Mihomo Chain forwarding, TUN coordination, or a selected
+process tree. The feature remains unavailable to product users.
 
 ## Remaining gates
 
