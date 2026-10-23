@@ -778,6 +778,56 @@ pub async fn clash5_set_plugin_enabled(plugin_id: String, enabled: bool) -> CmdR
     Ok(())
 }
 
+fn set_plugin_states(root: &std::path::Path, states: &[(String, bool)]) -> Result<(), plugins::PluginFailure> {
+    for (id, enabled) in states {
+        plugins::set_plugin_enabled(root, id, *enabled)?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_revoke_plugin_signer(signer_fingerprint: String) -> CmdResult<u32> {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    if signer_fingerprint.len() != 64 || !signer_fingerprint.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(coded_error("C5-PLUGIN-001", "signer fingerprint is invalid"));
+    }
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    let previous: Vec<(String, bool)> = plugins::installed_plugins(&root)
+        .map_err(plugin_failure)?
+        .into_iter()
+        .filter(|plugin| plugin.signer_fingerprint == signer_fingerprint)
+        .map(|plugin| (plugin.id, plugin.enabled))
+        .collect();
+    if previous.is_empty() {
+        return Err(coded_error("C5-PLUGIN-001", "no installed plugin uses this signer"));
+    }
+    let disabled: Vec<(String, bool)> = previous.iter().map(|(id, _)| (id.clone(), false)).collect();
+    if let Err(error) = set_plugin_states(&root, &disabled) {
+        let _ = set_plugin_states(&root, &previous);
+        return Err(plugin_failure(error));
+    }
+    let restore_root = root.clone();
+    let restore_states = previous.clone();
+    apply_plugin_change_with_rollback(
+        update_plugin_configuration,
+        move || async move { set_plugin_states(&restore_root, &restore_states).map_err(|_| DataError::InvalidInput) },
+        |result| result.is_valid(),
+    )
+    .await?;
+    let details = serde_json::json!({ "signer_fingerprint": signer_fingerprint });
+    let audit_result = crate::config::profiles::with_clash5_binding_store(move |store| {
+        store.record_plugin_audit("plugin.signer.revoke", &details)
+    })
+    .await;
+    if audit_result.is_err() {
+        tracing::warn!("plugin signer revocation audit event could not be persisted");
+    }
+    Ok(previous.len() as u32)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn clash5_list_plugin_audit_events(limit: Option<u32>) -> CmdResult<Vec<PluginAuditEvent>> {
