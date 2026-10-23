@@ -39,9 +39,10 @@ No test fixture can establish that Windows route state was restored. Release acc
 M5 does not depend on a future upstream service-protocol release. clash5 pins its
 own `clash5-service-ipc` fork to a reviewed commit. The fork exposes an authenticated,
 capability-gated `process-proxy/session` API for attach, status, and detach. It accepts
-only the active owner session, a loopback relay PID and port, and exact targets with a
-creation timestamp. The chain credential stays inside the relay and never crosses the
-privileged service boundary.
+only the active owner session, a claimed relay PID and port, and exact targets with a
+creation timestamp. The privileged service does not yet verify the relay listener's
+identity or loopback bind; that is required before product activation. The chain
+credential stays outside the privileged service boundary.
 
 The service persists a pending recovery intent before driver attach, installs IPv4
 and IPv6 TCP redirect filters in a dynamic WFP transaction after driver attach,
@@ -59,22 +60,23 @@ driver packaging, or release readiness.
 
 ## Controlled Windows driver validation
 
-On 2026-10-22, the protocol-v1 callout binary was built with the WDK 26100 toolchain
-and exercised on Windows 10 with test signing enabled. A short-lived local test
-certificate signed the binary. The `c5wfptest` demand-start kernel service loaded
-successfully, an authenticated administrator probe attached a session, rejected a
-detach request with a different session ID, and detached the original session.
-The service and test certificate were removed after the probe.
+On 2026-10-23, the protocol-v2 driver built with WDK 26100/MSVC x64 static analysis
+and loaded as a demand-start kernel service on Windows 10 in test-signing mode.
+An elevated probe rejected a stale process creation time, attached the exact live
+PID and creation time, rejected a duplicate attach and a different session's
+detach, then passed matching and idempotent detach. The test service and one-day
+certificate were removed afterward. Authenticode verification passed; SignTool's
+Microsoft-root `/kp` check failed for the self-signed test certificate, so this
+does not establish release-signing readiness.
 
-This verifies the earlier driver entry path and its control-device session ownership
-boundary only. Protocol v2 now passes target creation times to the driver and
-invalidates targets on process exit; its runtime attach behavior has not yet been
-validated on Windows. The earlier test did not install WFP policy, redirect live traffic, start a
-relay, change TUN configuration, or validate a target process tree. The feature
-therefore remains unavailable to product users until the gates below are met.
-## Gating questions before implementation
+The WFP policy was separately installed, read back through an independent engine
+connection, and removed on the same host. These checks do not validate process-exit
+invalidation, live traffic redirection, relay behavior, TUN coordination, or a
+selected process tree. The feature remains unavailable to product users.
 
-- Choose and package the signed WFP callout driver and privileged service; this repository currently has no driver project or installer lifecycle for one.
+## Remaining gates
+
+- Package and manage the signed WFP callout driver and privileged service lifecycle.
 - Verify supported Windows versions, signing requirements, Secure Boot behavior, upgrade/uninstall cleanup, and antivirus/anti-cheat observations.
 - Prove exact-instance process-tree tracking, including race-free child discovery and PID reuse handling.
 - Prove how the active Windows Mihomo TUN backend avoids core re-entry; until then, keep injection unavailable while TUN is active rather than silently changing the user's TUN setting.
