@@ -85,12 +85,12 @@ Microsoft-root `/kp` check failed for the self-signed test certificate, so this
 does not establish release-signing readiness.
 
 The WFP policy was separately installed, read back through an independent engine
-connection, and removed on the same host. The live IPv4 TCP probes read the
-driver context and redirect record, and the newer probe passed the record to
-the relay's HTTP proxy socket before completing a bidirectional transfer. They
-do not validate process-exit invalidation, IPv6 or UDP traffic, the final Mihomo
-outbound socket's redirect record, Chain forwarding, TUN coordination, or a
-selected process tree. The feature remains unavailable to product users.
+connection, and removed on the same host. Live IPv4 and IPv6 TCP probes read the
+driver context and redirect record, passed the record to the relay's HTTP proxy
+socket, and completed a bidirectional transfer through a fixture listener. They
+do not validate process-exit invalidation, UDP traffic, the final Mihomo outbound
+socket's redirect record, Chain forwarding, TUN coordination, or a selected
+process tree. The feature remains unavailable to product users.
 
 ## Remaining gates
 
