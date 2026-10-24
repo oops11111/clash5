@@ -338,7 +338,7 @@ fn default_dns_section() -> serde_yaml_ng::Mapping {
         ("enable".into(), Value::Bool(true)),
         // Must match the frontend default used for authoritative `dns.ipv6`.
         ("ipv6".into(), Value::Bool(true)),
-        ("listen".into(), Value::String(":53".into())),
+        ("listen".into(), Value::String("127.0.0.1:53".into())),
         ("enhanced-mode".into(), Value::String("fake-ip".into())),
         ("fake-ip-range".into(), Value::String("198.18.0.1/16".into())),
         ("fake-ip-range6".into(), Value::String("fdfe:dcba:9876::1/64".into())),
@@ -661,7 +661,7 @@ mod tests {
     use serde_yaml_ng::Value;
 
     #[test]
-    fn default_dns_uses_no_plaintext_upstream_and_no_system_bootstrap() {
+    fn default_dns_uses_no_plaintext_upstream_no_system_bootstrap_and_loopback_listen() {
         let dns = default_dns_section();
         let servers = |key: &str| -> Vec<String> {
             dns.get(key)
@@ -677,5 +677,7 @@ mod tests {
                 .all(|server| server.starts_with("https://"))
         );
         assert!(!servers("default-nameserver").iter().any(|server| server == "system"));
+        let listen = dns.get("listen").and_then(Value::as_str);
+        assert_eq!(listen, Some("127.0.0.1:53"));
     }
 }

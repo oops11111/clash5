@@ -131,9 +131,8 @@ configuration.
 Resolvers see the domain names you look up. Existing DNS configuration files
 are not changed by an upgrade; they keep the values you saved.
 
-The DNS listener is configured on port 53 by default. Whether it is reachable
-from other devices depends on the core's binding and on *Allow LAN*, and is
-being verified in [#51](https://github.com/oops11111/clash5/issues/51).
+The DNS listener for new installations binds `127.0.0.1` only, so other devices
+cannot query it. Existing DNS files keep the address they were saved with.
 
 ### 4.10 Controller
 

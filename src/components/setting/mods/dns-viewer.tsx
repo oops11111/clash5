@@ -143,7 +143,7 @@ function parseList(str: string): string[] {
 
 const DEFAULT_DNS_CONFIG = {
   enable: true,
-  listen: ':53',
+  listen: '127.0.0.1:53',
   'enhanced-mode': 'fake-ip' as 'fake-ip' | 'redir-host',
   'fake-ip-range': '198.18.0.1/16',
   'fake-ip-range6': 'fdfe:dcba:9876::1/64',
