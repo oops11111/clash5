@@ -280,6 +280,7 @@ pub async fn clash5_test_chain(id: String, test_url: Option<String>) -> CmdResul
         .delay_proxy_by_name(&group_name, url.as_str(), 10_000)
         .await
         .map_err(|_| coded_error("C5-CHAIN-011", "chain connectivity test failed"))?;
+    record_chain_sample(&chain.id, "tested", None, Some(result.delay)).await;
     Ok(ChainTestResult {
         delay_ms: result.delay,
         group_name,
@@ -372,6 +373,11 @@ pub enum ExitIpResult {
     Healthy {
         observation: exit_ip::ExitObservation,
     },
+    /// The exit address differs from the chain's pinned address. Reported under the warn policy.
+    Drift {
+        observation: exit_ip::ExitObservation,
+        pinned_ip: String,
+    },
     Warning {
         code: String,
     },
@@ -380,6 +386,26 @@ pub enum ExitIpResult {
         observation: exit_ip::ExitObservation,
         selection_persisted: bool,
     },
+}
+
+/// Best-effort history write. A failed write must not change the outcome the user just saw.
+async fn record_chain_sample(chain_id: &str, status: &str, exit_ip: Option<std::net::IpAddr>, delay_ms: Option<u32>) {
+    let sample = clash5_data::ChainSample {
+        chain_id: chain_id.to_owned(),
+        measured_at: String::new(),
+        status: status.to_owned(),
+        exit_ip: exit_ip.map(|ip| ip.to_string()),
+        delay_ms,
+    };
+    let _ = with_clash5_binding_store(move |store| store.record_chain_sample(&sample)).await;
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_chain_samples(id: String, limit: Option<u32>) -> CmdResult<Vec<clash5_data::ChainSample>> {
+    with_clash5_binding_store(move |store| store.chain_samples(&id, limit.unwrap_or(20).clamp(1, 200) as usize))
+        .await
+        .map_err(|_| storage_failure())
 }
 
 #[tauri::command]
@@ -403,7 +429,22 @@ pub async fn clash5_detect_exit_ip(id: String, service_url: Option<String>) -> C
         .find(|chain| chain.id == id && chain.enabled && chain.profile_id == profile_id)
         .ok_or_else(|| coded_error("C5-CHAIN-002", "an enabled chain in the current profile was not found"))?;
     match exit_ip::detect(&chain.group_name(), url.clone()).await {
-        Ok(observation) => return Ok(ExitIpResult::Healthy { observation }),
+        Ok(observation) => {
+            let drifted = chain
+                .pinned_exit_ip
+                .as_deref()
+                .is_some_and(|pinned| pinned.parse::<std::net::IpAddr>().ok() != Some(observation.ip));
+            if !drifted {
+                record_chain_sample(&chain.id, "healthy", Some(observation.ip), None).await;
+                return Ok(ExitIpResult::Healthy { observation });
+            }
+            let pinned_ip = chain.pinned_exit_ip.clone().unwrap_or_default();
+            if !matches!(chain.exit_policy, clash5_data::ExitPolicy::Switch { .. }) {
+                record_chain_sample(&chain.id, "drift", Some(observation.ip), None).await;
+                return Ok(ExitIpResult::Drift { observation, pinned_ip });
+            }
+            record_chain_sample(&chain.id, "drift", Some(observation.ip), None).await;
+        }
         Err(error) if error.to_string() == "C5-EXIT-004" => {
             return Err(coded_error(
                 "C5-EXIT-004",
@@ -413,6 +454,7 @@ pub async fn clash5_detect_exit_ip(id: String, service_url: Option<String>) -> C
         Err(_) => {}
     }
     let clash5_data::ExitPolicy::Switch { fallback_chain_id } = &chain.exit_policy else {
+        record_chain_sample(&chain.id, "failed", None, None).await;
         return Ok(ExitIpResult::Warning {
             code: "C5-EXIT-003".into(),
         });

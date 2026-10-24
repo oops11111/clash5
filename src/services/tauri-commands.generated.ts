@@ -488,6 +488,10 @@ export const commands = {
     typedError<null, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_delete_app_route', { id }),
     ),
+  clash5ChainSamples: (id: string, limit: number | null) =>
+    typedError<ChainSample[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_chain_samples', { id, limit }),
+    ),
   clash5TestChain: (id: string, testUrl: string | null) =>
     typedError<ChainTestResult, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_test_chain', { id, testUrl }),
@@ -721,6 +725,15 @@ export type ChainNodeOption = {
   source_name: string | null
 }
 
+/**  One detection or test outcome. `status` is one of healthy, drift, warning, failed, tested. */
+export type ChainSample = {
+  chain_id: string
+  measured_at: string
+  status: string
+  exit_ip: string | null
+  delay_ms: number | null
+}
+
 export type ChainTestResult = {
   delay_ms: number
   group_name: string
@@ -819,6 +832,8 @@ export type DownloadEvent =
 export type ExitIpResult =
   | { status: 'disabled' }
   | { status: 'healthy'; observation: ExitObservation }
+  /**  The exit address differs from the chain's pinned address. Reported under the warn policy. */
+  | { status: 'drift'; observation: ExitObservation; pinned_ip: string }
   | { status: 'warning'; code: string }
   | {
       status: 'switched'
@@ -1427,6 +1442,8 @@ export type ProxyChain = {
   hops: Hop[]
   enabled: boolean
   exit_policy: ExitPolicy
+  /**  Exit address the chain is expected to keep. Detection reports drift when it differs. */
+  pinned_exit_ip: string | null
 }
 
 export type ProxyExtraContract = {
