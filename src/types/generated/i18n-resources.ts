@@ -38,6 +38,7 @@ export interface TranslationResources {
       effectiveChain: string
       empty: string
       enabled: string
+      exitDrift: string
       exitEnabled: string
       exitPrivacy: string
       exitService: string
@@ -47,6 +48,8 @@ export interface TranslationResources {
       failurePolicy: string
       fallback: string
       front: string
+      history: string
+      historyEmpty: string
       hop: string
       hopsHint: string
       inspector: string
@@ -60,6 +63,9 @@ export interface TranslationResources {
       moveUp: string
       name: string
       needNodes: string
+      notPinned: string
+      pinExit: string
+      pinnedExit: string
       pluginPending: string
       policyGroup: string
       poolDeleted: string
@@ -73,6 +79,13 @@ export interface TranslationResources {
       poolSaved: string
       removeHop: string
       routeName: string
+      sample: {
+        drift: string
+        failed: string
+        healthy: string
+        tested: string
+        warning: string
+      }
       save: string
       saveBeforeTest: string
       saved: string
@@ -84,6 +97,7 @@ export interface TranslationResources {
       testSuccess: string
       twoHopHint: string
       twoHopTemplate: string
+      unpinExit: string
       useTemplate: string
       visual: string
       warnOnly: string

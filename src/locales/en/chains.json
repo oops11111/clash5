@@ -81,5 +81,19 @@
   "appDeleted": "Route deleted.",
   "appEditRoute": "Edit",
   "appDeleteRoute": "Delete",
-  "missingChain": "Missing chain"
+  "missingChain": "Missing chain",
+  "exitDrift": "The exit address is {{observed}}, not the pinned {{pinned}}.",
+  "pinnedExit": "Pinned exit: {{ip}}",
+  "notPinned": "No exit address is pinned.",
+  "pinExit": "Pin the last exit address",
+  "unpinExit": "Clear the pin",
+  "history": "History",
+  "historyEmpty": "No samples yet. Run a test or an exit check.",
+  "sample": {
+    "healthy": "healthy",
+    "drift": "drift",
+    "warning": "warning",
+    "failed": "failed",
+    "tested": "tested"
+  }
 }

@@ -23,6 +23,7 @@ export interface Clash5Chain {
   profile_id: string | null
   hops: ChainHopRef[]
   enabled: boolean
+  pinned_exit_ip: string | null
   exit_policy: { mode: 'warn' } | { mode: 'switch'; fallback_chain_id: string }
 }
 
@@ -66,9 +67,18 @@ interface ExitObservation {
   elapsed_ms: number
 }
 
+export interface ChainSample {
+  chain_id: string
+  measured_at: string
+  status: 'healthy' | 'drift' | 'warning' | 'failed' | 'tested'
+  exit_ip: string | null
+  delay_ms: number | null
+}
+
 export type ExitIpResult =
   | { status: 'disabled' }
   | { status: 'healthy'; observation: ExitObservation }
+  | { status: 'drift'; observation: ExitObservation; pinned_ip: string }
   | { status: 'warning'; code: string }
   | {
       status: 'switched'

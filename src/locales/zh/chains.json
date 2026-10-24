@@ -81,5 +81,19 @@
   "appDeleted": "路由已删除。",
   "appEditRoute": "编辑",
   "appDeleteRoute": "删除",
-  "missingChain": "缺少链路"
+  "missingChain": "缺少链路",
+  "exitDrift": "出口地址是 {{observed}}，与固定的 {{pinned}} 不一致。",
+  "pinnedExit": "固定出口：{{ip}}",
+  "notPinned": "未固定出口地址。",
+  "pinExit": "固定最近一次的出口地址",
+  "unpinExit": "取消固定",
+  "history": "历史记录",
+  "historyEmpty": "还没有记录。运行一次测试或出口检测。",
+  "sample": {
+    "healthy": "正常",
+    "drift": "漂移",
+    "warning": "告警",
+    "failed": "失败",
+    "tested": "测试"
+  }
 }

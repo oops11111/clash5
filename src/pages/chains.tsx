@@ -22,6 +22,7 @@ import { BasePage } from '@/components/base'
 import {
   activateClash5Chain,
   deleteClash5AppRoute,
+  getClash5ChainSamples,
   deleteClash5Chain,
   deleteClash5NodePool,
   detectClash5ExitIp,
@@ -36,6 +37,7 @@ import type {
   AppMatcherRef,
   AppRouteDef,
   ChainHopRef,
+  ChainSample,
   ChainNodeOption,
   ChainNodeRef,
   ChainWorkspace,
@@ -71,6 +73,7 @@ const newChain = (workspace: ChainWorkspace): Clash5Chain => ({
   ],
   enabled: true,
   exit_policy: { mode: 'warn' },
+  pinned_exit_ip: null,
 })
 
 const newRoute = (): AppRouteDef => ({
@@ -123,6 +126,7 @@ const ChainsPage = () => {
   const [policyGroup, setPolicyGroup] = useState('')
   const [exitResult, setExitResult] = useState<ExitIpResult | null>(null)
   const [appRoutes, setAppRoutes] = useState<AppRouteDef[]>([])
+  const [samples, setSamples] = useState<ChainSample[]>([])
   const [routeDraft, setRouteDraft] = useState<AppRouteDef | null>(null)
   const [poolName, setPoolName] = useState('')
   const [poolMemberKeys, setPoolMemberKeys] = useState<string[]>([])
@@ -144,6 +148,12 @@ const ChainsPage = () => {
     const selected =
       next.chains.find((chain) => chain.id === selectedId) ?? next.chains[0]
     setDraft(selected ? structuredClone(selected) : newChain(next))
+    setSamples([])
+    if (selected) {
+      void getClash5ChainSamples(selected.id, 10)
+        .then(setSamples)
+        .catch(() => setSamples([]))
+    }
     setPolicyGroup((current) =>
       next.policy_groups.includes(current)
         ? current
@@ -155,6 +165,14 @@ const ChainsPage = () => {
   // Pool edits change only the pool list, so an unsaved chain draft is kept.
   const refreshWorkspace = useCallback(async () => {
     setWorkspace(await getClash5ChainWorkspace())
+  }, [])
+
+  const refreshSamples = useCallback(async (chainId: string) => {
+    try {
+      setSamples(await getClash5ChainSamples(chainId, 10))
+    } catch {
+      setSamples([])
+    }
   }, [])
 
   const refreshRoutes = useCallback(async () => {
@@ -397,8 +415,17 @@ const ChainsPage = () => {
                     exitEnabled ? serviceUrl : null,
                   )
                   setExitResult(result)
+                  void refreshSamples(draft.id)
                   if (result.status === 'warning')
                     report(t('chains.exitWarning'), 'warning')
+                  if (result.status === 'drift')
+                    report(
+                      t('chains.exitDrift', {
+                        pinned: result.pinned_ip,
+                        observed: result.observation.ip,
+                      }),
+                      'warning',
+                    )
                   if (result.status === 'switched')
                     report(
                       t('chains.exitSwitched'),
@@ -416,6 +443,7 @@ const ChainsPage = () => {
                 void perform(async () => {
                   if (!draft) return
                   const result = await testClash5Chain(draft.id)
+                  void refreshSamples(draft.id)
                   report(t('chains.testSuccess', { delay: result.delay_ms }))
                 })
               }
@@ -663,6 +691,65 @@ const ChainsPage = () => {
                   <Typography color="text.secondary" variant="caption">
                     {t('chains.saveBeforeTest')}
                   </Typography>
+                )}
+                <Typography variant="caption" color="text.secondary">
+                  {draft.pinned_exit_ip
+                    ? t('chains.pinnedExit', { ip: draft.pinned_exit_ip })
+                    : t('chains.notPinned')}
+                </Typography>
+                <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
+                  <Button
+                    size="small"
+                    disabled={
+                      busy ||
+                      !exitResult ||
+                      (exitResult.status !== 'healthy' &&
+                        exitResult.status !== 'drift')
+                    }
+                    onClick={() => {
+                      if (
+                        exitResult &&
+                        (exitResult.status === 'healthy' ||
+                          exitResult.status === 'drift')
+                      )
+                        setDraft({
+                          ...draft,
+                          pinned_exit_ip: exitResult.observation.ip,
+                        })
+                    }}
+                  >
+                    {t('chains.pinExit')}
+                  </Button>
+                  <Button
+                    size="small"
+                    disabled={busy || !draft.pinned_exit_ip}
+                    onClick={() => setDraft({ ...draft, pinned_exit_ip: null })}
+                  >
+                    {t('chains.unpinExit')}
+                  </Button>
+                </Stack>
+                <Typography variant="subtitle2">
+                  {t('chains.history')}
+                </Typography>
+                {samples.length === 0 ? (
+                  <Typography color="text.secondary" variant="caption">
+                    {t('chains.historyEmpty')}
+                  </Typography>
+                ) : (
+                  samples.map((sample, index) => (
+                    <Typography
+                      key={index}
+                      variant="caption"
+                      sx={{ display: 'block' }}
+                    >
+                      {sample.measured_at.replace('T', ' ').slice(0, 19)} ·{' '}
+                      {t(`chains.sample.${sample.status}`)} ·{' '}
+                      {sample.exit_ip ?? '—'}
+                      {sample.delay_ms !== null
+                        ? ` · ${sample.delay_ms} ms`
+                        : ''}
+                    </Typography>
+                  ))
                 )}
                 <FormControlLabel
                   label={t('chains.exitEnabled')}
