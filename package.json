@@ -29,6 +29,7 @@
     "gen:contract": "node scripts/gen-contract.mjs",
     "gen:command-contract": "node scripts/gen-command-contract.mjs",
     "check:command-contract": "node scripts/check-command-contract.mjs",
+    "check:privacy-defaults": "node scripts/check-privacy-defaults.mjs",
     "arch:check": "node scripts/check-architecture.mjs listen emit invoke",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

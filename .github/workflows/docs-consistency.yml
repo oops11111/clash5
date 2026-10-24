@@ -7,6 +7,13 @@ name: docs-consistency
 on:
   pull_request:
     paths:
+      - PRIVACY.md
+      - scripts/check-privacy-defaults.mjs
+      - src-tauri/src/config/verge.rs
+      - src-tauri/src/config/clash.rs
+      - src-tauri/src/utils/init.rs
+      - src/pages/home.tsx
+      - src/components/setting/mods/misc-viewer.tsx
       - CONTRIBUTING.md
       - AGENTS.md
       - CLAUDE.md
@@ -17,6 +24,13 @@ on:
   push:
     branches: [dev]
     paths:
+      - PRIVACY.md
+      - scripts/check-privacy-defaults.mjs
+      - src-tauri/src/config/verge.rs
+      - src-tauri/src/config/clash.rs
+      - src-tauri/src/utils/init.rs
+      - src/pages/home.tsx
+      - src/components/setting/mods/misc-viewer.tsx
       - CONTRIBUTING.md
       - AGENTS.md
       - CLAUDE.md
@@ -57,6 +71,8 @@ jobs:
           check .github/PULL_REQUEST_TEMPLATE.md '## Approach'
           check .github/PULL_REQUEST_TEMPLATE.md '## Scope'
           echo "All cross-document anchors are consistent."
+      - name: Check privacy defaults against PRIVACY.md
+        run: node scripts/check-privacy-defaults.mjs
       - name: How to fix a failure
         if: failure()
         run: |
