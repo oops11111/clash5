@@ -99,7 +99,10 @@ connection, and removed on the same host. Live IPv4 and IPv6 TCP probes read the
 driver context and redirect record, passed the record to the relay's HTTP proxy
 socket, and completed a bidirectional transfer through a fixture listener. The
 same elevated probe then used the normal core-stop path and confirmed that the
-WFP filters and recovery record disappeared. These probes do not validate
+WFP filters and recovery record disappeared. It attached a second session and
+ran startup reconciliation against its persisted record; the WFP filters and
+record disappeared again. This exercises recovery on Windows 10, but not a
+forced service crash or watchdog restart. These probes do not validate
 process-exit invalidation, UDP traffic, the final Mihomo outbound
 socket's redirect record, Chain forwarding, TUN coordination, or a selected
 process tree. The feature remains unavailable to product users.
