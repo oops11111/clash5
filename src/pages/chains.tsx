@@ -1,5 +1,7 @@
+// Hop, pool member and sample rows have no stable id and are controlled inputs,
+// so their index is a safe key.
+/* eslint-disable @eslint-react/no-array-index-key */
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
-import { Fragment, useCallback, useEffect, useState } from 'react'
 import {
   Alert,
   Box,
@@ -16,6 +18,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BasePage } from '@/components/base'
@@ -38,7 +41,6 @@ import type {
   AppRouteDef,
   ChainHopRef,
   ChainSample,
-  ChainNodeOption,
   ChainNodeRef,
   ChainWorkspace,
   Clash5Chain,
@@ -172,7 +174,7 @@ const ChainsPage = () => {
     if (selected) {
       void getClash5ChainSamples(selected.id, 10)
         .then(setSamples)
-        .catch(() => setSamples([]))
+        .catch(() => undefined)
     }
     setPolicyGroup((current) =>
       next.policy_groups.includes(current)
