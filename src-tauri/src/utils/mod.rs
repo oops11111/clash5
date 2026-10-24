@@ -1,6 +1,7 @@
 #[cfg(target_os = "macos")]
 pub mod connections_stream;
 pub mod dirs;
+pub mod encryption_key;
 pub mod help;
 pub mod init;
 #[cfg(target_os = "linux")]

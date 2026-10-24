@@ -155,6 +155,29 @@ pub fn path_to_str(path: &Path) -> Result<&str> {
         .ok_or_else(|| anyhow::anyhow!("failed to get path from {:?}", path))
 }
 
+/// Windows and macOS keep the key in the OS credential store. A legacy key file is moved there once.
+#[cfg(not(target_os = "linux"))]
+pub fn get_encryption_key() -> Result<Vec<u8>> {
+    use crate::utils::encryption_key::{OsKeyStore, resolve_key};
+    static KEY: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    if let Some(key) = KEY.get() {
+        return Ok(key.clone());
+    }
+    let key_path = app_home_dir()?.join(".encryption_key");
+    let legacy = match fs::read(&key_path) {
+        Ok(bytes) => Some(bytes),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(anyhow::anyhow!("Failed to read encryption key: {}", error)),
+    };
+    let (key, legacy_removable) = resolve_key(&OsKeyStore, legacy)?;
+    if legacy_removable {
+        // A failed removal is harmless: the next start finds the same key in the store.
+        let _ = fs::remove_file(&key_path);
+    }
+    Ok(KEY.get_or_init(|| key).clone())
+}
+
+#[cfg(target_os = "linux")]
 pub fn get_encryption_key() -> Result<Vec<u8>> {
     let app_dir = app_home_dir()?;
     let key_path = app_dir.join(".encryption_key");
