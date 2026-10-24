@@ -65,6 +65,7 @@ export interface Clash5PluginSummary {
   writable_paths: string[]
   signer_fingerprint: string
   enabled: boolean
+  has_previous: boolean
 }
 
 export interface Clash5PluginAuditEvent {
@@ -81,6 +82,7 @@ export interface Clash5PluginPackagePreview {
   name: string
   description: string
   permissions: string[]
+  writable_paths: string[]
   signer_fingerprint: string
   signer: string
 }

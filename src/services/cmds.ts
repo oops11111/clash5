@@ -164,6 +164,24 @@ export const uninstallClash5Plugin = (pluginId: string) =>
   mutate(() => invoke<null>('clash5_uninstall_plugin', { pluginId }), {
     id: `clash5.plugin.uninstall.${pluginId}`,
   })
+export const upgradeClash5Plugin = (
+  stagingId: string,
+  confirmedSigner: string,
+  allowDowngrade: boolean,
+) =>
+  mutate(
+    () =>
+      invoke<Clash5PluginSummary>('clash5_upgrade_plugin', {
+        stagingId,
+        confirmedSigner,
+        allowDowngrade,
+      }),
+    { id: `clash5.plugin.upgrade.${stagingId}` },
+  )
+export const rollbackClash5Plugin = (pluginId: string) =>
+  mutate(() => invoke<null>('clash5_rollback_plugin', { pluginId }), {
+    id: `clash5.plugin.rollback.${pluginId}`,
+  })
 export const getClash5PluginEffectiveConfig =
   async (): Promise<Clash5PluginEffectiveConfig> => {
     const result = await invoke<GeneratedPluginEffectiveConfig>(

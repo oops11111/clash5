@@ -33,6 +33,8 @@ import {
   listClash5PluginAuditEvents,
   listClash5Plugins,
   revokeClash5PluginSigner,
+  rollbackClash5Plugin,
+  upgradeClash5Plugin,
   uninstallClash5Plugin,
   setClash5PluginEnabled,
   stageClash5PluginPackage,
@@ -52,6 +54,28 @@ import type {
 import type { Clash5PluginBindingTarget } from '@/types/clash5-plugin'
 
 type PluginTab = 'installed' | 'market' | 'binding' | 'settings'
+
+const versionParts = (version: string) => {
+  const parts = version.split('.')
+  return parts.every((part) => /^\d+$/.test(part))
+    ? parts.map((part) => Number(part))
+    : null
+}
+
+const isNewerVersion = (candidate: string, installed: string) => {
+  const next = versionParts(candidate)
+  const current = versionParts(installed)
+  if (!next || !current) return false
+  for (
+    let index = 0;
+    index < Math.max(next.length, current.length);
+    index += 1
+  ) {
+    const difference = (next[index] ?? 0) - (current[index] ?? 0)
+    if (difference !== 0) return difference > 0
+  }
+  return false
+}
 
 const tabs: PluginTab[] = ['installed', 'market', 'binding', 'settings']
 
@@ -192,15 +216,53 @@ const PluginsPage = () => {
     }
   }, [tab, t])
 
+  const installedPreviewMatch = packagePreview
+    ? (plugins ?? []).find((plugin) => plugin.id === packagePreview.id)
+    : undefined
+  const upgradeAllowed =
+    !installedPreviewMatch ||
+    (packagePreview !== null &&
+      isNewerVersion(packagePreview.version, installedPreviewMatch.version))
+  const addedPermissions = installedPreviewMatch
+    ? (packagePreview?.permissions ?? []).filter(
+        (permission) => !installedPreviewMatch.permissions.includes(permission),
+      )
+    : []
+  const addedPaths = installedPreviewMatch
+    ? (packagePreview?.writable_paths ?? []).filter(
+        (path) => !installedPreviewMatch.writable_paths.includes(path),
+      )
+    : []
+
   const installPackage = async () => {
     if (!packagePreview) return
     setBusy(true)
     try {
-      await installStagedClash5Plugin(
-        packagePreview.staging_id,
-        packagePreview.signer,
-      )
+      if (installedPreviewMatch) {
+        await upgradeClash5Plugin(
+          packagePreview.staging_id,
+          packagePreview.signer,
+          false,
+        )
+      } else {
+        await installStagedClash5Plugin(
+          packagePreview.staging_id,
+          packagePreview.signer,
+        )
+      }
       setPackagePreview(null)
+      setPlugins(await listClash5Plugins())
+    } catch {
+      setPluginError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const rollbackPlugin = async (plugin: Clash5PluginSummary) => {
+    setBusy(true)
+    try {
+      await rollbackClash5Plugin(plugin.id)
       setPlugins(await listClash5Plugins())
     } catch {
       setPluginError(true)
@@ -480,6 +542,15 @@ const PluginsPage = () => {
                         : 'layout.components.navigation.pluginEnableBinding',
                     )}
                   </Button>
+                  {plugin.has_previous && (
+                    <Button
+                      size="small"
+                      disabled={busy}
+                      onClick={() => void rollbackPlugin(plugin)}
+                    >
+                      {t('layout.components.navigation.pluginRollback')}
+                    </Button>
+                  )}
                   <Button
                     size="small"
                     color="error"
@@ -1016,6 +1087,33 @@ const PluginsPage = () => {
                   <Chip key={permission} size="small" label={permission} />
                 ))}
               </Stack>
+              {installedPreviewMatch && upgradeAllowed && (
+                <Alert severity="info">
+                  {t('layout.components.navigation.pluginUpgradeFrom', {
+                    from: installedPreviewMatch.version,
+                    to: packagePreview.version,
+                  })}
+                </Alert>
+              )}
+              {installedPreviewMatch && !upgradeAllowed && (
+                <Alert severity="error">
+                  {t('layout.components.navigation.pluginUpgradeBlocked')}
+                </Alert>
+              )}
+              {addedPermissions.length > 0 && (
+                <Alert severity="warning">
+                  {t('layout.components.navigation.pluginAddedPermissions', {
+                    items: addedPermissions.join(', '),
+                  })}
+                </Alert>
+              )}
+              {addedPaths.length > 0 && (
+                <Alert severity="warning">
+                  {t('layout.components.navigation.pluginAddedPaths', {
+                    items: addedPaths.join(', '),
+                  })}
+                </Alert>
+              )}
               <Alert severity="warning">
                 {t('layout.components.navigation.pluginTrustWarning')}
               </Alert>
@@ -1028,10 +1126,14 @@ const PluginsPage = () => {
           </Button>
           <Button
             onClick={() => void installPackage()}
-            disabled={busy}
+            disabled={busy || !upgradeAllowed}
             variant="contained"
           >
-            {t('layout.components.navigation.pluginTrustInstall')}
+            {t(
+              installedPreviewMatch
+                ? 'layout.components.navigation.pluginUpgradeConfirm'
+                : 'layout.components.navigation.pluginTrustInstall',
+            )}
           </Button>
         </DialogActions>
       </Dialog>

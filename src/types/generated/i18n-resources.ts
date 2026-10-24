@@ -281,6 +281,8 @@ export interface TranslationResources {
           orphanRetentionSummary: string
           pendingRebind: string
           pluginAddBinding: string
+          pluginAddedPaths: string
+          pluginAddedPermissions: string
           pluginAuditEmpty: string
           pluginAuditError: string
           pluginAuditTitle: string
@@ -298,6 +300,7 @@ export interface TranslationResources {
           pluginProvenanceProfile: string
           pluginProvenanceTitle: string
           pluginRemoveBinding: string
+          pluginRollback: string
           pluginSaveBinding: string
           pluginSelect: string
           pluginSettingsHint: string
@@ -320,6 +323,9 @@ export interface TranslationResources {
           pluginUninstallConfirm: string
           pluginUninstallDescription: string
           pluginUninstallTitle: string
+          pluginUpgradeBlocked: string
+          pluginUpgradeConfirm: string
+          pluginUpgradeFrom: string
           proxyGroups: string
           purgeExpiredOrphans: string
           purgeExpiredOrphansConfirm: string

@@ -301,6 +301,22 @@ export const commands = {
     typedError<null, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_uninstall_plugin', { pluginId }),
     ),
+  clash5UpgradePlugin: (
+    stagingId: string,
+    confirmedSigner: string,
+    allowDowngrade: boolean,
+  ) =>
+    typedError<PluginSummary, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_upgrade_plugin', {
+        stagingId,
+        confirmedSigner,
+        allowDowngrade,
+      }),
+    ),
+  clash5RollbackPlugin: (pluginId: string) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_rollback_plugin', { pluginId }),
+    ),
   clash5StagePluginPackage: () =>
     typedError<
       {
@@ -310,6 +326,7 @@ export const commands = {
         name: string
         description: string
         permissions: string[]
+        writable_paths: string[]
         signer_fingerprint: string
         signer: string
       } | null,
@@ -1150,6 +1167,7 @@ export type PluginPackagePreview = {
   name: string
   description: string
   permissions: string[]
+  writable_paths: string[]
   signer_fingerprint: string
   signer: string
 }
@@ -1163,6 +1181,7 @@ export type PluginSummary = {
   writable_paths: string[]
   signer_fingerprint: string
   enabled: boolean
+  has_previous: boolean
 }
 
 export type PrfExtra = {
