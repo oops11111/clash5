@@ -155,3 +155,64 @@ pub fn get_network_interfaces_info() -> CmdResult<Vec<NetworkInterfaceWire>> {
 
     Ok(result)
 }
+
+/// The services the Home IP card may query. Requests go through the running core's mixed port, so
+/// the reported address is the one the selected route exits from.
+const IP_INFO_SERVICES: [&str; 6] = [
+    "https://api.ip.sb/geoip",
+    "https://ipapi.co/json",
+    "https://api.ipapi.is/",
+    "https://ipwho.is/",
+    "https://ip.api.skk.moe/cf-geoip",
+    "https://get.geojs.io/v1/ip/geo.json",
+];
+
+fn ip_info_service_allowed(url: &str) -> bool {
+    IP_INFO_SERVICES.contains(&url)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn fetch_ip_info(service_url: String) -> CmdResult<String> {
+    if !ip_info_service_allowed(&service_url) {
+        return Err(super::CommandFailure::plain("IP information service is not allowed"));
+    }
+    let port = crate::config::active_mixed_port().await;
+    let client = reqwest::Client::builder()
+        .proxy(reqwest::Proxy::all(format!("http://127.0.0.1:{port}")).stringify_err()?)
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .timeout(std::time::Duration::from_secs(10))
+        .user_agent(format!("clash5/{}", env!("CARGO_PKG_VERSION")))
+        .build()
+        .stringify_err()?;
+    let response = client.get(&service_url).send().await.stringify_err()?;
+    if !response.status().is_success() {
+        return Err(super::CommandFailure::plain(format!(
+            "IP information service returned {}",
+            response.status()
+        )));
+    }
+    let mut body = Vec::new();
+    let mut response = response;
+    while let Some(chunk) = response.chunk().await.stringify_err()? {
+        if body.len() + chunk.len() > 16 * 1024 {
+            return Err(super::CommandFailure::plain("IP information response is too large"));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    String::from_utf8(body).map_err(super::CommandFailure::plain)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ip_info_service_allowed;
+
+    #[test]
+    fn ip_info_requests_are_limited_to_the_listed_https_services() {
+        assert!(ip_info_service_allowed("https://api.ip.sb/geoip"));
+        assert!(!ip_info_service_allowed("http://api.ip.sb/geoip"));
+        assert!(!ip_info_service_allowed("http://127.0.0.1:9097/configs"));
+        assert!(!ip_info_service_allowed("https://example.invalid/"));
+    }
+}

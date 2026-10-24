@@ -13,6 +13,14 @@ static SESSION_FALLBACK: AtomicU16 = AtomicU16::new(0);
 
 pub struct MixedPort;
 
+/// Port the running core serves mixed HTTP and SOCKS traffic on, after any startup fallback.
+pub(crate) async fn active_mixed_port() -> u16 {
+    match MixedPort::session_fallback() {
+        Some(port) => port,
+        None => Config::clash().await.latest_arc().get_mixed_port(),
+    }
+}
+
 impl MixedPort {
     pub(crate) fn session_fallback() -> Option<u16> {
         match SESSION_FALLBACK.load(Ordering::Acquire) {

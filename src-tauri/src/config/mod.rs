@@ -4,6 +4,7 @@ mod config;
 pub(crate) mod dns;
 mod encrypt;
 mod mixed_port;
+pub(crate) use mixed_port::active_mixed_port;
 mod port;
 mod prfitem;
 pub mod profiles;
