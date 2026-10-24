@@ -87,18 +87,17 @@ only when you start the update.
 The Home page card shows your apparent public IP address and its approximate
 location. It is off by default; enable it in the Home page card settings. A
 saved setting from an earlier version is kept. While the card is visible and
-the window is in use, clash5 refreshes it every 5 minutes. Each refresh asks one service, chosen
-at random, from:
+the window is in use, clash5 refreshes it every 5 minutes. Each refresh asks one
+service, chosen at random, from:
 
 `api.ip.sb`, `ipapi.co`, `api.ipapi.is`, `ipwho.is`, `ip.api.skk.moe`,
 `get.geojs.io`.
 
 These services are independent third parties with their own privacy policies.
-Requests are sent by the application itself, not through clash5's proxy port,
-so the service sees the address the request leaves from. Disable the card in the
-Home page settings to stop these requests.
-Routing this request through the selected route is tracked in
-[#52](https://github.com/oops11111/clash5/issues/52).
+Requests go through clash5's local mixed port, so the service sees the address
+of the route the running core selects for them. If that route is direct, the
+service sees your direct address. Disable the card in the Home page card
+settings to stop these requests.
 
 ### 4.6 Exit IP detection: user-initiated
 

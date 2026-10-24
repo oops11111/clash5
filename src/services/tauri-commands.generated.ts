@@ -16,6 +16,10 @@ export const commands = {
     typedError<SystemProxyWire, CommandFailure_Serialize>(
       __TAURI_INVOKE('get_sys_proxy'),
     ),
+  fetchIpInfo: (serviceUrl: string) =>
+    typedError<string, CommandFailure_Serialize>(
+      __TAURI_INVOKE('fetch_ip_info', { serviceUrl }),
+    ),
   getAutoProxy: () =>
     typedError<AutoProxyWire, CommandFailure_Serialize>(
       __TAURI_INVOKE('get_auto_proxy'),
