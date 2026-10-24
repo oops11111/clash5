@@ -288,6 +288,17 @@ export interface TranslationResources {
           pluginAuditTitle: string
           pluginBindingSaveError: string
           pluginCancel: string
+          pluginCatalogAdd: string
+          pluginCatalogAddTitle: string
+          pluginCatalogEmpty: string
+          pluginCatalogError: string
+          pluginCatalogInstall: string
+          pluginCatalogPluginCount: string
+          pluginCatalogPreview: string
+          pluginCatalogRefresh: string
+          pluginCatalogRemove: string
+          pluginCatalogSignerNote: string
+          pluginCatalogUrl: string
           pluginConfig: string
           pluginConflictTitle: string
           pluginDisableBinding: string

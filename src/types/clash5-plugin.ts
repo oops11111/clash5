@@ -86,3 +86,28 @@ export interface Clash5PluginPackagePreview {
   signer_fingerprint: string
   signer: string
 }
+
+export interface Clash5CatalogEntry {
+  id: string
+  version: string
+  name: string
+  description: string
+  file: string
+  sha256: string
+}
+
+export interface Clash5CatalogView {
+  id: string
+  name: string
+  url: string
+  signer_fingerprint: string
+  plugins: Clash5CatalogEntry[]
+}
+
+export interface Clash5CatalogPreview {
+  url: string
+  name: string
+  signer: string
+  signer_fingerprint: string
+  plugin_count: number
+}

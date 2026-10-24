@@ -44,6 +44,8 @@ import type {
   Clash5PluginBindingBatchInput,
   Clash5PluginAuditEvent,
   Clash5PluginEffectiveConfig,
+  Clash5CatalogPreview,
+  Clash5CatalogView,
   Clash5PluginPackagePreview,
   Clash5PluginSummary,
 } from '@/types/clash5-plugin'
@@ -182,6 +184,44 @@ export const rollbackClash5Plugin = (pluginId: string) =>
   mutate(() => invoke<null>('clash5_rollback_plugin', { pluginId }), {
     id: `clash5.plugin.rollback.${pluginId}`,
   })
+export const listClash5PluginCatalogs = () =>
+  invoke<Clash5CatalogView[]>('clash5_list_plugin_catalogs')
+export const previewClash5PluginCatalog = (url: string) =>
+  invoke<Clash5CatalogPreview>('clash5_preview_plugin_catalog', { url })
+export const saveClash5PluginCatalog = (
+  url: string,
+  confirmedSignerFingerprint: string,
+) =>
+  mutate(
+    () =>
+      invoke<Clash5CatalogView>('clash5_save_plugin_catalog', {
+        url,
+        confirmedSignerFingerprint,
+      }),
+    { id: 'clash5.plugin.catalog.save' },
+  )
+export const refreshClash5PluginCatalog = (catalogId: string) =>
+  mutate(
+    () =>
+      invoke<Clash5CatalogView>('clash5_refresh_plugin_catalog', { catalogId }),
+    { id: `clash5.plugin.catalog.refresh.${catalogId}` },
+  )
+export const removeClash5PluginCatalog = (catalogId: string) =>
+  mutate(() => invoke<null>('clash5_remove_plugin_catalog', { catalogId }), {
+    id: `clash5.plugin.catalog.remove.${catalogId}`,
+  })
+export const downloadClash5CatalogPlugin = (
+  catalogId: string,
+  pluginId: string,
+) =>
+  mutate(
+    () =>
+      invoke<Clash5PluginPackagePreview>('clash5_download_catalog_plugin', {
+        catalogId,
+        pluginId,
+      }),
+    { id: `clash5.plugin.catalog.download.${pluginId}` },
+  )
 export const getClash5PluginEffectiveConfig =
   async (): Promise<Clash5PluginEffectiveConfig> => {
     const result = await invoke<GeneratedPluginEffectiveConfig>(

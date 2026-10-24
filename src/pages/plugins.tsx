@@ -32,7 +32,13 @@ import {
   listClash5PluginBindings,
   listClash5PluginAuditEvents,
   listClash5Plugins,
+  downloadClash5CatalogPlugin,
+  listClash5PluginCatalogs,
+  previewClash5PluginCatalog,
+  refreshClash5PluginCatalog,
+  removeClash5PluginCatalog,
   revokeClash5PluginSigner,
+  saveClash5PluginCatalog,
   rollbackClash5Plugin,
   upgradeClash5Plugin,
   uninstallClash5Plugin,
@@ -51,7 +57,11 @@ import type {
   Clash5PluginPackagePreview,
   Clash5PluginSummary,
 } from '@/types/clash5-plugin'
-import type { Clash5PluginBindingTarget } from '@/types/clash5-plugin'
+import type {
+  Clash5CatalogPreview,
+  Clash5CatalogView,
+  Clash5PluginBindingTarget,
+} from '@/types/clash5-plugin'
 
 type PluginTab = 'installed' | 'market' | 'binding' | 'settings'
 
@@ -117,6 +127,11 @@ const PluginsPage = () => {
     useState<Clash5PluginPackagePreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [signerToRevoke, setSignerToRevoke] = useState<string | null>(null)
+  const [catalogs, setCatalogs] = useState<Clash5CatalogView[] | null>(null)
+  const [catalogUrl, setCatalogUrl] = useState('')
+  const [catalogPreview, setCatalogPreview] =
+    useState<Clash5CatalogPreview | null>(null)
+  const [catalogError, setCatalogError] = useState(false)
   const [pluginToUninstall, setPluginToUninstall] =
     useState<Clash5PluginSummary | null>(null)
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false)
@@ -191,6 +206,21 @@ const PluginsPage = () => {
       cancelled = true
     }
   }, [tab, t])
+
+  useEffect(() => {
+    if (tab !== 'market') return
+    let cancelled = false
+    listClash5PluginCatalogs()
+      .then((items) => {
+        if (!cancelled) setCatalogs(items)
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogError(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tab])
 
   useEffect(() => {
     if (tab !== 'installed' && tab !== 'settings') return
@@ -284,6 +314,77 @@ const PluginsPage = () => {
       setPlugins(await listClash5Plugins())
     } catch {
       setPluginError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const previewCatalog = async () => {
+    setBusy(true)
+    setCatalogError(false)
+    try {
+      setCatalogPreview(await previewClash5PluginCatalog(catalogUrl.trim()))
+    } catch {
+      setCatalogPreview(null)
+      setCatalogError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const addCatalog = async () => {
+    if (!catalogPreview) return
+    setBusy(true)
+    setCatalogError(false)
+    try {
+      await saveClash5PluginCatalog(
+        catalogPreview.url,
+        catalogPreview.signer_fingerprint,
+      )
+      setCatalogPreview(null)
+      setCatalogUrl('')
+      setCatalogs(await listClash5PluginCatalogs())
+    } catch {
+      setCatalogError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const refreshCatalog = async (catalogId: string) => {
+    setBusy(true)
+    setCatalogError(false)
+    try {
+      await refreshClash5PluginCatalog(catalogId)
+      setCatalogs(await listClash5PluginCatalogs())
+    } catch {
+      setCatalogError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeCatalog = async (catalogId: string) => {
+    setBusy(true)
+    setCatalogError(false)
+    try {
+      await removeClash5PluginCatalog(catalogId)
+      setCatalogs(await listClash5PluginCatalogs())
+    } catch {
+      setCatalogError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // The downloaded package opens the same preview as a picked file, so install and upgrade rules apply.
+  const installCatalogPlugin = async (catalogId: string, pluginId: string) => {
+    setBusy(true)
+    setCatalogError(false)
+    try {
+      setPackagePreview(await downloadClash5CatalogPlugin(catalogId, pluginId))
+    } catch {
+      setCatalogError(true)
     } finally {
       setBusy(false)
     }
@@ -573,6 +674,147 @@ const PluginsPage = () => {
       </Stack>
     )
   }
+
+  const renderMarket = () => (
+    <Stack spacing={2}>
+      {catalogError && (
+        <Alert severity="error">
+          {t('layout.components.navigation.pluginCatalogError')}
+        </Alert>
+      )}
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+        <Stack spacing={1.5}>
+          <Typography sx={{ fontWeight: 600 }}>
+            {t('layout.components.navigation.pluginCatalogAddTitle')}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <TextField
+              size="small"
+              fullWidth
+              label={t('layout.components.navigation.pluginCatalogUrl')}
+              value={catalogUrl}
+              onChange={(event) => {
+                setCatalogUrl(event.target.value)
+                setCatalogPreview(null)
+              }}
+            />
+            <Button
+              disabled={busy || !catalogUrl.trim()}
+              onClick={() => void previewCatalog()}
+            >
+              {t('layout.components.navigation.pluginCatalogPreview')}
+            </Button>
+          </Stack>
+          {catalogPreview && (
+            <Stack spacing={1}>
+              <Typography>
+                {catalogPreview.name} ·{' '}
+                {t('layout.components.navigation.pluginCatalogPluginCount', {
+                  count: catalogPreview.plugin_count,
+                })}
+              </Typography>
+              <Typography variant="body2">
+                {t('layout.components.navigation.pluginSigner', {
+                  fingerprint: catalogPreview.signer_fingerprint,
+                })}
+              </Typography>
+              <Alert severity="warning">
+                {t('layout.components.navigation.pluginCatalogSignerNote')}
+              </Alert>
+              <Button
+                variant="contained"
+                sx={{ alignSelf: 'flex-start' }}
+                disabled={busy}
+                onClick={() => void addCatalog()}
+              >
+                {t('layout.components.navigation.pluginCatalogAdd')}
+              </Button>
+            </Stack>
+          )}
+        </Stack>
+      </Paper>
+      {catalogs === null ? (
+        <Typography color="text.secondary">
+          {t('layout.components.navigation.empty.pluginLoading')}
+        </Typography>
+      ) : catalogs.length === 0 ? (
+        <Typography color="text.secondary">
+          {t('layout.components.navigation.pluginCatalogEmpty')}
+        </Typography>
+      ) : (
+        catalogs.map((catalog) => (
+          <Paper
+            key={catalog.id}
+            variant="outlined"
+            sx={{ p: 2, borderRadius: 2 }}
+          >
+            <Stack spacing={1}>
+              <Stack
+                direction="row"
+                sx={{ justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <Typography sx={{ fontWeight: 600 }}>{catalog.name}</Typography>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    disabled={busy}
+                    onClick={() => void refreshCatalog(catalog.id)}
+                  >
+                    {t('layout.components.navigation.pluginCatalogRefresh')}
+                  </Button>
+                  <Button
+                    size="small"
+                    color="error"
+                    disabled={busy}
+                    onClick={() => void removeCatalog(catalog.id)}
+                  >
+                    {t('layout.components.navigation.pluginCatalogRemove')}
+                  </Button>
+                </Stack>
+              </Stack>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ wordBreak: 'break-all' }}
+              >
+                {catalog.url}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {t('layout.components.navigation.pluginSigner', {
+                  fingerprint: catalog.signer_fingerprint,
+                })}
+              </Typography>
+              {catalog.plugins.map((entry) => (
+                <Stack
+                  key={entry.id}
+                  direction="row"
+                  sx={{ justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <Stack>
+                    <Typography>
+                      {entry.name} · v{entry.version}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {entry.description}
+                    </Typography>
+                  </Stack>
+                  <Button
+                    size="small"
+                    disabled={busy}
+                    onClick={() =>
+                      void installCatalogPlugin(catalog.id, entry.id)
+                    }
+                  >
+                    {t('layout.components.navigation.pluginCatalogInstall')}
+                  </Button>
+                </Stack>
+              ))}
+            </Stack>
+          </Paper>
+        ))
+      )}
+    </Stack>
+  )
 
   const renderSettings = () => {
     const auditPanel = (
@@ -1020,6 +1262,8 @@ const PluginsPage = () => {
         </Tabs>
         {tab === 'installed' ? (
           renderInstalled()
+        ) : tab === 'market' ? (
+          renderMarket()
         ) : tab === 'binding' ? (
           <Stack spacing={2}>
             {renderBindings()}

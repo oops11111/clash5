@@ -152,6 +152,15 @@ entered, and only when you start a backup or enable scheduled backup.
 Desktop notifications use generic text (for example, that the system proxy was
 turned on). They never include node names, addresses or domains.
 
+### 4.13 Plugin catalogs: user-initiated
+
+Adding or refreshing a plugin catalog requests, from the catalog's https address:
+its index, its signature, its signer key, and, when you choose to install from
+it, the plugin package. Requests go through clash5's local mixed port, so they
+leave on the route the core selects. They carry no identifiers beyond the
+standard request headers, and clash5 sends no subscription, credential or node
+data. Catalog contents are verified against the pinned signer before use.
+
 ## 5. Plugins
 
 Plugins run in a sandbox with no network access, no file system access and no
