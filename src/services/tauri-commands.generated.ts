@@ -476,6 +476,18 @@ export const commands = {
     typedError<null, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_delete_node_pool', { id }),
     ),
+  clash5ListAppRoutes: () =>
+    typedError<AppRoute[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_app_routes'),
+    ),
+  clash5SaveAppRoute: (route: AppRoute) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_save_app_route', { route }),
+    ),
+  clash5DeleteAppRoute: (id: string) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_delete_app_route', { id }),
+    ),
   clash5TestChain: (id: string, testUrl: string | null) =>
     typedError<ChainTestResult, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_test_chain', { id, testUrl }),
@@ -648,6 +660,27 @@ export const commands = {
 }
 
 /* Types */
+/**
+ *  Which processes a route applies to. A name matches the executable's name; a path matches the
+ *  full executable path.
+ */
+export type AppMatcher =
+  | { kind: 'process_name'; name: string }
+  | { kind: 'process_path'; path: string }
+
+/**
+ *  An application or subsystem route. Routes are independent objects; each one lists the processes
+ *  it covers and where their traffic goes.
+ */
+export type AppRoute = {
+  schema_version: number
+  id: string
+  name: string
+  matchers: AppMatcher[]
+  target: RouteTarget
+  enabled: boolean
+}
+
 export type AutoProxyWire = {
   enable: boolean
   url: string
@@ -1545,6 +1578,11 @@ export type ProxyViewV1_Serialize = {
 }
 
 export type QualityStatus = 'healthy' | 'slow' | 'failed'
+
+export type RouteTarget =
+  | { kind: 'chain'; chain_id: string }
+  | { kind: 'direct' }
+  | { kind: 'reject' }
 
 export type RunStateView = {
   mode: RunningMode

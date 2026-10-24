@@ -202,6 +202,18 @@ pub async fn clash5_save_chain(chain: ProxyChain) -> CmdResult {
 pub async fn clash5_delete_chain(id: String) -> CmdResult {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
     let definitions = chains::definitions().await.map_err(|_| storage_failure())?;
+    let routes = with_clash5_binding_store(|store| store.app_routes())
+        .await
+        .map_err(|_| storage_failure())?;
+    if routes
+        .iter()
+        .any(|route| matches!(&route.target, clash5_data::RouteTarget::Chain { chain_id } if *chain_id == id))
+    {
+        return Err(coded_error(
+            "C5-CHAIN-017",
+            "an app route still sends traffic to this chain; change or remove the route first",
+        ));
+    }
     let previous = definitions
         .iter()
         .find(|chain| chain.id == id)
@@ -528,4 +540,43 @@ pub async fn clash5_delete_node_pool(id: String) -> CmdResult {
             ),
             _ => storage_failure(),
         })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_list_app_routes() -> CmdResult<Vec<clash5_data::AppRoute>> {
+    with_clash5_binding_store(|store| store.app_routes())
+        .await
+        .map_err(|_| storage_failure())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_save_app_route(route: clash5_data::AppRoute) -> CmdResult {
+    let _guard = PROFILE_WRITE_LOCK.lock().await;
+    route
+        .validate()
+        .map_err(|_| coded_error("C5-ROUTE-002", "app route definition is invalid"))?;
+    if let clash5_data::RouteTarget::Chain { chain_id } = &route.target {
+        let known = chains::definitions()
+            .await
+            .map_err(|_| storage_failure())?
+            .iter()
+            .any(|chain| chain.id == *chain_id && chain.enabled);
+        if !known {
+            return Err(coded_error("C5-ROUTE-003", "the route's chain is not an enabled chain"));
+        }
+    }
+    with_clash5_binding_store(move |store| store.save_app_route(&route))
+        .await
+        .map_err(|_| storage_failure())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_delete_app_route(id: String) -> CmdResult {
+    let _guard = PROFILE_WRITE_LOCK.lock().await;
+    with_clash5_binding_store(move |store| store.delete_app_route(&id))
+        .await
+        .map_err(|_| storage_failure())
 }

@@ -2,8 +2,8 @@ use super::manual;
 use crate::{config::profiles::with_clash5_binding_store, utils::dirs};
 use anyhow::{Result, anyhow};
 use clash5_data::{
-    CompiledChain, IdentityKey, Node, NodeRecord, NodeRef, ProxyChain, ScopedProxy, Source, compile_chains,
-    parse_proxy_node,
+    CompiledChain, IdentityKey, Node, NodeRecord, NodeRef, ProxyChain, RouteTarget, ScopedProxy, Source,
+    compile_app_routes, compile_chains, parse_proxy_node,
 };
 use serde_yaml_ng::{Mapping, Value};
 use std::path::Path;
@@ -166,14 +166,28 @@ pub(crate) async fn generate(config: &mut Mapping, profile_id: Option<&str>) -> 
         .into_iter()
         .filter(|chain| chain.profile_id.as_deref() == profile_id && chain.enabled)
         .collect();
+    // A route can name a chain from another profile. That route is inactive here, not an error,
+    // so switching profiles never fails the configuration.
+    let routes: Vec<_> = with_clash5_binding_store(|store| store.app_routes())
+        .await
+        .map_err(|_| anyhow!("C5-ROUTE-001"))?
+        .into_iter()
+        .filter(|route| match &route.target {
+            RouteTarget::Chain { chain_id } => chains.iter().any(|chain| chain.id == *chain_id),
+            RouteTarget::Direct | RouteTarget::Reject => true,
+        })
+        .collect();
     if chains.is_empty() {
+        compile_app_routes(config, &routes, &chains).map_err(anyhow::Error::from)?;
         return Ok(vec![]);
     }
     let pools = with_clash5_binding_store(|store| store.node_pools())
         .await
         .map_err(|_| anyhow!("C5-CHAIN-006"))?;
     let catalog = catalog(config, profile_id).await?;
-    compile_chains(config, &chains, &pools, &catalog).map_err(anyhow::Error::from)
+    let compiled = compile_chains(config, &chains, &pools, &catalog).map_err(anyhow::Error::from)?;
+    compile_app_routes(config, &routes, &chains).map_err(anyhow::Error::from)?;
+    Ok(compiled)
 }
 
 #[cfg(test)]
