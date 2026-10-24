@@ -52,8 +52,10 @@ and marks the record active only after both stages succeed. Status reads back bo
 WFP filter IDs and confirms that the claimed relay still owns both loopback
 listeners before reporting an active session. Status also compares target PIDs
 and creation times; if every target has exited, it detaches the recorded session
-before reporting idle. Normal core stop detaches the
-recorded WFP session before stopping the core; a core crash also detaches it
+before reporting idle. A service monitor performs the same exact-instance check
+once per second and detaches if every target exits, the relay listeners disappear,
+or WFP policy is lost. Cleanup failure marks recovery required. Normal core stop
+detaches the recorded WFP session before stopping the core; a core crash also detaches it
 before the watchdog attempts a restart, and cleanup failure stops recovery.
 The service treats an interrupted, foreign, unreadable, or uncleared record as
 recovery-required. At service startup it
@@ -103,10 +105,10 @@ socket, and completed a bidirectional transfer through a fixture listener. The
 same elevated probe then used the normal core-stop path and confirmed that the
 WFP filters and recovery record disappeared. It attached a second session and
 ran startup reconciliation against its persisted record; the WFP filters and
-record disappeared again. A third exact target exited, after which a status
-query returned idle and removed its WFP filters and record. This cleanup still
-depends on a status query; it does not establish a background watcher, forced
-service crash, or watchdog restart. These probes do not validate
+record disappeared again. A third exact target was attached through the service
+API and then terminated; the service monitor removed its WFP filters and record
+without a status query, and a subsequent query returned idle. This does not
+establish forced service-crash or watchdog-restart behavior. These probes do not validate
 UDP traffic, the final Mihomo outbound
 socket's redirect record, Chain forwarding, TUN coordination, or a selected
 process tree. The feature remains unavailable to product users.
