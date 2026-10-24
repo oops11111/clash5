@@ -73,6 +73,8 @@
       "pluginAddedPermissions": "新增请求的权限：{{items}}",
       "pluginAddedPaths": "新增的可写路径：{{items}}",
       "pluginUpgradeConfirm": "升级",
+      "pluginSignerKnown": "该签名者已有 {{count}} 个已安装插件。安装即确认此处显示的签名者。",
+      "pluginSignerNew": "新的签名者。安装此包即信任该签名者的插件及其后续更新。",
       "pluginRollback": "回滚",
       "pluginEditBinding": "编辑绑定",
       "pluginSelect": "插件",

@@ -73,6 +73,8 @@
       "pluginAddedPermissions": "New permissions requested: {{items}}",
       "pluginAddedPaths": "New writable paths: {{items}}",
       "pluginUpgradeConfirm": "Upgrade",
+      "pluginSignerKnown": "This signer already has {{count}} installed plugin(s). Installing confirms the signer you see here.",
+      "pluginSignerNew": "New signer. Installing this package trusts this signer for its plugins and future updates.",
       "pluginRollback": "Roll back",
       "pluginEditBinding": "Edit binding",
       "pluginSelect": "Plugin",

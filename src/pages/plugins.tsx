@@ -216,6 +216,12 @@ const PluginsPage = () => {
     }
   }, [tab, t])
 
+  const knownSignerCount = packagePreview
+    ? (plugins ?? []).filter(
+        (plugin) =>
+          plugin.signer_fingerprint === packagePreview.signer_fingerprint,
+      ).length
+    : 0
   const installedPreviewMatch = packagePreview
     ? (plugins ?? []).find((plugin) => plugin.id === packagePreview.id)
     : undefined
@@ -1087,6 +1093,13 @@ const PluginsPage = () => {
                   <Chip key={permission} size="small" label={permission} />
                 ))}
               </Stack>
+              <Alert severity={knownSignerCount > 0 ? 'info' : 'warning'}>
+                {knownSignerCount > 0
+                  ? t('layout.components.navigation.pluginSignerKnown', {
+                      count: knownSignerCount,
+                    })
+                  : t('layout.components.navigation.pluginSignerNew')}
+              </Alert>
               {installedPreviewMatch && upgradeAllowed && (
                 <Alert severity="info">
                   {t('layout.components.navigation.pluginUpgradeFrom', {

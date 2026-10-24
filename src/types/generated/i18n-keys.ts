@@ -223,6 +223,8 @@ export const translationKeys = [
   'layout.components.navigation.pluginAddedPermissions',
   'layout.components.navigation.pluginAddedPaths',
   'layout.components.navigation.pluginUpgradeConfirm',
+  'layout.components.navigation.pluginSignerKnown',
+  'layout.components.navigation.pluginSignerNew',
   'layout.components.navigation.pluginRollback',
   'layout.components.navigation.pluginEditBinding',
   'layout.components.navigation.pluginSelect',
