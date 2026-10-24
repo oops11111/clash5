@@ -254,6 +254,83 @@ cleanup:
     return status;
 }
 
+static NTSTATUS C5UpdateTargets(C5_DRIVER_STATE *state,
+                                const C5_UPDATE_TARGETS_REQUEST *request)
+{
+    PEPROCESS processes[C5_MAX_TARGET_PIDS];
+    KIRQL oldIrql;
+    UINT32 index;
+    UINT32 candidate;
+    UINT32 referencedCount = 0;
+    NTSTATUS status = STATUS_SUCCESS;
+
+    if (request->version != C5_SESSION_PROTOCOL_VERSION || request->size != sizeof(*request) ||
+        request->sessionId == 0 || request->targetCount == 0 ||
+        request->targetCount > C5_MAX_TARGET_PIDS || request->reserved != 0) {
+        return STATUS_INVALID_PARAMETER;
+    }
+    if (KeGetCurrentIrql() > APC_LEVEL) {
+        return STATUS_INVALID_DEVICE_STATE;
+    }
+    RtlZeroMemory(processes, sizeof(processes));
+    for (index = 0; index < request->targetCount; index++) {
+        if (request->targets[index].pid == 0 || request->targets[index].createdAt == 0) {
+            status = STATUS_INVALID_PARAMETER;
+            goto cleanup;
+        }
+        status = PsLookupProcessByProcessId((HANDLE)(ULONG_PTR)request->targets[index].pid,
+                                            &processes[index]);
+        if (!NT_SUCCESS(status)) {
+            goto cleanup;
+        }
+        referencedCount++;
+        if ((UINT64)PsGetProcessCreateTimeQuadPart(processes[index]) != request->targets[index].createdAt) {
+            status = STATUS_INVALID_PARAMETER;
+            goto cleanup;
+        }
+        for (candidate = 0; candidate < index; candidate++) {
+            if (request->targets[index].pid == request->targets[candidate].pid) {
+                status = STATUS_INVALID_PARAMETER;
+                goto cleanup;
+            }
+        }
+    }
+
+    ExAcquireFastMutex(&state->processLock);
+    for (index = 0; index < request->targetCount; index++) {
+        if (PsGetProcessExitStatus(processes[index]) != STATUS_PENDING) {
+            status = STATUS_INVALID_PARAMETER;
+            goto unlock;
+        }
+    }
+    KeAcquireSpinLock(&state->sessionLock, &oldIrql);
+    if (!state->sessionActive || state->session.sessionId != request->sessionId) {
+        status = STATUS_ACCESS_DENIED;
+    } else {
+        for (index = 0; index < request->targetCount; index++) {
+            if (request->targets[index].pid == state->session.relayPid) {
+                status = STATUS_INVALID_PARAMETER;
+                break;
+            }
+        }
+        if (NT_SUCCESS(status)) {
+            RtlZeroMemory(state->targets, sizeof(state->targets));
+            RtlCopyMemory(state->targets, request->targets,
+                          request->targetCount * sizeof(request->targets[0]));
+            state->targetCount = (UINT16)request->targetCount;
+        }
+    }
+    KeReleaseSpinLock(&state->sessionLock, oldIrql);
+
+unlock:
+    ExReleaseFastMutex(&state->processLock);
+cleanup:
+    for (index = 0; index < referencedCount; index++) {
+        ObDereferenceObject(processes[index]);
+    }
+    return status;
+}
+
 _Function_class_(DRIVER_DISPATCH)
 static NTSTATUS C5Dispatch(PDEVICE_OBJECT deviceObject, PIRP irp)
 {
@@ -270,6 +347,9 @@ static NTSTATUS C5Dispatch(PDEVICE_OBJECT deviceObject, PIRP irp)
                stack->Parameters.DeviceIoControl.InputBufferLength == sizeof(C5_DETACH_REQUEST)) {
         const C5_DETACH_REQUEST *request = (const C5_DETACH_REQUEST *)irp->AssociatedIrp.SystemBuffer;
         status = C5DetachSession(state, request);
+    } else if (stack->Parameters.DeviceIoControl.IoControlCode == IOCTL_C5_UPDATE_TARGETS &&
+               stack->Parameters.DeviceIoControl.InputBufferLength == sizeof(C5_UPDATE_TARGETS_REQUEST)) {
+        status = C5UpdateTargets(state, (const C5_UPDATE_TARGETS_REQUEST *)irp->AssociatedIrp.SystemBuffer);
     } else {
         status = STATUS_INVALID_DEVICE_REQUEST;
     }

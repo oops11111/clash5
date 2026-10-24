@@ -30,6 +30,13 @@ keys in `driver.h`. Closing the control device is not
 crash recovery; a service watchdog still has to remove its WFP filters and TUN
 exclusions after a failure.
 
+Protocol v3 replaces the exact target set under the same session ID without
+removing WFP filters. The driver validates every new PID and creation time,
+rejects a stale or foreign session, and publishes the set after checking that
+each process is still live. The privileged service must persist the new set or
+detach the session if persistence fails. This control path does not discover
+children or make process-tree selection available.
+
 Explicit non-loopback local binds are currently rejected because a loopback-only
 relay cannot satisfy their zone/address constraint. Supporting those binds, UDP,
 target discovery, filter lifecycle, relay record handling, TUN exclusion, and
