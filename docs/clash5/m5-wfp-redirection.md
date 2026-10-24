@@ -50,7 +50,9 @@ The service persists a pending recovery intent before driver attach, installs IP
 and IPv6 TCP redirect filters in a dynamic WFP transaction after driver attach,
 and marks the record active only after both stages succeed. Status reads back both
 WFP filter IDs and confirms that the claimed relay still owns both loopback
-listeners before reporting an active session. Normal core stop detaches the
+listeners before reporting an active session. Status also compares target PIDs
+and creation times; if every target has exited, it detaches the recorded session
+before reporting idle. Normal core stop detaches the
 recorded WFP session before stopping the core; a core crash also detaches it
 before the watchdog attempts a restart, and cleanup failure stops recovery.
 The service treats an interrupted, foreign, unreadable, or uncleared record as
@@ -101,9 +103,11 @@ socket, and completed a bidirectional transfer through a fixture listener. The
 same elevated probe then used the normal core-stop path and confirmed that the
 WFP filters and recovery record disappeared. It attached a second session and
 ran startup reconciliation against its persisted record; the WFP filters and
-record disappeared again. This exercises recovery on Windows 10, but not a
-forced service crash or watchdog restart. These probes do not validate
-process-exit invalidation, UDP traffic, the final Mihomo outbound
+record disappeared again. A third exact target exited, after which a status
+query returned idle and removed its WFP filters and record. This cleanup still
+depends on a status query; it does not establish a background watcher, forced
+service crash, or watchdog restart. These probes do not validate
+UDP traffic, the final Mihomo outbound
 socket's redirect record, Chain forwarding, TUN coordination, or a selected
 process tree. The feature remains unavailable to product users.
 
