@@ -4,13 +4,14 @@ use serde_yaml_ng::{Mapping, Value};
 
 pub const MAX_APP_MATCHERS: usize = 32;
 
-/// Which processes a route applies to. A name matches the executable's name; a path matches the
-/// full executable path.
+/// What a route matches. Process matchers use the executable name or full path. The domain matcher
+/// matches a domain and its subdomains for every application, so it cannot separate applications.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AppMatcher {
     ProcessName { name: String },
     ProcessPath { path: String },
+    DomainSuffix { suffix: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
@@ -21,8 +22,8 @@ pub enum RouteTarget {
     Reject,
 }
 
-/// An application or subsystem route. Routes are independent objects; each one lists the processes
-/// it covers and where their traffic goes.
+/// An application or subsystem route. Routes are independent objects; each one lists what it covers
+/// and where that traffic goes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(deny_unknown_fields)]
 pub struct AppRoute {
@@ -32,6 +33,10 @@ pub struct AppRoute {
     pub matchers: Vec<AppMatcher>,
     pub target: RouteTarget,
     pub enabled: bool,
+    /// Resolver for this route's domain matchers, as a DoH URL or an IP address. It is only valid with
+    /// domain matchers, and it applies to every application that resolves those domains.
+    #[serde(default)]
+    pub nameserver: Option<String>,
 }
 
 fn uuid_v4(value: &str) -> bool {
@@ -53,6 +58,14 @@ fn rule_safe(value: &str) -> bool {
             .any(|character| matches!(character, ',' | '\n' | '\r' | '\0'))
 }
 
+fn domain_label_valid(label: &str) -> bool {
+    !label.is_empty()
+        && label.len() <= 63
+        && !label.starts_with('-')
+        && !label.ends_with('-')
+        && label.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+}
+
 impl AppMatcher {
     fn validate(&self) -> Result<(), DataError> {
         match self {
@@ -64,6 +77,11 @@ impl AppMatcher {
             Self::ProcessPath { path } => {
                 let absolute = path.starts_with('/') || (path.len() > 2 && path.as_bytes()[1] == b':');
                 if !rule_safe(path) || !absolute {
+                    return Err(DataError::InvalidInput);
+                }
+            }
+            Self::DomainSuffix { suffix } => {
+                if suffix.len() > 253 || !suffix.split('.').all(domain_label_valid) {
                     return Err(DataError::InvalidInput);
                 }
             }
@@ -92,12 +110,24 @@ impl AppRoute {
         {
             return Err(DataError::InvalidInput);
         }
+        if let Some(nameserver) = &self.nameserver {
+            let has_domains = self
+                .matchers
+                .iter()
+                .any(|matcher| matches!(matcher, AppMatcher::DomainSuffix { .. }));
+            let doh = nameserver.starts_with("https://") && rule_safe(nameserver);
+            let ip = nameserver.parse::<std::net::IpAddr>().is_ok();
+            if !has_domains || !(doh || ip) {
+                return Err(DataError::InvalidInput);
+            }
+        }
         Ok(())
     }
 }
 
-/// Adds one rule per matcher ahead of the existing rules, so a route beats the profile's own rules.
-/// `find-process-mode: always` is required for process matching and is set only when routes exist.
+/// Adds one rule per matcher ahead of the profile's rules. Process matchers need `find-process-mode`,
+/// which is set only when a route uses them. A route's nameserver becomes a `nameserver-policy` entry
+/// for each of its domain suffixes. Nothing is written unless every route validates first.
 pub fn compile_app_routes(
     config: &mut Mapping,
     routes: &[AppRoute],
@@ -108,6 +138,8 @@ pub fn compile_app_routes(
         return Ok(0);
     }
     let mut rules = vec![];
+    let mut policies = Mapping::new();
+    let mut process_matchers = false;
     for route in &active {
         route.validate().map_err(|_| ChainError::InvalidDefinition)?;
         let target = match &route.target {
@@ -122,21 +154,64 @@ pub fn compile_app_routes(
             }
         };
         for matcher in &route.matchers {
-            rules.push(match matcher {
-                AppMatcher::ProcessName { name } => format!("PROCESS-NAME,{name},{target}"),
-                AppMatcher::ProcessPath { path } => format!("PROCESS-PATH,{path},{target}"),
-            });
+            match matcher {
+                AppMatcher::ProcessName { name } => {
+                    process_matchers = true;
+                    rules.push(format!("PROCESS-NAME,{name},{target}"));
+                }
+                AppMatcher::ProcessPath { path } => {
+                    process_matchers = true;
+                    rules.push(format!("PROCESS-PATH,{path},{target}"));
+                }
+                AppMatcher::DomainSuffix { suffix } => {
+                    rules.push(format!("DOMAIN-SUFFIX,{suffix},{target}"));
+                    if let Some(nameserver) = &route.nameserver {
+                        let key = format!("+.{suffix}");
+                        if policies.contains_key(key.as_str()) {
+                            return Err(ChainError::NameConflict);
+                        }
+                        policies.insert(key.into(), Value::Sequence(vec![nameserver.clone().into()]));
+                    }
+                }
+            }
         }
     }
-    let count = rules.len();
-    let existing = match config.remove("rules") {
-        Some(Value::Sequence(existing)) => existing,
+    // Validate the whole batch before touching the configuration, so a failure changes nothing.
+    let existing_rules = match config.get("rules") {
         None => vec![],
+        Some(Value::Sequence(existing)) => existing.clone(),
+        Some(_) => return Err(ChainError::InvalidConfig),
+    };
+    let mut merged_policy = match config.get("dns") {
+        None if policies.is_empty() => None,
+        Some(Value::Mapping(dns)) => match dns.get("nameserver-policy") {
+            None => Some(Mapping::new()),
+            Some(Value::Mapping(existing)) => Some(existing.clone()),
+            Some(_) => return Err(ChainError::InvalidConfig),
+        },
         _ => return Err(ChainError::InvalidConfig),
     };
-    let mut merged: Vec<Value> = rules.into_iter().map(Value::from).collect();
-    merged.extend(existing);
-    config.insert("rules".into(), Value::Sequence(merged));
-    config.insert("find-process-mode".into(), "always".into());
+    if let Some(merged) = merged_policy.as_mut() {
+        for (key, value) in &policies {
+            // A profile's own policy for the same domain wins over an app route. Replacing it would change DNS.
+            if merged.contains_key(key) {
+                return Err(ChainError::NameConflict);
+            }
+            merged.insert(key.clone(), value.clone());
+        }
+    }
+
+    let count = rules.len();
+    let mut merged_rules: Vec<Value> = rules.into_iter().map(Value::from).collect();
+    merged_rules.extend(existing_rules);
+    config.insert("rules".into(), Value::Sequence(merged_rules));
+    if let Some(merged) = merged_policy
+        && let Some(Value::Mapping(dns)) = config.get_mut("dns")
+    {
+        dns.insert("nameserver-policy".into(), Value::Mapping(merged));
+    }
+    if process_matchers {
+        config.insert("find-process-mode".into(), "always".into());
+    }
     Ok(count)
 }

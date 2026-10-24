@@ -34,6 +34,7 @@ fn route(matchers: Vec<AppMatcher>, target: RouteTarget, enabled: bool) -> AppRo
         matchers,
         target,
         enabled,
+        nameserver: None,
     }
 }
 
@@ -186,4 +187,70 @@ fn routes_round_trip_through_the_store() {
     assert_eq!(store.app_routes().unwrap(), vec![saved]);
     store.delete_app_route(ROUTE_ID).unwrap();
     assert!(store.app_routes().unwrap().is_empty());
+}
+
+fn domain_route(suffix: &str, nameserver: Option<&str>) -> AppRoute {
+    AppRoute {
+        schema_version: 1,
+        id: ROUTE_ID.into(),
+        name: "Domains".into(),
+        matchers: vec![AppMatcher::DomainSuffix { suffix: suffix.into() }],
+        target: RouteTarget::Direct,
+        enabled: true,
+        nameserver: nameserver.map(str::to_owned),
+    }
+}
+
+#[test]
+fn domain_policy_adds_suffix_rules_and_a_per_domain_resolver_without_process_mode() {
+    let mut config: Mapping = serde_yaml_ng::from_str(
+        "dns: {enable: true, nameserver: ['https://doh.pub/dns-query']}\nrules: ['MATCH,DIRECT']\n",
+    )
+    .unwrap();
+    let routes = [domain_route("example.test", Some("https://dns.example.test/dns-query"))];
+    compile_app_routes(&mut config, &routes, &[]).unwrap();
+    assert_eq!(rules(&config)[0], "DOMAIN-SUFFIX,example.test,DIRECT");
+    assert_eq!(
+        config["dns"]["nameserver-policy"]["+.example.test"][0],
+        "https://dns.example.test/dns-query"
+    );
+    assert!(config.get("find-process-mode").is_none());
+}
+
+#[test]
+fn a_resolver_without_domain_matchers_or_with_a_bad_address_is_rejected() {
+    assert!(domain_route("example.test", None).validate().is_ok());
+    let mut process_only = domain_route("example.test", Some("1.1.1.1"));
+    process_only.matchers = vec![AppMatcher::ProcessName { name: "x".into() }];
+    assert!(process_only.validate().is_err());
+    assert!(
+        domain_route("example.test", Some("http://plain.example.test/dns-query"))
+            .validate()
+            .is_err()
+    );
+    assert!(domain_route("example.test", Some("1.1.1.1")).validate().is_ok());
+    for bad in ["-bad.example", "exa mple.test", "a..b", "under_score.test", ""] {
+        assert!(domain_route(bad, None).validate().is_err(), "{bad}");
+    }
+}
+
+#[test]
+fn a_profile_policy_for_the_same_domain_is_never_overwritten() {
+    let mut config: Mapping = serde_yaml_ng::from_str(
+        "dns: {nameserver-policy: {'+.example.test': ['https://own.example/dns-query']}}\nrules: []\n",
+    )
+    .unwrap();
+    let before = config.clone();
+    let routes = [domain_route("example.test", Some("1.1.1.1"))];
+    assert!(compile_app_routes(&mut config, &routes, &[]).is_err());
+    assert_eq!(config, before);
+}
+
+#[test]
+fn a_resolver_needs_a_dns_section_and_a_failed_batch_changes_nothing() {
+    let mut config: Mapping = serde_yaml_ng::from_str("rules: []\n").unwrap();
+    let before = config.clone();
+    let routes = [domain_route("example.test", Some("1.1.1.1"))];
+    assert!(compile_app_routes(&mut config, &routes, &[]).is_err());
+    assert_eq!(config, before);
 }
