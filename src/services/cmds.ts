@@ -36,6 +36,7 @@ import type {
 import type {
   ChainWorkspace,
   Clash5Chain,
+  AppRouteDef,
   ExitIpResult,
   NodePoolDef,
 } from '@/types/clash5-chain'
@@ -76,6 +77,12 @@ export const saveClash5NodePool = (pool: NodePoolDef) =>
   invoke<null>('clash5_save_node_pool', { pool })
 export const deleteClash5NodePool = (id: string) =>
   invoke<null>('clash5_delete_node_pool', { id })
+export const listClash5AppRoutes = () =>
+  invoke<AppRouteDef[]>('clash5_list_app_routes')
+export const saveClash5AppRoute = (route: AppRouteDef) =>
+  invoke<null>('clash5_save_app_route', { route })
+export const deleteClash5AppRoute = (id: string) =>
+  invoke<null>('clash5_delete_app_route', { id })
 export const testClash5Chain = (id: string, testUrl: string | null = null) =>
   invoke<{ delay_ms: number; group_name: string }>('clash5_test_chain', {
     id,

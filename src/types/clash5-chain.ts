@@ -35,6 +35,24 @@ export interface ChainNodeOption {
   source_name: string | null
 }
 
+export type AppMatcherRef =
+  | { kind: 'process_name'; name: string }
+  | { kind: 'process_path'; path: string }
+
+export type RouteTargetRef =
+  | { kind: 'chain'; chain_id: string }
+  | { kind: 'direct' }
+  | { kind: 'reject' }
+
+export interface AppRouteDef {
+  schema_version: 1
+  id: string
+  name: string
+  matchers: AppMatcherRef[]
+  target: RouteTargetRef
+  enabled: boolean
+}
+
 export interface ChainWorkspace {
   profile_id: string | null
   chains: Clash5Chain[]

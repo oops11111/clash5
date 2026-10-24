@@ -9,6 +9,25 @@ export interface TranslationResources {
       activatedSession: string
       addHop: string
       adjacentHops: string
+      appAddMatcher: string
+      appDeleted: string
+      appDeleteRoute: string
+      appDirect: string
+      appEditRoute: string
+      appEmpty: string
+      appMatcherKind: string
+      appMatcherValue: string
+      appNewRoute: string
+      appProcessName: string
+      appProcessPath: string
+      appReject: string
+      appRemoveMatcher: string
+      appRouteHint: string
+      appRouteName: string
+      apps: string
+      appSaved: string
+      appSaveRoute: string
+      appTarget: string
       create: string
       createPool: string
       delete: string
@@ -34,6 +53,7 @@ export interface TranslationResources {
       landing: string
       list: string
       manual: string
+      missingChain: string
       missingNode: string
       missingPool: string
       moveDown: string
