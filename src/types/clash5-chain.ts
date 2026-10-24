@@ -27,7 +27,7 @@ export interface Clash5Chain {
   exit_policy: { mode: 'warn' } | { mode: 'switch'; fallback_chain_id: string }
 }
 
-export interface ChainNodeOption {
+interface ChainNodeOption {
   reference: ChainNodeRef
   display_name: string
   kind: string

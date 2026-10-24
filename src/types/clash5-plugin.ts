@@ -87,7 +87,7 @@ export interface Clash5PluginPackagePreview {
   signer: string
 }
 
-export interface Clash5CatalogEntry {
+interface Clash5CatalogEntry {
   id: string
   version: string
   name: string
