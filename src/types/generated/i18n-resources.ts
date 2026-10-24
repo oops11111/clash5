@@ -81,6 +81,12 @@ export interface TranslationResources {
       page: {
         title: string
       }
+      processProxy: {
+        off: string
+        title: string
+        toggle: string
+        unavailable: string
+      }
     }
     home: {
       components: {

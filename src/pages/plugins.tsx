@@ -626,6 +626,7 @@ const PluginsPage = () => {
         {bindings.map((binding) => (
           <Paper
             key={binding.id}
+            data-clash5-binding-id={binding.id}
             variant="outlined"
             sx={{ p: 2, borderRadius: 2 }}
           >

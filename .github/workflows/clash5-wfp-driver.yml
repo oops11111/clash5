@@ -1,0 +1,43 @@
+name: clash5 WFP driver build
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/clash5-wfp-driver.yml'
+      - 'drivers/windows/wfp/**'
+  push:
+    branches:
+      - dev
+    paths:
+      - '.github/workflows/clash5-wfp-driver.yml'
+      - 'drivers/windows/wfp/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wfp-x64:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: NuGet/setup-nuget@v3
+        with:
+          nuget-version: '6.14.0'
+      - name: Restore WDK and build unsigned driver
+        shell: pwsh
+        run: |
+          $packagesRoot = Join-Path $env:RUNNER_TEMP 'wdk-packages'
+          nuget install Microsoft.Windows.WDK.x64 -Version 10.0.26100.6584 -DependencyVersion Lowest -OutputDirectory $packagesRoot -Source https://api.nuget.org/v3/index.json -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw 'WDK restore failed' }
+
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $visualStudio = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $visualStudio) { throw 'Visual Studio C++ tools are missing' }
+          $msvcRoot = Get-ChildItem -LiteralPath (Join-Path $visualStudio 'VC/Tools/MSVC') -Directory |
+            Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $msvcRoot) { throw 'MSVC toolchain is missing' }
+
+          & ./drivers/windows/wfp/build.ps1 -PackagesRoot $packagesRoot -MsvcRoot $msvcRoot -OutputDirectory (Join-Path $env:RUNNER_TEMP 'wfp-build')
+          if ($LASTEXITCODE -ne 0) { throw 'WFP driver build failed' }

@@ -976,68 +976,38 @@ async function prepareM3PluginFixture() {
 }
 
 async function clickBindingAction(bindingId, labels) {
-  const priority = bindingId.endsWith('-high') ? '80' : '20'
-  const priorityLabels = [
-    `Priority ${priority}`,
-    `优先级 ${priority}`,
-    `優先級 ${priority}`,
-  ]
-  const findEnabledBindingAction = ({
-    buttonLabels,
-    bindingPriorityLabels,
-  }) => {
-    const cards = [...document.querySelectorAll('.base-page .MuiPaper-root')]
-      .filter(
-        (card) =>
-          card.textContent?.includes('m3.smoke.plugin') &&
-          [...card.querySelectorAll('.MuiChip-root')].some((chip) =>
-            bindingPriorityLabels.includes(chip.textContent?.trim()),
-          ) &&
-          [...card.querySelectorAll('button')].some((button) =>
-            buttonLabels.includes(button.textContent?.trim()),
-          ),
-      )
-      .sort((left, right) => left.textContent.length - right.textContent.length)
-    const button = [...(cards[0]?.querySelectorAll('button') ?? [])].find(
+  const args = { bindingId, buttonLabels: labels }
+  const findBindingAction = ({ bindingId: id, buttonLabels }) => {
+    const card = document.querySelector(
+      `.base-page [data-clash5-binding-id="${id}"]`,
+    )
+    const button = [...(card?.querySelectorAll('button') ?? [])].find(
       (item) =>
         buttonLabels.includes(item.textContent?.trim()) && !item.disabled,
     )
     return Boolean(button)
   }
-  const args = { bindingPriorityLabels: priorityLabels, buttonLabels: labels }
   await browser.waitUntil(
-    () => browser.execute(findEnabledBindingAction, args).then(Boolean),
+    () => browser.execute(findBindingAction, args).then(Boolean),
     {
       timeout: 10_000,
       interval: 100,
       timeoutMsg: `${labels[0]} did not become enabled for ${bindingId}`,
     },
   )
-  const clicked = await browser.execute(
-    ({ buttonLabels, bindingPriorityLabels }) => {
-      const cards = [...document.querySelectorAll('.base-page .MuiPaper-root')]
-        .filter(
-          (card) =>
-            card.textContent?.includes('m3.smoke.plugin') &&
-            [...card.querySelectorAll('.MuiChip-root')].some((chip) =>
-              bindingPriorityLabels.includes(chip.textContent?.trim()),
-            ),
-        )
-        .sort(
-          (left, right) => left.textContent.length - right.textContent.length,
-        )
-      const button = [...(cards[0]?.querySelectorAll('button') ?? [])].find(
-        (item) =>
-          buttonLabels.includes(item.textContent?.trim()) && !item.disabled,
-      )
-      button?.click()
-      return Boolean(button)
-    },
-    args,
-  )
+  const clicked = await browser.execute(({ bindingId: id, buttonLabels }) => {
+    const card = document.querySelector(
+      `.base-page [data-clash5-binding-id="${id}"]`,
+    )
+    const button = [...(card?.querySelectorAll('button') ?? [])].find(
+      (item) =>
+        buttonLabels.includes(item.textContent?.trim()) && !item.disabled,
+    )
+    button?.click()
+    return Boolean(button)
+  }, args)
   if (!clicked) throw new Error(`Could not find ${labels[0]} for ${bindingId}`)
 }
-
 async function verifyM3PluginUi() {
   await browser.waitUntil(
     () =>
@@ -1114,6 +1084,21 @@ async function verifyM3PluginUi() {
     )
     binding?.click()
   })
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        [...document.querySelectorAll('.base-page [role="tab"]')].some(
+          (tab) =>
+            tab.getAttribute('aria-selected') === 'true' &&
+            ['Binding', '绑定', '綁定'].includes(tab.textContent?.trim()),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Plugin binding tab did not activate',
+    },
+  )
   await clickBindingAction(m3BindingIds[1], ['Disable', '停用'])
   await browser.waitUntil(
     async () =>
