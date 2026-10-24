@@ -233,12 +233,12 @@ const ChainsPage = () => {
   }
   const hopsValid = Boolean(
     draft &&
-    draft.hops.length >= 2 &&
-    draft.hops.length <= MAX_HOPS &&
-    draft.hops.every((hop) => hopInfo(hop).ok) &&
-    draft.hops
-      .slice(1)
-      .every((hop, index) => !sameHop(hop, draft.hops[index])),
+      draft.hops.length >= 2 &&
+      draft.hops.length <= MAX_HOPS &&
+      draft.hops.every((hop) => hopInfo(hop).ok) &&
+      draft.hops
+        .slice(1)
+        .every((hop, index) => !sameHop(hop, draft.hops[index])),
   )
 
   const perform = async (action: () => Promise<void>) => {
