@@ -22,18 +22,24 @@ fn chain(profile_id: Option<&str>) -> ProxyChain {
     let landing: serde_yaml_ng::Value =
         serde_yaml_ng::from_str("name: landing\ntype: http\nserver: landing.example.invalid\nport: 8002\n").unwrap();
     ProxyChain {
-        schema_version: 1,
+        schema_version: 2,
         id: "18dc0b8a-7485-49bc-8a91-f48bdc736846".into(),
         name: "Chain".into(),
         profile_id: profile_id.map(str::to_owned),
-        front: clash5_data::NodeRef {
-            source: Source::Manual,
-            stable_id: parse_proxy_node(&front).unwrap().stable_id().unwrap(),
-        },
-        landing: clash5_data::NodeRef {
-            source: Source::Manual,
-            stable_id: parse_proxy_node(&landing).unwrap().stable_id().unwrap(),
-        },
+        hops: vec![
+            clash5_data::Hop::Node {
+                node: clash5_data::NodeRef {
+                    source: Source::Manual,
+                    stable_id: parse_proxy_node(&front).unwrap().stable_id().unwrap(),
+                },
+            },
+            clash5_data::Hop::Node {
+                node: clash5_data::NodeRef {
+                    source: Source::Manual,
+                    stable_id: parse_proxy_node(&landing).unwrap().stable_id().unwrap(),
+                },
+            },
+        ],
         enabled: true,
         exit_policy: ExitPolicy::Warn,
     }
@@ -185,7 +191,7 @@ fn plugin_audit_keeps_only_allowlisted_fields_at_any_depth() {
 }
 
 #[test]
-fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
+fn schema_v2_migrates_transactionally_to_current_schema() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
     std::fs::create_dir_all(&root).unwrap();
     let directory = tempfile::tempdir_in(&root).unwrap();
@@ -209,7 +215,7 @@ fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(version, 5);
+    assert_eq!(version, 6);
     assert!(table_exists);
 
     let rollback_directory = tempfile::tempdir_in(&root).unwrap();
@@ -235,7 +241,7 @@ fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
 }
 
 #[test]
-fn prior_m3_and_m2_schemas_upgrade_to_v5() {
+fn prior_m3_and_m2_schemas_upgrade_to_current_schema() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
     std::fs::create_dir_all(&root).unwrap();
 
@@ -274,7 +280,7 @@ fn prior_m3_and_m2_schemas_upgrade_to_v5() {
         drop(store);
         let db = rusqlite::Connection::open(&path).unwrap();
         let migrated_version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
-        assert_eq!(migrated_version, 5);
+        assert_eq!(migrated_version, 6);
         let plugin_table_exists: bool = db
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='plugin_bindings')",

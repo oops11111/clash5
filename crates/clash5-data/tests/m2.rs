@@ -1,5 +1,6 @@
 use clash5_data::{
-    BindingStore, ChainError, ExitPolicy, NodeRef, ProxyChain, ScopedProxy, Source, compile_chains, parse_proxy_node,
+    BindingStore, ChainError, ExitPolicy, Hop, NodeRef, ProxyChain, ScopedProxy, Source, compile_chains,
+    parse_proxy_node,
 };
 use serde_yaml_ng::{Mapping, Value};
 
@@ -38,12 +39,18 @@ fn fixture() -> (ProxyChain, Vec<ScopedProxy>, Mapping) {
         ),
     ];
     let chain = ProxyChain {
-        schema_version: 1,
+        schema_version: 2,
         id: CHAIN_ID.into(),
         name: "Fixture chain".into(),
         profile_id: Some("profile-a".into()),
-        front: catalog[0].reference.clone(),
-        landing: catalog[1].reference.clone(),
+        hops: vec![
+            Hop::Node {
+                node: catalog[0].reference.clone(),
+            },
+            Hop::Node {
+                node: catalog[1].reference.clone(),
+            },
+        ],
         enabled: true,
         exit_policy: ExitPolicy::Warn,
     };
@@ -58,14 +65,14 @@ fn fixture() -> (ProxyChain, Vec<ScopedProxy>, Mapping) {
 fn two_hop_snapshot_preserves_original_overrides_and_rules() {
     let (chain, catalog, mut config) = fixture();
     let original = config.clone();
-    let compiled = compile_chains(&mut config, &[chain], &catalog).unwrap();
+    let compiled = compile_chains(&mut config, &[chain], &[], &catalog).unwrap();
     let runtime = &compiled[0];
     let proxies = config["proxies"].as_sequence().unwrap();
     assert_eq!(proxies[0], original["proxies"][0]);
     assert_eq!(config["rules"], original["rules"]);
     assert!(proxies[1].get("dialer-proxy").is_none());
-    assert_eq!(proxies[1]["name"], runtime.front_name);
-    assert_eq!(proxies[2]["dialer-proxy"], runtime.front_name);
+    assert_eq!(proxies[1]["name"], runtime.first_hop_name);
+    assert_eq!(proxies[2]["dialer-proxy"], runtime.first_hop_name);
     assert_eq!(proxies[2]["name"], runtime.landing_name);
     assert_eq!(config["proxy-groups"][1]["proxies"][0], runtime.landing_name);
     assert_eq!(
@@ -73,8 +80,8 @@ fn two_hop_snapshot_preserves_original_overrides_and_rules() {
         serde_json::json!({
             "chain_id": CHAIN_ID,
             "group_name": format!("clash5-chain-{CHAIN_ID}"),
-            "front_name": format!("clash5-chain-{CHAIN_ID}-front"),
-            "landing_name": format!("clash5-chain-{CHAIN_ID}-landing")
+            "first_hop_name": format!("clash5-chain-{CHAIN_ID}-h0"),
+            "landing_name": format!("clash5-chain-{CHAIN_ID}-h1")
         })
     );
 }
@@ -85,7 +92,7 @@ fn rename_resolves_by_identity_and_identical_duplicates_are_safe() {
     catalog[0].proxy.insert("name".into(), "Renamed".into());
     let duplicate = scoped(Source::Manual, "Another name", 18081);
     catalog.push(duplicate);
-    assert!(compile_chains(&mut config, &[chain], &catalog).is_ok());
+    assert!(compile_chains(&mut config, &[chain], &[], &catalog).is_ok());
 }
 
 #[test]
@@ -96,7 +103,7 @@ fn ambiguous_identity_and_wrong_source_leave_config_untouched() {
     conflicting.proxy.insert("tls".into(), true.into());
     catalog.push(conflicting);
     assert_eq!(
-        compile_chains(&mut config, std::slice::from_ref(&chain), &catalog),
+        compile_chains(&mut config, std::slice::from_ref(&chain), &[], &catalog),
         Err(ChainError::AmbiguousNode)
     );
     assert_eq!(config, original);
@@ -105,7 +112,7 @@ fn ambiguous_identity_and_wrong_source_leave_config_untouched() {
         provider_id: "provider-b".into(),
     };
     assert_eq!(
-        compile_chains(&mut config, &[chain], &catalog),
+        compile_chains(&mut config, &[chain], &[], &catalog),
         Err(ChainError::MissingNode)
     );
     assert_eq!(config, original);
@@ -116,17 +123,20 @@ fn conflicting_generated_names_and_later_missing_nodes_roll_back_all_chains() {
     let (chain, catalog, mut config) = fixture();
     let mut missing = chain.clone();
     missing.id = "28dc0b8a-7485-49bc-8a91-f48bdc736846".into();
-    missing.landing.stable_id = "not-present".into();
+    let Hop::Node { node } = missing.hops.last_mut().unwrap() else {
+        panic!("fixture hops are nodes")
+    };
+    node.stable_id = "not-present".into();
     let original = config.clone();
     assert_eq!(
-        compile_chains(&mut config, &[chain.clone(), missing], &catalog),
+        compile_chains(&mut config, &[chain.clone(), missing], &[], &catalog),
         Err(ChainError::MissingNode)
     );
     assert_eq!(config, original);
     config.get_mut("proxies").unwrap().as_sequence_mut().unwrap()[0]["name"] = chain.group_name().into();
     let original = config.clone();
     assert_eq!(
-        compile_chains(&mut config, &[chain], &catalog),
+        compile_chains(&mut config, &[chain], &[], &catalog),
         Err(ChainError::NameConflict)
     );
     assert_eq!(config, original);
@@ -146,7 +156,9 @@ fn chain_survives_restart_without_persisting_credentials_and_rejects_invalid_edi
         invalid.id = "not-a-uuid".into();
         assert!(store.save_proxy_chain(&invalid).is_err());
         invalid = chain.clone();
-        invalid.front = invalid.landing.clone();
+        invalid.hops = vec![invalid.hops[0].clone()];
+        assert!(store.save_proxy_chain(&invalid).is_err());
+        invalid.hops = vec![invalid.hops[0].clone(), invalid.hops[0].clone()];
         assert!(store.save_proxy_chain(&invalid).is_err());
     }
     let mut store = BindingStore::open(&path).unwrap();
@@ -163,7 +175,7 @@ fn disabled_chain_needs_no_runtime_nodes_and_does_not_modify_config() {
     let (mut chain, _, mut config) = fixture();
     chain.enabled = false;
     let original = config.clone();
-    assert!(compile_chains(&mut config, &[chain], &[]).unwrap().is_empty());
+    assert!(compile_chains(&mut config, &[chain], &[], &[]).unwrap().is_empty());
     assert_eq!(config, original);
 }
 
@@ -177,11 +189,11 @@ fn fallback_groups_reference_only_enabled_chains_and_reject_cycles_atomically() 
     };
     let original = config.clone();
     assert_eq!(
-        compile_chains(&mut config, std::slice::from_ref(&primary), &catalog),
+        compile_chains(&mut config, std::slice::from_ref(&primary), &[], &catalog),
         Err(ChainError::InvalidDefinition)
     );
     assert_eq!(config, original);
-    compile_chains(&mut config, &[primary.clone(), fallback.clone()], &catalog).unwrap();
+    compile_chains(&mut config, &[primary.clone(), fallback.clone()], &[], &catalog).unwrap();
     assert_eq!(config["proxy-groups"][1]["proxies"][1], fallback.group_name());
     assert_eq!(config["proxy-groups"][0]["proxies"][1], primary.group_name());
     fallback.exit_policy = ExitPolicy::Switch {
@@ -189,7 +201,7 @@ fn fallback_groups_reference_only_enabled_chains_and_reject_cycles_atomically() 
     };
     let mut config = original.clone();
     assert_eq!(
-        compile_chains(&mut config, &[primary, fallback], &catalog),
+        compile_chains(&mut config, &[primary, fallback], &[], &catalog),
         Err(ChainError::InvalidDefinition)
     );
     assert_eq!(config, original);

@@ -1,4 +1,4 @@
-use clash5_data::{ExitPolicy, NodeRef, ProxyChain, ScopedProxy, Source, compile_chains, parse_proxy_node};
+use clash5_data::{ExitPolicy, Hop, NodeRef, ProxyChain, ScopedProxy, Source, compile_chains, parse_proxy_node};
 use serde_yaml_ng::{Mapping, Value};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,12 +23,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
     let chain = ProxyChain {
-        schema_version: 1,
+        schema_version: 2,
         id: "18dc0b8a-7485-49bc-8a91-f48bdc736846".into(),
         name: "Local two-hop fixture".into(),
         profile_id: None,
-        front: catalog[0].reference.clone(),
-        landing: catalog[1].reference.clone(),
+        hops: vec![
+            Hop::Node {
+                node: catalog[0].reference.clone(),
+            },
+            Hop::Node {
+                node: catalog[1].reference.clone(),
+            },
+        ],
         enabled: true,
         exit_policy: ExitPolicy::Warn,
     };
@@ -36,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "mixed-port: 0\nallow-lan: false\nmode: rule\nlog-level: warning\nexternal-controller: 127.0.0.1:{}\nsecret: fixture-controller-secret\nrules: ['MATCH,REJECT']\n",
         ports[3]
     ))?;
-    let compiled = compile_chains(&mut config, &[chain], &catalog)?;
+    let compiled = compile_chains(&mut config, &[chain], &[], &catalog)?;
     let listeners: Value = serde_yaml_ng::from_str(&format!(
         "- {{name: fixture-probe, type: http, listen: 127.0.0.1, port: {}, proxy: {}}}",
         ports[2], compiled[0].group_name

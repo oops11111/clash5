@@ -1,4 +1,4 @@
-use crate::{DataError, IdentityKey, Node, ProxyChain, StableId, identity::text};
+use crate::{DataError, Hop, IdentityKey, Node, NodePool, ProxyChain, StableId, identity::text};
 use rusqlite::{Connection, DatabaseName, OptionalExtension, Transaction, backup::Progress, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -225,6 +225,21 @@ fn sanitize_plugin_audit(value: &Value) -> Value {
         ),
         Value::Array(values) => Value::Array(values.iter().map(sanitize_plugin_audit).collect()),
         other => other.clone(),
+    }
+}
+
+/// Rewrites a node reference to its new stable ID when the identity key generation changed it.
+fn rekey_reference(
+    reference: &mut crate::chain::NodeRef,
+    rekeyed_ids: &BTreeMap<(String, String, StableId), StableId>,
+) -> Result<bool, DataError> {
+    let (kind, provider) = reference.source.scope()?;
+    match rekeyed_ids.get(&(kind.to_owned(), provider.to_owned(), reference.stable_id.clone())) {
+        Some(new_id) => {
+            reference.stable_id = new_id.clone();
+            Ok(true)
+        }
+        None => Ok(false),
     }
 }
 
@@ -692,17 +707,31 @@ impl BindingStore {
                 .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
                 .collect::<Result<Vec<_>, _>>()?
         };
+        let stored_pools = {
+            let mut statement = tx.prepare("SELECT id,definition FROM pools")?;
+            statement
+                .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?
+                .collect::<Result<Vec<_>, _>>()?
+        };
+        for (id, definition) in stored_pools {
+            let mut pool: NodePool = serde_json::from_str(&definition).map_err(|_| DataError::Database)?;
+            let mut changed = false;
+            for member in &mut pool.members {
+                changed |= rekey_reference(member, &rekeyed_ids)?;
+            }
+            if changed {
+                pool.validate()?;
+                let definition = serde_json::to_string(&pool).map_err(|_| DataError::InvalidInput)?;
+                tx.execute("UPDATE pools SET definition=?2 WHERE id=?1", params![id, definition])?;
+            }
+        }
         let mut chains_rekeyed = 0usize;
         for (id, definition) in stored_chains {
             let mut chain: ProxyChain = serde_json::from_str(&definition).map_err(|_| DataError::Database)?;
             let mut changed = false;
-            for reference in [&mut chain.front, &mut chain.landing] {
-                let (kind, provider) = reference.source.scope()?;
-                if let Some(new_id) =
-                    rekeyed_ids.get(&(kind.to_owned(), provider.to_owned(), reference.stable_id.clone()))
-                {
-                    reference.stable_id = new_id.clone();
-                    changed = true;
+            for hop in &mut chain.hops {
+                if let Hop::Node { node } = hop {
+                    changed |= rekey_reference(node, &rekeyed_ids)?;
                 }
             }
             if changed {
@@ -756,7 +785,7 @@ impl BindingStore {
         db.pragma_update(None, "foreign_keys", true)?;
         db.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if !(0..=5).contains(&version) {
+        if !(0..=6).contains(&version) {
             return Err(DataError::SchemaVersion);
         }
         let mut version = version;
@@ -912,6 +941,16 @@ CREATE TABLE IF NOT EXISTS plugin_bindings(
 ) STRICT;
 CREATE INDEX IF NOT EXISTS plugin_bindings_target ON plugin_bindings(target_type,source_kind,provider_id,target_id,enabled,orphan);
 PRAGMA user_version=5;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 6 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS pools(id TEXT PRIMARY KEY, definition TEXT NOT NULL CHECK(json_valid(definition))) STRICT;
+PRAGMA user_version=6;
 "#,
             )?;
             tx.commit()?;
@@ -1565,6 +1604,58 @@ PRAGMA user_version=5;
             Ok(chain)
         })
         .collect()
+    }
+    pub fn save_node_pool(&mut self, pool: &NodePool) -> Result<(), DataError> {
+        pool.validate()?;
+        let definition = serde_json::to_value(pool).map_err(|_| DataError::InvalidInput)?;
+        let tx = self.db.transaction()?;
+        tx.execute(
+            "INSERT INTO pools VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET definition=excluded.definition",
+            params![pool.id, definition.to_string()],
+        )?;
+        audit(&tx, "pool.upsert", serde_json::json!({"pools":1}))?;
+        tx.commit()?;
+        Ok(())
+    }
+    pub fn node_pools(&self) -> Result<Vec<NodePool>, DataError> {
+        let mut statement = self.db.prepare("SELECT definition FROM pools ORDER BY id")?;
+        let raw = statement.query_map([], |row| row.get::<_, String>(0))?;
+        raw.map(|raw| {
+            let pool: NodePool = serde_json::from_str(&raw?).map_err(|_| DataError::Database)?;
+            pool.validate()?;
+            Ok(pool)
+        })
+        .collect()
+    }
+    /// A pool that a stored chain still uses cannot be deleted; the chain would otherwise fail to compile.
+    pub fn delete_node_pool(&mut self, id: &str) -> Result<(), DataError> {
+        text(id)?;
+        let tx = self.db.transaction()?;
+        let in_use = {
+            let mut statement = tx.prepare(
+                "SELECT definition FROM chains WHERE json_extract(definition,'$.schema_version') IS NOT NULL",
+            )?;
+            let raw = statement.query_map([], |row| row.get::<_, String>(0))?;
+            let mut in_use = false;
+            for definition in raw {
+                let chain: ProxyChain = serde_json::from_str(&definition?).map_err(|_| DataError::Database)?;
+                in_use |= chain
+                    .hops
+                    .iter()
+                    .any(|hop| matches!(hop, Hop::Pool { pool_id } if pool_id == id));
+            }
+            in_use
+        };
+        if in_use {
+            return Err(DataError::InvalidInput);
+        }
+        let deleted = tx.execute("DELETE FROM pools WHERE id=?1", [id])?;
+        if deleted == 0 {
+            return Err(DataError::NotFound);
+        }
+        audit(&tx, "pool.delete", serde_json::json!({"pools":deleted}))?;
+        tx.commit()?;
+        Ok(())
     }
     pub fn delete_proxy_chain(&mut self, id: &str) -> Result<(), DataError> {
         text(id)?;

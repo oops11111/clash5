@@ -176,20 +176,26 @@ fn planned_key_rotation_rekeys_saved_chain_references_atomically() {
         .refresh_provider("provider-a", std::slice::from_ref(&subscription_node))
         .unwrap();
     let chain = ProxyChain {
-        schema_version: 1,
+        schema_version: 2,
         id: "18dc0b8a-7485-49bc-8a91-f48bdc736846".into(),
         name: "Rotation chain".into(),
         profile_id: Some("profile-a".into()),
-        front: NodeRef {
-            source: Source::Manual,
-            stable_id: manual_old_id.clone(),
-        },
-        landing: NodeRef {
-            source: Source::Subscription {
-                provider_id: "provider-a".into(),
+        hops: vec![
+            clash5_data::Hop::Node {
+                node: NodeRef {
+                    source: Source::Manual,
+                    stable_id: manual_old_id.clone(),
+                },
             },
-            stable_id: subscription_old_id.clone(),
-        },
+            clash5_data::Hop::Node {
+                node: NodeRef {
+                    source: Source::Subscription {
+                        provider_id: "provider-a".into(),
+                    },
+                    stable_id: subscription_old_id.clone(),
+                },
+            },
+        ],
         enabled: true,
         exit_policy: ExitPolicy::Warn,
     };
@@ -215,18 +221,21 @@ fn planned_key_rotation_rekeys_saved_chain_references_atomically() {
 
     let chains = store.proxy_chains().unwrap();
     assert_eq!(chains.len(), 1);
-    assert_eq!(chains[0].front.source, Source::Manual);
-    assert_eq!(chains[0].front.stable_id, manual_node.stable_id_v2(&new_key).unwrap());
+    let clash5_data::Hop::Node { node: front } = &chains[0].hops[0] else {
+        panic!("first hop is a node")
+    };
+    let clash5_data::Hop::Node { node: landing } = &chains[0].hops[1] else {
+        panic!("second hop is a node")
+    };
+    assert_eq!(front.source, Source::Manual);
+    assert_eq!(front.stable_id, manual_node.stable_id_v2(&new_key).unwrap());
     assert_eq!(
-        chains[0].landing.source,
+        landing.source,
         Source::Subscription {
             provider_id: "provider-a".into(),
         }
     );
-    assert_eq!(
-        chains[0].landing.stable_id,
-        subscription_node.stable_id_v2(&new_key).unwrap()
-    );
+    assert_eq!(landing.stable_id, subscription_node.stable_id_v2(&new_key).unwrap());
 }
 
 #[test]

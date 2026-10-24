@@ -4,7 +4,10 @@ mod plugin_patch;
 mod profile;
 mod store;
 
-pub use chain::{ChainError, CompiledChain, ExitPolicy, NodeRef, ProxyChain, ScopedProxy, compile_chains};
+pub use chain::{
+    ChainError, CompiledChain, ExitPolicy, Hop, MAX_HOPS, MAX_POOL_MEMBERS, NodePool, NodeRef, ProxyChain, ScopedProxy,
+    compile_chains,
+};
 pub use identity::{DataError, IdentityKey, Node, StableId};
 pub use plugin_patch::{
     ConfigProvenance, EffectiveConfig, PluginConflict, PluginPatch, merge_plugin_patches, validate_plugin_patch,
