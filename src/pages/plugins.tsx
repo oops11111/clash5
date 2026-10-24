@@ -382,7 +382,8 @@ const PluginsPage = () => {
     setBusy(true)
     setCatalogError(false)
     try {
-      setPackagePreview(await downloadClash5CatalogPlugin(catalogId, pluginId))
+      const result = await downloadClash5CatalogPlugin(catalogId, pluginId)
+      if (result.ok) setPackagePreview(result.value)
     } catch {
       setCatalogError(true)
     } finally {
@@ -1269,23 +1270,8 @@ const PluginsPage = () => {
             {renderBindings()}
             <IdentityRecoveryPanel />
           </Stack>
-        ) : tab === 'settings' ? (
-          renderSettings()
         ) : (
-          <Paper variant="outlined" sx={{ p: 4, borderRadius: 3 }}>
-            <Stack
-              spacing={1}
-              sx={{ alignItems: 'center', textAlign: 'center' }}
-            >
-              <ExtensionOutlinedIcon color="primary" fontSize="large" />
-              <Typography variant="h6">
-                {t(`layout.components.navigation.empty.${tab}Title`)}
-              </Typography>
-              <Typography color="text.secondary">
-                {t(`layout.components.navigation.empty.${tab}Description`)}
-              </Typography>
-            </Stack>
-          </Paper>
+          renderSettings()
         )}
       </Stack>
       <Dialog

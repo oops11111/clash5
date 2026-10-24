@@ -108,6 +108,17 @@ const targetFromValue = (value: string): RouteTargetRef =>
     : value === 'reject'
       ? { kind: 'reject' }
       : { kind: 'direct' }
+const targetLabel = (
+  target: RouteTargetRef,
+  chains: readonly { id: string; name: string }[],
+  labels: { missing: string; direct: string; reject: string },
+) => {
+  if (target.kind !== 'chain') {
+    return target.kind === 'direct' ? labels.direct : labels.reject
+  }
+  const chainId = target.chain_id
+  return chains.find((chain) => chain.id === chainId)?.name ?? labels.missing
+}
 const MAX_MATCHERS = 32
 
 const failureCode = (error: unknown) => {
@@ -1087,15 +1098,11 @@ const ChainsPage = () => {
                     <Typography variant="caption" color="text.secondary">
                       {route.matchers.map(matcherValue).join(', ')}
                       {' → '}
-                      {route.target.kind === 'chain'
-                        ? (workspace.chains.find(
-                            (chain) => chain.id === route.target.chain_id,
-                          )?.name ?? t('chains.missingChain'))
-                        : t(
-                            route.target.kind === 'direct'
-                              ? 'chains.appDirect'
-                              : 'chains.appReject',
-                          )}
+                      {targetLabel(route.target, workspace.chains, {
+                        missing: t('chains.missingChain'),
+                        direct: t('chains.appDirect'),
+                        reject: t('chains.appReject'),
+                      })}
                     </Typography>
                   </Stack>
                   <Stack direction="row" sx={{ gap: 1, alignItems: 'center' }}>
