@@ -962,11 +962,13 @@ async function prepareM3PluginFixture() {
   const audit = await invoke('clash5_list_plugin_audit_events', { limit: 50 })
   if (
     !audit.some((event) => event.event === 'plugin.install') ||
-    !audit.some((event) => event.event === 'plugin.permission.use') ||
     !audit.some(
       (event) =>
-        event.event === 'plugin.execute' &&
-        event.details.plugin_id === installed.id,
+        event.event === 'plugin.apply' &&
+        event.details.executed?.some(
+          (entry) =>
+            entry.plugin_id === installed.id && entry.permissions?.length > 0,
+        ),
     )
   ) {
     throw new Error(
