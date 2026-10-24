@@ -129,7 +129,7 @@ fn v1_database_migrates_without_discarding_nodes() {
     let version: i64 = migrated
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 6);
+    assert_eq!(version, 7);
     let columns: Vec<String> = migrated
         .prepare("PRAGMA table_info(nodes)")
         .unwrap()

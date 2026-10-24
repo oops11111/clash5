@@ -1,4 +1,4 @@
-use crate::{DataError, Hop, IdentityKey, Node, NodePool, ProxyChain, StableId, identity::text};
+use crate::{AppRoute, DataError, Hop, IdentityKey, Node, NodePool, ProxyChain, StableId, identity::text};
 use rusqlite::{Connection, DatabaseName, OptionalExtension, Transaction, backup::Progress, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -785,7 +785,7 @@ impl BindingStore {
         db.pragma_update(None, "foreign_keys", true)?;
         db.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if !(0..=6).contains(&version) {
+        if !(0..=7).contains(&version) {
             return Err(DataError::SchemaVersion);
         }
         let mut version = version;
@@ -951,6 +951,16 @@ PRAGMA user_version=5;
                 r#"
 CREATE TABLE IF NOT EXISTS pools(id TEXT PRIMARY KEY, definition TEXT NOT NULL CHECK(json_valid(definition))) STRICT;
 PRAGMA user_version=6;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 7 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS app_routes(id TEXT PRIMARY KEY, definition TEXT NOT NULL CHECK(json_valid(definition))) STRICT;
+PRAGMA user_version=7;
 "#,
             )?;
             tx.commit()?;
@@ -1604,6 +1614,39 @@ PRAGMA user_version=6;
             Ok(chain)
         })
         .collect()
+    }
+    pub fn save_app_route(&mut self, route: &AppRoute) -> Result<(), DataError> {
+        route.validate()?;
+        let definition = serde_json::to_value(route).map_err(|_| DataError::InvalidInput)?;
+        let tx = self.db.transaction()?;
+        tx.execute(
+            "INSERT INTO app_routes VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET definition=excluded.definition",
+            params![route.id, definition.to_string()],
+        )?;
+        audit(&tx, "route.upsert", serde_json::json!({"routes":1}))?;
+        tx.commit()?;
+        Ok(())
+    }
+    pub fn app_routes(&self) -> Result<Vec<AppRoute>, DataError> {
+        let mut statement = self.db.prepare("SELECT definition FROM app_routes ORDER BY id")?;
+        let raw = statement.query_map([], |row| row.get::<_, String>(0))?;
+        raw.map(|raw| {
+            let route: AppRoute = serde_json::from_str(&raw?).map_err(|_| DataError::Database)?;
+            route.validate()?;
+            Ok(route)
+        })
+        .collect()
+    }
+    pub fn delete_app_route(&mut self, id: &str) -> Result<(), DataError> {
+        text(id)?;
+        let tx = self.db.transaction()?;
+        let deleted = tx.execute("DELETE FROM app_routes WHERE id=?1", [id])?;
+        if deleted == 0 {
+            return Err(DataError::NotFound);
+        }
+        audit(&tx, "route.delete", serde_json::json!({"routes":deleted}))?;
+        tx.commit()?;
+        Ok(())
     }
     pub fn save_node_pool(&mut self, pool: &NodePool) -> Result<(), DataError> {
         pool.validate()?;

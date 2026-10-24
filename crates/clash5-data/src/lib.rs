@@ -1,9 +1,11 @@
+mod app_route;
 mod chain;
 mod identity;
 mod plugin_patch;
 mod profile;
 mod store;
 
+pub use app_route::{AppMatcher, AppRoute, MAX_APP_MATCHERS, RouteTarget, compile_app_routes};
 pub use chain::{
     ChainError, CompiledChain, ExitPolicy, Hop, MAX_HOPS, MAX_POOL_MEMBERS, NodePool, NodeRef, ProxyChain, ScopedProxy,
     compile_chains,
