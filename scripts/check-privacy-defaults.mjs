@@ -21,7 +21,9 @@ const checks = [
   {
     name: 'Miscellaneous update check defaults to off in the UI',
     file: 'src/components/setting/mods/misc-viewer.tsx',
-    ok: (text) => text.includes('autoCheckUpdate: false,') && text.includes('auto_check_update ?? false'),
+    ok: (text) =>
+      text.includes('autoCheckUpdate: false,') &&
+      text.includes('auto_check_update ?? false'),
   },
   {
     name: 'DNS listener binds loopback by default',
@@ -35,7 +37,12 @@ const checks = [
       const start = text.indexOf('fn default_dns_section()')
       const end = text.indexOf('pub(super) async fn init_dns_config()')
       const section = text.slice(start, end)
-      return start >= 0 && end > start && !section.includes('"8.8.8.8"') && !section.includes('"system"')
+      return (
+        start >= 0 &&
+        end > start &&
+        !section.includes('"8.8.8.8"') &&
+        !section.includes('"system"')
+      )
     },
   },
   {
@@ -56,7 +63,8 @@ const checks = [
   {
     name: 'PRIVACY.md does not reference upstream update hosts',
     file: 'PRIVACY.md',
-    ok: (text) => !text.includes('update.hwdns.net') && !text.includes('gh-proxy.org'),
+    ok: (text) =>
+      !text.includes('update.hwdns.net') && !text.includes('gh-proxy.org'),
   },
 ]
 
@@ -67,7 +75,9 @@ for (const check of checks) {
     console.log(`ok   ${check.name}`)
   } else {
     failures += 1
-    console.error(`::error file=${check.file}::privacy default mismatch: ${check.name}`)
+    console.error(
+      `::error file=${check.file}::privacy default mismatch: ${check.name}`,
+    )
   }
 }
 

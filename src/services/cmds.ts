@@ -12,7 +12,9 @@ import {
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
 import type {
+  AppRoute as GeneratedAppRoute,
   Binding as GeneratedBinding,
+  ChainSample as GeneratedChainSample,
   ChainWorkspace as GeneratedChainWorkspace,
   ClashInfo,
   CommandFailure_Serialize,
@@ -79,9 +81,15 @@ export const saveClash5NodePool = (pool: NodePoolDef) =>
 export const deleteClash5NodePool = (id: string) =>
   invoke<null>('clash5_delete_node_pool', { id })
 export const getClash5ChainSamples = (id: string, limit: number) =>
-  invoke<ChainSample[]>('clash5_chain_samples', { id, limit })
+  invoke<GeneratedChainSample[]>('clash5_chain_samples', {
+    id,
+    limit,
+  }) as Promise<ChainSample[]>
 export const listClash5AppRoutes = () =>
-  invoke<AppRouteDef[]>('clash5_list_app_routes')
+  invoke<GeneratedAppRoute[]>('clash5_list_app_routes') as Promise<
+    AppRouteDef[]
+  >
+
 export const saveClash5AppRoute = (route: AppRouteDef) =>
   invoke<null>('clash5_save_app_route', { route })
 export const deleteClash5AppRoute = (id: string) =>
