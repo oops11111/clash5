@@ -95,5 +95,9 @@
     "warning": "告警",
     "failed": "失败",
     "tested": "测试"
-  }
+  },
+  "appDomainSuffix": "域名后缀",
+  "appNameserver": "这些域名的解析器（可选）",
+  "appNameserverHint": "DoH 地址，例如 https://dns.example/dns-query，或一个 IP 地址。",
+  "appDomainScope": "域名规则作用于所有解析这些域名的应用，无法把不同应用区分开。"
 }

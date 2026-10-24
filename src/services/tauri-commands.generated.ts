@@ -665,16 +665,17 @@ export const commands = {
 
 /* Types */
 /**
- *  Which processes a route applies to. A name matches the executable's name; a path matches the
- *  full executable path.
+ *  What a route matches. Process matchers use the executable name or full path. The domain matcher
+ *  matches a domain and its subdomains for every application, so it cannot separate applications.
  */
 export type AppMatcher =
   | { kind: 'process_name'; name: string }
   | { kind: 'process_path'; path: string }
+  | { kind: 'domain_suffix'; suffix: string }
 
 /**
- *  An application or subsystem route. Routes are independent objects; each one lists the processes
- *  it covers and where their traffic goes.
+ *  An application or subsystem route. Routes are independent objects; each one lists what it covers
+ *  and where that traffic goes.
  */
 export type AppRoute = {
   schema_version: number
@@ -683,6 +684,11 @@ export type AppRoute = {
   matchers: AppMatcher[]
   target: RouteTarget
   enabled: boolean
+  /**
+   *  Resolver for this route's domain matchers, as a DoH URL or an IP address. It is only valid with
+   *  domain matchers, and it applies to every application that resolves those domains.
+   */
+  nameserver?: string | null
 }
 
 export type AutoProxyWire = {

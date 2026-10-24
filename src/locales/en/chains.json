@@ -95,5 +95,9 @@
     "warning": "warning",
     "failed": "failed",
     "tested": "tested"
-  }
+  },
+  "appDomainSuffix": "Domain suffix",
+  "appNameserver": "Resolver for these domains (optional)",
+  "appNameserverHint": "A DoH address such as https://dns.example/dns-query, or an IP address.",
+  "appDomainScope": "Domain rules apply to every application that resolves these domains. They cannot separate one application from another."
 }

@@ -13,10 +13,14 @@ export interface TranslationResources {
       appDeleted: string
       appDeleteRoute: string
       appDirect: string
+      appDomainScope: string
+      appDomainSuffix: string
       appEditRoute: string
       appEmpty: string
       appMatcherKind: string
       appMatcherValue: string
+      appNameserver: string
+      appNameserverHint: string
       appNewRoute: string
       appProcessName: string
       appProcessPath: string

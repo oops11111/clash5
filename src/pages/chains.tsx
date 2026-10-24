@@ -83,14 +83,23 @@ const newRoute = (): AppRouteDef => ({
   matchers: [{ kind: 'process_name', name: '' }],
   target: { kind: 'direct' },
   enabled: true,
+  nameserver: null,
 })
 const matcherValue = (matcher: AppMatcherRef) =>
-  matcher.kind === 'process_name' ? matcher.name : matcher.path
+  matcher.kind === 'process_name'
+    ? matcher.name
+    : matcher.kind === 'process_path'
+      ? matcher.path
+      : matcher.suffix
 const matcherWith = (
   kind: AppMatcherRef['kind'],
   value: string,
 ): AppMatcherRef =>
-  kind === 'process_name' ? { kind, name: value } : { kind, path: value }
+  kind === 'process_name'
+    ? { kind, name: value }
+    : kind === 'process_path'
+      ? { kind, path: value }
+      : { kind, suffix: value }
 const targetValue = (target: RouteTargetRef) =>
   target.kind === 'chain' ? `chain:${target.chain_id}` : target.kind
 const targetFromValue = (value: string): RouteTargetRef =>
@@ -908,6 +917,9 @@ const ChainsPage = () => {
                         <MenuItem value="process_path">
                           {t('chains.appProcessPath')}
                         </MenuItem>
+                        <MenuItem value="domain_suffix">
+                          {t('chains.appDomainSuffix')}
+                        </MenuItem>
                       </TextField>
                       <TextField
                         size="small"
@@ -944,6 +956,28 @@ const ChainsPage = () => {
                       </Button>
                     </Stack>
                   ))}
+                  {routeDraft.matchers.some(
+                    (matcher) => matcher.kind === 'domain_suffix',
+                  ) && (
+                    <>
+                      <TextField
+                        size="small"
+                        label={t('chains.appNameserver')}
+                        helperText={t('chains.appNameserverHint')}
+                        value={routeDraft.nameserver ?? ''}
+                        disabled={busy}
+                        onChange={(event) =>
+                          setRouteDraft({
+                            ...routeDraft,
+                            nameserver: event.target.value,
+                          })
+                        }
+                      />
+                      <Alert severity="info">
+                        {t('chains.appDomainScope')}
+                      </Alert>
+                    </>
+                  )}
                   <Button
                     size="small"
                     sx={{ alignSelf: 'flex-start' }}
@@ -1009,7 +1043,10 @@ const ChainsPage = () => {
                       }
                       onClick={() =>
                         void perform(async () => {
-                          await saveClash5AppRoute(routeDraft)
+                          await saveClash5AppRoute({
+                            ...routeDraft,
+                            nameserver: routeDraft.nameserver?.trim() || null,
+                          })
                           setRouteDraft(null)
                           await refreshRoutes()
                           report(t('chains.appSaved'))

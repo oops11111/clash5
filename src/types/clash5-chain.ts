@@ -39,6 +39,7 @@ export interface ChainNodeOption {
 export type AppMatcherRef =
   | { kind: 'process_name'; name: string }
   | { kind: 'process_path'; path: string }
+  | { kind: 'domain_suffix'; suffix: string }
 
 export type RouteTargetRef =
   | { kind: 'chain'; chain_id: string }
@@ -52,6 +53,7 @@ export interface AppRouteDef {
   matchers: AppMatcherRef[]
   target: RouteTargetRef
   enabled: boolean
+  nameserver: string | null
 }
 
 export interface ChainWorkspace {
