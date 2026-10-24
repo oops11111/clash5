@@ -1,4 +1,4 @@
-use crate::{AppRoute, DataError, Hop, IdentityKey, Node, NodePool, ProxyChain, StableId, identity::text};
+use crate::{AppRoute, ChainSample, DataError, Hop, IdentityKey, Node, NodePool, ProxyChain, StableId, identity::text};
 use rusqlite::{Connection, DatabaseName, OptionalExtension, Transaction, backup::Progress, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -785,7 +785,7 @@ impl BindingStore {
         db.pragma_update(None, "foreign_keys", true)?;
         db.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if !(0..=7).contains(&version) {
+        if !(0..=8).contains(&version) {
             return Err(DataError::SchemaVersion);
         }
         let mut version = version;
@@ -961,6 +961,21 @@ PRAGMA user_version=6;
                 r#"
 CREATE TABLE IF NOT EXISTS app_routes(id TEXT PRIMARY KEY, definition TEXT NOT NULL CHECK(json_valid(definition))) STRICT;
 PRAGMA user_version=7;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 8 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS chain_samples(
+ id INTEGER PRIMARY KEY, chain_id TEXT NOT NULL, measured_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+ status TEXT NOT NULL CHECK(status IN ('healthy','drift','warning','failed','tested')),
+ exit_ip TEXT, delay_ms INTEGER
+) STRICT;
+CREATE INDEX IF NOT EXISTS chain_samples_chain ON chain_samples(chain_id,id);
+PRAGMA user_version=8;
 "#,
             )?;
             tx.commit()?;
@@ -1614,6 +1629,46 @@ PRAGMA user_version=7;
             Ok(chain)
         })
         .collect()
+    }
+    /// Records one detection or test outcome for a chain.
+    pub fn record_chain_sample(&mut self, sample: &ChainSample) -> Result<(), DataError> {
+        text(&sample.chain_id)?;
+        if !matches!(
+            sample.status.as_str(),
+            "healthy" | "drift" | "warning" | "failed" | "tested"
+        ) {
+            return Err(DataError::InvalidInput);
+        }
+        if let Some(ip) = &sample.exit_ip {
+            ip.parse::<std::net::IpAddr>().map_err(|_| DataError::InvalidInput)?;
+        }
+        let tx = self.db.transaction()?;
+        tx.execute(
+            "INSERT INTO chain_samples(chain_id,status,exit_ip,delay_ms) VALUES(?1,?2,?3,?4)",
+            params![sample.chain_id, sample.status, sample.exit_ip, sample.delay_ms],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+    /// Most recent samples first, capped so the history stays small.
+    pub fn chain_samples(&self, chain_id: &str, limit: usize) -> Result<Vec<ChainSample>, DataError> {
+        text(chain_id)?;
+        if !(1..=200).contains(&limit) {
+            return Err(DataError::InvalidInput);
+        }
+        let mut statement = self.db.prepare(
+            "SELECT chain_id,measured_at,status,exit_ip,delay_ms FROM chain_samples WHERE chain_id=?1 ORDER BY id DESC LIMIT ?2",
+        )?;
+        let rows = statement.query_map(params![chain_id, limit as i64], |row| {
+            Ok(ChainSample {
+                chain_id: row.get(0)?,
+                measured_at: row.get(1)?,
+                status: row.get(2)?,
+                exit_ip: row.get(3)?,
+                delay_ms: row.get(4)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(DataError::from)
     }
     pub fn save_app_route(&mut self, route: &AppRoute) -> Result<(), DataError> {
         route.validate()?;

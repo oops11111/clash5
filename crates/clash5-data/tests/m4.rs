@@ -42,6 +42,7 @@ fn chain(hops: Vec<Hop>) -> ProxyChain {
         hops,
         enabled: true,
         exit_policy: ExitPolicy::Warn,
+        pinned_exit_ip: None,
     }
 }
 
@@ -156,4 +157,52 @@ fn pools_reject_duplicate_members_and_chains_reject_adjacent_repeats() {
     assert!(repeated.validate().is_err());
     let too_long = chain(vec![Hop::Node { node: node("a") }; 7]);
     assert!(too_long.validate().is_err());
+}
+
+#[test]
+fn a_pinned_exit_address_must_be_an_ip_and_samples_return_newest_first() {
+    let mut pinned = chain(vec![Hop::Node { node: node("a") }, Hop::Node { node: node("c") }]);
+    pinned.pinned_exit_ip = Some("203.0.113.7".into());
+    assert!(pinned.validate().is_ok());
+    pinned.pinned_exit_ip = Some("not-an-address".into());
+    assert!(pinned.validate().is_err());
+
+    let mut store = BindingStore::memory().unwrap();
+    store
+        .save_proxy_chain(&chain(vec![
+            Hop::Node { node: node("a") },
+            Hop::Node { node: node("c") },
+        ]))
+        .unwrap();
+    for (status, ip, delay) in [
+        ("healthy", Some("203.0.113.7"), Some(40)),
+        ("drift", Some("198.51.100.1"), None),
+    ] {
+        store
+            .record_chain_sample(&clash5_data::ChainSample {
+                chain_id: CHAIN_ID.into(),
+                measured_at: String::new(),
+                status: status.into(),
+                exit_ip: ip.map(str::to_owned),
+                delay_ms: delay,
+            })
+            .unwrap();
+    }
+    let samples = store.chain_samples(CHAIN_ID, 10).unwrap();
+    assert_eq!(
+        samples.iter().map(|sample| sample.status.as_str()).collect::<Vec<_>>(),
+        ["drift", "healthy"]
+    );
+    assert!(
+        store
+            .record_chain_sample(&clash5_data::ChainSample {
+                chain_id: CHAIN_ID.into(),
+                measured_at: String::new(),
+                status: "unknown".into(),
+                exit_ip: None,
+                delay_ms: None,
+            })
+            .is_err()
+    );
+    assert!(store.chain_samples(CHAIN_ID, 0).is_err());
 }

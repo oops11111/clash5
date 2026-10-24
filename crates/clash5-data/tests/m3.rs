@@ -42,6 +42,7 @@ fn chain(profile_id: Option<&str>) -> ProxyChain {
         ],
         enabled: true,
         exit_policy: ExitPolicy::Warn,
+        pinned_exit_ip: None,
     }
 }
 
@@ -215,7 +216,7 @@ fn schema_v2_migrates_transactionally_to_current_schema() {
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(version, 7);
+    assert_eq!(version, 8);
     assert!(table_exists);
 
     let rollback_directory = tempfile::tempdir_in(&root).unwrap();
@@ -280,7 +281,7 @@ fn prior_m3_and_m2_schemas_upgrade_to_current_schema() {
         drop(store);
         let db = rusqlite::Connection::open(&path).unwrap();
         let migrated_version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
-        assert_eq!(migrated_version, 7);
+        assert_eq!(migrated_version, 8);
         let plugin_table_exists: bool = db
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='plugin_bindings')",

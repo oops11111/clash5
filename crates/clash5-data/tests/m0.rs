@@ -198,6 +198,7 @@ fn planned_key_rotation_rekeys_saved_chain_references_atomically() {
         ],
         enabled: true,
         exit_policy: ExitPolicy::Warn,
+        pinned_exit_ip: None,
     };
     store.save_proxy_chain(&chain).unwrap();
 

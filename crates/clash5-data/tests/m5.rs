@@ -22,6 +22,7 @@ fn chain(enabled: bool) -> ProxyChain {
         hops: vec![Hop::Node { node: node("a") }, Hop::Node { node: node("c") }],
         enabled,
         exit_policy: ExitPolicy::Warn,
+        pinned_exit_ip: None,
     }
 }
 

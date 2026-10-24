@@ -32,6 +32,17 @@ pub enum ExitPolicy {
     Switch { fallback_chain_id: String },
 }
 
+/// One detection or test outcome. `status` is one of healthy, drift, warning, failed, tested.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(deny_unknown_fields)]
+pub struct ChainSample {
+    pub chain_id: String,
+    pub measured_at: String,
+    pub status: String,
+    pub exit_ip: Option<String>,
+    pub delay_ms: Option<u32>,
+}
+
 /// A pool is an independent object. Chains refer to it by ID, so one pool can serve many chains.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(deny_unknown_fields)]
@@ -52,6 +63,8 @@ pub struct ProxyChain {
     pub hops: Vec<Hop>,
     pub enabled: bool,
     pub exit_policy: ExitPolicy,
+    /// Exit address the chain is expected to keep. Detection reports drift when it differs.
+    pub pinned_exit_ip: Option<String>,
 }
 
 /// Schema 1 stored a fixed front and landing pair. It is read as two node hops and written back as schema 2.
@@ -70,6 +83,8 @@ struct ProxyChainWire {
     landing: Option<NodeRef>,
     enabled: bool,
     exit_policy: ExitPolicy,
+    #[serde(default)]
+    pinned_exit_ip: Option<String>,
 }
 
 impl TryFrom<ProxyChainWire> for ProxyChain {
@@ -94,6 +109,7 @@ impl TryFrom<ProxyChainWire> for ProxyChain {
             hops,
             enabled: wire.enabled,
             exit_policy: wire.exit_policy,
+            pinned_exit_ip: wire.pinned_exit_ip,
         })
     }
 }
@@ -150,6 +166,11 @@ impl ProxyChain {
         }
         if let ExitPolicy::Switch { fallback_chain_id } = &self.exit_policy
             && (!uuid_v4(fallback_chain_id) || fallback_chain_id == &self.id)
+        {
+            return Err(DataError::InvalidInput);
+        }
+        if let Some(pinned) = &self.pinned_exit_ip
+            && pinned.parse::<std::net::IpAddr>().is_err()
         {
             return Err(DataError::InvalidInput);
         }

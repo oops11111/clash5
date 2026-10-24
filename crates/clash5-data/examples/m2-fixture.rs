@@ -37,6 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
         enabled: true,
         exit_policy: ExitPolicy::Warn,
+        pinned_exit_ip: None,
     };
     let mut config: Mapping = serde_yaml_ng::from_str(&format!(
         "mixed-port: 0\nallow-lan: false\nmode: rule\nlog-level: warning\nexternal-controller: 127.0.0.1:{}\nsecret: fixture-controller-secret\nrules: ['MATCH,REJECT']\n",
