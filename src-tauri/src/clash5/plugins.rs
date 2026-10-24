@@ -568,6 +568,49 @@ pub(crate) fn upgrade_package(
     Ok(item)
 }
 
+pub(crate) fn recover_plugin_directories_at_startup() -> anyhow::Result<()> {
+    let root = crate::utils::dirs::app_home_dir()?.join("plugins");
+    recover_plugin_directories(&root).map_err(Into::into)
+}
+
+/// Repairs plugin directories left by an interrupted install, upgrade or swap. Runs once at startup,
+/// before any plugin operation, so no other operation can be in progress.
+pub(crate) fn recover_plugin_directories(plugin_root: &Path) -> std::io::Result<()> {
+    let entries = match fs::read_dir(plugin_root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    for entry in entries {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let Some(rest) = name.strip_prefix('.') else {
+            continue;
+        };
+        if rest.ends_with(".tmp") {
+            fs::remove_dir_all(entry.path())?;
+        } else if let Some(id) = rest.strip_suffix(".previous").filter(|id| valid_plugin_id(id)) {
+            // An upgrade moved the installed version aside and was interrupted before the new one landed.
+            if !plugin_root.join(id).exists() {
+                fs::rename(entry.path(), plugin_root.join(id))?;
+            }
+        } else if let Some(id) = rest.strip_suffix(".swap").filter(|id| valid_plugin_id(id)) {
+            let destination = plugin_root.join(id);
+            let previous = previous_directory(plugin_root, id);
+            if !destination.exists() {
+                // Interrupted after the first step: put the scratch copy back.
+                fs::rename(entry.path(), &destination)?;
+            } else if !previous.exists() {
+                // Interrupted after the second step: the swap is complete except for the last rename.
+                fs::rename(entry.path(), &previous)?;
+            } else {
+                fs::remove_dir_all(entry.path())?;
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Swaps the installed version with the kept previous version. Calling it twice restores the
 /// original state, so a failed configuration apply can undo the swap the same way.
 pub(crate) fn swap_with_previous(plugin_root: &Path, id: &str) -> Result<(), PluginFailure> {
@@ -1046,6 +1089,35 @@ mod tests {
             upgrade_package(again, &root, true).err(),
             Some(PluginFailure::InvalidPackage)
         );
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn startup_recovery_repairs_interrupted_upgrades_and_swaps() -> Result<(), PluginFailure> {
+        let root = std::env::temp_dir().join(format!("clash5-plugin-recover-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let io = |_| PluginFailure::ExecutionFailed;
+        // Upgrade interrupted after moving the installed version aside.
+        fs::create_dir_all(root.join(".moved.plugin.previous")).map_err(io)?;
+        // Swap interrupted after its first step: the installed directory is missing.
+        fs::create_dir_all(root.join(".lost.plugin.swap")).map_err(io)?;
+        // Stale temporary directory from an interrupted install.
+        fs::create_dir_all(root.join(".moved.plugin.abc123.tmp")).map_err(io)?;
+        // Swap interrupted after its second step: both directories exist and the scratch copy is stale.
+        fs::create_dir_all(root.join("both.plugin")).map_err(io)?;
+        fs::create_dir_all(root.join(".both.plugin.previous")).map_err(io)?;
+        fs::create_dir_all(root.join(".both.plugin.swap")).map_err(io)?;
+
+        recover_plugin_directories(&root).map_err(io)?;
+
+        assert!(root.join("moved.plugin").is_dir());
+        assert!(!root.join(".moved.plugin.previous").exists());
+        assert!(!root.join(".moved.plugin.abc123.tmp").exists());
+        assert!(root.join("lost.plugin").is_dir());
+        assert!(!root.join(".lost.plugin.swap").exists());
+        assert!(!root.join(".both.plugin.swap").exists());
+        assert!(root.join(".both.plugin.previous").is_dir());
         let _ = fs::remove_dir_all(&root);
         Ok(())
     }

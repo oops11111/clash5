@@ -70,6 +70,10 @@ async fn resolve_setup() {
     if let Err(e) = init::init_dns_config().await {
         logging!(warn, Type::Setup, "DNS config initialization failed: {}", e);
     }
+    logging_error!(
+        Type::Setup,
+        crate::clash5::plugins::recover_plugin_directories_at_startup()
+    );
     if config_initialized {
         init_verge_config().await;
     }
