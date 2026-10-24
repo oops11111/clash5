@@ -76,6 +76,7 @@ pub(crate) struct PluginSummary {
     pub writable_paths: Vec<String>,
     pub signer_fingerprint: String,
     pub enabled: bool,
+    pub has_previous: bool,
 }
 
 #[derive(Serialize)]
@@ -489,6 +490,112 @@ pub(crate) fn inspect_package(package: &[u8]) -> Result<VerifiedPluginPackage, P
     })
 }
 
+fn write_package_files(directory: &Path, package: &VerifiedPluginPackage) -> std::io::Result<()> {
+    fs::write(directory.join("manifest.json"), &package.manifest_bytes)?;
+    fs::write(directory.join("module.wasm"), &package.module)?;
+    fs::write(directory.join("manifest.minisig"), &package.signature)?;
+    fs::write(directory.join("signer.pub"), &package.signer)
+}
+
+fn previous_directory(plugin_root: &Path, id: &str) -> std::path::PathBuf {
+    plugin_root.join(format!(".{id}.previous"))
+}
+
+/// Dotted numeric versions only, compared component by component. Anything else is rejected.
+fn version_parts(version: &str) -> Option<Vec<u64>> {
+    version.split('.').map(|part| part.parse().ok()).collect()
+}
+
+pub(crate) fn has_previous_version(plugin_root: &Path, id: &str) -> bool {
+    valid_plugin_id(id) && previous_directory(plugin_root, id).is_dir()
+}
+
+/// Replaces an installed plugin with a newer version from the same signer. The previous version
+/// is kept for rollback. The enabled state of the plugin is carried over.
+pub(crate) fn upgrade_package(
+    package: VerifiedPluginPackage,
+    plugin_root: &Path,
+    allow_downgrade: bool,
+) -> Result<PluginSummary, PluginFailure> {
+    let id = package.manifest.id.clone();
+    let destination = plugin_root.join(&id);
+    let installed_metadata = fs::symlink_metadata(&destination).map_err(|_| PluginFailure::InvalidPackage)?;
+    if !installed_metadata.file_type().is_dir() {
+        return Err(PluginFailure::InvalidPackage);
+    }
+    let installed_manifest: PluginManifest =
+        serde_json::from_slice(&read_installed_file(&destination, "manifest.json", MAX_MANIFEST_BYTES)?)
+            .map_err(|_| PluginFailure::InvalidPackage)?;
+    let installed_signer = read_installed_file(&destination, "signer.pub", 1024)?;
+    if std::str::from_utf8(&installed_signer)
+        .map_err(|_| PluginFailure::InvalidPackage)?
+        .trim()
+        != package.signer.trim()
+    {
+        return Err(PluginFailure::PermissionDenied);
+    }
+    let current = version_parts(&installed_manifest.version).ok_or(PluginFailure::InvalidPackage)?;
+    let incoming = version_parts(&package.manifest.version).ok_or(PluginFailure::InvalidPackage)?;
+    match incoming.cmp(&current) {
+        std::cmp::Ordering::Equal => return Err(PluginFailure::InvalidPackage),
+        std::cmp::Ordering::Less if !allow_downgrade => return Err(PluginFailure::PermissionDenied),
+        _ => {}
+    }
+
+    let temporary = plugin_root.join(format!(".{id}.{}.tmp", nanoid::nanoid!()));
+    fs::create_dir(&temporary).map_err(|_| PluginFailure::ExecutionFailed)?;
+    if write_package_files(&temporary, &package).is_err() {
+        let _ = fs::remove_dir_all(&temporary);
+        return Err(PluginFailure::ExecutionFailed);
+    }
+    if destination.join(DISABLED_MARKER).exists() {
+        let _ = fs::write(temporary.join(DISABLED_MARKER), b"");
+    }
+
+    let previous = previous_directory(plugin_root, &id);
+    let _ = fs::remove_dir_all(&previous);
+    if fs::rename(&destination, &previous).is_err() {
+        let _ = fs::remove_dir_all(&temporary);
+        return Err(PluginFailure::ExecutionFailed);
+    }
+    if fs::rename(&temporary, &destination).is_err() {
+        let _ = fs::rename(&previous, &destination);
+        let _ = fs::remove_dir_all(&temporary);
+        return Err(PluginFailure::ExecutionFailed);
+    }
+    let mut item = summary(&package.manifest, &package.signer);
+    item.enabled = plugin_enabled(plugin_root, &id);
+    Ok(item)
+}
+
+/// Swaps the installed version with the kept previous version. Calling it twice restores the
+/// original state, so a failed configuration apply can undo the swap the same way.
+pub(crate) fn swap_with_previous(plugin_root: &Path, id: &str) -> Result<(), PluginFailure> {
+    if !valid_plugin_id(id) {
+        return Err(PluginFailure::InvalidPackage);
+    }
+    let destination = plugin_root.join(id);
+    let previous = previous_directory(plugin_root, id);
+    if !destination.is_dir() || !previous.is_dir() {
+        return Err(PluginFailure::InvalidPackage);
+    }
+    let enabled = plugin_enabled(plugin_root, id);
+    let scratch = plugin_root.join(format!(".{id}.swap"));
+    let _ = fs::remove_dir_all(&scratch);
+    fs::rename(&destination, &scratch).map_err(|_| PluginFailure::ExecutionFailed)?;
+    if fs::rename(&previous, &destination).is_err() {
+        let _ = fs::rename(&scratch, &destination);
+        return Err(PluginFailure::ExecutionFailed);
+    }
+    if fs::rename(&scratch, &previous).is_err() {
+        let _ = fs::rename(&destination, &previous);
+        let _ = fs::rename(&scratch, &destination);
+        return Err(PluginFailure::ExecutionFailed);
+    }
+    // The enabled state belongs to the plugin, not to a version directory.
+    set_plugin_enabled(plugin_root, id, enabled)
+}
+
 pub(crate) fn install_package(
     package: VerifiedPluginPackage,
     plugin_root: &Path,
@@ -500,14 +607,7 @@ pub(crate) fn install_package(
     let temporary = plugin_root.join(format!(".{id}.{suffix}.tmp"));
     let backup = plugin_root.join(format!(".{id}.{suffix}.backup"));
     fs::create_dir(&temporary).map_err(|_| PluginFailure::ExecutionFailed)?;
-    let write_result = (|| {
-        fs::write(temporary.join("manifest.json"), &package.manifest_bytes)?;
-        fs::write(temporary.join("module.wasm"), &package.module)?;
-        fs::write(temporary.join("manifest.minisig"), &package.signature)?;
-        fs::write(temporary.join("signer.pub"), &package.signer)?;
-        Ok::<(), std::io::Error>(())
-    })();
-    if write_result.is_err() {
+    if write_package_files(&temporary, &package).is_err() {
         let _ = fs::remove_dir_all(&temporary);
         return Err(PluginFailure::ExecutionFailed);
     }
@@ -576,6 +676,7 @@ pub(crate) fn installed_plugins(plugin_root: &Path) -> Result<Vec<PluginSummary>
         }
         let mut item = summary(&manifest, signer);
         item.enabled = plugin_enabled(plugin_root, &manifest.id);
+        item.has_previous = has_previous_version(plugin_root, &manifest.id);
         plugins.push(item);
     }
     plugins.sort_by(|left, right| left.name.cmp(&right.name).then_with(|| left.id.cmp(&right.id)));
@@ -592,6 +693,7 @@ fn summary(manifest: &PluginManifest, signer: &str) -> PluginSummary {
         writable_paths: manifest.writable_paths.clone(),
         signer_fingerprint: hex_digest(signer.as_bytes()),
         enabled: true,
+        has_previous: false,
     }
 }
 
@@ -873,6 +975,77 @@ mod tests {
         uninstall_plugin(&root, "sample.plugin")?;
         assert!(!root.join("sample.plugin").exists());
         assert!(root.join("other.plugin").exists());
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn versions_compare_numerically_and_reject_non_numeric_parts() {
+        assert!(version_parts("1.10.0") > version_parts("1.9.9"));
+        assert_eq!(version_parts("1.x.0"), None);
+    }
+
+    #[test]
+    fn swap_is_symmetric_and_keeps_the_plugin_enabled_state() -> Result<(), PluginFailure> {
+        let root = std::env::temp_dir().join(format!("clash5-plugin-swap-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("swap.plugin")).map_err(|_| PluginFailure::ExecutionFailed)?;
+        fs::create_dir_all(root.join(".swap.plugin.previous")).map_err(|_| PluginFailure::ExecutionFailed)?;
+        fs::write(root.join("swap.plugin/version"), b"new").map_err(|_| PluginFailure::ExecutionFailed)?;
+        fs::write(root.join(".swap.plugin.previous/version"), b"old").map_err(|_| PluginFailure::ExecutionFailed)?;
+        set_plugin_enabled(&root, "swap.plugin", false)?;
+
+        swap_with_previous(&root, "swap.plugin")?;
+        assert_eq!(
+            fs::read(root.join("swap.plugin/version")).ok().as_deref(),
+            Some(&b"old"[..])
+        );
+        assert!(!plugin_enabled(&root, "swap.plugin"));
+
+        swap_with_previous(&root, "swap.plugin")?;
+        assert_eq!(
+            fs::read(root.join("swap.plugin/version")).ok().as_deref(),
+            Some(&b"new"[..])
+        );
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn upgrade_keeps_the_previous_version_and_the_disabled_state() -> Result<(), PluginFailure> {
+        let package = include_bytes!("../../../scripts/fixtures/m3-acceptance-plugin.c5p");
+        let inspected = inspect_package(package)?;
+        let id = inspected.manifest.id.clone();
+        let root = std::env::temp_dir().join(format!("clash5-plugin-upgrade-ok-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        install_package(verify_package(package, std::slice::from_ref(&inspected.signer))?, &root)?;
+        set_plugin_enabled(&root, &id, false)?;
+
+        // The signature was checked when the package was verified; only the version is changed here.
+        let mut newer = verify_package(package, std::slice::from_ref(&inspected.signer))?;
+        newer.manifest.version = "9.9.9".into();
+        let installed = upgrade_package(newer, &root, false)?;
+
+        assert_eq!(installed.version, "9.9.9");
+        assert!(!installed.enabled);
+        assert!(has_previous_version(&root, &id));
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn upgrade_refuses_the_same_version_after_the_signer_matches() -> Result<(), PluginFailure> {
+        let package = include_bytes!("../../../scripts/fixtures/m3-acceptance-plugin.c5p");
+        let inspected = inspect_package(package)?;
+        let root = std::env::temp_dir().join(format!("clash5-plugin-upgrade-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        install_package(verify_package(package, std::slice::from_ref(&inspected.signer))?, &root)?;
+
+        let again = verify_package(package, std::slice::from_ref(&inspected.signer))?;
+        assert_eq!(
+            upgrade_package(again, &root, true).err(),
+            Some(PluginFailure::InvalidPackage)
+        );
         let _ = fs::remove_dir_all(&root);
         Ok(())
     }

@@ -191,6 +191,8 @@ fn is_plugin_audit_event(event: &str) -> bool {
             | "plugin.disable"
             | "plugin.signer.revoke"
             | "plugin.uninstall"
+            | "plugin.upgrade"
+            | "plugin.rollback"
             | "plugin.apply"
             | "plugin.permission.use"
             | "plugin.execute"

@@ -645,6 +645,7 @@ pub struct PluginPackagePreview {
     name: String,
     description: String,
     permissions: Vec<String>,
+    writable_paths: Vec<String>,
     signer_fingerprint: String,
     signer: String,
 }
@@ -698,6 +699,7 @@ pub async fn clash5_stage_plugin_package() -> CmdResult<Option<PluginPackagePrev
         name: package.manifest.name,
         description: package.manifest.description,
         permissions: package.manifest.permissions,
+        writable_paths: package.manifest.writable_paths,
         signer_fingerprint,
         signer: package.signer,
     }))
@@ -860,6 +862,96 @@ pub async fn clash5_revoke_plugin_signer(signer_fingerprint: String) -> CmdResul
         tracing::warn!("plugin signer revocation audit event could not be persisted");
     }
     Ok(previous.len() as u32)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_upgrade_plugin(
+    staging_id: String,
+    confirmed_signer: String,
+    allow_downgrade: bool,
+) -> CmdResult<plugins::PluginSummary> {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    if staging_id.len() != 21
+        || !staging_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        || confirmed_signer.len() > 1_024
+    {
+        return Err(coded_error("C5-PLUGIN-001", "staged plugin reference is invalid"));
+    }
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    let staged = root.join(".staging").join(format!("{staging_id}.c5p"));
+    let bytes = tokio::fs::read(&staged)
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-001", "staged plugin package is unavailable"))?;
+    let package = plugins::verify_package(&bytes, &[confirmed_signer]).map_err(plugin_failure)?;
+    let plugin_id = package.manifest.id.clone();
+    let audit_details = serde_json::json!({
+        "plugin_id": plugin_id.clone(),
+        "version": package.manifest.version.clone(),
+        "permissions": package.manifest.permissions.clone(),
+        "signer_fingerprint": sha2::Sha256::digest(package.signer.as_bytes())
+            .iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+    });
+    let upgrade_root = root.clone();
+    let installed =
+        tokio::task::spawn_blocking(move || plugins::upgrade_package(package, &upgrade_root, allow_downgrade))
+            .await
+            .map_err(|_| coded_error("C5-PLUGIN-004", "plugin upgrade failed"))?
+            .map_err(plugin_failure)?;
+    let restore_root = root.clone();
+    let restore_id = plugin_id.clone();
+    apply_plugin_change_with_rollback(
+        update_plugin_configuration,
+        move || async move { plugins::swap_with_previous(&restore_root, &restore_id).map_err(|_| DataError::InvalidInput) },
+        |result| result.is_valid(),
+    )
+    .await?;
+    let _ = tokio::fs::remove_file(staged).await;
+    let audit_result = crate::config::profiles::with_clash5_binding_store(move |store| {
+        store.record_plugin_audit("plugin.upgrade", &audit_details)
+    })
+    .await;
+    if audit_result.is_err() {
+        tracing::warn!(plugin_id = %installed.id, "plugin upgrade audit event could not be persisted");
+    }
+    Ok(installed)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_rollback_plugin(plugin_id: String) -> CmdResult {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    if !plugins::has_previous_version(&root, &plugin_id) {
+        return Err(coded_error(
+            "C5-PLUGIN-001",
+            "no previous version is kept for this plugin",
+        ));
+    }
+    plugins::swap_with_previous(&root, &plugin_id).map_err(plugin_failure)?;
+    let restore_root = root.clone();
+    let restore_id = plugin_id.clone();
+    apply_plugin_change_with_rollback(
+        update_plugin_configuration,
+        move || async move { plugins::swap_with_previous(&restore_root, &restore_id).map_err(|_| DataError::InvalidInput) },
+        |result| result.is_valid(),
+    )
+    .await?;
+    let details = serde_json::json!({ "plugin_id": plugin_id });
+    let audit_result = crate::config::profiles::with_clash5_binding_store(move |store| {
+        store.record_plugin_audit("plugin.rollback", &details)
+    })
+    .await;
+    if audit_result.is_err() {
+        tracing::warn!("plugin rollback audit event could not be persisted");
+    }
+    Ok(())
 }
 
 #[tauri::command]
