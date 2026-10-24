@@ -1,4 +1,5 @@
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import {
   Alert,
   Box,
@@ -15,19 +16,21 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BasePage } from '@/components/base'
 import {
   activateClash5Chain,
   deleteClash5Chain,
+  deleteClash5NodePool,
   detectClash5ExitIp,
   getClash5ChainWorkspace,
   saveClash5Chain,
+  saveClash5NodePool,
   testClash5Chain,
 } from '@/services/cmds'
 import type {
+  ChainHopRef,
   ChainNodeOption,
   ChainNodeRef,
   ChainWorkspace,
@@ -43,13 +46,23 @@ const sameNode = (left: ChainNodeRef, right: ChainNodeRef) =>
     (right.source.kind === 'subscription' &&
       left.source.provider_id === right.source.provider_id))
 const emptyNode: ChainNodeRef = { source: { kind: 'manual' }, stable_id: '' }
+const MAX_HOPS = 6
+const MAX_POOL_MEMBERS = 32
+const sameHop = (left: ChainHopRef, right: ChainHopRef) =>
+  left.kind === 'node'
+    ? right.kind === 'node' && sameNode(left.node, right.node)
+    : right.kind === 'pool' && left.pool_id === right.pool_id
+const hopValue = (hop: ChainHopRef) =>
+  hop.kind === 'node' ? `node:${nodeKey(hop.node)}` : `pool:${hop.pool_id}`
 const newChain = (workspace: ChainWorkspace): Clash5Chain => ({
-  schema_version: 1,
+  schema_version: 2,
   id: crypto.randomUUID(),
   name: '',
   profile_id: workspace.profile_id,
-  front: workspace.nodes[0]?.reference ?? emptyNode,
-  landing: workspace.nodes[1]?.reference ?? emptyNode,
+  hops: [
+    { kind: 'node', node: workspace.nodes[0]?.reference ?? emptyNode },
+    { kind: 'node', node: workspace.nodes[1]?.reference ?? emptyNode },
+  ],
   enabled: true,
   exit_policy: { mode: 'warn' },
 })
@@ -78,6 +91,8 @@ const ChainsPage = () => {
   )
   const [policyGroup, setPolicyGroup] = useState('')
   const [exitResult, setExitResult] = useState<ExitIpResult | null>(null)
+  const [poolName, setPoolName] = useState('')
+  const [poolMemberKeys, setPoolMemberKeys] = useState<string[]>([])
   const [exitEnabled, setExitEnabled] = useState(
     () => localStorage.getItem('clash5-exit-ip-enabled') !== 'false',
   )
@@ -100,6 +115,11 @@ const ChainsPage = () => {
     setExitResult(null)
   }, [])
 
+  // Pool edits change only the pool list, so an unsaved chain draft is kept.
+  const refreshWorkspace = useCallback(async () => {
+    setWorkspace(await getClash5ChainWorkspace())
+  }, [])
+
   useEffect(() => {
     void load().catch((error: unknown) => {
       setSeverity('error')
@@ -110,11 +130,34 @@ const ChainsPage = () => {
   const saved = workspace?.chains.find((chain) => chain.id === draft?.id)
   const clean = saved && JSON.stringify(saved) === JSON.stringify(draft)
   const canTest = Boolean(clean && saved?.enabled && !busy)
-  const front = workspace?.nodes.find(
-    (node) => draft && sameNode(node.reference, draft.front),
-  )
-  const landing = workspace?.nodes.find(
-    (node) => draft && sameNode(node.reference, draft.landing),
+  const hopInfo = (hop: ChainHopRef) => {
+    if (hop.kind === 'pool') {
+      const pool = workspace?.pools.find((entry) => entry.id === hop.pool_id)
+      return {
+        title: pool?.name ?? t('chains.missingPool'),
+        detail: pool
+          ? t('chains.poolMembersCount', { count: pool.members.length })
+          : '—',
+        ok: Boolean(pool),
+      }
+    }
+    const node = workspace?.nodes.find((entry) =>
+      sameNode(entry.reference, hop.node),
+    )
+    return {
+      title: node?.display_name ?? t('chains.missingNode'),
+      detail: node
+        ? `${node.kind.toUpperCase()} · ${node.server}:${node.port}`
+        : '—',
+      ok: Boolean(node),
+    }
+  }
+  const hopsValid = Boolean(
+    draft &&
+    draft.hops.length >= 2 &&
+    draft.hops.length <= MAX_HOPS &&
+    draft.hops.every((hop) => hopInfo(hop).ok) &&
+    draft.hops.slice(1).every((hop, index) => !sameHop(hop, draft.hops[index])),
   )
 
   const perform = async (action: () => Promise<void>) => {
@@ -142,61 +185,141 @@ const ChainsPage = () => {
     setTab('visual')
   }
 
-  const renderNode = (
-    role: 'front' | 'landing',
-    node: ChainNodeOption | undefined,
-  ) => (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 2,
-        borderRadius: 3,
-        flex: 1,
-        minWidth: 0,
-        width: { xs: '100%', lg: 'auto' },
-        bgcolor: 'action.hover',
-      }}
-    >
-      <Typography color="text.secondary" variant="caption">
-        {t(`chains.${role}`)}
-      </Typography>
-      <TextField
-        select
-        fullWidth
-        size="small"
-        sx={{ mt: 1 }}
-        label={t(`chains.${role}`)}
-        value={node ? nodeKey(node.reference) : ''}
-        disabled={busy}
-        onChange={(event) => {
-          const selected = workspace?.nodes.find(
-            (entry) => nodeKey(entry.reference) === event.target.value,
-          )
-          if (selected && draft)
-            setDraft({ ...draft, [role]: selected.reference })
+  const updateHop = (index: number, hop: ChainHopRef) => {
+    if (!draft) return
+    setDraft({
+      ...draft,
+      hops: draft.hops.map((entry, position) =>
+        position === index ? hop : entry,
+      ),
+    })
+  }
+
+  const moveHop = (index: number, delta: number) => {
+    if (!draft) return
+    const target = index + delta
+    if (target < 0 || target >= draft.hops.length) return
+    const hops = [...draft.hops]
+    ;[hops[index], hops[target]] = [hops[target], hops[index]]
+    setDraft({ ...draft, hops })
+  }
+
+  const removeHop = (index: number) => {
+    if (!draft) return
+    setDraft({
+      ...draft,
+      hops: draft.hops.filter((_, position) => position !== index),
+    })
+  }
+
+  const addHop = () => {
+    if (!draft || !workspace) return
+    setDraft({
+      ...draft,
+      hops: [
+        ...draft.hops,
+        { kind: 'node', node: workspace.nodes[0]?.reference ?? emptyNode },
+      ],
+    })
+  }
+
+  const renderHop = (index: number, hop: ChainHopRef) => {
+    const info = hopInfo(hop)
+    const label = t('chains.hop', { index: index + 1 })
+    return (
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 2,
+          borderRadius: 3,
+          flex: 1,
+          minWidth: 0,
+          width: { xs: '100%', lg: 'auto' },
+          bgcolor: 'action.hover',
         }}
       >
-        {workspace?.nodes.map((entry) => (
-          <MenuItem
-            key={nodeKey(entry.reference)}
-            value={nodeKey(entry.reference)}
+        <Stack spacing={1}>
+          <Stack
+            direction="row"
+            sx={{ justifyContent: 'space-between', alignItems: 'center' }}
           >
-            {entry.display_name} · {entry.kind} ·{' '}
-            {entry.source_name ?? t('chains.manual')}
-          </MenuItem>
-        ))}
-      </TextField>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: 'block', mt: 1, overflowWrap: 'anywhere' }}
-      >
-        {node
-          ? `${node.kind.toUpperCase()} · ${node.server}:${node.port}`
-          : t('chains.missingNode')}
-      </Typography>
-    </Paper>
-  )
+            <Typography color="text.secondary" variant="caption">
+              {label}
+            </Typography>
+            <Stack direction="row">
+              <Button
+                size="small"
+                disabled={busy || index === 0}
+                onClick={() => moveHop(index, -1)}
+              >
+                {t('chains.moveUp')}
+              </Button>
+              <Button
+                size="small"
+                disabled={busy || !draft || index === draft.hops.length - 1}
+                onClick={() => moveHop(index, 1)}
+              >
+                {t('chains.moveDown')}
+              </Button>
+              <Button
+                size="small"
+                color="error"
+                disabled={busy || !draft || draft.hops.length <= 2}
+                onClick={() => removeHop(index)}
+              >
+                {t('chains.removeHop')}
+              </Button>
+            </Stack>
+          </Stack>
+          <TextField
+            select
+            fullWidth
+            size="small"
+            label={label}
+            value={hopValue(hop)}
+            disabled={busy}
+            onChange={(event) => {
+              const value = event.target.value
+              if (value.startsWith('pool:')) {
+                updateHop(index, { kind: 'pool', pool_id: value.slice(5) })
+                return
+              }
+              const selected = workspace?.nodes.find(
+                (entry) => `node:${nodeKey(entry.reference)}` === value,
+              )
+              if (selected)
+                updateHop(index, { kind: 'node', node: selected.reference })
+            }}
+          >
+            {workspace?.nodes.map((entry) => (
+              <MenuItem
+                key={`node:${nodeKey(entry.reference)}`}
+                value={`node:${nodeKey(entry.reference)}`}
+              >
+                {entry.display_name} · {entry.kind} ·{' '}
+                {entry.source_name ?? t('chains.manual')}
+              </MenuItem>
+            ))}
+            {workspace?.pools.map((pool) => (
+              <MenuItem key={`pool:${pool.id}`} value={`pool:${pool.id}`}>
+                {t('chains.poolOption', {
+                  name: pool.name,
+                  count: pool.members.length,
+                })}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: 'block', overflowWrap: 'anywhere' }}
+          >
+            {info.detail}
+          </Typography>
+        </Stack>
+      </Paper>
+    )
+  }
 
   return (
     <BasePage title={t('layout.components.navigation.tabs.chains')}>
@@ -217,6 +340,7 @@ const ChainsPage = () => {
           >
             <Tab value="visual" label={t('chains.visual')} />
             <Tab value="list" label={t('chains.list')} />
+            <Tab value="pools" label={t('chains.pools')} />
             <Tab value="templates" label={t('chains.templates')} />
           </Tabs>
           <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
@@ -259,14 +383,7 @@ const ChainsPage = () => {
             <Button
               size="small"
               variant="contained"
-              disabled={
-                busy ||
-                !draft ||
-                !draft.name.trim() ||
-                !front ||
-                !landing ||
-                sameNode(draft.front, draft.landing)
-              }
+              disabled={busy || !draft || !draft.name.trim() || !hopsValid}
               onClick={() =>
                 void perform(async () => {
                   if (!draft) return
@@ -316,16 +433,37 @@ const ChainsPage = () => {
                   direction={{ xs: 'column', lg: 'row' }}
                   sx={{ py: 3, gap: 2, alignItems: 'center', minWidth: 0 }}
                 >
-                  {renderNode('front', front)}
-                  <ArrowForwardIcon
-                    color="primary"
-                    sx={{ transform: { xs: 'rotate(90deg)', lg: 'none' } }}
-                  />
-                  {renderNode('landing', landing)}
+                  {draft.hops.map((hop, index) => (
+                    <Fragment key={index}>
+                      {index > 0 && (
+                        <ArrowForwardIcon
+                          color="primary"
+                          sx={{
+                            transform: { xs: 'rotate(90deg)', lg: 'none' },
+                          }}
+                        />
+                      )}
+                      {renderHop(index, hop)}
+                    </Fragment>
+                  ))}
                 </Stack>
+                <Button
+                  size="small"
+                  disabled={busy || draft.hops.length >= MAX_HOPS}
+                  onClick={addHop}
+                >
+                  {t('chains.addHop')}
+                </Button>
                 <Typography color="text.secondary" variant="body2">
-                  {t('chains.twoHopHint')}
+                  {t('chains.hopsHint')}
                 </Typography>
+                {draft.hops
+                  .slice(1)
+                  .some((hop, index) => sameHop(hop, draft.hops[index])) && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    {t('chains.adjacentHops')}
+                  </Alert>
+                )}
                 {workspace.nodes.length < 2 && (
                   <Alert severity="info" sx={{ mt: 2 }}>
                     {t('chains.needNodes')}
@@ -359,36 +497,22 @@ const ChainsPage = () => {
                     {t('chains.pluginPending')}
                   </Typography>
                 </Paper>
-                {(['front', 'landing'] as const).map((role) => {
-                  const node = role === 'front' ? front : landing
+                {draft.hops.map((hop, index) => {
+                  const info = hopInfo(hop)
                   return (
                     <Paper
-                      key={role}
+                      key={index}
                       variant="outlined"
                       sx={{ p: 2, borderRadius: 3, overflowWrap: 'anywhere' }}
                     >
                       <Typography variant="subtitle2">
-                        {t(`chains.${role}`)}
+                        {t('chains.hop', { index: index + 1 })}
                       </Typography>
                       <Typography variant="body2" sx={{ my: 1 }}>
-                        {node?.display_name ?? t('chains.missingNode')}
+                        {info.title}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {node
-                          ? `${node.kind} · ${node.server}:${node.port}`
-                          : '—'}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{ mt: 1, display: 'block' }}
-                      >
-                        {node
-                          ? t(
-                              node.reference.source.kind === 'manual'
-                                ? 'chains.manual'
-                                : 'chains.subscription',
-                            )
-                          : '—'}
+                        {info.detail}
                       </Typography>
                     </Paper>
                   )
@@ -590,6 +714,125 @@ const ChainsPage = () => {
                     }
                   >
                     {t('chains.delete')}
+                  </Button>
+                </Stack>
+              </Paper>
+            ))}
+          </Stack>
+        )}
+        {workspace && tab === 'pools' && (
+          <Stack spacing={2}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+              <Stack spacing={2}>
+                <Typography variant="subtitle1">
+                  {t('chains.createPool')}
+                </Typography>
+                <Typography color="text.secondary" variant="body2">
+                  {t('chains.poolEmpty')}
+                </Typography>
+                <TextField
+                  size="small"
+                  label={t('chains.poolName')}
+                  value={poolName}
+                  disabled={busy}
+                  onChange={(event) => setPoolName(event.target.value)}
+                />
+                <TextField
+                  select
+                  size="small"
+                  label={t('chains.poolMembers')}
+                  value={poolMemberKeys}
+                  disabled={busy}
+                  slotProps={{ select: { multiple: true } }}
+                  onChange={(event) => {
+                    const value = event.target.value
+                    setPoolMemberKeys(
+                      typeof value === 'string' ? value.split(',') : value,
+                    )
+                  }}
+                >
+                  {workspace.nodes.map((entry) => (
+                    <MenuItem
+                      key={nodeKey(entry.reference)}
+                      value={nodeKey(entry.reference)}
+                    >
+                      {entry.display_name} · {entry.kind} ·{' '}
+                      {entry.source_name ?? t('chains.manual')}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <Button
+                  variant="contained"
+                  sx={{ alignSelf: 'flex-start' }}
+                  disabled={
+                    busy ||
+                    !poolName.trim() ||
+                    poolMemberKeys.length === 0 ||
+                    poolMemberKeys.length > MAX_POOL_MEMBERS
+                  }
+                  onClick={() =>
+                    void perform(async () => {
+                      const members = workspace.nodes
+                        .filter((entry) =>
+                          poolMemberKeys.includes(nodeKey(entry.reference)),
+                        )
+                        .map((entry) => entry.reference)
+                      await saveClash5NodePool({
+                        schema_version: 1,
+                        id: crypto.randomUUID(),
+                        name: poolName.trim(),
+                        members,
+                      })
+                      setPoolName('')
+                      setPoolMemberKeys([])
+                      await refreshWorkspace()
+                      report(t('chains.poolSaved'))
+                    })
+                  }
+                >
+                  {t('chains.savePool')}
+                </Button>
+              </Stack>
+            </Paper>
+            {workspace.pools.length === 0 && (
+              <Alert severity="info">{t('chains.poolNone')}</Alert>
+            )}
+            {workspace.pools.map((pool) => (
+              <Paper
+                key={pool.id}
+                variant="outlined"
+                sx={{ p: 2, borderRadius: 3 }}
+              >
+                <Stack
+                  direction="row"
+                  sx={{
+                    gap: 1,
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <Stack>
+                    <Typography sx={{ fontWeight: 600 }}>
+                      {pool.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {t('chains.poolMembersCount', {
+                        count: pool.members.length,
+                      })}
+                    </Typography>
+                  </Stack>
+                  <Button
+                    color="error"
+                    disabled={busy}
+                    onClick={() =>
+                      void perform(async () => {
+                        await deleteClash5NodePool(pool.id)
+                        await refreshWorkspace()
+                        report(t('chains.poolDeleted'))
+                      })
+                    }
+                  >
+                    {t('chains.deletePool')}
                   </Button>
                 </Stack>
               </Paper>

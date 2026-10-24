@@ -5,13 +5,23 @@ export interface ChainNodeRef {
   stable_id: string
 }
 
-export interface Clash5Chain {
+export type ChainHopRef =
+  | { kind: 'node'; node: ChainNodeRef }
+  | { kind: 'pool'; pool_id: string }
+
+export interface NodePoolDef {
   schema_version: 1
   id: string
   name: string
+  members: ChainNodeRef[]
+}
+
+export interface Clash5Chain {
+  schema_version: 2
+  id: string
+  name: string
   profile_id: string | null
-  front: ChainNodeRef
-  landing: ChainNodeRef
+  hops: ChainHopRef[]
   enabled: boolean
   exit_policy: { mode: 'warn' } | { mode: 'switch'; fallback_chain_id: string }
 }
@@ -28,6 +38,7 @@ export interface ChainNodeOption {
 export interface ChainWorkspace {
   profile_id: string | null
   chains: Clash5Chain[]
+  pools: NodePoolDef[]
   nodes: ChainNodeOption[]
   policy_groups: string[]
 }

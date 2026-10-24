@@ -37,6 +37,7 @@ import type {
   ChainWorkspace,
   Clash5Chain,
   ExitIpResult,
+  NodePoolDef,
 } from '@/types/clash5-chain'
 import type {
   Clash5PluginBinding,
@@ -71,6 +72,10 @@ export const saveClash5Chain = (chain: Clash5Chain) =>
   invoke<null>('clash5_save_chain', { chain })
 export const deleteClash5Chain = (id: string) =>
   invoke<null>('clash5_delete_chain', { id })
+export const saveClash5NodePool = (pool: NodePoolDef) =>
+  invoke<null>('clash5_save_node_pool', { pool })
+export const deleteClash5NodePool = (id: string) =>
+  invoke<null>('clash5_delete_node_pool', { id })
 export const testClash5Chain = (id: string, testUrl: string | null = null) =>
   invoke<{ delay_ms: number; group_name: string }>('clash5_test_chain', {
     id,

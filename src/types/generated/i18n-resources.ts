@@ -7,9 +7,13 @@ export interface TranslationResources {
       activate: string
       activated: string
       activatedSession: string
+      addHop: string
+      adjacentHops: string
       create: string
+      createPool: string
       delete: string
       deleted: string
+      deletePool: string
       detectExit: string
       disabled: string
       effectiveChain: string
@@ -24,19 +28,35 @@ export interface TranslationResources {
       failurePolicy: string
       fallback: string
       front: string
+      hop: string
+      hopsHint: string
       inspector: string
       landing: string
       list: string
       manual: string
       missingNode: string
+      missingPool: string
+      moveDown: string
+      moveUp: string
       name: string
       needNodes: string
       pluginPending: string
       policyGroup: string
+      poolDeleted: string
+      poolEmpty: string
+      poolMembers: string
+      poolMembersCount: string
+      poolName: string
+      poolNone: string
+      poolOption: string
+      pools: string
+      poolSaved: string
+      removeHop: string
       routeName: string
       save: string
       saveBeforeTest: string
       saved: string
+      savePool: string
       subscription: string
       switchVerified: string
       templates: string
