@@ -57,8 +57,11 @@ suppresses C6014 because `FwpsApplyModifiedLayerData0` takes ownership of the
 redirect context without an analyzer-visible contract. Other component diagnostics
 still fail the build. It produces one object for each C source file and an
 unsigned `clash5wfp.sys`; this build does not establish WFP runtime behavior.
-Driver signing, packaging, installation, and real Windows routing tests are
-still pending.
+Release driver signing, packaging, and installation are still pending. An
+isolated Windows 10 host in test-signing mode has run temporary signed-driver
+IPv4 and IPv6 TCP redirection probes, including one exact IPv4 target through
+the relay and a generated two-hop Mihomo Chain. See
+`docs/clash5/m5-wfp-redirection.md` for the evidence and remaining gates.
 
 API constraints: [connect redirection](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection),
 [writable request finalization](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/fwpsk/nf-fwpsk-fwpsacquirewritablelayerdatapointer0).

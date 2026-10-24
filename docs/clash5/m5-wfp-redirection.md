@@ -83,9 +83,15 @@ readiness.
 
 A separate Windows smoke test starts the bundled Mihomo core with a listener
 pinned to the generated two-hop Chain. It rejects anonymous CONNECT with 407;
-an authenticated CONNECT reaches the target through both configured hops. This
-checks the listener and Chain adapter independently of WFP, not the complete
-process-proxy route.
+an authenticated CONNECT reaches the target through both configured hops.
+An elevated Windows 10 probe also attached an exact target through the service
+API and sent its IPv4 TCP request through WFP, the relay, the authenticated
+Mihomo listener, and both selected Chain hops. The target received the fixture
+response, and each hop recorded one forwarding request to the expected next
+destination. The service monitor removed the WFP filters and recovery record
+after the target exited. The temporary driver service and certificate were
+removed and independently confirmed absent. This is a controlled fixture route;
+the application still does not create or own that listener and relay session.
 
 ## Controlled Windows driver validation
 
@@ -107,11 +113,25 @@ WFP filters and recovery record disappeared. It attached a second session and
 ran startup reconciliation against its persisted record; the WFP filters and
 record disappeared again. A third exact target was attached through the service
 API and then terminated; the service monitor removed its WFP filters and record
-without a status query, and a subsequent query returned idle. This does not
-establish forced service-crash or watchdog-restart behavior. These probes do not validate
-UDP traffic, the final Mihomo outbound
-socket's redirect record, Chain forwarding, TUN coordination, or a selected
-process tree. The feature remains unavailable to product users.
+without a status query, and a subsequent query returned idle. The integrated
+Chain fixture above verifies one exact IPv4 target through both configured hops.
+These probes do not establish forced service-crash or watchdog-restart behavior,
+UDP traffic, the final Mihomo outbound socket's redirect record, TUN
+coordination, or a selected process tree. The feature remains unavailable to
+product users.
+
+To reproduce the integrated fixture, start
+`node scripts/m5-wfp-chain-fixture.mjs <mihomo-binary> <scratch-directory>` on
+Windows. It writes `m5-wfp-chain-ready.json` with `proxyPort`, `targetPort`, and
+`token`. On an isolated, elevated Windows 10 test host with the protocol-v2 WFP
+driver temporarily installed, set `CLASH5_M5_MIHOMO_PORT`,
+`CLASH5_M5_TARGET_PORT`, and `CLASH5_M5_CHAIN_TOKEN` from those fields, then run
+the ignored service-fork test
+`exact_target_tcp_traverses_external_mihomo_chain`. Write
+`m5-wfp-chain-done.txt` in the scratch directory after the test exits. The
+fixture checks that both Chain hops received the request and writes
+`m5-wfp-chain-result.txt`. Remove the test driver service and certificate after
+the run; the fixture does not install or remove either one.
 
 ## Remaining gates
 
