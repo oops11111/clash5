@@ -171,12 +171,10 @@ fn ip_info_service_allowed(url: &str) -> bool {
     IP_INFO_SERVICES.contains(&url)
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn fetch_ip_info(service_url: String) -> CmdResult<String> {
-    if !ip_info_service_allowed(&service_url) {
-        return Err(super::CommandFailure::plain("IP information service is not allowed"));
-    }
+/// Fetches a small HTTPS document through the running core's mixed port, so the request leaves on the
+/// route the core selects. Redirects are refused and the body is capped at `limit` bytes.
+pub(crate) async fn fetch_via_core(url: &str, limit: usize) -> CmdResult<Vec<u8>> {
+    let url = crate::clash5::catalog::validate_catalog_url(url).stringify_err()?;
     let port = crate::config::active_mixed_port().await;
     let client = reqwest::Client::builder()
         .proxy(reqwest::Proxy::all(format!("http://127.0.0.1:{port}")).stringify_err()?)
@@ -186,21 +184,30 @@ pub async fn fetch_ip_info(service_url: String) -> CmdResult<String> {
         .user_agent(format!("clash5/{}", env!("CARGO_PKG_VERSION")))
         .build()
         .stringify_err()?;
-    let response = client.get(&service_url).send().await.stringify_err()?;
+    let mut response = client.get(url).send().await.stringify_err()?;
     if !response.status().is_success() {
         return Err(super::CommandFailure::plain(format!(
-            "IP information service returned {}",
+            "remote service returned {}",
             response.status()
         )));
     }
     let mut body = Vec::new();
-    let mut response = response;
     while let Some(chunk) = response.chunk().await.stringify_err()? {
-        if body.len() + chunk.len() > 16 * 1024 {
-            return Err(super::CommandFailure::plain("IP information response is too large"));
+        if body.len() + chunk.len() > limit {
+            return Err(super::CommandFailure::plain("remote response is too large"));
         }
         body.extend_from_slice(&chunk);
     }
+    Ok(body)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn fetch_ip_info(service_url: String) -> CmdResult<String> {
+    if !ip_info_service_allowed(&service_url) {
+        return Err(super::CommandFailure::plain("IP information service is not allowed"));
+    }
+    let body = fetch_via_core(&service_url, 16 * 1024).await?;
     String::from_utf8(body).map_err(super::CommandFailure::plain)
 }
 

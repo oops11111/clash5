@@ -321,6 +321,37 @@ export const commands = {
     typedError<null, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_rollback_plugin', { pluginId }),
     ),
+  clash5ListPluginCatalogs: () =>
+    typedError<PluginCatalogView[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_plugin_catalogs'),
+    ),
+  clash5PreviewPluginCatalog: (url: string) =>
+    typedError<PluginCatalogPreview, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_preview_plugin_catalog', { url }),
+    ),
+  clash5SavePluginCatalog: (url: string, confirmedSignerFingerprint: string) =>
+    typedError<PluginCatalogView, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_save_plugin_catalog', {
+        url,
+        confirmedSignerFingerprint,
+      }),
+    ),
+  clash5RefreshPluginCatalog: (catalogId: string) =>
+    typedError<PluginCatalogView, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_refresh_plugin_catalog', { catalogId }),
+    ),
+  clash5RemovePluginCatalog: (catalogId: string) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_remove_plugin_catalog', { catalogId }),
+    ),
+  /**
+   *  Downloads one listed package, checks it against the signed digest and manifest, and stages it.
+   *  The result goes through the same preview and install flow as a file picked by the user.
+   */
+  clash5DownloadCatalogPlugin: (catalogId: string, pluginId: string) =>
+    typedError<PluginPackagePreview, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_download_catalog_plugin', { catalogId, pluginId }),
+    ),
   clash5StagePluginPackage: () =>
     typedError<
       {
@@ -624,6 +655,16 @@ export type Binding = {
   config: unknown
   orphan?: boolean
   disappeared_at?: string | null
+}
+
+/**  One plugin listed by a catalog. `sha256` covers the exact `.c5p` bytes. */
+export type CatalogEntry = {
+  id: string
+  version: string
+  name: string
+  description: string
+  file: string
+  sha256: string
 }
 
 export type ChainActivation = {
@@ -1147,6 +1188,22 @@ export type PluginBindingSummary = {
 export type PluginBindingTarget =
   | { kind: 'node'; source: Source; stable_id: string }
   | { kind: 'chain'; chain_id: string }
+
+export type PluginCatalogPreview = {
+  url: string
+  name: string
+  signer: string
+  signer_fingerprint: string
+  plugin_count: number
+}
+
+export type PluginCatalogView = {
+  id: string
+  name: string
+  url: string
+  signer_fingerprint: string
+  plugins: CatalogEntry[]
+}
 
 export type PluginConflict = {
   path: string

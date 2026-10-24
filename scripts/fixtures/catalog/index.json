@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "clash5 fixture catalog",
+  "plugins": [
+    {
+      "id": "m3.smoke.plugin",
+      "version": "1.0.0",
+      "name": "M3 smoke plugin",
+      "description": "Acceptance fixture that sets the TUN MTU.",
+      "file": "m3-acceptance-plugin.c5p",
+      "sha256": "bfbd0860da1d2323a9445b507b255c8efa18499d3e59e7afd32a9fa9b921ffda"
+    }
+  ]
+}

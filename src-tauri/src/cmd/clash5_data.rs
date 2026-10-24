@@ -654,6 +654,37 @@ fn plugin_failure(error: PluginFailure) -> super::CommandFailure {
     coded_error(error.code(), "plugin package could not be verified or installed")
 }
 
+/// Stages a verified-to-be-parsable package and returns its preview. Callers confirm the signer.
+pub(crate) async fn stage_package_bytes(bytes: Vec<u8>) -> CmdResult<PluginPackagePreview> {
+    let package = plugins::inspect_package(&bytes).map_err(plugin_failure)?;
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins")
+        .join(".staging");
+    tokio::fs::create_dir_all(&root)
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "plugin staging is unavailable"))?;
+    let staging_id = nanoid::nanoid!();
+    tokio::fs::write(root.join(format!("{staging_id}.c5p")), bytes)
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "plugin package could not be staged"))?;
+    let signer_fingerprint = sha2::Sha256::digest(package.signer.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    Ok(PluginPackagePreview {
+        staging_id,
+        id: package.manifest.id,
+        version: package.manifest.version,
+        name: package.manifest.name,
+        description: package.manifest.description,
+        permissions: package.manifest.permissions,
+        writable_paths: package.manifest.writable_paths,
+        signer_fingerprint,
+        signer: package.signer,
+    })
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn clash5_stage_plugin_package() -> CmdResult<Option<PluginPackagePreview>> {
@@ -676,33 +707,7 @@ pub async fn clash5_stage_plugin_package() -> CmdResult<Option<PluginPackagePrev
     let bytes = tokio::fs::read(path)
         .await
         .map_err(|_| coded_error("C5-PLUGIN-001", "plugin package could not be read"))?;
-    let package = plugins::inspect_package(&bytes).map_err(plugin_failure)?;
-    let root = dirs::app_home_dir()
-        .map_err(super::CommandFailure::plain)?
-        .join("plugins")
-        .join(".staging");
-    tokio::fs::create_dir_all(&root)
-        .await
-        .map_err(|_| coded_error("C5-PLUGIN-004", "plugin staging is unavailable"))?;
-    let staging_id = nanoid::nanoid!();
-    tokio::fs::write(root.join(format!("{staging_id}.c5p")), bytes)
-        .await
-        .map_err(|_| coded_error("C5-PLUGIN-004", "plugin package could not be staged"))?;
-    let signer_fingerprint = sha2::Sha256::digest(package.signer.as_bytes())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    Ok(Some(PluginPackagePreview {
-        staging_id,
-        id: package.manifest.id,
-        version: package.manifest.version,
-        name: package.manifest.name,
-        description: package.manifest.description,
-        permissions: package.manifest.permissions,
-        writable_paths: package.manifest.writable_paths,
-        signer_fingerprint,
-        signer: package.signer,
-    }))
+    stage_package_bytes(bytes).await.map(Some)
 }
 
 #[tauri::command]
