@@ -169,8 +169,11 @@ pub(crate) async fn generate(config: &mut Mapping, profile_id: Option<&str>) -> 
     if chains.is_empty() {
         return Ok(vec![]);
     }
+    let pools = with_clash5_binding_store(|store| store.node_pools())
+        .await
+        .map_err(|_| anyhow!("C5-CHAIN-006"))?;
     let catalog = catalog(config, profile_id).await?;
-    compile_chains(config, &chains, &catalog).map_err(anyhow::Error::from)
+    compile_chains(config, &chains, &pools, &catalog).map_err(anyhow::Error::from)
 }
 
 #[cfg(test)]

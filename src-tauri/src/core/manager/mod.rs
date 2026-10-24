@@ -265,8 +265,12 @@ impl CoreManager {
             .and_then(serde_yaml_ng::Value::as_sequence)
             .into_iter()
             .flatten()
-            .find(|proxy| proxy.get("name").and_then(serde_yaml_ng::Value::as_str) == Some(landing_name))
-            .context("generated chain landing proxy is missing")?;
+            .find(|proxy| proxy.get("name").and_then(serde_yaml_ng::Value::as_str) == Some(landing_name));
+        // A pool as the last hop compiles to a group, which sing-box cannot dial through.
+        let Some(landing) = landing else {
+            self.singbox_degraded.store(false, Ordering::Release);
+            return Ok(());
+        };
         if singbox_config::map_landing_outbound(landing, "clash5-exit").is_err() {
             // Unsupported protocols retain the ordinary Mihomo route.
             self.singbox_degraded.store(false, Ordering::Release);

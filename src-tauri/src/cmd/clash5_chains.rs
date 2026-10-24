@@ -7,7 +7,7 @@ use crate::{
     },
     core::{CoreManager, handle::Handle},
 };
-use clash5_data::{NodeRef, ProxyChain, parse_proxy_node};
+use clash5_data::{NodePool, NodeRef, ProxyChain, parse_proxy_node};
 use serde::Serialize;
 use serde_yaml_ng::Value;
 
@@ -29,6 +29,7 @@ pub struct ChainNodeOption {
 pub struct ChainWorkspace {
     profile_id: Option<String>,
     chains: Vec<ProxyChain>,
+    pools: Vec<NodePool>,
     nodes: Vec<ChainNodeOption>,
     policy_groups: Vec<String>,
 }
@@ -90,7 +91,11 @@ pub async fn clash5_chain_workspace() -> CmdResult<ChainWorkspace> {
         });
     }
     nodes.sort_by(|left, right| left.display_name.cmp(&right.display_name));
+    let pools = with_clash5_binding_store(|store| store.node_pools())
+        .await
+        .map_err(|_| storage_failure())?;
     Ok(ChainWorkspace {
+        pools,
         chains: definitions
             .into_iter()
             .filter(|chain| chain.profile_id == profile_id)
@@ -154,6 +159,16 @@ pub async fn clash5_save_chain(chain: ProxyChain) -> CmdResult {
         ));
     }
     let definitions = chains::definitions().await.map_err(|_| storage_failure())?;
+    let pools = with_clash5_binding_store(|store| store.node_pools())
+        .await
+        .map_err(|_| storage_failure())?;
+    if chain
+        .hops
+        .iter()
+        .any(|hop| matches!(hop, clash5_data::Hop::Pool { pool_id } if !pools.iter().any(|pool| pool.id == *pool_id)))
+    {
+        return Err(coded_error("C5-CHAIN-015", "chain uses a pool that does not exist"));
+    }
     if let clash5_data::ExitPolicy::Switch { fallback_chain_id } = &chain.exit_policy
         && !definitions
             .iter()
@@ -322,7 +337,7 @@ pub async fn clash5_activate_chain(id: String, policy_group: String) -> CmdResul
     if !policy_group_exists {
         return Err(coded_error("C5-CHAIN-001", "select an available policy group"));
     }
-    let landing_name = format!("{}-landing", chain.group_name());
+    let landing_name = chain.landing_name();
     CoreManager::global()
         .set_singbox_landing(Some(&landing_name))
         .await
@@ -438,10 +453,11 @@ mod tests {
             serde_json::to_value(ChainWorkspace {
                 profile_id: None,
                 chains: vec![],
+                pools: vec![],
                 nodes: vec![],
                 policy_groups: vec!["PROXY".into()],
             })?,
-            json!({"profile_id":null,"chains":[],"nodes":[],"policy_groups":["PROXY"]})
+            json!({"profile_id":null,"chains":[],"pools":[],"nodes":[],"policy_groups":["PROXY"]})
         );
         assert_eq!(
             serde_json::to_value(ChainTestResult {
@@ -486,4 +502,30 @@ mod tests {
         );
         Ok(())
     }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_save_node_pool(pool: NodePool) -> CmdResult {
+    let _guard = PROFILE_WRITE_LOCK.lock().await;
+    pool.validate()
+        .map_err(|_| coded_error("C5-CHAIN-001", "pool definition is invalid"))?;
+    with_clash5_binding_store(move |store| store.save_node_pool(&pool))
+        .await
+        .map_err(|_| storage_failure())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_delete_node_pool(id: String) -> CmdResult {
+    let _guard = PROFILE_WRITE_LOCK.lock().await;
+    with_clash5_binding_store(move |store| store.delete_node_pool(&id))
+        .await
+        .map_err(|error| match error {
+            clash5_data::DataError::InvalidInput => coded_error(
+                "C5-CHAIN-016",
+                "a chain still uses this pool; remove it from the chain first",
+            ),
+            _ => storage_failure(),
+        })
 }

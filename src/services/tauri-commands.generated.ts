@@ -468,6 +468,14 @@ export const commands = {
     typedError<null, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_delete_chain', { id }),
     ),
+  clash5SaveNodePool: (pool: NodePool) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_save_node_pool', { pool }),
+    ),
+  clash5DeleteNodePool: (id: string) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_delete_node_pool', { id }),
+    ),
   clash5TestChain: (id: string, testUrl: string | null) =>
     typedError<ChainTestResult, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_test_chain', { id, testUrl }),
@@ -688,6 +696,7 @@ export type ChainTestResult = {
 export type ChainWorkspace = {
   profile_id: string | null
   chains: ProxyChain[]
+  pools: NodePool[]
   nodes: ChainNodeOption[]
   policy_groups: string[]
 }
@@ -800,6 +809,12 @@ export type FailedOperation =
   | 'systemProxyDisable'
   | 'systemProxyRestore'
   | 'systemProxyGuard'
+
+export type Hop =
+  /**  One node, used as this hop. */
+  | { kind: 'node'; node: NodeRef }
+  /**  A pool, used as this hop. Traffic uses whichever member the latency probe currently prefers. */
+  | { kind: 'pool'; pool_id: string }
 
 /**  Define the `profiles.yaml` schema */
 export type IProfiles = IProfiles_Serialize | IProfiles_Deserialize
@@ -1101,6 +1116,14 @@ export type Node = {
   sni?: string
 }
 
+/**  A pool is an independent object. Chains refer to it by ID, so one pool can serve many chains. */
+export type NodePool = {
+  schema_version: number
+  id: string
+  name: string
+  members: NodeRef[]
+}
+
 export type NodeQuality = {
   status: QualityStatus
   short_delay_ms: number | null
@@ -1362,13 +1385,13 @@ export type ProxyCapabilities = {
   smux: boolean
 }
 
+/**  Deserialized by hand so the schema 1 front and landing pair can be read. */
 export type ProxyChain = {
   schema_version: number
   id: string
   name: string
   profile_id: string | null
-  front: NodeRef
-  landing: NodeRef
+  hops: Hop[]
   enabled: boolean
   exit_policy: ExitPolicy
 }
