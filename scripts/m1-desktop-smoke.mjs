@@ -1929,7 +1929,11 @@ async function verifyM2Chains() {
   const chain = workspace.chains.find(
     (chain) => chain.name === 'M2 desktop chain',
   )
-  if (!chain.landing.source.provider_id?.endsWith(':M2-provider'))
+  const landingHop = chain.hops.at(-1)
+  if (
+    landingHop?.kind !== 'node' ||
+    !landingHop.node.source.provider_id?.endsWith(':M2-provider')
+  )
     throw new Error('Chain did not retain its external provider source')
   const tested = await invoke('clash5_test_chain', {
     id: chain.id,
@@ -2013,7 +2017,16 @@ async function verifyM2Chains() {
     await invoke('clash5_save_chain', {
       chain: {
         ...chain,
-        landing: { ...chain.landing, stable_id: 'fixture-missing-node' },
+        hops: [
+          ...chain.hops.slice(0, -1),
+          {
+            kind: 'node',
+            node: {
+              ...chain.hops.at(-1).node,
+              stable_id: 'fixture-missing-node',
+            },
+          },
+        ],
       },
     })
   } catch {
@@ -2037,7 +2050,7 @@ async function verifyM2Chains() {
     ...chain,
     id: '28dc0b8a-7485-49bc-8a91-f48bdc736846',
     name: 'M2 verified fallback policy',
-    front: limited.reference,
+    hops: [{ kind: 'node', node: limited.reference }, ...chain.hops.slice(1)],
     exit_policy: { mode: 'switch', fallback_chain_id: chain.id },
   }
   await invoke('clash5_save_chain', { chain: failing })
@@ -2093,8 +2106,10 @@ async function verifyM4SingboxRoute() {
     ...original,
     id: randomUUID(),
     name: 'M4 real sing-box route',
-    front: front.reference,
-    landing: landing.reference,
+    hops: [
+      { kind: 'node', node: front.reference },
+      { kind: 'node', node: landing.reference },
+    ],
   }
   await invoke('clash5_save_chain', { chain })
   await invoke('patch_verge_config', { payload: { singbox_persistent: true } })
