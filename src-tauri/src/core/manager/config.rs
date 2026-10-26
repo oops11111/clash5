@@ -326,6 +326,17 @@ impl CoreManager {
     where
         F: FnOnce(&mut IRuntime),
     {
+        self.update_runtime_config_checked(|runtime| {
+            f(runtime);
+            Ok(())
+        })
+        .await
+    }
+
+    pub(crate) async fn update_runtime_config_checked<F>(&self, f: F) -> Result<ValidationOutcome>
+    where
+        F: FnOnce(&mut IRuntime) -> Result<()>,
+    {
         if !self.try_start_config_update() {
             logging!(debug, Type::Core, "Configuration update is already running");
             return Ok(ValidationOutcome::Busy);
@@ -336,7 +347,7 @@ impl CoreManager {
 
         let runtime = Config::runtime().await;
         let transaction = DraftTransaction::begin(vec![&runtime])?;
-        runtime.edit_draft(f);
+        runtime.edit_draft(f)?;
         self.validate_and_apply(transaction).await
     }
 
