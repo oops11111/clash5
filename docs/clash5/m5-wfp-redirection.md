@@ -42,7 +42,9 @@ capability-gated `process-proxy/session` API for attach, status, and detach. It 
 only the active owner session, a claimed relay PID and port, and exact targets with a
 creation timestamp. The privileged service now checks that the claimed relay PID
 owns listeners on both IPv4 and IPv6 loopback at the requested port before attach.
-This check does not keep the listeners alive after attach; the app must own their
+It records the relay process creation time and rechecks the same instance after
+attach and target updates, on status queries, and during monitoring. A reused PID
+cannot substitute another listener process. The app must own the listeners'
 lifecycle and react to relay failure before product activation. The chain
 credential stays outside the privileged service boundary.
 
@@ -126,6 +128,12 @@ readable session. The integrated WFP-to-relay-to-two-hop-Chain fixture also
 passed with service-side driver readback before active status. Each hop recorded
 one forwarding request. The temporary driver services, test certificates, and
 directories were independently confirmed absent after both probes.
+The service now persists the relay process creation time with its recovery
+record and rejects a changed relay instance even if the PID and loopback port
+are reused. The relay identity check and 96 runnable service library tests
+passed on Windows 10. A repeated elevated WFP-to-two-hop-Chain probe passed
+with one request at each hop; its temporary driver service, certificate, and
+test directory were independently confirmed absent.
 
 The WFP policy was separately installed, read back through an independent engine
 connection, and removed on the same host. Live IPv4 and IPv6 TCP probes read the
