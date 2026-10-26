@@ -422,6 +422,18 @@ export const commands = {
     typedError<ExitIpResult, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_detect_exit_ip', { id, serviceUrl }),
     ),
+  clash5ProcessProxyStatus: () =>
+    typedError<ProcessProxyStatus, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_process_proxy_status'),
+    ),
+  clash5AttachProcessProxy: (chainId: string, pid: number) =>
+    typedError<ProcessProxyStatus, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_attach_process_proxy', { chainId, pid }),
+    ),
+  clash5DetachProcessProxy: () =>
+    typedError<ProcessProxyStatus, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_detach_process_proxy'),
+    ),
   enhanceProfiles: () =>
     typedError<ValidationOutcome, CommandFailure_Serialize>(
       __TAURI_INVOKE('enhance_profiles'),
@@ -1246,6 +1258,17 @@ export type ProbeBatch = {
   unavailable: number
   failed: number
 }
+
+export type ProcessProxyStatus =
+  | { status: 'unavailable' }
+  | { status: 'idle' }
+  | {
+      status: 'active'
+      chain_id: string
+      relay_port: number
+      target_count: number
+    }
+  | { status: 'recovery_required'; detail: string }
 
 export type ProfileDnsSettings =
   | ProfileDnsSettings_Serialize
