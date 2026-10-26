@@ -241,30 +241,32 @@ pub async fn clash5_import_manual_proxies(proxies: Vec<JsonValue>) -> CmdResult<
         .add_import(proxies, &identity_key)
         .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy import is invalid"))?;
     let imported = import.nodes.len();
-    manual::save(&file)
-        .await
-        .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy file could not be saved"))?;
-    if manual::load()
-        .await
-        .and_then(|saved| saved.runtime_proxies(&identity_key))
-        .is_err()
-    {
-        manual::restore(previous.as_deref())
+    if import.file_changed {
+        manual::save(&file)
             .await
-            .map_err(|_| coded_error("MANUAL_IMPORT_ROLLBACK_FAILED", "could not restore manual proxy file"))?;
-        return Err(coded_error(
-            "MANUAL_IMPORT_FAILED",
-            "manual proxy file could not be read back",
-        ));
-    }
+            .map_err(|_| coded_error("MANUAL_IMPORT_FAILED", "manual proxy file could not be saved"))?;
+        if manual::load()
+            .await
+            .and_then(|saved| saved.runtime_proxies(&identity_key))
+            .is_err()
+        {
+            manual::restore(previous.as_deref())
+                .await
+                .map_err(|_| coded_error("MANUAL_IMPORT_ROLLBACK_FAILED", "could not restore manual proxy file"))?;
+            return Err(coded_error(
+                "MANUAL_IMPORT_FAILED",
+                "manual proxy file could not be read back",
+            ));
+        }
 
-    let applied = CoreManager::global().update_config_forced().await;
-    if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
-        restore_manual_file(previous.as_deref()).await?;
-        return Err(coded_error(
-            "MANUAL_IMPORT_FAILED",
-            "manual proxy configuration was rejected",
-        ));
+        let applied = CoreManager::global().update_config_forced().await;
+        if !applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+            restore_manual_file(previous.as_deref()).await?;
+            return Err(coded_error(
+                "MANUAL_IMPORT_FAILED",
+                "manual proxy configuration was rejected",
+            ));
+        }
     }
 
     let saved = crate::config::profiles::with_clash5_binding_store(move |store| {
@@ -272,7 +274,9 @@ pub async fn clash5_import_manual_proxies(proxies: Vec<JsonValue>) -> CmdResult<
     })
     .await;
     if saved.is_err() {
-        restore_manual_file(previous.as_deref()).await?;
+        if import.file_changed {
+            restore_manual_file(previous.as_deref()).await?;
+        }
         return Err(coded_error(
             "MANUAL_IMPORT_FAILED",
             "manual proxy inventory could not be saved",
