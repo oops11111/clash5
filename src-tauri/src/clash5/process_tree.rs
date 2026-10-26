@@ -1,17 +1,51 @@
+#[cfg(test)]
 use std::collections::{BTreeMap, HashMap};
 
+#[cfg(windows)]
+pub(crate) fn selected_process_target(pid: u32) -> anyhow::Result<clash_verge_service_ipc::ProcessProxyTarget> {
+    use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
+    use windows_sys::Win32::{
+        Foundation::FILETIME,
+        System::Threading::{GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+    };
+
+    if pid == 0 {
+        anyhow::bail!("C5-PROXY-002");
+    }
+    let raw = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if raw.is_null() {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    let handle = unsafe { OwnedHandle::from_raw_handle(raw) };
+    let mut creation = FILETIME::default();
+    let mut exit = FILETIME::default();
+    let mut kernel = FILETIME::default();
+    let mut user = FILETIME::default();
+    if unsafe { GetProcessTimes(handle.as_raw_handle(), &mut creation, &mut exit, &mut kernel, &mut user) } == 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    let created_at = (u64::from(creation.dwHighDateTime) << 32) | u64::from(creation.dwLowDateTime);
+    if created_at == 0 {
+        anyhow::bail!("C5-PROXY-002");
+    }
+    Ok(clash_verge_service_ipc::ProcessProxyTarget { pid, created_at })
+}
+
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct ProcessKey {
     pid: u32,
     creation_time_100ns: u64,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct ImageFileIdentity {
     volume_serial_number: u64,
     file_id: [u8; 16],
 }
 
+#[cfg(test)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct ProcessIdentity {
     key: ProcessKey,
@@ -19,6 +53,7 @@ struct ProcessIdentity {
     image_file: Option<ImageFileIdentity>,
 }
 
+#[cfg(test)]
 impl ProcessIdentity {
     fn is_valid(&self) -> bool {
         self.key.pid != 0
@@ -28,6 +63,7 @@ impl ProcessIdentity {
     }
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProcessTreeError {
     InvalidIdentity,
@@ -36,6 +72,7 @@ enum ProcessTreeError {
     ConflictingProcessInstance,
 }
 
+#[cfg(test)]
 #[derive(Default)]
 struct ProcessTree {
     members: HashMap<ProcessKey, ProcessIdentity>,
@@ -43,6 +80,7 @@ struct ProcessTree {
     active_by_pid: BTreeMap<u32, ProcessKey>,
 }
 
+#[cfg(test)]
 impl ProcessTree {
     pub fn new(root: ProcessIdentity) -> Result<Self, ProcessTreeError> {
         if !root.is_valid() {
