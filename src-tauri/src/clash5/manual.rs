@@ -13,7 +13,7 @@ const FILE_NAME: &str = "clash5-manual-proxies.yaml";
 const MAX_IMPORT: usize = 256;
 const MAX_STORED: usize = 4_096;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, PartialEq, Serialize)]
 pub(crate) struct ManualProxyEntry {
     display_name: String,
     #[serde(
@@ -31,6 +31,7 @@ pub(crate) struct ManualProxyFile {
 pub(crate) struct ManualImport {
     pub nodes: Vec<Node>,
     pub changed_ids: Vec<StableId>,
+    pub file_changed: bool,
 }
 
 pub(crate) fn runtime_name(stable_id: &str) -> String {
@@ -120,10 +121,12 @@ impl ManualProxyFile {
         if entries.len() > MAX_STORED {
             bail!("manual proxy inventory is full");
         }
+        let file_changed = self.entries != entries;
         self.entries = entries;
         Ok(ManualImport {
             nodes: imported,
             changed_ids: changed_ids.into_iter().collect(),
+            file_changed,
         })
     }
 
@@ -200,6 +203,9 @@ mod tests {
         assert!(renamed.changed_ids.is_empty());
         assert_eq!(file.entries.len(), 1);
         assert_eq!(entry_node(&file.entries[0], &key).unwrap().display_name, "Renamed");
+
+        let unchanged = file.add_import(vec![proxy("Renamed", "tcp")], &key).unwrap();
+        assert!(!unchanged.file_changed);
 
         let changed = file.add_import(vec![proxy("Renamed", "ws")], &key).unwrap();
         assert_eq!(changed.changed_ids.len(), 1);
