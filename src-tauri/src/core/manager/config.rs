@@ -178,6 +178,7 @@ impl CoreManager {
         Config::runtime().await.edit_draft(|d| {
             *d = IRuntime {
                 config: Some(clash_config.to_owned()),
+                transient_listeners: Default::default(),
                 plugin_provenance: Default::default(),
                 plugin_conflicts: Default::default(),
                 dns_override: None,
