@@ -1,11 +1,18 @@
+#[cfg(windows)]
 use super::{chains, exit_ip::ChainListener, process_tree};
+use crate::cmd::CmdResult;
+#[cfg(not(windows))]
+use crate::cmd::coded_error;
+#[cfg(windows)]
 use crate::{
-    cmd::{CmdResult, coded_error},
+    cmd::coded_error,
     config::{Config, profiles::PROFILE_WRITE_LOCK},
     core::{owner_identity::current_owner_credentials, service},
 };
 use serde::Serialize;
+#[cfg(windows)]
 use std::{sync::OnceLock, time::Duration};
+#[cfg(windows)]
 use tokio::sync::{Mutex, oneshot};
 
 #[derive(Debug, Clone, Serialize, specta::Type)]
