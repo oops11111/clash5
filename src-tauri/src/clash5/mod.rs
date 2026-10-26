@@ -3,5 +3,5 @@ pub(crate) mod exit_ip;
 pub(crate) mod import;
 pub(crate) mod manual;
 pub(crate) mod plugins;
-#[cfg(test)]
+pub(crate) mod process_proxy;
 mod process_tree;
