@@ -126,6 +126,10 @@ pub(crate) async fn status() -> CmdResult<ProcessProxyStatus> {
 }
 
 #[cfg(not(windows))]
+#[allow(
+    clippy::unused_async,
+    reason = "command handlers keep the cross-platform async interface"
+)]
 pub(crate) async fn status() -> CmdResult<ProcessProxyStatus> {
     Ok(ProcessProxyStatus::Unavailable)
 }
@@ -254,6 +258,10 @@ pub(crate) async fn attach(chain_id: String, pid: u32) -> CmdResult<ProcessProxy
 }
 
 #[cfg(not(windows))]
+#[allow(
+    clippy::unused_async,
+    reason = "command handlers keep the cross-platform async interface"
+)]
 pub(crate) async fn attach(_chain_id: String, _pid: u32) -> CmdResult<ProcessProxyStatus> {
     Err(coded_error(
         "C5-PROXY-001",
@@ -292,6 +300,10 @@ pub(crate) async fn detach() -> CmdResult<ProcessProxyStatus> {
 }
 
 #[cfg(not(windows))]
+#[allow(
+    clippy::unused_async,
+    reason = "command handlers keep the cross-platform async interface"
+)]
 pub(crate) async fn detach() -> CmdResult<ProcessProxyStatus> {
     Err(coded_error(
         "C5-PROXY-001",
