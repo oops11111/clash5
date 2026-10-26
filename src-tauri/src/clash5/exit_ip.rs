@@ -4,6 +4,7 @@ use reqwest::{Client, Proxy, Url};
 use serde::Serialize;
 use serde_yaml_ng::{Mapping, Value};
 use std::{
+    collections::BTreeMap,
     net::{IpAddr, Ipv4Addr, TcpListener},
     time::{Duration, Instant},
 };
@@ -124,7 +125,18 @@ fn remove_listener(config: &mut Mapping, owned: &Value) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn apply_transient_listeners(config: &mut Mapping, listeners: &BTreeMap<String, Value>) -> Result<()> {
+    for (name, listener) in listeners {
+        if listener.get("name").and_then(Value::as_str) != Some(name.as_str()) {
+            return Err(anyhow!("C5-EXIT-002"));
+        }
+        insert_listener(config, listener.clone())?;
+    }
+    Ok(())
+}
+
 pub(crate) struct ChainListener {
+    name: String,
     definition: Value,
     port: u16,
     token: String,
@@ -140,6 +152,7 @@ impl ChainListener {
         let definition = probe_listener(&name, port, proxy_name, &token);
         drop(reservation);
         Ok(Self {
+            name,
             definition,
             port,
             token,
@@ -156,6 +169,9 @@ impl ChainListener {
             .update_runtime_config_checked(|runtime| {
                 let config = runtime.config.as_mut().ok_or_else(|| anyhow!("C5-EXIT-002"))?;
                 insert_listener(config, self.definition.clone())?;
+                runtime
+                    .transient_listeners
+                    .insert(self.name.clone(), self.definition.clone());
                 self.active = true;
                 Ok(())
             })
@@ -183,7 +199,16 @@ impl ChainListener {
         let removed = CoreManager::global()
             .update_runtime_config_checked(|runtime| {
                 let config = runtime.config.as_mut().ok_or_else(|| anyhow!("C5-EXIT-004"))?;
-                remove_listener(config, &self.definition)
+                remove_listener(config, &self.definition)?;
+                if runtime
+                    .transient_listeners
+                    .get(&self.name)
+                    .is_some_and(|current| current != &self.definition)
+                {
+                    return Err(anyhow!("C5-EXIT-004"));
+                }
+                runtime.transient_listeners.remove(&self.name);
+                Ok(())
             })
             .await;
         if removed.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
@@ -253,6 +278,24 @@ mod tests {
         config.insert("listeners".into(), "invalid".into());
         assert!(insert_listener(&mut config, owned.clone()).is_err());
         assert!(remove_listener(&mut config, &owned).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn regenerated_config_keeps_owned_listener_and_rejects_a_collision() -> Result<()> {
+        let listener = probe_listener("session", 12345, "chain", "secret");
+        let mut active = BTreeMap::new();
+        active.insert("session".to_owned(), listener.clone());
+
+        let mut regenerated = Mapping::new();
+        apply_transient_listeners(&mut regenerated, &active)?;
+        assert_eq!(regenerated["listeners"], Value::Sequence(vec![listener]));
+
+        let conflicting = probe_listener("session", 12345, "other-chain", "other-secret");
+        let mut regenerated = Mapping::new();
+        regenerated.insert("listeners".into(), Value::Sequence(vec![conflicting.clone()]));
+        assert!(apply_transient_listeners(&mut regenerated, &active).is_err());
+        assert_eq!(regenerated["listeners"], Value::Sequence(vec![conflicting]));
         Ok(())
     }
 
