@@ -17,8 +17,8 @@ use tokio::sync::{Mutex, oneshot};
 
 #[derive(Debug, Clone, Serialize, specta::Type)]
 #[serde(tag = "status", rename_all = "snake_case")]
+#[allow(dead_code)]
 pub enum ProcessProxyStatus {
-    #[allow(dead_code)]
     Unavailable,
     Idle,
     Active {
