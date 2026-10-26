@@ -37,6 +37,11 @@ each process is still live. The privileged service must persist the new set or
 detach the session if persistence fails. This control path does not discover
 children or make process-tree selection available.
 
+Protocol v4 adds an administrator-only readback of the active session and its
+exact target slots. The service compares this snapshot with its recovery record
+before reporting the session active and during its monitor loop. An unavailable
+or mismatched driver session requires recovery, even if WFP filters remain.
+
 Explicit non-loopback local binds are currently rejected because a loopback-only
 relay cannot satisfy their zone/address constraint. Supporting those binds, UDP,
 target discovery, filter lifecycle, relay record handling, TUN exclusion, and

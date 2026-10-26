@@ -331,12 +331,35 @@ cleanup:
     return status;
 }
 
+static NTSTATUS C5QuerySession(C5_DRIVER_STATE *state,
+                               C5_QUERY_SESSION_RESPONSE *response)
+{
+    KIRQL oldIrql;
+
+    RtlZeroMemory(response, sizeof(*response));
+    KeAcquireSpinLock(&state->sessionLock, &oldIrql);
+    if (!state->sessionActive) {
+        KeReleaseSpinLock(&state->sessionLock, oldIrql);
+        return STATUS_NOT_FOUND;
+    }
+    response->version = C5_SESSION_PROTOCOL_VERSION;
+    response->size = sizeof(*response);
+    response->sessionId = state->session.sessionId;
+    response->relayPid = state->session.relayPid;
+    response->relayPort = state->session.relayPort;
+    response->targetCount = state->targetCount;
+    RtlCopyMemory(response->targets, state->targets, sizeof(state->targets));
+    KeReleaseSpinLock(&state->sessionLock, oldIrql);
+    return STATUS_SUCCESS;
+}
+
 _Function_class_(DRIVER_DISPATCH)
 static NTSTATUS C5Dispatch(PDEVICE_OBJECT deviceObject, PIRP irp)
 {
     C5_DRIVER_STATE *state = (C5_DRIVER_STATE *)deviceObject->DeviceExtension;
     PIO_STACK_LOCATION stack = IoGetCurrentIrpStackLocation(irp);
     NTSTATUS status;
+    ULONG_PTR information = 0;
 
     if (stack->MajorFunction != IRP_MJ_DEVICE_CONTROL) {
         status = STATUS_SUCCESS;
@@ -350,11 +373,18 @@ static NTSTATUS C5Dispatch(PDEVICE_OBJECT deviceObject, PIRP irp)
     } else if (stack->Parameters.DeviceIoControl.IoControlCode == IOCTL_C5_UPDATE_TARGETS &&
                stack->Parameters.DeviceIoControl.InputBufferLength == sizeof(C5_UPDATE_TARGETS_REQUEST)) {
         status = C5UpdateTargets(state, (const C5_UPDATE_TARGETS_REQUEST *)irp->AssociatedIrp.SystemBuffer);
+    } else if (stack->Parameters.DeviceIoControl.IoControlCode == IOCTL_C5_QUERY_SESSION &&
+               stack->Parameters.DeviceIoControl.InputBufferLength == 0 &&
+               stack->Parameters.DeviceIoControl.OutputBufferLength == sizeof(C5_QUERY_SESSION_RESPONSE)) {
+        status = C5QuerySession(state, (C5_QUERY_SESSION_RESPONSE *)irp->AssociatedIrp.SystemBuffer);
+        if (NT_SUCCESS(status)) {
+            information = sizeof(C5_QUERY_SESSION_RESPONSE);
+        }
     } else {
         status = STATUS_INVALID_DEVICE_REQUEST;
     }
     irp->IoStatus.Status = status;
-    irp->IoStatus.Information = 0;
+    irp->IoStatus.Information = information;
     IoCompleteRequest(irp, IO_NO_INCREMENT);
     return status;
 }

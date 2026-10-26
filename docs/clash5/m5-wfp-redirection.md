@@ -62,6 +62,10 @@ set without removing the active WFP filters. The driver validates live PID and
 creation-time pairs and publishes them atomically for new classifications; the
 service persists the new set and detaches on update or persistence failure.
 The app still needs a process-tree watcher to drive this request.
+Protocol v4 reads back the driver session and exact target slots before attach
+or update is accepted, before status reports active, and during service monitoring.
+If the driver is unavailable or differs from the recovery record, the service
+reports recovery required and the monitor attempts cleanup.
 The service treats an interrupted, foreign, unreadable, or uncleared record as
 recovery-required. At service startup it
 detaches a surviving recorded driver session before normal work resumes. A filter
@@ -115,6 +119,14 @@ with a second live instance, rejected a foreign session ID and a stale creation
 time, then accepted the valid update again. The test-only driver service and
 one-day certificate were removed and independently confirmed absent.
 
+On 2026-10-26, protocol v4 passed the same analysis build. An elevated Windows
+10 probe read back the attached and updated targets, confirmed that rejected
+updates left the target set unchanged, and confirmed that detach removed the
+readable session. The integrated WFP-to-relay-to-two-hop-Chain fixture also
+passed with service-side driver readback before active status. Each hop recorded
+one forwarding request. The temporary driver services, test certificates, and
+directories were independently confirmed absent after both probes.
+
 The WFP policy was separately installed, read back through an independent engine
 connection, and removed on the same host. Live IPv4 and IPv6 TCP probes read the
 driver context and redirect record, passed the record to the relay's HTTP proxy
@@ -134,7 +146,7 @@ product users.
 To reproduce the integrated fixture, start
 `node scripts/m5-wfp-chain-fixture.mjs <mihomo-binary> <scratch-directory>` on
 Windows. It writes `m5-wfp-chain-ready.json` with `proxyPort`, `targetPort`, and
-`token`. On an isolated, elevated Windows 10 test host with the protocol-v3 WFP
+`token`. On an isolated, elevated Windows 10 test host with the protocol-v4 WFP
 driver temporarily installed, set `CLASH5_M5_MIHOMO_PORT`,
 `CLASH5_M5_TARGET_PORT`, and `CLASH5_M5_CHAIN_TOKEN` from those fields, then run
 the ignored service-fork test
