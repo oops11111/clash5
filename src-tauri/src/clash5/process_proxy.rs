@@ -87,10 +87,16 @@ async fn service_status() -> anyhow::Result<ProcessProxyStatus> {
     if response.code != 0 {
         return Err(anyhow::anyhow!("C5-PROXY-005: {}", response.message));
     }
-    response
+    let status = response
         .data
         .map(status_from_service)
-        .ok_or_else(|| anyhow::anyhow!("C5-PROXY-005"))
+        .ok_or_else(|| anyhow::anyhow!("C5-PROXY-005"))?;
+    Ok(match status {
+        ProcessProxyStatus::Active { .. } => ProcessProxyStatus::RecoveryRequired {
+            detail: "the service retained an active session but this app has no local relay".into(),
+        },
+        other => other,
+    })
 }
 
 #[cfg(windows)]
