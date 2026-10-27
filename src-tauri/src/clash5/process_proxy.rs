@@ -230,6 +230,14 @@ pub(crate) async fn status() -> CmdResult<ProcessProxyStatus> {
 
 #[cfg(windows)]
 pub(crate) async fn attach(chain_id: String, pid: u32) -> CmdResult<ProcessProxyStatus> {
+    // Keep ownership of the listener and relay if the command caller disappears.
+    tokio::spawn(attach_inner(chain_id, pid))
+        .await
+        .map_err(|_| process_proxy_error("C5-PROXY-005", "process proxy operation stopped"))?
+}
+
+#[cfg(windows)]
+async fn attach_inner(chain_id: String, pid: u32) -> CmdResult<ProcessProxyStatus> {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
     if PENDING_CLEANUPS.load(Ordering::SeqCst) != 0 {
         return Err(process_proxy_error(
@@ -378,6 +386,14 @@ pub(crate) async fn attach(_chain_id: String, _pid: u32) -> CmdResult<ProcessPro
 
 #[cfg(windows)]
 pub(crate) async fn detach() -> CmdResult<ProcessProxyStatus> {
+    // Finish service detachment and local cleanup even if the caller is cancelled.
+    tokio::spawn(detach_inner())
+        .await
+        .map_err(|_| process_proxy_error("C5-PROXY-005", "process proxy operation stopped"))?
+}
+
+#[cfg(windows)]
+async fn detach_inner() -> CmdResult<ProcessProxyStatus> {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
     if PENDING_CLEANUPS.load(Ordering::SeqCst) != 0 {
         return Err(process_proxy_error(
