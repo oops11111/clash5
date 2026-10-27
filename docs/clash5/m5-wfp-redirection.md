@@ -22,7 +22,9 @@ The current Mihomo TUN schema documents UID inclusion/exclusion as Linux-only an
 
 ## Chain adapter and redirect-record boundary
 
-The chain-pinned listener must be created in runtime configuration with a random session credential, bound to loopback, and removed on every detach or failed attach. Its `proxy` field must name the selected generated chain group. The app now uses a reusable `ChainListener` lease for exit-IP checks to add and remove such an inbound. Insertion checks the current configuration under the core update guard, and cleanup compares the complete listener definition before removing it; a same-name replacement produces a cleanup error. Runtime configuration regeneration carries active transient listeners forward and rejects a name collision. Exit-IP checks keep the lease in a task that survives caller cancellation and retries failed cleanup. The listener is absent from saved profiles; the active runtime file contains its credential until removal. The process-proxy controller still needs to retain ownership across attach, cancellation, and failed cleanup, then release it after detach or rollback.
+The chain-pinned listener must be created in runtime configuration with a random session credential, bound to loopback, and removed on every detach or failed attach. Its `proxy` field must name the selected generated chain group. The app uses a reusable `ChainListener` lease for exit-IP checks and process proxy sessions. Insertion checks the current configuration under the core update guard, and cleanup compares the complete listener definition before removing it; a same-name replacement produces a cleanup error. Runtime configuration regeneration carries active transient listeners forward and rejects a name collision. The listener is absent from saved profiles; the active runtime file contains its credential until removal.
+
+The process-proxy controller owns the listener and relay during a session. Attach and detach continue if the command caller is cancelled, and failed listener cleanup is retained and retried in the background. While local cleanup remains pending, status reports recovery required and a new attach is rejected. The Windows unit test `listener_cleanup_survives_cancellation_and_retries_failure` covers cancellation during listener cleanup and a subsequent retry; it does not prove recovery after application or service termination.
 
 WFP redirect records are opaque. The relay transfers the record to its socket toward the chain-pinned HTTP listener before connecting, which passed a Windows 10 test with a fixture listener. Mihomo owns the subsequent socket toward the final destination, so clash5's relay cannot attach the record there. Coexistence with other WFP redirectors therefore remains unproven; the relay and Mihomo must be excluded from clash5's own target filters, and external redirector coexistence must not be claimed until tested on Windows.
 
@@ -101,8 +103,8 @@ Mihomo listener, and both selected Chain hops. The target received the fixture
 response, and each hop recorded one forwarding request to the expected next
 destination. The service monitor removed the WFP filters and recovery record
 after the target exited. The temporary driver service and certificate were
-removed and independently confirmed absent. This is a controlled fixture route;
-the application still does not create or own that listener and relay session.
+removed and independently confirmed absent. This was a controlled fixture route;
+it did not exercise the application's own listener and relay lifecycle.
 
 ## Controlled Windows driver validation
 
