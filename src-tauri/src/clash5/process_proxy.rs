@@ -271,26 +271,21 @@ pub(crate) async fn attach(_chain_id: String, _pid: u32) -> CmdResult<ProcessPro
 
 #[cfg(windows)]
 pub(crate) async fn detach() -> CmdResult<ProcessProxyStatus> {
-    let session = active().lock().await.take();
+    let _guard = PROFILE_WRITE_LOCK.lock().await;
     let proof = service::active_service_session()
         .map_err(|_| process_proxy_error("C5-PROXY-005", "the privileged service session is not active"))?;
     let credentials = current_owner_credentials()
         .map_err(|_| process_proxy_error("C5-PROXY-005", "owner credentials are unavailable"))?;
+    let mut active_session = active().lock().await;
     let response = match clash_verge_service_ipc::detach_process_proxy(&credentials, &proof).await {
         Ok(response) => response,
-        Err(error) => {
-            if let Some(session) = session {
-                *active().lock().await = Some(session);
-            }
-            return Err(process_proxy_error("C5-PROXY-005", error));
-        }
+        Err(error) => return Err(process_proxy_error("C5-PROXY-005", error)),
     };
     if response.code != 0 {
-        if let Some(session) = session {
-            *active().lock().await = Some(session);
-        }
         return Err(process_proxy_error("C5-PROXY-005", response.message));
     }
+    let session = active_session.take();
+    drop(active_session);
     if let Some(session) = session {
         cleanup(session)
             .await
