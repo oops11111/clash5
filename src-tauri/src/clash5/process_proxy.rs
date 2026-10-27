@@ -35,7 +35,7 @@ pub enum ProcessProxyStatus {
 struct ActiveProcessProxy {
     chain_id: String,
     relay_port: u16,
-    targets: Vec<clash_verge_service_ipc::ProcessProxyTarget>,
+    generation: u64,
     shutdown: Option<oneshot::Sender<()>>,
     relay_task: tokio::task::JoinHandle<std::io::Result<()>>,
     listener: ChainListener,
@@ -91,40 +91,60 @@ fn status_from_service(status: clash_verge_service_ipc::ProcessProxySessionStatu
 }
 
 #[cfg(windows)]
-async fn service_status() -> anyhow::Result<ProcessProxyStatus> {
+fn service_session_matches(
+    session: &clash_verge_service_ipc::ProcessProxySession,
+    local_generation: u64,
+    local_relay_port: u16,
+    proof_generation: u64,
+) -> bool {
+    session.session_id == proof_generation
+        && session.session_id == local_generation
+        && session.relay_pid == std::process::id()
+        && session.relay_port == local_relay_port
+}
+
+#[cfg(windows)]
+async fn service_status(local: Option<&ActiveProcessProxy>) -> anyhow::Result<ProcessProxyStatus> {
     let proof = service::active_service_session()?;
     let credentials = current_owner_credentials()?;
     let response = clash_verge_service_ipc::get_process_proxy_status(&credentials, &proof).await?;
     if response.code != 0 {
         return Err(anyhow::anyhow!("C5-PROXY-005: {}", response.message));
     }
-    let status = response
-        .data
-        .map(status_from_service)
-        .ok_or_else(|| anyhow::anyhow!("C5-PROXY-005"))?;
+    let status = response.data.ok_or_else(|| anyhow::anyhow!("C5-PROXY-005"))?;
     Ok(match status {
-        ProcessProxyStatus::Active { .. } => ProcessProxyStatus::RecoveryRequired {
-            detail: "the service retained an active session but this app has no local relay".into(),
+        clash_verge_service_ipc::ProcessProxySessionStatus::Active { session } => match local {
+            Some(local) if service_session_matches(&session, local.generation, local.relay_port, proof.generation) => {
+                ProcessProxyStatus::Active {
+                    chain_id: local.chain_id.clone(),
+                    relay_port: session.relay_port,
+                    target_count: session.targets.len() as u32,
+                }
+            }
+            _ => ProcessProxyStatus::RecoveryRequired {
+                detail: "the service session does not match the local redirect relay".into(),
+            },
         },
-        other => other,
+        clash_verge_service_ipc::ProcessProxySessionStatus::Idle if local.is_some() => {
+            ProcessProxyStatus::RecoveryRequired {
+                detail: "the service no longer has the local redirect session".into(),
+            }
+        }
+        other => status_from_service(other),
     })
 }
 
 #[cfg(windows)]
 pub(crate) async fn status() -> CmdResult<ProcessProxyStatus> {
-    if let Some(session) = active().lock().await.as_ref() {
-        if session.relay_task.is_finished() {
-            return Ok(ProcessProxyStatus::RecoveryRequired {
-                detail: "the local redirect relay stopped unexpectedly".into(),
-            });
-        }
-        return Ok(ProcessProxyStatus::Active {
-            chain_id: session.chain_id.clone(),
-            relay_port: session.relay_port,
-            target_count: session.targets.len() as u32,
+    let session = active().lock().await;
+    if let Some(session) = session.as_ref()
+        && session.relay_task.is_finished()
+    {
+        return Ok(ProcessProxyStatus::RecoveryRequired {
+            detail: "the local redirect relay stopped unexpectedly".into(),
         });
     }
-    service_status()
+    service_status(session.as_ref())
         .await
         .map_err(|error| process_proxy_error("C5-PROXY-005", error))
 }
@@ -211,7 +231,7 @@ pub(crate) async fn attach(chain_id: String, pid: u32) -> CmdResult<ProcessProxy
             let _ = cleanup(ActiveProcessProxy {
                 chain_id,
                 relay_port,
-                targets: vec![target],
+                generation: proof.generation,
                 shutdown: Some(shutdown),
                 relay_task,
                 listener,
@@ -224,7 +244,7 @@ pub(crate) async fn attach(chain_id: String, pid: u32) -> CmdResult<ProcessProxy
         let _ = cleanup(ActiveProcessProxy {
             chain_id,
             relay_port,
-            targets: vec![target],
+            generation: proof.generation,
             shutdown: Some(shutdown),
             relay_task,
             listener,
@@ -238,7 +258,7 @@ pub(crate) async fn attach(chain_id: String, pid: u32) -> CmdResult<ProcessProxy
             let _ = cleanup(ActiveProcessProxy {
                 chain_id,
                 relay_port,
-                targets: vec![target],
+                generation: proof.generation,
                 shutdown: Some(shutdown),
                 relay_task,
                 listener,
@@ -253,7 +273,7 @@ pub(crate) async fn attach(chain_id: String, pid: u32) -> CmdResult<ProcessProxy
     *active().lock().await = Some(ActiveProcessProxy {
         chain_id,
         relay_port,
-        targets: vec![target],
+        generation: proof.generation,
         shutdown: Some(shutdown),
         relay_task,
         listener,
@@ -296,6 +316,29 @@ pub(crate) async fn detach() -> CmdResult<ProcessProxyStatus> {
             .map_err(|error| process_proxy_error("C5-PROXY-004", error))?;
     }
     Ok(ProcessProxyStatus::Idle)
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::service_session_matches;
+    use clash_verge_service_ipc::ProcessProxySession;
+
+    #[test]
+    fn active_status_requires_the_matching_service_and_local_relay() {
+        let mut session = ProcessProxySession {
+            owner_key: "fixture".into(),
+            session_id: 42,
+            relay_pid: std::process::id(),
+            relay_port: 18081,
+            targets: vec![],
+        };
+        assert!(service_session_matches(&session, 42, 18081, 42));
+        assert!(!service_session_matches(&session, 41, 18081, 42));
+        assert!(!service_session_matches(&session, 42, 18082, 42));
+        assert!(!service_session_matches(&session, 42, 18081, 43));
+        session.relay_pid = 0;
+        assert!(!service_session_matches(&session, 42, 18081, 42));
+    }
 }
 
 #[cfg(not(windows))]
