@@ -59,16 +59,20 @@ async fn cleanup(mut session: ActiveProcessProxy) -> anyhow::Result<()> {
     if let Some(shutdown) = session.shutdown.take() {
         let _ = shutdown.send(());
     }
-    let relay_result = tokio::time::timeout(Duration::from_secs(5), session.relay_task)
-        .await
-        .map_err(|_| anyhow::anyhow!("C5-PROXY-004"))?
-        .map_err(|_| anyhow::anyhow!("C5-PROXY-004"))?;
-    relay_result.map_err(|_| anyhow::anyhow!("C5-PROXY-004"))?;
-    session
-        .listener
-        .close()
-        .await
-        .map_err(|_| anyhow::anyhow!("C5-PROXY-004"))
+    let relay_stopped = match tokio::time::timeout(Duration::from_secs(5), &mut session.relay_task).await {
+        Ok(Ok(Ok(()))) => true,
+        Err(_) => {
+            session.relay_task.abort();
+            false
+        }
+        _ => false,
+    };
+    let listener_closed = session.listener.close().await.is_ok();
+    if relay_stopped && listener_closed {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("C5-PROXY-004"))
+    }
 }
 
 #[cfg(windows)]
