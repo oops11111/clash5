@@ -132,7 +132,7 @@ impl TrayState {
         #[cfg(not(target_os = "macos"))]
         {
             let _ = (verge, kind);
-            (false, Cow::Borrowed(include_bytes!("../../../icons/icon.ico")))
+            (false, Cow::Borrowed(include_bytes!("../../../icons/tray-icon.ico")))
         }
 
         #[cfg(target_os = "macos")]
