@@ -1,12 +1,14 @@
-use crate::{config::Config, core::CoreManager};
+use crate::core::CoreManager;
 use anyhow::{Result, anyhow};
 use reqwest::{Client, Proxy, Url};
 use serde::Serialize;
 use serde_yaml_ng::{Mapping, Value};
 use std::{
+    collections::BTreeMap,
     net::{IpAddr, Ipv4Addr, TcpListener},
     time::{Duration, Instant},
 };
+use tokio::sync::oneshot;
 
 #[derive(Clone, Debug, Serialize, specta::Type)]
 pub struct ExitObservation {
@@ -92,58 +94,155 @@ fn probe_listener(name: &str, port: u16, proxy_name: &str, password: &str) -> Va
     Value::Mapping(listener)
 }
 
-/// Probe through a temporary loopback inbound pinned to one chain, then remove only that inbound.
-pub(crate) async fn detect(proxy_name: &str, url: Url) -> Result<ExitObservation> {
-    let reservation = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
-    let port = reservation.local_addr()?.port();
-    let name = format!("clash5-exit-probe-{port}");
-    let runtime = Config::runtime().await.data_arc();
-    let config = runtime.config.as_ref().ok_or_else(|| anyhow!("C5-EXIT-002"))?;
-    if config.get("listeners").is_some_and(|value| !value.is_sequence())
-        || config
-            .get("listeners")
-            .and_then(Value::as_sequence)
-            .is_some_and(|listeners| {
-                listeners
-                    .iter()
-                    .any(|listener| listener.get("name").and_then(Value::as_str) == Some(name.as_str()))
-            })
+fn insert_listener(config: &mut Mapping, listener: Value) -> Result<()> {
+    let listeners = config
+        .entry(Value::from("listeners"))
+        .or_insert_with(|| Value::Sequence(vec![]))
+        .as_sequence_mut()
+        .ok_or_else(|| anyhow!("C5-EXIT-002"))?;
+    if listeners
+        .iter()
+        .any(|existing| existing.get("name") == listener.get("name"))
     {
         return Err(anyhow!("C5-EXIT-002"));
     }
-    let token = session_token()?;
-    let listener = probe_listener(&name, port, proxy_name, &token);
-    drop(reservation);
-    let applied = CoreManager::global()
-        .update_runtime_config(move |runtime| {
-            if let Some(config) = runtime.config.as_mut() {
-                let listeners = config
-                    .entry(Value::from("listeners"))
-                    .or_insert_with(|| Value::Sequence(vec![]));
-                if let Some(listeners) = listeners.as_sequence_mut() {
-                    listeners.push(listener);
-                }
-            }
-        })
-        .await;
-    let observed = if applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
-        request(url, port, &token).await.map_err(|_| anyhow!("C5-EXIT-003"))
-    } else {
-        Err(anyhow!("C5-EXIT-002"))
+    listeners.push(listener);
+    Ok(())
+}
+
+fn remove_listener(config: &mut Mapping, owned: &Value) -> Result<()> {
+    let Some(value) = config.get_mut("listeners") else {
+        return Ok(());
     };
-    let removed = CoreManager::global()
-        .update_runtime_config(move |runtime| {
-            if let Some(config) = runtime.config.as_mut()
-                && let Some(listeners) = config.get_mut("listeners").and_then(Value::as_sequence_mut)
-            {
-                listeners.retain(|listener| listener.get("name").and_then(Value::as_str) != Some(name.as_str()));
-            }
-        })
-        .await;
-    if !removed.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+    let listeners = value.as_sequence_mut().ok_or_else(|| anyhow!("C5-EXIT-004"))?;
+    if listeners
+        .iter()
+        .any(|listener| listener.get("name") == owned.get("name") && listener != owned)
+    {
         return Err(anyhow!("C5-EXIT-004"));
     }
-    observed
+    listeners.retain(|listener| listener != owned);
+    Ok(())
+}
+
+pub(crate) fn apply_transient_listeners(config: &mut Mapping, listeners: &BTreeMap<String, Value>) -> Result<()> {
+    for (name, listener) in listeners {
+        if listener.get("name").and_then(Value::as_str) != Some(name.as_str()) {
+            return Err(anyhow!("C5-EXIT-002"));
+        }
+        insert_listener(config, listener.clone())?;
+    }
+    Ok(())
+}
+
+pub(crate) struct ChainListener {
+    name: String,
+    definition: Value,
+    port: u16,
+    token: String,
+    active: bool,
+}
+
+impl ChainListener {
+    pub(crate) fn new(proxy_name: &str, namespace: &str) -> Result<Self> {
+        let reservation = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
+        let port = reservation.local_addr()?.port();
+        let name = format!("{namespace}-{port}");
+        let token = session_token()?;
+        let definition = probe_listener(&name, port, proxy_name, &token);
+        drop(reservation);
+        Ok(Self {
+            name,
+            definition,
+            port,
+            token,
+            active: false,
+        })
+    }
+
+    /// Keep the lease after an error or cancellation until `close` succeeds.
+    pub(crate) async fn activate(&mut self) -> Result<()> {
+        if self.active {
+            return Err(anyhow!("C5-EXIT-002"));
+        }
+        let applied = CoreManager::global()
+            .update_runtime_config_checked(|runtime| {
+                let config = runtime.config.as_mut().ok_or_else(|| anyhow!("C5-EXIT-002"))?;
+                insert_listener(config, self.definition.clone())?;
+                runtime
+                    .transient_listeners
+                    .insert(self.name.clone(), self.definition.clone());
+                self.active = true;
+                Ok(())
+            })
+            .await;
+        if applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+            Ok(())
+        } else {
+            self.close().await?;
+            Err(anyhow!("C5-EXIT-002"))
+        }
+    }
+
+    pub(crate) const fn port(&self) -> u16 {
+        self.port
+    }
+
+    pub(crate) fn token(&self) -> &str {
+        &self.token
+    }
+
+    pub(crate) async fn close(&mut self) -> Result<()> {
+        if !self.active {
+            return Ok(());
+        }
+        let removed = CoreManager::global()
+            .update_runtime_config_checked(|runtime| {
+                let config = runtime.config.as_mut().ok_or_else(|| anyhow!("C5-EXIT-004"))?;
+                remove_listener(config, &self.definition)?;
+                if runtime
+                    .transient_listeners
+                    .get(&self.name)
+                    .is_some_and(|current| current != &self.definition)
+                {
+                    return Err(anyhow!("C5-EXIT-004"));
+                }
+                runtime.transient_listeners.remove(&self.name);
+                Ok(())
+            })
+            .await;
+        if removed.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+            self.active = false;
+            Ok(())
+        } else {
+            Err(anyhow!("C5-EXIT-004"))
+        }
+    }
+}
+
+/// Probe through a temporary loopback inbound pinned to one chain, then remove only that inbound.
+pub(crate) async fn detect(proxy_name: &str, url: Url) -> Result<ExitObservation> {
+    let mut listener = ChainListener::new(proxy_name, "clash5-exit-probe")?;
+    let (send, receive) = oneshot::channel();
+    tokio::spawn(async move {
+        let observed = match listener.activate().await {
+            Ok(()) => request(url, listener.port(), listener.token())
+                .await
+                .map_err(|_| anyhow!("C5-EXIT-003")),
+            Err(error) => Err(error),
+        };
+        let result = if listener.active && listener.close().await.is_err() {
+            Err(anyhow!("C5-EXIT-004"))
+        } else {
+            observed
+        };
+        let _ = send.send(result);
+        while listener.active {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            let _ = listener.close().await;
+        }
+    });
+    receive.await.map_err(|_| anyhow!("C5-EXIT-004"))?
 }
 
 #[cfg(test)]
@@ -157,6 +256,47 @@ mod tests {
         assert_eq!(value["listen"], "127.0.0.1");
         assert_eq!(value["users"][0]["username"], "clash5");
         assert_eq!(value["users"][0]["password"], "ephemeral-secret");
+    }
+
+    #[test]
+    fn listener_lease_rejects_collisions_and_preserves_replacements() -> Result<()> {
+        let owned = probe_listener("session", 12345, "chain", "secret");
+        let other = probe_listener("other", 12346, "chain", "other-secret");
+        let mut config = Mapping::new();
+        insert_listener(&mut config, owned.clone())?;
+        insert_listener(&mut config, other.clone())?;
+        assert!(insert_listener(&mut config, owned.clone()).is_err());
+        remove_listener(&mut config, &owned)?;
+        remove_listener(&mut config, &owned)?;
+        assert_eq!(config["listeners"], Value::Sequence(vec![other.clone()]));
+
+        let replacement = probe_listener("session", 12345, "different-chain", "new-secret");
+        insert_listener(&mut config, replacement.clone())?;
+        assert!(remove_listener(&mut config, &owned).is_err());
+        assert_eq!(config["listeners"], Value::Sequence(vec![other, replacement]));
+
+        config.insert("listeners".into(), "invalid".into());
+        assert!(insert_listener(&mut config, owned.clone()).is_err());
+        assert!(remove_listener(&mut config, &owned).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn regenerated_config_keeps_owned_listener_and_rejects_a_collision() -> Result<()> {
+        let listener = probe_listener("session", 12345, "chain", "secret");
+        let mut active = BTreeMap::new();
+        active.insert("session".to_owned(), listener.clone());
+
+        let mut regenerated = Mapping::new();
+        apply_transient_listeners(&mut regenerated, &active)?;
+        assert_eq!(regenerated["listeners"], Value::Sequence(vec![listener]));
+
+        let conflicting = probe_listener("session", 12345, "other-chain", "other-secret");
+        let mut regenerated = Mapping::new();
+        regenerated.insert("listeners".into(), Value::Sequence(vec![conflicting.clone()]));
+        assert!(apply_transient_listeners(&mut regenerated, &active).is_err());
+        assert_eq!(regenerated["listeners"], Value::Sequence(vec![conflicting]));
+        Ok(())
     }
 
     #[test]
