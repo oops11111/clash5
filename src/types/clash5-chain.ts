@@ -77,7 +77,7 @@ export interface ChainSample {
   delay_ms: number | null
 }
 
-export type QualityStatus = 'healthy' | 'warning' | 'failed'
+type QualityStatus = 'healthy' | 'warning' | 'failed'
 
 /** One long-lived connection measurement through a chain. Speeds are bytes per second. */
 export interface ChainQualityReport {
