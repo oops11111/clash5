@@ -510,6 +510,10 @@ export const commands = {
     typedError<ExitIpResult, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_detect_exit_ip', { id, serviceUrl }),
     ),
+  clash5RunQualityTest: (id: string, downloadBytes: number | null) =>
+    typedError<QualityReport, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_run_quality_test', { id, downloadBytes }),
+    ),
   enhanceProfiles: () =>
     typedError<ValidationOutcome, CommandFailure_Serialize>(
       __TAURI_INVOKE('enhance_profiles'),
@@ -1320,6 +1324,7 @@ export type PluginSummary = {
   signer_fingerprint: string
   enabled: boolean
   has_previous: boolean
+  bundled: boolean
 }
 
 export type PrfExtra = {
@@ -1598,6 +1603,17 @@ export type ProxyViewV1_Serialize = {
   records: { [key in string]: ProxyNodeView_Serialize }
   standalone: string[]
   providers: ProxyProviderView_Serialize[]
+}
+
+export type QualityReport = {
+  status: string
+  throughput_median_bps: number
+  throughput_p10_bps: number
+  first_byte_ms: number
+  jitter_ms: number
+  rtt_p95_ms: number
+  disconnects: number
+  bytes_used: number
 }
 
 export type QualityStatus = 'healthy' | 'slow' | 'failed'
