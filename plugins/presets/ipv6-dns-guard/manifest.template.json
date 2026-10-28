@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "id": "clash5.preset.ipv6-dns-guard",
+  "version": "1.0.0",
+  "name": "IPv6 and DNS guard",
+  "description": "Turns off IPv6 and IPv6 DNS answers so traffic and lookups stay on the configured proxy path. Changes only the two boolean fields listed in writable_paths.",
+  "abi_version": 1,
+  "permissions": ["config.read", "config.patch"],
+  "writable_paths": ["/ipv6", "/dns/ipv6"]
+}

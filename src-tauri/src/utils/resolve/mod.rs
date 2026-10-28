@@ -74,6 +74,10 @@ async fn resolve_setup() {
         Type::Setup,
         crate::clash5::plugins::recover_plugin_directories_at_startup()
     );
+    logging_error!(
+        Type::Setup,
+        crate::clash5::plugins::install_bundled_plugins_at_startup()
+    );
     if config_initialized {
         init_verge_config().await;
     }

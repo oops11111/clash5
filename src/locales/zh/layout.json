@@ -126,7 +126,8 @@
         "lock": "锁定菜单排序",
         "collapseNavBar": "收起导航栏",
         "expandNavBar": "展开导航栏"
-      }
+      },
+      "pluginBundled": "内置"
     },
     "serviceMigration": {
       "locationRefusedMessage": "系统服务的安装路径或目录权限未通过安全检查，无法启动内核。请重新安装服务以恢复服务文件和权限，随后重试。Windows 可能会请求管理员授权。",

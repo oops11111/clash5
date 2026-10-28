@@ -77,6 +77,7 @@ pub(crate) struct PluginSummary {
     pub signer_fingerprint: String,
     pub enabled: bool,
     pub has_previous: bool,
+    pub bundled: bool,
 }
 
 #[derive(Serialize)]
@@ -233,6 +234,12 @@ pub(crate) async fn apply_bound_plugins(
 }
 
 const DISABLED_MARKER: &str = "disabled";
+const BUNDLED_MARKER: &str = "bundled";
+/// Project signing key for built-in presets. `None` until the maintainer pins the key; nothing is
+/// installed as built-in without it.
+pub(crate) const BUNDLED_SIGNER: Option<&str> = None;
+/// Signed preset packages compiled into the binary. Add one `include_bytes!` entry per package when shipping.
+const BUNDLED_PACKAGES: &[&[u8]] = &[];
 
 fn valid_plugin_id(id: &str) -> bool {
     !id.is_empty()
@@ -270,6 +277,9 @@ pub(crate) fn set_plugin_enabled(plugin_root: &Path, id: &str, enabled: bool) ->
 
 /// Removes an installed plugin directory. Callers must ensure no binding still refers to it.
 pub(crate) fn uninstall_plugin(plugin_root: &Path, id: &str) -> Result<(), PluginFailure> {
+    if is_bundled(plugin_root, id) {
+        return Err(PluginFailure::PermissionDenied);
+    }
     if !valid_plugin_id(id) {
         return Err(PluginFailure::InvalidPackage);
     }
@@ -517,6 +527,9 @@ pub(crate) fn upgrade_package(
     plugin_root: &Path,
     allow_downgrade: bool,
 ) -> Result<PluginSummary, PluginFailure> {
+    if is_bundled(plugin_root, &package.manifest.id) {
+        return Err(PluginFailure::PermissionDenied);
+    }
     let id = package.manifest.id.clone();
     let destination = plugin_root.join(&id);
     let installed_metadata = fs::symlink_metadata(&destination).map_err(|_| PluginFailure::InvalidPackage)?;
@@ -643,6 +656,17 @@ pub(crate) fn install_package(
     package: VerifiedPluginPackage,
     plugin_root: &Path,
 ) -> Result<PluginSummary, PluginFailure> {
+    if is_bundled(plugin_root, &package.manifest.id) {
+        return Err(PluginFailure::PermissionDenied);
+    }
+    install_into(package, plugin_root, false)
+}
+
+fn install_into(
+    package: VerifiedPluginPackage,
+    plugin_root: &Path,
+    bundled: bool,
+) -> Result<PluginSummary, PluginFailure> {
     fs::create_dir_all(plugin_root).map_err(|_| PluginFailure::ExecutionFailed)?;
     let id = &package.manifest.id;
     let destination = plugin_root.join(id);
@@ -651,6 +675,11 @@ pub(crate) fn install_package(
     let backup = plugin_root.join(format!(".{id}.{suffix}.backup"));
     fs::create_dir(&temporary).map_err(|_| PluginFailure::ExecutionFailed)?;
     if write_package_files(&temporary, &package).is_err() {
+        let _ = fs::remove_dir_all(&temporary);
+        return Err(PluginFailure::ExecutionFailed);
+    }
+
+    if bundled && fs::write(temporary.join(BUNDLED_MARKER), b"").is_err() {
         let _ = fs::remove_dir_all(&temporary);
         return Err(PluginFailure::ExecutionFailed);
     }
@@ -681,7 +710,38 @@ pub(crate) fn install_package(
     if existing {
         let _ = fs::remove_dir_all(&backup);
     }
-    Ok(summary(&package.manifest, &package.signer))
+    let mut item = summary(&package.manifest, &package.signer);
+    item.bundled = bundled;
+    Ok(item)
+}
+
+pub(crate) fn is_bundled(plugin_root: &Path, id: &str) -> bool {
+    valid_plugin_id(id) && plugin_root.join(id).join(BUNDLED_MARKER).exists()
+}
+
+/// Installs the built-in presets at startup. Without a pinned signer there is nothing to install.
+pub(crate) fn install_bundled_plugins_at_startup() -> anyhow::Result<()> {
+    let root = crate::utils::dirs::app_home_dir()?.join("plugins");
+    install_bundled_packages(BUNDLED_PACKAGES, BUNDLED_SIGNER, &root)
+        .map_err(|error| anyhow::anyhow!("built-in plugin install failed: {error:?}"))
+}
+
+/// Each built-in package must verify against the pinned project key. A reinstall keeps a disabled
+/// plugin disabled, so an app update does not re-enable something the user turned off.
+fn install_bundled_packages(packages: &[&[u8]], signer: Option<&str>, plugin_root: &Path) -> Result<(), PluginFailure> {
+    let Some(signer) = signer else {
+        return Ok(());
+    };
+    for package in packages {
+        let verified = verify_package(package, &[signer.to_owned()])?;
+        let id = verified.manifest.id.clone();
+        let enabled = plugin_enabled(plugin_root, &id);
+        install_into(verified, plugin_root, true)?;
+        if !enabled {
+            set_plugin_enabled(plugin_root, &id, false)?;
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn installed_plugins(plugin_root: &Path) -> Result<Vec<PluginSummary>, PluginFailure> {
@@ -720,6 +780,7 @@ pub(crate) fn installed_plugins(plugin_root: &Path) -> Result<Vec<PluginSummary>
         let mut item = summary(&manifest, signer);
         item.enabled = plugin_enabled(plugin_root, &manifest.id);
         item.has_previous = has_previous_version(plugin_root, &manifest.id);
+        item.bundled = is_bundled(plugin_root, &manifest.id);
         plugins.push(item);
     }
     plugins.sort_by(|left, right| left.name.cmp(&right.name).then_with(|| left.id.cmp(&right.id)));
@@ -737,6 +798,7 @@ fn summary(manifest: &PluginManifest, signer: &str) -> PluginSummary {
         signer_fingerprint: hex_digest(signer.as_bytes()),
         enabled: true,
         has_previous: false,
+        bundled: false,
     }
 }
 
@@ -1153,5 +1215,27 @@ mod tests {
             execute_blocking(module.to_vec(), b"{}".to_vec(), vec![]),
             Err(PluginFailure::TimedOut)
         );
+    }
+
+    #[test]
+    fn bundled_plugins_are_protected_and_keep_their_disabled_state() -> Result<(), PluginFailure> {
+        let root = std::env::temp_dir().join(format!("clash5-plugin-bundled-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let package: &[u8] = include_bytes!("../../../scripts/fixtures/m3-acceptance-plugin.c5p");
+        let signer = inspect_package(package)?.signer;
+
+        install_bundled_packages(&[package], Some(&signer), &root)?;
+        let installed = installed_plugins(&root)?;
+        assert!(installed[0].bundled);
+        assert!(install_package(inspect_package(package)?, &root).is_err());
+        assert!(uninstall_plugin(&root, &installed[0].id).is_err());
+
+        set_plugin_enabled(&root, &installed[0].id, false)?;
+        install_bundled_packages(&[package], Some(&signer), &root)?;
+        assert!(!plugin_enabled(&root, &installed[0].id));
+
+        install_bundled_packages(&[package], None, &root)?;
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
     }
 }

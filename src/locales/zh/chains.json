@@ -99,5 +99,22 @@
   "appDomainSuffix": "域名后缀",
   "appNameserver": "这些域名的解析器（可选）",
   "appNameserverHint": "DoH 地址，例如 https://dns.example/dns-query，或一个 IP 地址。",
-  "appDomainScope": "域名规则作用于所有解析这些域名的应用，无法把不同应用区分开。"
+  "appDomainScope": "域名规则作用于所有解析这些域名的应用，无法把不同应用区分开。",
+  "quality": {
+    "run": "质量检测",
+    "note": "仅在你手动启动时运行。会经过这条链路发送真实流量，上限 20 MB、60 秒。",
+    "confirm": "这次检测会经过链路发送约 {{size}} MB 流量，最长约一分钟。是否继续？",
+    "status": "结果",
+    "median": "中位速度",
+    "p10": "慢尾速度（p10）",
+    "firstByte": "首字节时延",
+    "jitter": "延迟抖动",
+    "rttP95": "延迟 p95",
+    "disconnects": "断线次数",
+    "bytesUsed": "已用流量",
+    "healthy": "健康",
+    "warning": "警告",
+    "failed": "失败",
+    "failedRun": "无法经过这条链路完成质量检测。"
+  }
 }

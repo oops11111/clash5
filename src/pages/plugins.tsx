@@ -611,6 +611,13 @@ const PluginsPage = () => {
                     {plugin.name}
                   </Typography>
                   <Chip size="small" label={`v${plugin.version}`} />
+                  {plugin.bundled && (
+                    <Chip
+                      size="small"
+                      color="primary"
+                      label={t('layout.components.navigation.pluginBundled')}
+                    />
+                  )}
                 </Stack>
                 <Typography variant="body2" color="text.secondary">
                   {plugin.description}
@@ -659,14 +666,16 @@ const PluginsPage = () => {
                       {t('layout.components.navigation.pluginRollback')}
                     </Button>
                   )}
-                  <Button
-                    size="small"
-                    color="error"
-                    disabled={busy}
-                    onClick={() => setPluginToUninstall(plugin)}
-                  >
-                    {t('layout.components.navigation.pluginUninstall')}
-                  </Button>
+                  {!plugin.bundled && (
+                    <Button
+                      size="small"
+                      color="error"
+                      disabled={busy}
+                      onClick={() => setPluginToUninstall(plugin)}
+                    >
+                      {t('layout.components.navigation.pluginUninstall')}
+                    </Button>
+                  )}
                 </Stack>
               </Stack>
             </Paper>

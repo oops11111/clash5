@@ -3,6 +3,7 @@ mod chain;
 mod identity;
 mod plugin_patch;
 mod profile;
+mod quality;
 mod store;
 
 pub use app_route::{AppMatcher, AppRoute, MAX_APP_MATCHERS, RouteTarget, compile_app_routes};
@@ -16,6 +17,7 @@ pub use plugin_patch::{
     validate_writable_paths,
 };
 pub use profile::{parse_inline_nodes, parse_proxy_node, replace_subscription_lines};
+pub use quality::{QUALITY_STATUSES, QualitySample};
 pub use store::{
     Binding, BindingStore, IdentitySourceSnapshot, NodeQuality, NodeRecord, OrphanCleanupPreview,
     PendingIdentityRebind, PluginAuditEvent, PluginBinding, PluginBindingTarget, ProviderDiff, QualityStatus, Source,

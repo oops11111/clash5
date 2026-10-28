@@ -161,6 +161,16 @@ leave on the route the core selects. They carry no identifiers beyond the
 standard request headers, and clash5 sends no subscription, credential or node
 data. Catalog contents are verified against the pinned signer before use.
 
+### 4.14 Long-lived connection quality test: user-initiated
+
+Starting the quality test on a chain sends real traffic through that chain: one
+download of a fixed-size file from `https://speed.cloudflare.com/__down`
+(5 MB by default, at most 20 MB), and ten requests to
+`http://cp.cloudflare.com/generate_204`, one per second. The run lasts at most
+60 seconds and only happens when you start it. Requests go through clash5's local
+mixed port and carry no subscription, credential or node data. The results stay
+on your device in the chain's history.
+
 ## 5. Plugins
 
 Plugins run in a sandbox with no network access, no file system access and no

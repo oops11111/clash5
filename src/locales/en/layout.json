@@ -126,7 +126,8 @@
         "lock": "Lock menu order",
         "collapseNavBar": "Collapse navigation bar",
         "expandNavBar": "Expand navigation bar"
-      }
+      },
+      "pluginBundled": "Built-in"
     },
     "serviceMigration": {
       "locationRefusedMessage": "The service cannot start the core because its installation path or directory permissions failed a security check. Reinstall the service to restore its files and permissions, then try again. Windows may ask for administrator approval.",

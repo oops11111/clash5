@@ -47,16 +47,21 @@ pub(crate) fn parse_ip(bytes: &[u8]) -> Result<IpAddr> {
         .ok_or_else(|| anyhow!("C5-EXIT-003"))
 }
 
-async fn request(url: Url, port: u16, token: &str) -> Result<ExitObservation> {
+/// HTTP client that only reaches the network through one pinned loopback inbound.
+pub(crate) fn pinned_client(port: u16, token: &str, timeout: Duration) -> Result<Client> {
     let proxy = Proxy::all(format!("http://127.0.0.1:{port}"))?.basic_auth("clash5", token);
-    let client = Client::builder()
+    Ok(Client::builder()
         .no_proxy()
         .proxy(proxy)
         .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(12))
+        .timeout(timeout)
         .connect_timeout(Duration::from_secs(5))
         .user_agent("clash5/exit-ip")
-        .build()?;
+        .build()?)
+}
+
+async fn request(url: Url, port: u16, token: &str) -> Result<ExitObservation> {
+    let client = pinned_client(port, token, Duration::from_secs(12))?;
     let started = Instant::now();
     let mut response = client.get(url).send().await?.error_for_status()?;
     let mut body = Vec::new();
@@ -94,6 +99,18 @@ fn probe_listener(name: &str, port: u16, proxy_name: &str, password: &str) -> Va
 
 /// Probe through a temporary loopback inbound pinned to one chain, then remove only that inbound.
 pub(crate) async fn detect(proxy_name: &str, url: Url) -> Result<ExitObservation> {
+    with_pinned_proxy(proxy_name, |port, token| async move {
+        request(url, port, &token).await.map_err(|_| anyhow!("C5-EXIT-003"))
+    })
+    .await
+}
+
+/// Runs `run` with the port and session secret of a temporary inbound pinned to one chain.
+/// The inbound is removed afterwards, whether or not `run` succeeded.
+pub(crate) async fn with_pinned_proxy<T, Fut>(proxy_name: &str, run: impl FnOnce(u16, String) -> Fut) -> Result<T>
+where
+    Fut: std::future::Future<Output = Result<T>>,
+{
     let reservation = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
     let port = reservation.local_addr()?.port();
     let name = format!("clash5-exit-probe-{port}");
@@ -127,7 +144,7 @@ pub(crate) async fn detect(proxy_name: &str, url: Url) -> Result<ExitObservation
         })
         .await;
     let observed = if applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
-        request(url, port, &token).await.map_err(|_| anyhow!("C5-EXIT-003"))
+        run(port, token).await
     } else {
         Err(anyhow!("C5-EXIT-002"))
     };

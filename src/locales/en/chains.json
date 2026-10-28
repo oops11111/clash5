@@ -99,5 +99,22 @@
   "appDomainSuffix": "Domain suffix",
   "appNameserver": "Resolver for these domains (optional)",
   "appNameserverHint": "A DoH address such as https://dns.example/dns-query, or an IP address.",
-  "appDomainScope": "Domain rules apply to every application that resolves these domains. They cannot separate one application from another."
+  "appDomainScope": "Domain rules apply to every application that resolves these domains. They cannot separate one application from another.",
+  "quality": {
+    "run": "Quality test",
+    "note": "Runs only when you start it. Sends real traffic through this chain, up to 20 MB and 60 seconds.",
+    "confirm": "This sends about {{size}} MB of traffic through the chain and takes up to a minute. Continue?",
+    "status": "Result",
+    "median": "Median speed",
+    "p10": "Slow-tail speed (p10)",
+    "firstByte": "First byte",
+    "jitter": "Jitter",
+    "rttP95": "Latency p95",
+    "disconnects": "Disconnects",
+    "bytesUsed": "Traffic used",
+    "healthy": "healthy",
+    "warning": "warning",
+    "failed": "failed",
+    "failedRun": "The quality test could not run through this chain."
+  }
 }

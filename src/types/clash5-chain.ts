@@ -77,6 +77,20 @@ export interface ChainSample {
   delay_ms: number | null
 }
 
+export type QualityStatus = 'healthy' | 'warning' | 'failed'
+
+/** One long-lived connection measurement through a chain. Speeds are bytes per second. */
+export interface ChainQualityReport {
+  status: QualityStatus
+  throughput_median_bps: number
+  throughput_p10_bps: number
+  first_byte_ms: number
+  jitter_ms: number
+  rtt_p95_ms: number
+  disconnects: number
+  bytes_used: number
+}
+
 export type ExitIpResult =
   | { status: 'disabled' }
   | { status: 'healthy'; observation: ExitObservation }

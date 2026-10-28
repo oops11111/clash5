@@ -66,6 +66,7 @@ export interface Clash5PluginSummary {
   signer_fingerprint: string
   enabled: boolean
   has_previous: boolean
+  bundled: boolean
 }
 
 export interface Clash5PluginAuditEvent {

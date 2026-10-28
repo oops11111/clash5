@@ -81,6 +81,23 @@ export interface TranslationResources {
       poolOption: string
       pools: string
       poolSaved: string
+      quality: {
+        bytesUsed: string
+        confirm: string
+        disconnects: string
+        failed: string
+        failedRun: string
+        firstByte: string
+        healthy: string
+        jitter: string
+        median: string
+        note: string
+        p10: string
+        rttP95: string
+        run: string
+        status: string
+        warning: string
+      }
       removeHop: string
       routeName: string
       sample: {
@@ -345,6 +362,7 @@ export interface TranslationResources {
           pluginAuditError: string
           pluginAuditTitle: string
           pluginBindingSaveError: string
+          pluginBundled: string
           pluginCancel: string
           pluginCatalogAdd: string
           pluginCatalogAddTitle: string

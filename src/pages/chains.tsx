@@ -31,6 +31,7 @@ import {
   detectClash5ExitIp,
   getClash5ChainWorkspace,
   listClash5AppRoutes,
+  runClash5QualityTest,
   saveClash5AppRoute,
   saveClash5Chain,
   saveClash5NodePool,
@@ -42,12 +43,19 @@ import type {
   ChainHopRef,
   ChainSample,
   ChainNodeRef,
+  ChainQualityReport,
   ChainWorkspace,
   Clash5Chain,
   ExitIpResult,
   RouteTargetRef,
 } from '@/types/clash5-chain'
 
+// Matches the backend default for the long-lived connection quality test.
+const QUALITY_DEFAULT_BYTES = 5_000_000
+const formatMegabytesPerSecond = (bps: number) =>
+  `${(bps / 1_000_000).toFixed(2)} MB/s`
+const formatMegabytes = (bytes: number) =>
+  `${(bytes / 1_000_000).toFixed(1)} MB`
 const nodeKey = (reference: ChainNodeRef) => JSON.stringify(reference)
 const sameNode = (left: ChainNodeRef, right: ChainNodeRef) =>
   left.stable_id === right.stable_id &&
@@ -147,6 +155,7 @@ const ChainsPage = () => {
   )
   const [policyGroup, setPolicyGroup] = useState('')
   const [exitResult, setExitResult] = useState<ExitIpResult | null>(null)
+  const [quality, setQuality] = useState<ChainQualityReport | null>(null)
   const [appRoutes, setAppRoutes] = useState<AppRouteDef[]>([])
   const [samples, setSamples] = useState<ChainSample[]>([])
   const [routeDraft, setRouteDraft] = useState<AppRouteDef | null>(null)
@@ -182,6 +191,7 @@ const ChainsPage = () => {
         : (next.policy_groups[0] ?? ''),
     )
     setExitResult(null)
+    setQuality(null)
   }, [])
 
   // Pool edits change only the pool list, so an unsaved chain draft is kept.
@@ -264,6 +274,7 @@ const ChainsPage = () => {
   const choose = (chain: Clash5Chain) => {
     setDraft(structuredClone(chain))
     setExitResult(null)
+    setQuality(null)
     setMessage('')
     setTab('visual')
   }
@@ -459,6 +470,31 @@ const ChainsPage = () => {
               }
             >
               {t('chains.detectExit')}
+            </Button>
+            <Button
+              size="small"
+              disabled={!canTest}
+              title={t('chains.quality.note')}
+              onClick={() =>
+                void perform(async () => {
+                  if (!draft) return
+                  if (
+                    !window.confirm(
+                      t('chains.quality.confirm', {
+                        size: Math.round(QUALITY_DEFAULT_BYTES / 1_000_000),
+                      }),
+                    )
+                  )
+                    return
+                  const result = await runClash5QualityTest(draft.id)
+                  setQuality(result)
+                  void refreshSamples(draft.id)
+                  if (result.status !== 'healthy')
+                    report(t(`chains.quality.${result.status}`), 'warning')
+                })
+              }
+            >
+              {t('chains.quality.run')}
             </Button>
             <Button
               size="small"
@@ -752,6 +788,39 @@ const ChainsPage = () => {
                     {t('chains.unpinExit')}
                   </Button>
                 </Stack>
+                {quality && (
+                  <Alert
+                    severity={
+                      quality.status === 'healthy'
+                        ? 'success'
+                        : quality.status === 'warning'
+                          ? 'warning'
+                          : 'error'
+                    }
+                    sx={{ my: 1 }}
+                  >
+                    <Typography variant="body2">
+                      {t('chains.quality.status')}:{' '}
+                      {t(`chains.quality.${quality.status}`)}
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block' }}>
+                      {t('chains.quality.median')}:{' '}
+                      {formatMegabytesPerSecond(quality.throughput_median_bps)}{' '}
+                      · {t('chains.quality.p10')}:{' '}
+                      {formatMegabytesPerSecond(quality.throughput_p10_bps)}
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block' }}>
+                      {t('chains.quality.firstByte')}: {quality.first_byte_ms}{' '}
+                      ms · {t('chains.quality.jitter')}: {quality.jitter_ms} ms
+                      · {t('chains.quality.rttP95')}: {quality.rtt_p95_ms} ms
+                    </Typography>
+                    <Typography variant="caption" sx={{ display: 'block' }}>
+                      {t('chains.quality.disconnects')}: {quality.disconnects} ·{' '}
+                      {t('chains.quality.bytesUsed')}:{' '}
+                      {formatMegabytes(quality.bytes_used)}
+                    </Typography>
+                  </Alert>
+                )}
                 <Typography variant="subtitle2">
                   {t('chains.history')}
                 </Typography>

@@ -1,6 +1,6 @@
 use super::{CmdResult, CommandFailure, coded_error};
 use crate::{
-    clash5::{chains, exit_ip},
+    clash5::{chains, exit_ip, quality},
     config::{
         Config,
         profiles::{PROFILE_WRITE_LOCK, with_clash5_binding_store},
@@ -494,6 +494,44 @@ pub async fn clash5_detect_exit_ip(id: String, service_url: Option<String>) -> C
         observation,
         selection_persisted,
     })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_run_quality_test(id: String, download_bytes: Option<u32>) -> CmdResult<quality::QualityReport> {
+    let chain = {
+        let _guard = PROFILE_WRITE_LOCK.lock().await;
+        let profile_id = Config::profiles()
+            .await
+            .latest_arc()
+            .current
+            .as_ref()
+            .map(ToString::to_string);
+        chains::definitions()
+            .await
+            .map_err(|_| storage_failure())?
+            .into_iter()
+            .find(|chain| chain.id == id && chain.enabled && chain.profile_id == profile_id)
+            .ok_or_else(|| coded_error("C5-CHAIN-002", "an enabled chain in the current profile was not found"))?
+    };
+    let bytes = download_bytes.map_or(quality::DEFAULT_DOWNLOAD_BYTES, u64::from);
+    let report = quality::measure(&chain.group_name(), bytes)
+        .await
+        .map_err(|_| coded_error("C5-QUALITY-002", "the quality test could not run through this chain"))?;
+    let sample = clash5_data::QualitySample {
+        chain_id: chain.id.clone(),
+        measured_at: String::new(),
+        status: report.status.clone(),
+        throughput_median_bps: report.throughput_median_bps,
+        throughput_p10_bps: report.throughput_p10_bps,
+        first_byte_ms: report.first_byte_ms,
+        jitter_ms: report.jitter_ms,
+        rtt_p95_ms: report.rtt_p95_ms,
+        disconnects: report.disconnects,
+        bytes_used: report.bytes_used,
+    };
+    let _ = with_clash5_binding_store(move |store| store.record_quality_sample(&sample)).await;
+    Ok(report)
 }
 
 #[cfg(test)]

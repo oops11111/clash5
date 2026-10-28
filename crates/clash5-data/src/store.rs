@@ -1,4 +1,7 @@
-use crate::{AppRoute, ChainSample, DataError, Hop, IdentityKey, Node, NodePool, ProxyChain, StableId, identity::text};
+use crate::{
+    AppRoute, ChainSample, DataError, Hop, IdentityKey, Node, NodePool, ProxyChain, QUALITY_STATUSES, QualitySample,
+    StableId, identity::text,
+};
 use rusqlite::{Connection, DatabaseName, OptionalExtension, Transaction, backup::Progress, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -785,7 +788,7 @@ impl BindingStore {
         db.pragma_update(None, "foreign_keys", true)?;
         db.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if !(0..=8).contains(&version) {
+        if !(0..=9).contains(&version) {
             return Err(DataError::SchemaVersion);
         }
         let mut version = version;
@@ -976,6 +979,22 @@ CREATE TABLE IF NOT EXISTS chain_samples(
 ) STRICT;
 CREATE INDEX IF NOT EXISTS chain_samples_chain ON chain_samples(chain_id,id);
 PRAGMA user_version=8;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 9 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS quality_samples(
+ id INTEGER PRIMARY KEY, chain_id TEXT NOT NULL, measured_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+ status TEXT NOT NULL CHECK(status IN ('healthy','warning','failed')),
+ throughput_median_bps INTEGER NOT NULL, throughput_p10_bps INTEGER NOT NULL, first_byte_ms INTEGER NOT NULL,
+ jitter_ms INTEGER NOT NULL, rtt_p95_ms INTEGER NOT NULL, disconnects INTEGER NOT NULL, bytes_used INTEGER NOT NULL
+) STRICT;
+CREATE INDEX IF NOT EXISTS quality_samples_chain ON quality_samples(chain_id,id);
+PRAGMA user_version=9;
 "#,
             )?;
             tx.commit()?;
@@ -1666,6 +1685,60 @@ PRAGMA user_version=8;
                 status: row.get(2)?,
                 exit_ip: row.get(3)?,
                 delay_ms: row.get(4)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(DataError::from)
+    }
+    /// Records one long-lived connection measurement, keeping only the most recent ones per chain.
+    pub fn record_quality_sample(&mut self, sample: &QualitySample) -> Result<(), DataError> {
+        text(&sample.chain_id)?;
+        if !QUALITY_STATUSES.contains(&sample.status.as_str()) {
+            return Err(DataError::InvalidInput);
+        }
+        let to_i64 = |value: u64| i64::try_from(value).map_err(|_| DataError::InvalidInput);
+        let tx = self.db.transaction()?;
+        tx.execute(
+            "INSERT INTO quality_samples(chain_id,status,throughput_median_bps,throughput_p10_bps,first_byte_ms,jitter_ms,rtt_p95_ms,disconnects,bytes_used) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+            params![
+                sample.chain_id,
+                sample.status,
+                to_i64(sample.throughput_median_bps)?,
+                to_i64(sample.throughput_p10_bps)?,
+                to_i64(sample.first_byte_ms)?,
+                to_i64(sample.jitter_ms)?,
+                to_i64(sample.rtt_p95_ms)?,
+                sample.disconnects,
+                to_i64(sample.bytes_used)?,
+            ],
+        )?;
+        tx.execute(
+            "DELETE FROM quality_samples WHERE chain_id=?1 AND id NOT IN (SELECT id FROM quality_samples WHERE chain_id=?1 ORDER BY id DESC LIMIT 100)",
+            params![sample.chain_id],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+    /// Most recent quality measurements first.
+    pub fn quality_samples(&self, chain_id: &str, limit: usize) -> Result<Vec<QualitySample>, DataError> {
+        text(chain_id)?;
+        if !(1..=100).contains(&limit) {
+            return Err(DataError::InvalidInput);
+        }
+        let mut statement = self.db.prepare(
+            "SELECT chain_id,measured_at,status,throughput_median_bps,throughput_p10_bps,first_byte_ms,jitter_ms,rtt_p95_ms,disconnects,bytes_used FROM quality_samples WHERE chain_id=?1 ORDER BY id DESC LIMIT ?2",
+        )?;
+        let rows = statement.query_map(params![chain_id, limit as i64], |row| {
+            Ok(QualitySample {
+                chain_id: row.get(0)?,
+                measured_at: row.get(1)?,
+                status: row.get(2)?,
+                throughput_median_bps: row.get::<_, i64>(3)? as u64,
+                throughput_p10_bps: row.get::<_, i64>(4)? as u64,
+                first_byte_ms: row.get::<_, i64>(5)? as u64,
+                jitter_ms: row.get::<_, i64>(6)? as u64,
+                rtt_p95_ms: row.get::<_, i64>(7)? as u64,
+                disconnects: row.get(8)?,
+                bytes_used: row.get::<_, i64>(9)? as u64,
             })
         })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(DataError::from)

@@ -26,6 +26,7 @@ import type {
   NodeRecord,
   PendingIdentityRebind as GeneratedPendingIdentityRebind,
   PluginAuditEvent as GeneratedPluginAuditEvent,
+  QualityReport as GeneratedQualityReport,
   PluginEffectiveConfig as GeneratedPluginEffectiveConfig,
   ProxyViewV1_Serialize,
   RunStateView,
@@ -39,6 +40,7 @@ import type {
   ChainWorkspace,
   Clash5Chain,
   AppRouteDef,
+  ChainQualityReport,
   ChainSample,
   ExitIpResult,
   NodePoolDef,
@@ -94,6 +96,14 @@ export const saveClash5AppRoute = (route: AppRouteDef) =>
   invoke<null>('clash5_save_app_route', { route })
 export const deleteClash5AppRoute = (id: string) =>
   invoke<null>('clash5_delete_app_route', { id })
+export const runClash5QualityTest = (
+  id: string,
+  downloadBytes: number | null = null,
+) =>
+  invoke<GeneratedQualityReport>('clash5_run_quality_test', {
+    id,
+    downloadBytes,
+  }) as Promise<ChainQualityReport>
 export const testClash5Chain = (id: string, testUrl: string | null = null) =>
   invoke<{ delay_ms: number; group_name: string }>('clash5_test_chain', {
     id,
