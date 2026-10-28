@@ -2124,7 +2124,7 @@ async function verifyM4SingboxRoute() {
   if (!activation.selection_persisted)
     throw new Error('M4 chain selection did not persist')
 
-  const landingName = `clash5-chain-${chain.id}-landing`
+  const landingName = `clash5-chain-${chain.id}-h${chain.hops.length - 1}`
   let status = await invoke('clash5_singbox_route_status', { landingName })
   if (
     !status.active ||
