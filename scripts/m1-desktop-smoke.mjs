@@ -1966,12 +1966,11 @@ async function verifyM2Chains() {
     throw new Error('Chain selection did not persist')
   const runtime = await invoke('get_runtime_config')
   const original = runtime.proxies.find((proxy) => proxy.name === 'M2-front')
-  const landing = runtime.proxies.find(
-    (proxy) => proxy.name === `clash5-chain-${chain.id}-landing`,
-  )
+  const lastHop = `clash5-chain-${chain.id}-h${chain.hops.length - 1}`
+  const landing = runtime.proxies.find((proxy) => proxy.name === lastHop)
   if (
     original['dialer-proxy'] ||
-    landing['dialer-proxy'] !== `clash5-chain-${chain.id}-front`
+    landing['dialer-proxy'] !== `clash5-chain-${chain.id}-h0`
   )
     throw new Error(
       'Generated chain changed the original or reversed hop direction',
