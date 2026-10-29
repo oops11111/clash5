@@ -4,7 +4,6 @@ import Layout from './_layout'
 import { navItems } from './_navigation'
 import ConnectionsPage from './connections'
 import LogsPage from './logs'
-import ProxyPage from './proxies'
 import UnlockPage from './unlock'
 
 export const router = createBrowserRouter([
@@ -20,7 +19,6 @@ export const router = createBrowserRouter([
           }) as RouteObject,
       )
       .concat([
-        { path: '/proxies', Component: ProxyPage },
         { path: '/unlock', Component: UnlockPage },
         // Still routed so a saved start page keeps working; the sidebar shows Diagnostics.
         { path: '/connections', Component: ConnectionsPage },

@@ -233,11 +233,6 @@ const SettingVergeBasic = ({ onError }: Props) => {
                 </MenuItem>
               )
             })}
-            {start_page === '/proxies' && (
-              <MenuItem value="/proxies">
-                {t('layout.components.navigation.tabs.proxies')}
-              </MenuItem>
-            )}
             {start_page === '/unlock' && (
               <MenuItem value="/unlock">
                 {t('layout.components.navigation.tabs.unlock')}

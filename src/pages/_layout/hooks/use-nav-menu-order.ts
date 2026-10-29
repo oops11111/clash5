@@ -27,7 +27,7 @@ const resolveMenuOrder = <T extends { path: string }>(
   defaultOrder: string[],
   map: Map<string, T>,
 ) => {
-  if (order?.some((path) => path === '/proxies' || path === '/unlock')) {
+  if (order?.some((path) => path === '/unlock')) {
     return defaultOrder
   }
   const seen = new Set<string>()

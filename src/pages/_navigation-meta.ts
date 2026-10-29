@@ -8,6 +8,10 @@ export const navigationItems = {
     label: 'layout.components.navigation.tabs.profiles',
     path: '/profile',
   },
+  proxies: {
+    label: 'layout.components.navigation.tabs.proxies',
+    path: '/proxies',
+  },
   chains: {
     label: 'layout.components.navigation.tabs.chains',
     path: '/chains',

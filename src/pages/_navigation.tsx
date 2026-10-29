@@ -5,6 +5,7 @@ import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import LanguageOutlinedIcon from '@mui/icons-material/LanguageOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
+import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined'
 import { type ComponentType, type ReactNode } from 'react'
 
 import ConnectionsSvg from '@/assets/image/itemicon/connections.svg?react'
@@ -19,6 +20,7 @@ import ChainsPage from './chains'
 import DiagnosticsPage from './diagnostics'
 import HomePage from './home'
 import NodePoolPage from './node-pool'
+import ProxyPage from './proxies'
 import PluginsPage from './plugins'
 import ProfilePage from './profiles'
 import RulesPage from './rules'
@@ -46,6 +48,11 @@ export const navItems: NavigationItem[] = [
     ...navigationItems.profiles,
     icon: [<DnsOutlinedIcon key="mui" />, <ProfilesSvg key="svg" />],
     Component: ProfilePage,
+  },
+  {
+    ...navigationItems.proxies,
+    icon: [<SwapHorizOutlinedIcon key="mui" />, <ProxiesSvg key="svg" />],
+    Component: ProxyPage,
   },
   {
     ...navigationItems.chains,
