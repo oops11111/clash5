@@ -966,6 +966,8 @@ export type IVerge_Deserialize = {
   traffic_refresh_seconds?: number | null
   /**  Minutes between automatic IP info refreshes; 0 disables them. */
   ip_auto_refresh_minutes?: number | null
+  /**  Text rule sets merged in front of the subscription rules. */
+  text_rule_sets?: TextRuleSet[] | null
   auto_close_connection?: boolean | null
   /**  Keep the sing-box sidecar alive after its relay becomes idle. */
   singbox_persistent?: boolean | null
@@ -1064,6 +1066,8 @@ export type IVerge_Serialize = {
   traffic_refresh_seconds: number | null
   /**  Minutes between automatic IP info refreshes; 0 disables them. */
   ip_auto_refresh_minutes: number | null
+  /**  Text rule sets merged in front of the subscription rules. */
+  text_rule_sets: TextRuleSet[] | null
   auto_close_connection: boolean | null
   /**  Keep the sing-box sidecar alive after its relay becomes idle. */
   singbox_persistent?: boolean | null
@@ -1631,6 +1635,11 @@ export type RouteTarget =
   | { kind: 'direct' }
   | { kind: 'reject' }
 
+/**  Where the rules of a text rule set send traffic. */
+export type RuleTarget =
+  /**  The default proxy: the target of the subscription's final `MATCH` rule. */
+  'default' | 'direct' | 'reject'
+
 export type RunStateView = {
   mode: RunningMode
   service: string
@@ -1691,6 +1700,14 @@ export type SystemProxyWire = {
   enable: boolean
   server: string
   bypass: string
+}
+
+/**  A user-authored list of `TYPE,content` rule lines. */
+export type TextRuleSet = {
+  id: string
+  name: string
+  target: RuleTarget
+  content: string
 }
 
 export type ToggleableProxyPort = {

@@ -93,6 +93,7 @@ verge_registry! {
     home_cards => NoEffect;
     traffic_refresh_seconds => NoEffect;
     ip_auto_refresh_minutes => NoEffect;
+    text_rule_sets => [ClashConfig];
     auto_close_connection => NoEffect;
     singbox_persistent => NoEffect;
     auto_check_update => NoEffect;

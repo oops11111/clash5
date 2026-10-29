@@ -2,6 +2,7 @@ use crate::core::notify::NoticeStatus;
 mod chain;
 pub mod field;
 mod merge;
+mod rules;
 mod script;
 pub mod seq;
 mod tun;
@@ -19,7 +20,7 @@ use crate::config::dns::{DnsOverrideState, dns_override_source};
 use crate::core::handle::Handle;
 use crate::utils::dirs;
 use crate::{
-    config::{Config, IProfiles, IVerge, PrfItem},
+    config::{Config, IProfiles, IVerge, PrfItem, TextRuleSet},
     constants,
     utils::tmpl,
 };
@@ -35,6 +36,7 @@ type ResultLog = Vec<(String, String)>;
 #[derive(Debug)]
 struct ConfigValues {
     clash_config: Mapping,
+    text_rule_sets: Vec<TextRuleSet>,
     clash_core: Option<String>,
     enable_tun: bool,
     enable_builtin: bool,
@@ -144,11 +146,14 @@ async fn get_config_values(profile_uid: &str) -> ConfigValues {
     #[cfg(target_os = "linux")]
     let tproxy_enabled = verge_arc.verge_tproxy_enabled.unwrap_or(false);
 
+    let text_rule_sets = verge_arc.text_rule_sets.clone().unwrap_or_default();
+
     drop(verge_arc);
     drop(verge);
 
     ConfigValues {
         clash_config,
+        text_rule_sets,
         clash_core,
         enable_tun,
         enable_builtin,
@@ -880,6 +885,7 @@ pub async fn enhance(
     let cfg_vals = get_config_values(profile_uid).await;
     let ConfigValues {
         clash_config,
+        text_rule_sets,
         clash_core,
         enable_tun,
         enable_builtin,
@@ -902,7 +908,7 @@ pub async fn enhance(
         dns_override_confirmation,
     );
     let enable_dns_settings = dns_override.enabled;
-    let config = profile.config;
+    let config = rules::apply(profile.config, &text_rule_sets);
     let merge_item = profile.merge_item;
     let script_item = profile.script_item;
     let rules_item = profile.rules_item;

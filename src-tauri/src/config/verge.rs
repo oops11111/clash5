@@ -37,6 +37,26 @@ impl PerformancePreset {
     }
 }
 
+/// Where the rules of a text rule set send traffic.
+#[derive(Default, Debug, Clone, Copy, Deserialize, Serialize, specta::Type, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum RuleTarget {
+    /// The default proxy: the target of the subscription's final `MATCH` rule.
+    #[default]
+    Default,
+    Direct,
+    Reject,
+}
+
+/// A user-authored list of `TYPE,content` rule lines.
+#[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+pub struct TextRuleSet {
+    pub id: std::string::String,
+    pub name: std::string::String,
+    pub target: RuleTarget,
+    pub content: std::string::String,
+}
+
 /// ### `verge.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
 #[serde(default)]
@@ -170,6 +190,9 @@ pub struct IVerge {
     /// Minutes between automatic IP info refreshes; 0 disables them.
     #[specta(type = Option<specta_typescript::Number>)]
     pub ip_auto_refresh_minutes: Option<u64>,
+
+    /// Text rule sets merged in front of the subscription rules.
+    pub text_rule_sets: Option<Vec<TextRuleSet>>,
 
     pub auto_close_connection: Option<bool>,
 
@@ -583,6 +606,7 @@ impl IVerge {
         patch!(home_cards);
         patch!(traffic_refresh_seconds);
         patch!(ip_auto_refresh_minutes);
+        patch!(text_rule_sets);
         patch!(enable_external_controller);
     }
 
