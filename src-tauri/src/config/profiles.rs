@@ -220,7 +220,7 @@ impl IProfiles {
             .as_deref()
             .and_then(|name| numbered_profile_name(name, &taken));
         if let Some(name) = numbered {
-            item.name = Some(name.into());
+            item.name = Some(name);
         }
 
         if self.items.is_none() {
