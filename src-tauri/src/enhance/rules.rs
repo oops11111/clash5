@@ -33,7 +33,7 @@ fn fields(rule: &str) -> Vec<&str> {
     rule.split(',').map(str::trim).collect()
 }
 
-fn policy_index(kind: &str) -> usize {
+const fn policy_index(kind: &str) -> usize {
     if kind.eq_ignore_ascii_case("MATCH") { 1 } else { 2 }
 }
 
@@ -162,7 +162,7 @@ fn merge_rules(custom: Vec<String>, subscription: Vec<String>) -> (Vec<String>, 
     (merged, report)
 }
 
-fn target_policy(target: RuleTarget, default: &str) -> &str {
+const fn target_policy(target: RuleTarget, default: &str) -> &str {
     match target {
         RuleTarget::Default => default,
         RuleTarget::Direct => "DIRECT",
