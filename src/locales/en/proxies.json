@@ -118,5 +118,16 @@
         "PASS": "Skips this rule when matched (PASS)"
       }
     }
+  },
+  "apps": {
+    "title": "Programs",
+    "hint": "Choose where each program goes. Programs without a choice use the default proxy.",
+    "empty": "No program routes yet.",
+    "placeholder": "Process name, e.g. curl.exe",
+    "target": "Egress",
+    "direct": "Direct",
+    "reject": "Reject",
+    "add": "Add",
+    "remove": "Remove"
   }
 }

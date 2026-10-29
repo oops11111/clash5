@@ -118,5 +118,16 @@
         "PASS": "跳过此项 (PASS)"
       }
     }
+  },
+  "apps": {
+    "title": "程序",
+    "hint": "为每个程序选择出口。没有设置的程序使用默认代理。",
+    "empty": "还没有程序规则。",
+    "placeholder": "进程名，例如 curl.exe",
+    "target": "出口",
+    "direct": "直连",
+    "reject": "拒绝",
+    "add": "添加",
+    "remove": "移除"
   }
 }

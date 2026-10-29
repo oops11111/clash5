@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router'
 
 import { BasePage } from '@/components/base'
 import { ProviderButton } from '@/components/proxy/provider-button'
+import { AppRoutesPanel } from '@/components/proxy/app-routes-panel'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
 import {
   useAppRefreshers,
@@ -85,7 +86,21 @@ const ProxyPage = () => {
         </Box>
       }
     >
-      <ProxyGroups mode={curMode ?? 'rule'} />
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          height: '100%',
+        }}
+      >
+        <Box sx={{ px: 2, pt: 2 }}>
+          <AppRoutesPanel />
+        </Box>
+        <Box sx={{ flex: 1, minHeight: 0 }}>
+          <ProxyGroups mode={curMode ?? 'rule'} />
+        </Box>
+      </Box>
     </BasePage>
   )
 }

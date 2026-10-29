@@ -791,6 +791,17 @@ export interface TranslationResources {
       }
     }
     proxies: {
+      apps: {
+        add: string
+        direct: string
+        empty: string
+        hint: string
+        placeholder: string
+        reject: string
+        remove: string
+        target: string
+        title: string
+      }
       components: {
         enums: {
           policies: {
