@@ -299,6 +299,8 @@ export interface TranslationResources {
           traffic: string
         }
         settings: {
+          accent: string
+          appearance: string
           cards: {
             clashInfo: string
             currentProxy: string
@@ -310,6 +312,7 @@ export interface TranslationResources {
             tests: string
             traffic: string
           }
+          cardsTitle: string
           title: string
         }
         title: string
@@ -600,6 +603,13 @@ export interface TranslationResources {
             showNext: string
           }
         }
+      }
+      manualNodes: {
+        hint: string
+        placeholder: string
+        preview: string
+        save: string
+        title: string
       }
       modals: {
         confirmDelete: {

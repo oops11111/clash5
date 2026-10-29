@@ -22,7 +22,10 @@
         "clashInfo": "Clash Info Cards",
         "systemInfo": "System Info Cards"
       },
-      "title": "Home Settings"
+      "title": "Home Settings",
+      "appearance": "Appearance",
+      "accent": "Accent color",
+      "cardsTitle": "Cards"
     },
     "title": "Home",
     "sections": {

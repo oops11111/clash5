@@ -224,5 +224,12 @@
     "qrViewer": {
       "title": "订阅二维码"
     }
+  },
+  "manualNodes": {
+    "title": "手动节点",
+    "hint": "不来自订阅的节点，不会自动更新。每行粘贴一个分享链接。",
+    "placeholder": "vless://… 或 ss://…（每行一个）",
+    "preview": "识别到 {{count}} 个节点 · {{errors}} 行格式错误",
+    "save": "保存"
   }
 }

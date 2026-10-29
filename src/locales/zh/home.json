@@ -22,7 +22,10 @@
         "clashInfo": "Clash 信息卡",
         "systemInfo": "系统信息卡"
       },
-      "title": "首页设置"
+      "title": "首页设置",
+      "appearance": "外观",
+      "accent": "强调色",
+      "cardsTitle": "显示的卡片"
     },
     "title": "首页",
     "sections": {

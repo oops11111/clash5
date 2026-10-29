@@ -41,6 +41,7 @@ import {
   type ProfileViewerRef,
 } from '@/components/profile/profile-viewer'
 import { ConfigViewer } from '@/components/setting/mods/config-viewer'
+import { ManualNodesCard } from '@/components/profile/manual-nodes-card'
 import { fetchProfilesIntoCache, useProfiles } from '@/hooks/use-profiles'
 import {
   createProfile,
@@ -1009,6 +1010,8 @@ const ProfilePage = () => {
           </Grid>
         </Box>
       </Box>
+
+      <ManualNodesCard />
 
       <ProfileViewer
         ref={viewerRef}

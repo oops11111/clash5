@@ -19,6 +19,7 @@ import {
   Grid,
   IconButton,
   Skeleton,
+  Stack,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -33,6 +34,8 @@ import { EnhancedCard } from '@/components/home/enhanced-card'
 import { EnhancedTrafficStats } from '@/components/home/enhanced-traffic-stats'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
+import { ThemeModeSwitch } from '@/components/setting/mods/theme-mode-switch'
+import ProxyControlSwitches from '@/components/shared/proxy-control-switches'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
 import { entry_lightweight_mode } from '@/services/cmds'
@@ -113,13 +116,17 @@ interface HomeSettingsDialogProps {
 }
 
 // 首页设置对话框组件
+// Accent colors offered in the home settings; the choice is saved as the theme's primary color.
+const ACCENT_COLORS = ['#2F6BFF', '#8B5CF6', '#22C55E', '#F59E0B']
+
 const HomeSettingsDialog = ({
   onClose,
   homeCards,
 }: HomeSettingsDialogProps) => {
   const { t } = useTranslation()
   const [cards, setCards] = useState<HomeCardsSettings>(homeCards)
-  const { patchVerge } = useVerge()
+  const { verge, patchVerge } = useVerge()
+  const accent = verge?.theme_setting?.primary_color
 
   const handleToggle = (key: string) => {
     setCards((prev: HomeCardsSettings) => ({
@@ -137,6 +144,46 @@ const HomeSettingsDialog = ({
     <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>{t('home.page.settings.title')}</DialogTitle>
       <DialogContent>
+        <Typography variant="overline" color="text.secondary">
+          {t('home.page.settings.appearance')}
+        </Typography>
+        <Stack spacing={1} sx={{ mb: 2 }}>
+          <ThemeModeSwitch
+            value={verge?.theme_mode}
+            onChange={(mode) => void patchVerge({ theme_mode: mode })}
+          />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="body2">
+              {t('home.page.settings.accent')}
+            </Typography>
+            {ACCENT_COLORS.map((color) => (
+              <IconButton
+                key={color}
+                size="small"
+                aria-label={t('home.page.settings.accent')}
+                onClick={() =>
+                  void patchVerge({
+                    theme_setting: {
+                      ...verge?.theme_setting,
+                      primary_color: color,
+                    },
+                  })
+                }
+                sx={{
+                  width: 24,
+                  height: 24,
+                  bgcolor: color,
+                  border: accent === color ? '2px solid' : 'none',
+                  borderColor: 'text.primary',
+                  '&:hover': { bgcolor: color },
+                }}
+              />
+            ))}
+          </Stack>
+        </Stack>
+        <Typography variant="overline" color="text.secondary">
+          {t('home.page.settings.cardsTitle')}
+        </Typography>
         <FormGroup>
           <FormControlLabel
             control={
@@ -327,6 +374,13 @@ const HomePage = () => {
       contentStyle={{ padding: 2 }}
       header={
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ minWidth: 200, mr: 1 }}>
+            <ProxyControlSwitches
+              label={t('settings.sections.system.toggles.systemProxy')}
+              onError={(err) => showNotice.error(err)}
+              noRightPadding
+            />
+          </Box>
           <Tooltip title={t('home.page.tooltips.lightweightMode')} arrow>
             <IconButton
               onClick={async () =>

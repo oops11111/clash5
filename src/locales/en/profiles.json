@@ -224,5 +224,12 @@
     "qrViewer": {
       "title": "Subscription QR Code"
     }
+  },
+  "manualNodes": {
+    "title": "Manual nodes",
+    "hint": "Nodes that do not come from a subscription. They are not refreshed automatically. Paste one share link per line.",
+    "placeholder": "vless://… or ss://… (one per line)",
+    "preview": "{{count}} nodes recognized · {{errors}} line(s) with errors",
+    "save": "Save"
   }
 }
