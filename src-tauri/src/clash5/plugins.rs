@@ -237,9 +237,13 @@ const DISABLED_MARKER: &str = "disabled";
 const BUNDLED_MARKER: &str = "bundled";
 /// Project signing key for built-in presets. `None` until the maintainer pins the key; nothing is
 /// installed as built-in without it.
-pub(crate) const BUNDLED_SIGNER: Option<&str> = None;
+pub(crate) const BUNDLED_SIGNER: Option<&str> = Some(
+    "untrusted comment: minisign public key 9D7EEB396268ED6C\nRWSdfus5YmjtbPaKjv+zGmuT4+G5bEln2JJ163Xmal3JWqQzSZlgfDSV\n",
+);
 /// Signed preset packages compiled into the binary. Add one `include_bytes!` entry per package when shipping.
-const BUNDLED_PACKAGES: &[&[u8]] = &[];
+const BUNDLED_PACKAGES: &[&[u8]] = &[include_bytes!(
+    "../../../plugins/presets/ipv6-dns-guard/ipv6-dns-guard.c5p"
+)];
 
 fn valid_plugin_id(id: &str) -> bool {
     !id.is_empty()
