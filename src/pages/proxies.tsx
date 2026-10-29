@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 
 import { BasePage } from '@/components/base'
-import { ProviderButton } from '@/components/proxy/provider-button'
 import { AppRoutesPanel } from '@/components/proxy/app-routes-panel'
+import { ProviderButton } from '@/components/proxy/provider-button'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
 import {
   useAppRefreshers,
