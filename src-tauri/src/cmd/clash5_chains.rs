@@ -462,6 +462,7 @@ pub async fn clash5_detect_exit_ip(id: String, service_url: Option<String>) -> C
     let Some(fallback) = definitions.iter().find(|candidate| {
         candidate.id == *fallback_chain_id && candidate.enabled && candidate.profile_id == profile_id
     }) else {
+        record_chain_sample(&chain.id, "failed", None, None).await;
         return Ok(ExitIpResult::Warning {
             code: "C5-CHAIN-002".into(),
         });
@@ -475,15 +476,23 @@ pub async fn clash5_detect_exit_ip(id: String, service_url: Option<String>) -> C
             ));
         }
         Err(_) => {
+            record_chain_sample(&chain.id, "failed", None, None).await;
             return Ok(ExitIpResult::Warning {
                 code: "C5-EXIT-003".into(),
             });
         }
     };
-    Handle::mihomo()
+    if Handle::mihomo()
         .select_node_for_group(&chain.group_name(), &fallback.group_name())
         .await
-        .map_err(|_| coded_error("C5-CHAIN-012", "the verified fallback could not be selected"))?;
+        .is_err()
+    {
+        record_chain_sample(&chain.id, "failed", None, None).await;
+        return Err(coded_error(
+            "C5-CHAIN-012",
+            "the verified fallback could not be selected",
+        ));
+    }
     let selection_persisted =
         crate::config::profiles::record_selected_node(&chain.group_name(), &fallback.group_name())
             .await
