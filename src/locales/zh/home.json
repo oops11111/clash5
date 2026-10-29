@@ -25,6 +25,21 @@
       "title": "首页设置",
       "appearance": "外观",
       "accent": "强调色",
+      "refresh": {
+        "title": "刷新",
+        "trafficInterval": "流量刷新间隔",
+        "trafficIntervalHint": "实时流量曲线的采样间隔",
+        "seconds": "{{count}} 秒",
+        "ipAuto": "IP 信息自动刷新",
+        "ipAutoHint": "默认关闭，开启后会定期访问外部服务",
+        "off": "关闭",
+        "minutes": "{{count}} 分钟"
+      },
+      "startup": {
+        "title": "启动",
+        "startPage": "启动后打开",
+        "startPageHint": "应用启动时默认显示的页面"
+      },
       "cardsTitle": "显示的卡片"
     },
     "title": "首页",

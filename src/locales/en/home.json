@@ -25,6 +25,21 @@
       "title": "Home Settings",
       "appearance": "Appearance",
       "accent": "Accent color",
+      "refresh": {
+        "title": "Refresh",
+        "trafficInterval": "Traffic refresh interval",
+        "trafficIntervalHint": "Sampling interval for the live traffic chart",
+        "seconds": "{{count}} s",
+        "ipAuto": "IP info auto refresh",
+        "ipAutoHint": "Off by default. When on, external services are contacted periodically",
+        "off": "Off",
+        "minutes": "{{count}} min"
+      },
+      "startup": {
+        "title": "Startup",
+        "startPage": "Open on launch",
+        "startPageHint": "Page shown when the app starts"
+      },
       "cardsTitle": "Cards"
     },
     "title": "Home",

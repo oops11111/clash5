@@ -313,6 +313,21 @@ export interface TranslationResources {
             traffic: string
           }
           cardsTitle: string
+          refresh: {
+            ipAuto: string
+            ipAutoHint: string
+            minutes: string
+            off: string
+            seconds: string
+            title: string
+            trafficInterval: string
+            trafficIntervalHint: string
+          }
+          startup: {
+            startPage: string
+            startPageHint: string
+            title: string
+          }
           title: string
         }
         title: string

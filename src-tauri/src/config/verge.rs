@@ -163,6 +163,14 @@ pub struct IVerge {
     #[specta(type = Option<specta_typescript::Unknown>)]
     pub home_cards: Option<serde_json::Value>,
 
+    /// Seconds between traffic samples shown on the home page.
+    #[specta(type = Option<specta_typescript::Number>)]
+    pub traffic_refresh_seconds: Option<u64>,
+
+    /// Minutes between automatic IP info refreshes; 0 disables them.
+    #[specta(type = Option<specta_typescript::Number>)]
+    pub ip_auto_refresh_minutes: Option<u64>,
+
     pub auto_close_connection: Option<bool>,
 
     /// Keep the sing-box sidecar alive after its relay becomes idle.
@@ -467,6 +475,8 @@ impl IVerge {
             auto_light_weight_minutes: Some(10),
             enable_dns_settings: Some(false),
             home_cards: None,
+            traffic_refresh_seconds: Some(2),
+            ip_auto_refresh_minutes: Some(0),
             enable_external_controller: Some(false),
             ..Self::default()
         }
@@ -571,6 +581,8 @@ impl IVerge {
         patch!(auto_light_weight_minutes);
         patch!(enable_dns_settings);
         patch!(home_cards);
+        patch!(traffic_refresh_seconds);
+        patch!(ip_auto_refresh_minutes);
         patch!(enable_external_controller);
     }
 

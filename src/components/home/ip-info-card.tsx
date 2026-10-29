@@ -19,13 +19,13 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useVerge } from '@/hooks/use-verge'
 import { getIpInfo } from '@/services/api'
 import { useQuery } from '@/services/query-client'
 import getSystem from '@/utils/get-system'
 
 import { EnhancedCard } from './enhanced-card'
 
-const IP_REFRESH_SECONDS = 300
 const COUNTDOWN_TICK_INTERVAL = 5_000
 const IP_INFO_CACHE_KEY = 'cv_ip_info_cache'
 
@@ -100,6 +100,9 @@ export const IpInfoCard = () => {
   const { t } = useTranslation()
   const [showIp, setShowIp] = useState(false)
   const appWindow = useMemo(() => getCurrentWebviewWindow(), [])
+  const { verge } = useVerge()
+  // 0 means automatic refresh is off; the manual refresh stays available.
+  const refreshSeconds = (verge?.ip_auto_refresh_minutes ?? 0) * 60
 
   // Once intersected, refreshes stay enabled until unmount.
   const [containerRef, hasIntersected, _resetIntersected] = useIntersection({
@@ -108,7 +111,7 @@ export const IpInfoCard = () => {
 
   const [countdown, setCountdown] = useState<CountDownState>({
     type: 'countdown',
-    remainingSeconds: IP_REFRESH_SECONDS,
+    remainingSeconds: refreshSeconds,
   })
 
   const { data: ipInfo, error, isLoading, refetch: mutate } = useIPInfo()
@@ -121,7 +124,7 @@ export const IpInfoCard = () => {
     }
 
     const elapsed = Math.floor((now - ts) / 1000)
-    const remaining = IP_REFRESH_SECONDS - elapsed
+    const remaining = refreshSeconds - elapsed
 
     if (remaining <= 0) {
       if (
@@ -136,7 +139,7 @@ export const IpInfoCard = () => {
         } finally {
           setCountdown({
             type: 'countdown',
-            remainingSeconds: IP_REFRESH_SECONDS,
+            remainingSeconds: refreshSeconds,
           })
         }
       } else {
@@ -154,7 +157,7 @@ export const IpInfoCard = () => {
     let timer: number | null = null
 
     // Prefer DOM intersection state; Tauri visibility is unreliable on some platforms.
-    if (hasIntersected) {
+    if (hasIntersected && refreshSeconds > 0) {
       console.debug(
         'IP info card has entered the viewport, starting the countdown interval.',
       )
@@ -174,7 +177,7 @@ export const IpInfoCard = () => {
           clearInterval(timer)
           timer = null
         }
-      } else if (hasIntersected) {
+      } else if (hasIntersected && refreshSeconds > 0) {
         console.debug('Document visible, resume the interval')
         if (timer == null) {
           timer = window.setInterval(onCountdownTick, COUNTDOWN_TICK_INTERVAL)
@@ -190,7 +193,7 @@ export const IpInfoCard = () => {
       if (timer != null) clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [hasIntersected])
+  }, [hasIntersected, refreshSeconds])
 
   const toggleShowIp = useCallback(() => {
     setShowIp((prev) => !prev)
@@ -364,12 +367,14 @@ export const IpInfoCard = () => {
               fontSize: '0.7rem',
             }}
           >
-            <Typography variant="caption">
-              {t('home.components.ipInfo.labels.autoRefresh')}
-              {countdown.type === 'countdown'
-                ? `: ${countdown.remainingSeconds}s`
-                : '...'}
-            </Typography>
+            {refreshSeconds > 0 && (
+              <Typography variant="caption">
+                {t('home.components.ipInfo.labels.autoRefresh')}
+                {countdown.type === 'countdown'
+                  ? `: ${countdown.remainingSeconds}s`
+                  : '...'}
+              </Typography>
+            )}
             <Typography
               variant="caption"
               sx={{

@@ -1,7 +1,9 @@
+import { useEffect, useRef } from 'react'
 import { MihomoWebSocket, Traffic } from 'tauri-plugin-mihomo-api'
 
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 import { useTrafficMonitorEnhanced } from './use-traffic-monitor'
+import { useVerge } from './use-verge'
 
 const FALLBACK_TRAFFIC: Traffic = { up: 0, down: 0, upTotal: 0, downTotal: 0 }
 const DUPLICATE_TRAFFIC_WINDOW_MS = 50
@@ -28,6 +30,14 @@ const shouldSkipDuplicateTraffic = (traffic: Traffic) => {
 export const useTrafficData = (options?: { enabled?: boolean }) => {
   const enabled = options?.enabled ?? true
 
+  const { verge } = useVerge()
+  const sampleMs = (verge?.traffic_refresh_seconds ?? 2) * 1000
+  const sampleMsRef = useRef(sampleMs)
+  const lastSampleRef = useRef(0)
+  useEffect(() => {
+    sampleMsRef.current = sampleMs
+  }, [sampleMs])
+
   const {
     graphData: { appendData },
   } = useTrafficMonitorEnhanced({ subscribe: false, enabled })
@@ -50,7 +60,11 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
           if (shouldSkipDuplicateTraffic(parsed)) {
             return
           }
-          appendData(parsed)
+          const now = Date.now()
+          if (now - lastSampleRef.current >= sampleMsRef.current) {
+            lastSampleRef.current = now
+            appendData(parsed)
+          }
           next(null, parsed)
         } catch (error) {
           next(error, FALLBACK_TRAFFIC)

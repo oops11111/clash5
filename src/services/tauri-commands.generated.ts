@@ -962,6 +962,10 @@ export type IVerge_Deserialize = {
   hotkeys?: string[] | null
   enable_global_hotkey?: boolean | null
   home_cards?: unknown | null
+  /**  Seconds between traffic samples shown on the home page. */
+  traffic_refresh_seconds?: number | null
+  /**  Minutes between automatic IP info refreshes; 0 disables them. */
+  ip_auto_refresh_minutes?: number | null
   auto_close_connection?: boolean | null
   /**  Keep the sing-box sidecar alive after its relay becomes idle. */
   singbox_persistent?: boolean | null
@@ -1056,6 +1060,10 @@ export type IVerge_Serialize = {
   hotkeys?: string[] | null
   enable_global_hotkey: boolean | null
   home_cards: unknown | null
+  /**  Seconds between traffic samples shown on the home page. */
+  traffic_refresh_seconds: number | null
+  /**  Minutes between automatic IP info refreshes; 0 disables them. */
+  ip_auto_refresh_minutes: number | null
   auto_close_connection: boolean | null
   /**  Keep the sing-box sidecar alive after its relay becomes idle. */
   singbox_persistent?: boolean | null

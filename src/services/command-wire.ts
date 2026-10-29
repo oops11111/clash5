@@ -97,6 +97,12 @@ export function vergeFromWire(value: IVerge_Serialize): IVergeConfig {
       ['default', 'inline', 'disable'] as const,
     ),
     auto_log_clean: choice(config.auto_log_clean, [0, 1, 2, 3, 4] as const),
+    traffic_refresh_seconds: choice(config.traffic_refresh_seconds, [
+      1, 2, 5,
+    ] as const),
+    ip_auto_refresh_minutes: choice(config.ip_auto_refresh_minutes, [
+      0, 5, 30,
+    ] as const),
     home_cards: config.home_cards == null ? undefined : homeCards,
     test_list: config.test_list?.flatMap((item) =>
       item.uid && item.url ? [{ ...item, uid: item.uid, url: item.url }] : [],

@@ -18,8 +18,12 @@ import {
   FormGroup,
   Grid,
   IconButton,
+  MenuItem,
+  Select,
   Skeleton,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -38,6 +42,7 @@ import { ThemeModeSwitch } from '@/components/setting/mods/theme-mode-switch'
 import ProxyControlSwitches from '@/components/shared/proxy-control-switches'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
+import { navigationItems } from '@/pages/_navigation-meta'
 import { entry_lightweight_mode } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
@@ -267,6 +272,103 @@ const HomeSettingsDialog = ({
             label={t('home.page.settings.cards.systemInfo')}
           />
         </FormGroup>
+        <Typography variant="overline" color="text.secondary">
+          {t('home.page.settings.refresh.title')}
+        </Typography>
+        <Stack spacing={1.5} sx={{ mb: 2 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <Stack>
+              <Typography variant="body2">
+                {t('home.page.settings.refresh.trafficInterval')}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {t('home.page.settings.refresh.trafficIntervalHint')}
+              </Typography>
+            </Stack>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              aria-label={t('home.page.settings.refresh.trafficInterval')}
+              value={verge?.traffic_refresh_seconds ?? 2}
+              onChange={(_, seconds: number | null) => {
+                if (seconds !== null)
+                  void patchVerge({ traffic_refresh_seconds: seconds })
+              }}
+            >
+              {[1, 2, 5].map((seconds) => (
+                <ToggleButton key={seconds} value={seconds}>
+                  {t('home.page.settings.refresh.seconds', { count: seconds })}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Stack>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <Stack>
+              <Typography variant="body2">
+                {t('home.page.settings.refresh.ipAuto')}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {t('home.page.settings.refresh.ipAutoHint')}
+              </Typography>
+            </Stack>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              aria-label={t('home.page.settings.refresh.ipAuto')}
+              value={verge?.ip_auto_refresh_minutes ?? 0}
+              onChange={(_, minutes: number | null) => {
+                if (minutes !== null)
+                  void patchVerge({ ip_auto_refresh_minutes: minutes })
+              }}
+            >
+              <ToggleButton value={0}>
+                {t('home.page.settings.refresh.off')}
+              </ToggleButton>
+              {[5, 30].map((minutes) => (
+                <ToggleButton key={minutes} value={minutes}>
+                  {t('home.page.settings.refresh.minutes', { count: minutes })}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Stack>
+        </Stack>
+        <Typography variant="overline" color="text.secondary">
+          {t('home.page.settings.startup.title')}
+        </Typography>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+        >
+          <Stack>
+            <Typography variant="body2">
+              {t('home.page.settings.startup.startPage')}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t('home.page.settings.startup.startPageHint')}
+            </Typography>
+          </Stack>
+          <Select
+            size="small"
+            value={verge?.start_page ?? '/'}
+            onChange={(e) => void patchVerge({ start_page: e.target.value })}
+            sx={{ minWidth: 140, '> div': { py: '7.5px' } }}
+          >
+            {Object.values(navigationItems).map((page) => (
+              <MenuItem key={page.path} value={page.path}>
+                {t(page.label)}
+              </MenuItem>
+            ))}
+          </Select>
+        </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t('shared.actions.cancel')}</Button>
