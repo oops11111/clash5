@@ -24,15 +24,15 @@ import { HotkeyViewer } from './mods/hotkey-viewer'
 import { LayoutViewer } from './mods/layout-viewer'
 import { LiteModeViewer } from './mods/lite-mode-viewer'
 import { MiscViewer } from './mods/misc-viewer'
-import { SettingItem, SettingList } from './mods/setting-comp'
+import { SettingItem, SettingSection } from './mods/setting-comp'
 import { ThemeViewer } from './mods/theme-viewer'
 import { UpdateViewer } from './mods/update-viewer'
 
 interface Props {
-  onError?: (err: Error) => void
+  section: SettingSection
 }
 
-const SettingVergeAdvanced = ({ onError: _ }: Props) => {
+const SettingVergeAdvanced = ({ section }: Props) => {
   const { t } = useTranslation()
 
   const configRef = useRef<DialogRef>(null)
@@ -79,7 +79,7 @@ const SettingVergeAdvanced = ({ onError: _ }: Props) => {
   }, [])
 
   return (
-    <SettingList title={t('settings.components.verge.advanced.title')}>
+    <>
       <ThemeViewer ref={themeRef} />
       <ConfigViewer ref={configRef} />
       <HotkeyViewer ref={hotkeyRef} />
@@ -89,102 +89,134 @@ const SettingVergeAdvanced = ({ onError: _ }: Props) => {
       <BackupViewer ref={backupRef} />
       <LiteModeViewer ref={liteModeRef} />
 
-      <SettingItem
-        onClick={() => backupRef.current?.open()}
-        label={t('settings.components.verge.advanced.fields.backupSetting')}
-        extra={
-          <TooltipIcon
-            title={t('settings.components.verge.advanced.tooltips.backupInfo')}
-            sx={{ opacity: '0.7' }}
-          />
-        }
-      />
+      {section === 'backup' && (
+        <SettingItem
+          onClick={() => backupRef.current?.open()}
+          label={t('settings.components.verge.advanced.fields.backupSetting')}
+          extra={
+            <TooltipIcon
+              title={t(
+                'settings.components.verge.advanced.tooltips.backupInfo',
+              )}
+              sx={{ opacity: '0.7' }}
+            />
+          }
+        />
+      )}
 
-      <SettingItem
-        onClick={() => configRef.current?.open()}
-        label={t('settings.components.verge.advanced.fields.runtimeConfig')}
-      />
+      {section === 'advanced' && (
+        <SettingItem
+          onClick={() => configRef.current?.open()}
+          label={t('settings.components.verge.advanced.fields.runtimeConfig')}
+        />
+      )}
 
-      <SettingItem
-        onClick={openAppDir}
-        label={t('settings.components.verge.advanced.fields.openConfDir')}
-        extra={
-          <TooltipIcon
-            title={t('settings.components.verge.advanced.tooltips.openConfDir')}
-            sx={{ opacity: '0.7' }}
-          />
-        }
-      />
+      {section === 'advanced' && (
+        <SettingItem
+          onClick={openAppDir}
+          label={t('settings.components.verge.advanced.fields.openConfDir')}
+          extra={
+            <TooltipIcon
+              title={t(
+                'settings.components.verge.advanced.tooltips.openConfDir',
+              )}
+              sx={{ opacity: '0.7' }}
+            />
+          }
+        />
+      )}
 
-      <SettingItem
-        onClick={openCoreDir}
-        label={t('settings.components.verge.advanced.fields.openCoreDir')}
-      />
+      {section === 'advanced' && (
+        <SettingItem
+          onClick={openCoreDir}
+          label={t('settings.components.verge.advanced.fields.openCoreDir')}
+        />
+      )}
 
-      <SettingItem
-        onClick={openLogsDir}
-        label={t('settings.components.verge.advanced.fields.openLogsDir')}
-      />
+      {section === 'advanced' && (
+        <SettingItem
+          onClick={openLogsDir}
+          label={t('settings.components.verge.advanced.fields.openLogsDir')}
+        />
+      )}
 
-      <SettingItem
-        onClick={onCheckUpdate}
-        label={t('settings.components.verge.advanced.fields.checkUpdates')}
-      />
+      {section === 'advanced' && (
+        <SettingItem
+          onClick={onCheckUpdate}
+          label={t('settings.components.verge.advanced.fields.checkUpdates')}
+        />
+      )}
 
-      <SettingItem
-        onClick={() => {
-          void mutate(() => openDevTools(), {
-            id: 'open-devtools',
-            errorNotice: false,
-          }).catch(() => {})
-        }}
-        label={t('settings.components.verge.advanced.fields.openDevTools')}
-      />
+      {section === 'advanced' && (
+        <SettingItem
+          onClick={() => {
+            void mutate(() => openDevTools(), {
+              id: 'open-devtools',
+              errorNotice: false,
+            }).catch(() => {})
+          }}
+          label={t('settings.components.verge.advanced.fields.openDevTools')}
+        />
+      )}
 
-      <SettingItem
-        label={t('settings.components.verge.advanced.fields.liteModeSettings')}
-        extra={
-          <TooltipIcon
-            title={t('settings.components.verge.advanced.tooltips.liteMode')}
-            sx={{ opacity: '0.7' }}
-          />
-        }
-        onClick={() => liteModeRef.current?.open()}
-      />
+      {section === 'advanced' && (
+        <SettingItem
+          label={t(
+            'settings.components.verge.advanced.fields.liteModeSettings',
+          )}
+          extra={
+            <TooltipIcon
+              title={t('settings.components.verge.advanced.tooltips.liteMode')}
+              sx={{ opacity: '0.7' }}
+            />
+          }
+          onClick={() => liteModeRef.current?.open()}
+        />
+      )}
 
-      <SettingItem
-        onClick={() => {
-          void mutate(() => exitApp(), {
-            id: 'exit-app',
-            errorNotice: false,
-          }).catch(() => {})
-        }}
-        label={t('settings.components.verge.advanced.fields.exit')}
-      />
+      {section === 'advanced' && (
+        <SettingItem
+          onClick={() => {
+            void mutate(() => exitApp(), {
+              id: 'exit-app',
+              errorNotice: false,
+            }).catch(() => {})
+          }}
+          label={t('settings.components.verge.advanced.fields.exit')}
+        />
+      )}
 
-      <SettingItem
-        label={t('settings.components.verge.advanced.fields.exportDiagnostics')}
-        extra={
-          <TooltipIcon
-            icon={ContentCopyRounded}
-            onClick={onExportDiagnosticInfo}
-          />
-        }
-      ></SettingItem>
+      {section === 'backup' && (
+        <SettingItem
+          label={t(
+            'settings.components.verge.advanced.fields.exportDiagnostics',
+          )}
+          extra={
+            <TooltipIcon
+              icon={ContentCopyRounded}
+              onClick={onExportDiagnosticInfo}
+            />
+          }
+        ></SettingItem>
+      )}
 
-      <SettingItem
-        label={t('settings.components.verge.advanced.fields.vergeVersion')}
-        extra={
-          <TooltipIcon
-            icon={ContentCopyRounded}
-            onClick={copyVersion}
-            title={t('settings.components.verge.advanced.actions.copyVersion')}
-          />
-        }
-      >
-        <Typography sx={{ py: '7px', pr: 1 }}>v{version}</Typography>
-      </SettingItem>
-    </SettingList>
+      {section === 'advanced' && (
+        <SettingItem
+          label={t('settings.components.verge.advanced.fields.vergeVersion')}
+          extra={
+            <TooltipIcon
+              icon={ContentCopyRounded}
+              onClick={copyVersion}
+              title={t(
+                'settings.components.verge.advanced.actions.copyVersion',
+              )}
+            />
+          }
+        >
+          <Typography sx={{ py: '7px', pr: 1 }}>v{version}</Typography>
+        </SettingItem>
+      )}
+    </>
   )
 }
 

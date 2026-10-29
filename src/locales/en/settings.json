@@ -1,5 +1,14 @@
 {
   "page": {
+    "groupsLabel": "Settings groups",
+    "groups": {
+      "appearance": "Appearance",
+      "system": "System & proxy",
+      "clash": "Clash settings",
+      "basic": "General",
+      "backup": "Backup & diagnostics",
+      "advanced": "Advanced"
+    },
     "actions": {
       "manual": "Manual",
       "telegram": "Telegram Channel",

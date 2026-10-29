@@ -1579,6 +1579,15 @@ export interface TranslationResources {
           telegram: string
         }
         actionsGroupLabel: string
+        groups: {
+          advanced: string
+          appearance: string
+          backup: string
+          basic: string
+          clash: string
+          system: string
+        }
+        groupsLabel: string
         title: string
       }
       sections: {

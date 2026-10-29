@@ -67,6 +67,14 @@ export const SettingItem: React.FC<ItemProps> = ({
   )
 }
 
+export type SettingSection =
+  | 'appearance'
+  | 'system'
+  | 'clash'
+  | 'basic'
+  | 'backup'
+  | 'advanced'
+
 export const SettingList: React.FC<{
   title: string
   children: ReactNode

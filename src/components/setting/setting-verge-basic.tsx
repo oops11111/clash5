@@ -18,12 +18,13 @@ import { GuardState } from './mods/guard-state'
 import { HotkeyViewer } from './mods/hotkey-viewer'
 import { LayoutViewer } from './mods/layout-viewer'
 import { MiscViewer } from './mods/misc-viewer'
-import { SettingItem, SettingList } from './mods/setting-comp'
+import { SettingItem, SettingSection } from './mods/setting-comp'
 import { ThemeModeSwitch } from './mods/theme-mode-switch'
 import { ThemeViewer } from './mods/theme-viewer'
 import { UpdateViewer } from './mods/update-viewer'
 
 interface Props {
+  section: SettingSection
   onError?: (err: Error) => void
 }
 
@@ -50,7 +51,7 @@ const languageOptions = supportedLanguages.map((code) => {
   return { code, label }
 })
 
-const SettingVergeBasic = ({ onError }: Props) => {
+const SettingVergeBasic = ({ section, onError }: Props) => {
   const { t } = useTranslation()
 
   const { verge, patchVerge, mutateVerge } = useVerge()
@@ -84,7 +85,7 @@ const SettingVergeBasic = ({ onError }: Props) => {
   }, [])
 
   return (
-    <SettingList title={t('settings.components.verge.basic.title')}>
+    <>
       <ThemeViewer ref={themeRef} />
       <ConfigViewer ref={configRef} />
       <HotkeyViewer ref={hotkeyRef} />
@@ -93,72 +94,82 @@ const SettingVergeBasic = ({ onError }: Props) => {
       <UpdateViewer ref={updateRef} />
       <BackupViewer ref={backupRef} />
 
-      <SettingItem
-        label={t('settings.components.verge.basic.fields.followSystemLanguage')}
-        secondary={t(
-          'settings.components.verge.basic.fields.followSystemLanguageDescription',
-        )}
-      >
-        <GuardState
-          value={!language || language === 'system'}
-          valueProps="checked"
-          onCatch={onError}
-          onFormat={(_, checked: boolean) => checked}
-          onChange={(checked) =>
-            onChangeData({
-              language: checked ? 'system' : manualLanguage,
-            })
-          }
-          onGuard={(checked) =>
-            patchVerge({
-              language: checked ? 'system' : manualLanguage,
-            })
-          }
+      {section === 'basic' && (
+        <SettingItem
+          label={t(
+            'settings.components.verge.basic.fields.followSystemLanguage',
+          )}
+          secondary={t(
+            'settings.components.verge.basic.fields.followSystemLanguageDescription',
+          )}
         >
-          <Switch />
-        </GuardState>
-      </SettingItem>
-
-      <SettingItem label={t('settings.components.verge.basic.fields.language')}>
-        <GuardState
-          value={
-            !language || language === 'system'
-              ? resolvePreferredLanguage('system')
-              : language
-          }
-          onCatch={onError}
-          onFormat={(e: any) => e.target.value}
-          onChange={(e) => onChangeData({ language: e })}
-          onGuard={(e) => patchVerge({ language: e })}
-        >
-          <Select
-            size="small"
-            disabled={!language || language === 'system'}
-            sx={{ width: 110, '> div': { py: '7.5px' } }}
+          <GuardState
+            value={!language || language === 'system'}
+            valueProps="checked"
+            onCatch={onError}
+            onFormat={(_, checked: boolean) => checked}
+            onChange={(checked) =>
+              onChangeData({
+                language: checked ? 'system' : manualLanguage,
+              })
+            }
+            onGuard={(checked) =>
+              patchVerge({
+                language: checked ? 'system' : manualLanguage,
+              })
+            }
           >
-            {languageOptions.map(({ code, label }) => (
-              <MenuItem key={code} value={code}>
-                {label}
-              </MenuItem>
-            ))}
-          </Select>
-        </GuardState>
-      </SettingItem>
+            <Switch />
+          </GuardState>
+        </SettingItem>
+      )}
 
-      <SettingItem
-        label={t('settings.components.verge.basic.fields.themeMode')}
-      >
-        <GuardState
-          value={theme_mode}
-          onCatch={onError}
-          onChange={(e) => onChangeData({ theme_mode: e })}
-          onGuard={(e) => patchVerge({ theme_mode: e })}
+      {section === 'basic' && (
+        <SettingItem
+          label={t('settings.components.verge.basic.fields.language')}
         >
-          <ThemeModeSwitch />
-        </GuardState>
-      </SettingItem>
+          <GuardState
+            value={
+              !language || language === 'system'
+                ? resolvePreferredLanguage('system')
+                : language
+            }
+            onCatch={onError}
+            onFormat={(e: any) => e.target.value}
+            onChange={(e) => onChangeData({ language: e })}
+            onGuard={(e) => patchVerge({ language: e })}
+          >
+            <Select
+              size="small"
+              disabled={!language || language === 'system'}
+              sx={{ width: 110, '> div': { py: '7.5px' } }}
+            >
+              {languageOptions.map(({ code, label }) => (
+                <MenuItem key={code} value={code}>
+                  {label}
+                </MenuItem>
+              ))}
+            </Select>
+          </GuardState>
+        </SettingItem>
+      )}
 
-      {OS !== 'linux' && (
+      {section === 'appearance' && (
+        <SettingItem
+          label={t('settings.components.verge.basic.fields.themeMode')}
+        >
+          <GuardState
+            value={theme_mode}
+            onCatch={onError}
+            onChange={(e) => onChangeData({ theme_mode: e })}
+            onGuard={(e) => patchVerge({ theme_mode: e })}
+          >
+            <ThemeModeSwitch />
+          </GuardState>
+        </SettingItem>
+      )}
+
+      {section === 'basic' && OS !== 'linux' && (
         <SettingItem
           label={t('settings.components.verge.basic.fields.trayClickEvent')}
         >
@@ -192,129 +203,143 @@ const SettingVergeBasic = ({ onError }: Props) => {
         </SettingItem>
       )}
 
-      <SettingItem
-        label={t('settings.components.verge.basic.fields.copyEnvType')}
-        extra={
-          <TooltipIcon icon={ContentCopyRounded} onClick={onCopyClashEnv} />
-        }
-      >
-        <GuardState
-          value={env_type ?? (OS === 'windows' ? 'powershell' : 'bash')}
-          onCatch={onError}
-          onFormat={(e: any) => e.target.value}
-          onChange={(e) => onChangeData({ env_type: e })}
-          onGuard={(e) => patchVerge({ env_type: e })}
+      {section === 'basic' && (
+        <SettingItem
+          label={t('settings.components.verge.basic.fields.copyEnvType')}
+          extra={
+            <TooltipIcon icon={ContentCopyRounded} onClick={onCopyClashEnv} />
+          }
         >
-          <Select size="small" sx={{ width: 140, '> div': { py: '7.5px' } }}>
-            <MenuItem value="bash">Bash</MenuItem>
-            <MenuItem value="fish">Fish</MenuItem>
-            <MenuItem value="nushell">Nushell</MenuItem>
-            <MenuItem value="cmd">CMD</MenuItem>
-            <MenuItem value="powershell">PowerShell</MenuItem>
-          </Select>
-        </GuardState>
-      </SettingItem>
+          <GuardState
+            value={env_type ?? (OS === 'windows' ? 'powershell' : 'bash')}
+            onCatch={onError}
+            onFormat={(e: any) => e.target.value}
+            onChange={(e) => onChangeData({ env_type: e })}
+            onGuard={(e) => patchVerge({ env_type: e })}
+          >
+            <Select size="small" sx={{ width: 140, '> div': { py: '7.5px' } }}>
+              <MenuItem value="bash">Bash</MenuItem>
+              <MenuItem value="fish">Fish</MenuItem>
+              <MenuItem value="nushell">Nushell</MenuItem>
+              <MenuItem value="cmd">CMD</MenuItem>
+              <MenuItem value="powershell">PowerShell</MenuItem>
+            </Select>
+          </GuardState>
+        </SettingItem>
+      )}
 
-      <SettingItem
-        label={t('settings.components.verge.basic.fields.startPage')}
-      >
-        <GuardState
-          value={start_page ?? '/'}
-          onCatch={onError}
-          onFormat={(e: any) => e.target.value}
-          onChange={(e) => onChangeData({ start_page: e })}
-          onGuard={(e) => patchVerge({ start_page: e })}
+      {section === 'basic' && (
+        <SettingItem
+          label={t('settings.components.verge.basic.fields.startPage')}
         >
-          <Select size="small" sx={{ width: 140, '> div': { py: '7.5px' } }}>
-            {Object.values(navigationItems).map((page) => {
-              return (
-                <MenuItem key={page.path} value={page.path}>
-                  {t(page.label)}
+          <GuardState
+            value={start_page ?? '/'}
+            onCatch={onError}
+            onFormat={(e: any) => e.target.value}
+            onChange={(e) => onChangeData({ start_page: e })}
+            onGuard={(e) => patchVerge({ start_page: e })}
+          >
+            <Select size="small" sx={{ width: 140, '> div': { py: '7.5px' } }}>
+              {Object.values(navigationItems).map((page) => {
+                return (
+                  <MenuItem key={page.path} value={page.path}>
+                    {t(page.label)}
+                  </MenuItem>
+                )
+              })}
+              {start_page === '/unlock' && (
+                <MenuItem value="/unlock">
+                  {t('layout.components.navigation.tabs.unlock')}
                 </MenuItem>
-              )
-            })}
-            {start_page === '/unlock' && (
-              <MenuItem value="/unlock">
-                {t('layout.components.navigation.tabs.unlock')}
-              </MenuItem>
-            )}
-          </Select>
-        </GuardState>
-      </SettingItem>
+              )}
+            </Select>
+          </GuardState>
+        </SettingItem>
+      )}
 
-      <SettingItem
-        label={t('settings.components.verge.basic.fields.startupScript')}
-      >
-        <GuardState
-          value={startup_script ?? ''}
-          onCatch={onError}
-          onFormat={(e: any) => e.target.value}
-          onChange={(e) => onChangeData({ startup_script: e })}
-          onGuard={(e) => patchVerge({ startup_script: e })}
+      {section === 'basic' && (
+        <SettingItem
+          label={t('settings.components.verge.basic.fields.startupScript')}
         >
-          <Input
-            value={startup_script}
-            disabled
-            disableUnderline
-            sx={{ width: 230 }}
-            endAdornment={
-              <>
-                <Button
-                  onClick={async () => {
-                    const selected = await open({
-                      directory: false,
-                      multiple: false,
-                      filters: [
-                        {
-                          name: 'Shell Script',
-                          extensions: ['sh', 'bat', 'ps1'],
-                        },
-                      ],
-                    })
-                    if (selected) {
-                      onChangeData({ startup_script: `${selected}` })
-                      patchVerge({ startup_script: `${selected}` })
-                    }
-                  }}
-                >
-                  {t('settings.components.verge.basic.actions.browse')}
-                </Button>
-                {startup_script && (
+          <GuardState
+            value={startup_script ?? ''}
+            onCatch={onError}
+            onFormat={(e: any) => e.target.value}
+            onChange={(e) => onChangeData({ startup_script: e })}
+            onGuard={(e) => patchVerge({ startup_script: e })}
+          >
+            <Input
+              value={startup_script}
+              disabled
+              disableUnderline
+              sx={{ width: 230 }}
+              endAdornment={
+                <>
                   <Button
                     onClick={async () => {
-                      onChangeData({ startup_script: '' })
-                      patchVerge({ startup_script: '' })
+                      const selected = await open({
+                        directory: false,
+                        multiple: false,
+                        filters: [
+                          {
+                            name: 'Shell Script',
+                            extensions: ['sh', 'bat', 'ps1'],
+                          },
+                        ],
+                      })
+                      if (selected) {
+                        onChangeData({ startup_script: `${selected}` })
+                        patchVerge({ startup_script: `${selected}` })
+                      }
                     }}
                   >
-                    {t('shared.actions.clear')}
+                    {t('settings.components.verge.basic.actions.browse')}
                   </Button>
-                )}
-              </>
-            }
-          ></Input>
-        </GuardState>
-      </SettingItem>
+                  {startup_script && (
+                    <Button
+                      onClick={async () => {
+                        onChangeData({ startup_script: '' })
+                        patchVerge({ startup_script: '' })
+                      }}
+                    >
+                      {t('shared.actions.clear')}
+                    </Button>
+                  )}
+                </>
+              }
+            ></Input>
+          </GuardState>
+        </SettingItem>
+      )}
 
-      <SettingItem
-        onClick={() => themeRef.current?.open()}
-        label={t('settings.components.verge.basic.fields.themeSetting')}
-      />
+      {section === 'appearance' && (
+        <SettingItem
+          onClick={() => themeRef.current?.open()}
+          label={t('settings.components.verge.basic.fields.themeSetting')}
+        />
+      )}
 
-      <SettingItem
-        onClick={() => layoutRef.current?.open()}
-        label={t('settings.components.verge.basic.fields.layoutSetting')}
-      />
+      {section === 'appearance' && (
+        <SettingItem
+          onClick={() => layoutRef.current?.open()}
+          label={t('settings.components.verge.basic.fields.layoutSetting')}
+        />
+      )}
 
-      <SettingItem
-        onClick={() => miscRef.current?.open()}
-        label={t('settings.components.verge.basic.fields.misc')}
-      />
+      {section === 'basic' && (
+        <SettingItem
+          onClick={() => miscRef.current?.open()}
+          label={t('settings.components.verge.basic.fields.misc')}
+        />
+      )}
 
-      <SettingItem
-        onClick={() => hotkeyRef.current?.open()}
-        label={t('settings.components.verge.basic.fields.hotkeySetting')}
-      />
-    </SettingList>
+      {section === 'basic' && (
+        <SettingItem
+          onClick={() => hotkeyRef.current?.open()}
+          label={t('settings.components.verge.basic.fields.hotkeySetting')}
+        />
+      )}
+    </>
   )
 }
 

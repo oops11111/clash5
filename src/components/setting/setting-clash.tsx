@@ -23,17 +23,18 @@ import { DnsViewer } from './mods/dns-viewer'
 import { HeaderConfiguration } from './mods/external-controller-cors'
 import { GuardState } from './mods/guard-state'
 import { NetworkInterfaceViewer } from './mods/network-interface-viewer'
-import { SettingItem, SettingList } from './mods/setting-comp'
+import { SettingItem, SettingSection } from './mods/setting-comp'
 import { TunnelsViewer } from './mods/tunnels-viewer'
 import { WebUIViewer } from './mods/web-ui-viewer'
 
 const isWIN = getSystem() === 'windows'
 
 interface Props {
+  section: SettingSection
   onError: (err: Error) => void
 }
 
-const SettingClash = ({ onError }: Props) => {
+const SettingClash = ({ section, onError }: Props) => {
   const { t } = useTranslation()
 
   const { clash, version, mutateClash, patchClash } = useClash()
@@ -123,7 +124,7 @@ const SettingClash = ({ onError }: Props) => {
   }
 
   return (
-    <SettingList title={t('settings.sections.clash.title')}>
+    <>
       <WebUIViewer ref={webRef} />
       <ClashPortViewer ref={portRef} />
       <ControllerViewer ref={ctrlRef} />
@@ -155,179 +156,204 @@ const SettingClash = ({ onError }: Props) => {
       </BaseDialog>
       <HeaderConfiguration ref={corsRef} />
       <TunnelsViewer ref={tunnelRef} />
-      <SettingItem
-        label={t('settings.sections.clash.form.fields.allowLan')}
-        extra={
-          <TooltipIcon
-            title={t('settings.sections.clash.form.tooltips.networkInterface')}
-            color={'inherit'}
-            icon={LanRounded}
-            onClick={() => {
-              networkRef.current?.open()
-            }}
-          />
-        }
-      >
-        <GuardState
-          value={allowLan ?? false}
-          valueProps="checked"
-          onCatch={onError}
-          onFormat={onSwitchFormat}
-          onChange={(e) => onChangeData({ 'allow-lan': e })}
-          onGuard={(e) => patchClash({ 'allow-lan': e })}
-        >
-          <Switch edge="end" />
-        </GuardState>
-      </SettingItem>
 
-      <SettingItem
-        label={t('settings.sections.clash.form.fields.dnsOverwrite')}
-        extra={
-          <>
+      {section === 'clash' && (
+        <SettingItem
+          label={t('settings.sections.clash.form.fields.allowLan')}
+          extra={
             <TooltipIcon
-              icon={SettingsRounded}
-              onClick={() => dnsRef.current?.open()}
+              title={t(
+                'settings.sections.clash.form.tooltips.networkInterface',
+              )}
+              color={'inherit'}
+              icon={LanRounded}
+              onClick={() => {
+                networkRef.current?.open()
+              }}
             />
+          }
+        >
+          <GuardState
+            value={allowLan ?? false}
+            valueProps="checked"
+            onCatch={onError}
+            onFormat={onSwitchFormat}
+            onChange={(e) => onChangeData({ 'allow-lan': e })}
+            onGuard={(e) => patchClash({ 'allow-lan': e })}
+          >
+            <Switch edge="end" />
+          </GuardState>
+        </SettingItem>
+      )}
+
+      {section === 'clash' && (
+        <SettingItem
+          label={t('settings.sections.clash.form.fields.dnsOverwrite')}
+          extra={
+            <>
+              <TooltipIcon
+                icon={SettingsRounded}
+                onClick={() => dnsRef.current?.open()}
+              />
+              <TooltipIcon
+                title={t('settings.modals.dns.dialog.profileScope')}
+                sx={{ opacity: '0.7' }}
+              />
+            </>
+          }
+        >
+          <Switch
+            edge="end"
+            checked={dnsEnabled}
+            disabled={
+              !currentProfile || dnsUpdating || dnsConfirmation !== null
+            }
+            onChange={(_, checked) => handleDnsToggle(checked)}
+          />
+        </SettingItem>
+      )}
+
+      {section === 'clash' && (
+        <SettingItem label={t('settings.sections.clash.form.fields.ipv6')}>
+          <GuardState
+            value={ipv6 ?? false}
+            valueProps="checked"
+            onCatch={onError}
+            onFormat={onSwitchFormat}
+            onChange={(e) => onChangeData({ ipv6: e })}
+            onGuard={(e) => patchClash({ ipv6: e })}
+          >
+            <Switch edge="end" />
+          </GuardState>
+        </SettingItem>
+      )}
+
+      {section === 'clash' && (
+        <SettingItem
+          label={t('settings.sections.clash.form.fields.unifiedDelay')}
+          extra={
             <TooltipIcon
-              title={t('settings.modals.dns.dialog.profileScope')}
+              title={t('settings.sections.clash.form.tooltips.unifiedDelay')}
               sx={{ opacity: '0.7' }}
             />
-          </>
-        }
-      >
-        <Switch
-          edge="end"
-          checked={dnsEnabled}
-          disabled={!currentProfile || dnsUpdating || dnsConfirmation !== null}
-          onChange={(_, checked) => handleDnsToggle(checked)}
-        />
-      </SettingItem>
-
-      <SettingItem label={t('settings.sections.clash.form.fields.ipv6')}>
-        <GuardState
-          value={ipv6 ?? false}
-          valueProps="checked"
-          onCatch={onError}
-          onFormat={onSwitchFormat}
-          onChange={(e) => onChangeData({ ipv6: e })}
-          onGuard={(e) => patchClash({ ipv6: e })}
+          }
         >
-          <Switch edge="end" />
-        </GuardState>
-      </SettingItem>
+          <GuardState
+            value={unifiedDelay ?? false}
+            valueProps="checked"
+            onCatch={onError}
+            onFormat={onSwitchFormat}
+            onChange={(e) => onChangeData({ 'unified-delay': e })}
+            onGuard={(e) => patchClash({ 'unified-delay': e })}
+          >
+            <Switch edge="end" />
+          </GuardState>
+        </SettingItem>
+      )}
 
-      <SettingItem
-        label={t('settings.sections.clash.form.fields.unifiedDelay')}
-        extra={
-          <TooltipIcon
-            title={t('settings.sections.clash.form.tooltips.unifiedDelay')}
-            sx={{ opacity: '0.7' }}
-          />
-        }
-      >
-        <GuardState
-          value={unifiedDelay ?? false}
-          valueProps="checked"
-          onCatch={onError}
-          onFormat={onSwitchFormat}
-          onChange={(e) => onChangeData({ 'unified-delay': e })}
-          onGuard={(e) => patchClash({ 'unified-delay': e })}
+      {section === 'clash' && (
+        <SettingItem
+          label={t('settings.sections.clash.form.fields.logLevel')}
+          extra={
+            <TooltipIcon
+              title={t('settings.sections.clash.form.tooltips.logLevel')}
+              sx={{ opacity: '0.7' }}
+            />
+          }
         >
-          <Switch edge="end" />
-        </GuardState>
-      </SettingItem>
+          <GuardState
+            value={logLevel === 'warn' ? 'warning' : (logLevel ?? 'info')}
+            onCatch={onError}
+            onFormat={(e: any) => e.target.value}
+            onChange={(e) => onChangeData({ 'log-level': e })}
+            onGuard={(e) => {
+              setClashLog((pre) => ({
+                ...pre!,
+                logLevel: e.toUpperCase() as LogLevel,
+              }))
+              return patchClash({ 'log-level': e })
+            }}
+          >
+            <Select size="small" sx={{ width: 100, '> div': { py: '7.5px' } }}>
+              <MenuItem value="debug">
+                {t('settings.sections.clash.form.options.logLevel.debug')}
+              </MenuItem>
+              <MenuItem value="info">
+                {t('settings.sections.clash.form.options.logLevel.info')}
+              </MenuItem>
+              <MenuItem value="warning">
+                {t('settings.sections.clash.form.options.logLevel.warning')}
+              </MenuItem>
+              <MenuItem value="error">
+                {t('settings.sections.clash.form.options.logLevel.error')}
+              </MenuItem>
+              <MenuItem value="silent">
+                {t('settings.sections.clash.form.options.logLevel.silent')}
+              </MenuItem>
+            </Select>
+          </GuardState>
+        </SettingItem>
+      )}
 
-      <SettingItem
-        label={t('settings.sections.clash.form.fields.logLevel')}
-        extra={
-          <TooltipIcon
-            title={t('settings.sections.clash.form.tooltips.logLevel')}
-            sx={{ opacity: '0.7' }}
-          />
-        }
-      >
-        <GuardState
-          value={logLevel === 'warn' ? 'warning' : (logLevel ?? 'info')}
-          onCatch={onError}
-          onFormat={(e: any) => e.target.value}
-          onChange={(e) => onChangeData({ 'log-level': e })}
-          onGuard={(e) => {
-            setClashLog((pre) => ({
-              ...pre!,
-              logLevel: e.toUpperCase() as LogLevel,
-            }))
-            return patchClash({ 'log-level': e })
-          }}
+      {section === 'clash' && (
+        <SettingItem
+          label={t('settings.sections.clash.form.fields.portConfig')}
         >
-          <Select size="small" sx={{ width: 100, '> div': { py: '7.5px' } }}>
-            <MenuItem value="debug">
-              {t('settings.sections.clash.form.options.logLevel.debug')}
-            </MenuItem>
-            <MenuItem value="info">
-              {t('settings.sections.clash.form.options.logLevel.info')}
-            </MenuItem>
-            <MenuItem value="warning">
-              {t('settings.sections.clash.form.options.logLevel.warning')}
-            </MenuItem>
-            <MenuItem value="error">
-              {t('settings.sections.clash.form.options.logLevel.error')}
-            </MenuItem>
-            <MenuItem value="silent">
-              {t('settings.sections.clash.form.options.logLevel.silent')}
-            </MenuItem>
-          </Select>
-        </GuardState>
-      </SettingItem>
-
-      <SettingItem label={t('settings.sections.clash.form.fields.portConfig')}>
-        <TextField
-          autoComplete="new-password"
-          disabled={false}
-          size="small"
-          value={displayedMixedPort}
-          sx={{ width: 100, input: { py: '7.5px', cursor: 'pointer' } }}
-          onClick={(e) => {
-            portRef.current?.open()
-            ;(e.target as HTMLElement).blur()
-          }}
-        />
-      </SettingItem>
-
-      <SettingItem
-        label={t('settings.sections.clash.form.fields.external')}
-        extra={
-          <TooltipIcon
-            title={t('settings.sections.externalCors.tooltips.open')}
-            icon={SettingsRounded}
+          <TextField
+            autoComplete="new-password"
+            disabled={false}
+            size="small"
+            value={displayedMixedPort}
+            sx={{ width: 100, input: { py: '7.5px', cursor: 'pointer' } }}
             onClick={(e) => {
-              e.stopPropagation()
-              corsRef.current?.open()
+              portRef.current?.open()
+              ;(e.target as HTMLElement).blur()
             }}
           />
-        }
-        onClick={() => {
-          ctrlRef.current?.open()
-        }}
-      />
+        </SettingItem>
+      )}
 
-      <SettingItem
-        onClick={() => webRef.current?.open()}
-        label={t('settings.sections.clash.form.fields.webUI')}
-      />
+      {section === 'system' && (
+        <SettingItem
+          label={t('settings.sections.clash.form.fields.external')}
+          extra={
+            <TooltipIcon
+              title={t('settings.sections.externalCors.tooltips.open')}
+              icon={SettingsRounded}
+              onClick={(e) => {
+                e.stopPropagation()
+                corsRef.current?.open()
+              }}
+            />
+          }
+          onClick={() => {
+            ctrlRef.current?.open()
+          }}
+        />
+      )}
 
-      <SettingItem
-        label={t('settings.sections.clash.form.fields.clashCore')}
-        extra={
-          <TooltipIcon
-            icon={SettingsRounded}
-            onClick={() => coreRef.current?.open()}
-          />
-        }
-      >
-        <Typography sx={{ py: '7px', pr: 1 }}>{version}</Typography>
-      </SettingItem>
+      {section === 'clash' && (
+        <SettingItem
+          onClick={() => webRef.current?.open()}
+          label={t('settings.sections.clash.form.fields.webUI')}
+        />
+      )}
 
-      {isWIN && (
+      {section === 'clash' && (
+        <SettingItem
+          label={t('settings.sections.clash.form.fields.clashCore')}
+          extra={
+            <TooltipIcon
+              icon={SettingsRounded}
+              onClick={() => coreRef.current?.open()}
+            />
+          }
+        >
+          <Typography sx={{ py: '7px', pr: 1 }}>{version}</Typography>
+        </SettingItem>
+      )}
+
+      {section === 'clash' && isWIN && (
         <SettingItem
           onClick={invoke_uwp_tool}
           label={t('settings.sections.clash.form.fields.openUwpTool')}
@@ -340,16 +366,20 @@ const SettingClash = ({ onError }: Props) => {
         />
       )}
 
-      <SettingItem
-        onClick={onUpdateGeo}
-        label={t('settings.sections.clash.form.fields.updateGeoData')}
-      />
+      {section === 'clash' && (
+        <SettingItem
+          onClick={onUpdateGeo}
+          label={t('settings.sections.clash.form.fields.updateGeoData')}
+        />
+      )}
 
-      <SettingItem
-        label={t('settings.sections.clash.form.fields.tunnels.title')}
-        onClick={() => tunnelRef.current?.open()}
-      />
-    </SettingList>
+      {section === 'clash' && (
+        <SettingItem
+          label={t('settings.sections.clash.form.fields.tunnels.title')}
+          onClick={() => tunnelRef.current?.open()}
+        />
+      )}
+    </>
   )
 }
 
