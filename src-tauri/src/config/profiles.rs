@@ -209,6 +209,20 @@ impl IProfiles {
             self.current = uid.to_owned();
         }
 
+        let taken: Vec<&str> = self
+            .items
+            .iter()
+            .flatten()
+            .filter_map(|existing| existing.name.as_deref())
+            .collect();
+        let numbered = item
+            .name
+            .as_deref()
+            .and_then(|name| numbered_profile_name(name, &taken));
+        if let Some(name) = numbered {
+            item.name = Some(name.into());
+        }
+
         if self.items.is_none() {
             self.items = Some(vec![]);
         }
@@ -1374,12 +1388,36 @@ fn activate_selected_nodes_with(repair: SelectionRepair) -> tokio::sync::oneshot
     first_pass_done
 }
 
+/// Returns `name` with a `（n）` suffix when another profile already uses it.
+fn numbered_profile_name(name: &str, taken: &[&str]) -> Option<String> {
+    if !taken.contains(&name) {
+        return None;
+    }
+    (2..)
+        .map(|n| format!("{name}（{n}）"))
+        .find(|candidate| !taken.contains(&candidate.as_str()))
+        .map(Into::into)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use clash5_data::{DataError, IdentityKey, Node};
     use tauri_plugin_mihomo::models::Proxy;
+
+    #[test]
+    fn numbered_profile_name_skips_taken_suffixes() {
+        assert_eq!(numbered_profile_name("example.com", &["other"]), None);
+        assert_eq!(
+            numbered_profile_name("example.com", &["example.com"]).as_deref(),
+            Some("example.com（2）")
+        );
+        assert_eq!(
+            numbered_profile_name("example.com", &["example.com", "example.com（2）"]).as_deref(),
+            Some("example.com（3）")
+        );
+    }
 
     struct FakeIdentityCredentials {
         values: Mutex<HashMap<i64, Vec<u8>>>,

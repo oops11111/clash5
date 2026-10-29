@@ -381,9 +381,11 @@ impl PrfItem {
 
         let uid = help::get_uid("R").into();
         let file = format!("{uid}.yaml").into();
-        let name = name
-            .map(|s| s.to_owned())
-            .unwrap_or_else(|| filename.map(|s| s.into()).unwrap_or_else(|| "Remote File".into()));
+        let name = name.map(|s| s.to_owned()).unwrap_or_else(|| {
+            filename
+                .map(|s| s.into())
+                .unwrap_or_else(|| url.host_str().map_or_else(|| "Remote File".into(), Into::into))
+        });
         let data = resp.text();
 
         let data = data.trim_start_matches('\u{feff}');

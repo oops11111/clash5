@@ -718,20 +718,36 @@ const ProfileItemBase = (props: ProfileItemProps) => {
               />
             </Box>
 
-            <Typography
+            <Box
               sx={{
                 width: batchMode ? 'calc(100% - 56px)' : 'calc(100% - 36px)',
-                fontSize: '18px',
-                fontWeight: '600',
-                lineHeight: '26px',
+                minWidth: 0,
               }}
-              variant="h6"
-              component="h2"
-              noWrap
-              title={name}
             >
-              {name}
-            </Typography>
+              <Typography
+                sx={{
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  lineHeight: '26px',
+                }}
+                variant="h6"
+                component="h2"
+                noWrap
+                title={name}
+              >
+                {name}
+              </Typography>
+              {hasUrl && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  noWrap
+                  title={from}
+                >
+                  {from}
+                </Typography>
+              )}
+            </Box>
           </Box>
 
           {hasUrl && (
@@ -762,7 +778,7 @@ const ProfileItemBase = (props: ProfileItemProps) => {
         <Box sx={boxStyle}>
           {
             <>
-              {description ? (
+              {description && (
                 <Typography
                   noWrap
                   title={description}
@@ -770,15 +786,6 @@ const ProfileItemBase = (props: ProfileItemProps) => {
                 >
                   {description}
                 </Typography>
-              ) : (
-                hasUrl && (
-                  <Typography
-                    noWrap
-                    title={`${t('shared.labels.from')} ${from}`}
-                  >
-                    {from}
-                  </Typography>
-                )
               )}
               {hasUrl && (
                 <Box
