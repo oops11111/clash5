@@ -12,15 +12,15 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BasePage } from '@/components/base'
+import {
+  SettingList,
+  SettingSection,
+} from '@/components/setting/mods/setting-comp'
 import { PerformancePresetSettings } from '@/components/setting/performance-preset-settings'
 import SettingClash from '@/components/setting/setting-clash'
 import SettingSystem from '@/components/setting/setting-system'
 import SettingVergeAdvanced from '@/components/setting/setting-verge-advanced'
 import SettingVergeBasic from '@/components/setting/setting-verge-basic'
-import {
-  SettingList,
-  SettingSection,
-} from '@/components/setting/mods/setting-comp'
 import { showNotice } from '@/services/notice-service'
 import { openExternalUrl } from '@/utils/open-external-url'
 
