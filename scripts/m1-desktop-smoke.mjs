@@ -1201,15 +1201,15 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
       'Home',
       'Nodes',
       'Subscriptions',
+      'Proxies',
       'Chains',
       'Rules',
       'Plugins',
-      'Connections',
-      'Logs',
+      'Diagnostics',
       'Settings',
     ],
-    ['首页', '节点', '订阅', '链路', '规则', '插件', '连接', '日志', '设置'],
-    ['首頁', '節點', '訂閱', '鏈路', '規則', '插件', '連線', '日誌', '設定'],
+    ['首页', '节点', '订阅', '代理', '链路', '规则', '插件', '诊断', '设置'],
+    ['首頁', '節點', '訂閱', '代理', '鏈路', '規則', '插件', '診斷', '設定'],
   ]
   if (
     !sidebar.logoVisible ||
