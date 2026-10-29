@@ -34,6 +34,7 @@ import {
   BaseStyledTextField,
   type DialogRef,
 } from '@/components/base'
+import { ManualNodesCard } from '@/components/profile/manual-nodes-card'
 import { ProfileItem } from '@/components/profile/profile-item'
 import { ProfileMore } from '@/components/profile/profile-more'
 import {
@@ -41,7 +42,6 @@ import {
   type ProfileViewerRef,
 } from '@/components/profile/profile-viewer'
 import { ConfigViewer } from '@/components/setting/mods/config-viewer'
-import { ManualNodesCard } from '@/components/profile/manual-nodes-card'
 import { fetchProfilesIntoCache, useProfiles } from '@/hooks/use-profiles'
 import {
   createProfile,

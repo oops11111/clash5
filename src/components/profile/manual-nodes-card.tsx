@@ -72,7 +72,7 @@ export const ManualNodesCard = () => {
             })}
           </Typography>
         )}
-        <Stack direction="row" justifyContent="flex-end">
+        <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
           <Button
             variant="contained"
             size="small"

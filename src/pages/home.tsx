@@ -152,7 +152,7 @@ const HomeSettingsDialog = ({
             value={verge?.theme_mode}
             onChange={(mode) => void patchVerge({ theme_mode: mode })}
           />
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <Typography variant="body2">
               {t('home.page.settings.accent')}
             </Typography>

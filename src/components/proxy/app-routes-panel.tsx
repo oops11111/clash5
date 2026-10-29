@@ -124,8 +124,7 @@ export const AppRoutesPanel = () => {
               key={route.id}
               direction="row"
               spacing={1}
-              alignItems="center"
-              flexWrap="wrap"
+              sx={{ alignItems: 'center', flexWrap: 'wrap' }}
             >
               <Typography sx={{ minWidth: 160, fontWeight: 600 }}>
                 {processName ?? route.name}
@@ -164,7 +163,11 @@ export const AppRoutesPanel = () => {
           )
         })}
 
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+        >
           <TextField
             size="small"
             placeholder={t('proxies.apps.placeholder')}
