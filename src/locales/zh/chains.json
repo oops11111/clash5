@@ -116,5 +116,6 @@
     "warning": "警告",
     "failed": "失败",
     "failedRun": "无法经过这条链路完成质量检测。"
-  }
+  },
+  "chainsTab": "链路"
 }

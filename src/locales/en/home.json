@@ -24,7 +24,12 @@
       },
       "title": "Home Settings"
     },
-    "title": "Home"
+    "title": "Home",
+    "sections": {
+      "status": "Status",
+      "traffic": "Traffic",
+      "tools": "Tools"
+    }
   },
   "components": {
     "proxyTun": {

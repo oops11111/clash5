@@ -24,7 +24,12 @@
       },
       "title": "首页设置"
     },
-    "title": "首页"
+    "title": "首页",
+    "sections": {
+      "status": "状态",
+      "traffic": "流量",
+      "tools": "工具"
+    }
   },
   "components": {
     "proxyTun": {

@@ -52,7 +52,14 @@ const ProxyPage = () => {
       contentStyle={{ height: '100%' }}
       title={t('proxies.page.title.default')}
       header={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            flexWrap: 'wrap',
+          }}
+        >
           <ProviderButton />
           <ButtonGroup size="small">
             {MODES.map((mode) => (

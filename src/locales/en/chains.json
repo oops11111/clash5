@@ -116,5 +116,6 @@
     "warning": "warning",
     "failed": "failed",
     "failedRun": "The quality test could not run through this chain."
-  }
+  },
+  "chainsTab": "Chains"
 }

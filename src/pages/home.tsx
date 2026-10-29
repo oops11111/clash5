@@ -20,6 +20,7 @@ import {
   IconButton,
   Skeleton,
   Tooltip,
+  Typography,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import { Suspense, lazy, useCallback, useMemo, useState } from 'react'
@@ -353,11 +354,13 @@ const HomePage = () => {
         </Box>
       }
     >
-      <Grid container spacing={1.5} columns={{ xs: 6, sm: 6, md: 12 }}>
-        {criticalCards}
-
-        {nonCriticalCards}
-      </Grid>
+      {homeSection(t('home.page.sections.status'), criticalCards)}
+      {/* nonCriticalCards starts with the traffic card, the rest are tools. */}
+      {homeSection(
+        t('home.page.sections.traffic'),
+        nonCriticalCards.slice(0, 1),
+      )}
+      {homeSection(t('home.page.sections.tools'), nonCriticalCards.slice(1))}
 
       {/* 首页设置弹窗 */}
       {settingsOpen && (
@@ -370,6 +373,19 @@ const HomePage = () => {
     </BasePage>
   )
 }
+
+// Renders a titled group of cards, or nothing when every card in it is hidden.
+const homeSection = (title: string, cards: React.ReactNode[]) =>
+  cards.some(Boolean) ? (
+    <Box key={title} sx={{ mb: 2 }}>
+      <Typography variant="overline" color="text.secondary">
+        {title}
+      </Typography>
+      <Grid container spacing={1.5} columns={{ xs: 6, sm: 6, md: 12 }}>
+        {cards}
+      </Grid>
+    </Box>
+  ) : null
 
 // 增强版网络设置卡片组件
 const NetworkSettingsCard = () => {

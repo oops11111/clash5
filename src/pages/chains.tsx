@@ -147,7 +147,7 @@ const ChainsPage = () => {
   const { t } = useTranslation()
   const [workspace, setWorkspace] = useState<ChainWorkspace | null>(null)
   const [draft, setDraft] = useState<Clash5Chain | null>(null)
-  const [tab, setTab] = useState('visual')
+  const [tab, setTab] = useState('chains')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [severity, setSeverity] = useState<'success' | 'warning' | 'error'>(
@@ -276,7 +276,7 @@ const ChainsPage = () => {
     setExitResult(null)
     setQuality(null)
     setMessage('')
-    setTab('visual')
+    setTab('chains')
   }
 
   const updateHop = (index: number, hop: ChainHopRef) => {
@@ -432,11 +432,9 @@ const ChainsPage = () => {
             onChange={(_, value: string) => setTab(value)}
             variant="scrollable"
           >
-            <Tab value="visual" label={t('chains.visual')} />
-            <Tab value="list" label={t('chains.list')} />
+            <Tab value="chains" label={t('chains.chainsTab')} />
             <Tab value="pools" label={t('chains.pools')} />
             <Tab value="apps" label={t('chains.apps')} />
-            <Tab value="templates" label={t('chains.templates')} />
           </Tabs>
           <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
             <Button
@@ -530,7 +528,60 @@ const ChainsPage = () => {
         {message && <Alert severity={severity}>{message}</Alert>}
         {busy && <CircularProgress size={20} />}
         {!workspace && !message && <CircularProgress size={24} />}
-        {workspace && draft && tab === 'visual' && (
+        {workspace && tab === 'chains' && (
+          <Stack spacing={1}>
+            <Button
+              variant="outlined"
+              disabled={busy}
+              onClick={() => {
+                setDraft(newChain(workspace))
+                setTab('chains')
+                setExitResult(null)
+              }}
+            >
+              {t('chains.create')}
+            </Button>
+            {workspace.chains.length === 0 && (
+              <Alert severity="info">{t('chains.empty')}</Alert>
+            )}
+            {workspace.chains.map((chain) => (
+              <Paper
+                key={chain.id}
+                variant="outlined"
+                sx={{ p: 2, borderRadius: 3 }}
+              >
+                <Stack
+                  direction="row"
+                  sx={{ gap: 1, alignItems: 'center', flexWrap: 'wrap' }}
+                >
+                  <Button onClick={() => choose(chain)} disabled={busy}>
+                    {chain.name}
+                  </Button>
+                  <Chip
+                    size="small"
+                    label={t(
+                      chain.enabled ? 'chains.enabled' : 'chains.disabled',
+                    )}
+                  />
+                  <Button
+                    color="error"
+                    disabled={busy}
+                    onClick={() =>
+                      void perform(async () => {
+                        await deleteClash5Chain(chain.id)
+                        await load()
+                        report(t('chains.deleted'))
+                      })
+                    }
+                  >
+                    {t('chains.delete')}
+                  </Button>
+                </Stack>
+              </Paper>
+            ))}
+          </Stack>
+        )}
+        {workspace && draft && tab === 'chains' && (
           <Box
             sx={{
               display: 'grid',
@@ -888,59 +939,6 @@ const ChainsPage = () => {
               </Stack>
             </Paper>
           </Box>
-        )}
-        {workspace && tab === 'list' && (
-          <Stack spacing={1}>
-            <Button
-              variant="outlined"
-              disabled={busy}
-              onClick={() => {
-                setDraft(newChain(workspace))
-                setTab('visual')
-                setExitResult(null)
-              }}
-            >
-              {t('chains.create')}
-            </Button>
-            {workspace.chains.length === 0 && (
-              <Alert severity="info">{t('chains.empty')}</Alert>
-            )}
-            {workspace.chains.map((chain) => (
-              <Paper
-                key={chain.id}
-                variant="outlined"
-                sx={{ p: 2, borderRadius: 3 }}
-              >
-                <Stack
-                  direction="row"
-                  sx={{ gap: 1, alignItems: 'center', flexWrap: 'wrap' }}
-                >
-                  <Button onClick={() => choose(chain)} disabled={busy}>
-                    {chain.name}
-                  </Button>
-                  <Chip
-                    size="small"
-                    label={t(
-                      chain.enabled ? 'chains.enabled' : 'chains.disabled',
-                    )}
-                  />
-                  <Button
-                    color="error"
-                    disabled={busy}
-                    onClick={() =>
-                      void perform(async () => {
-                        await deleteClash5Chain(chain.id)
-                        await load()
-                        report(t('chains.deleted'))
-                      })
-                    }
-                  >
-                    {t('chains.delete')}
-                  </Button>
-                </Stack>
-              </Paper>
-            ))}
-          </Stack>
         )}
         {workspace && tab === 'apps' && (
           <Stack spacing={2}>
@@ -1330,26 +1328,6 @@ const ChainsPage = () => {
               </Paper>
             ))}
           </Stack>
-        )}
-        {workspace && tab === 'templates' && (
-          <Paper variant="outlined" sx={{ p: 3, borderRadius: 3 }}>
-            <Typography variant="subtitle1">
-              {t('chains.twoHopTemplate')}
-            </Typography>
-            <Typography color="text.secondary" sx={{ my: 1 }}>
-              {t('chains.twoHopHint')}
-            </Typography>
-            <Button
-              disabled={busy}
-              onClick={() => {
-                setDraft(newChain(workspace))
-                setTab('visual')
-                setExitResult(null)
-              }}
-            >
-              {t('chains.useTemplate')}
-            </Button>
-          </Paper>
         )}
       </Stack>
     </BasePage>

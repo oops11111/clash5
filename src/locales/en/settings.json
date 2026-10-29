@@ -92,9 +92,9 @@
       }
     },
     "appearance": {
-      "light": "Light",
-      "dark": "Dark",
-      "system": "System"
+      "light": "White",
+      "dark": "Black",
+      "system": "Follow system"
     },
     "clash": {
       "title": "Clash Setting",

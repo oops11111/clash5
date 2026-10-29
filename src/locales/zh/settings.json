@@ -92,9 +92,9 @@
       }
     },
     "appearance": {
-      "light": "浅色",
-      "dark": "深色",
-      "system": "系统"
+      "light": "白色",
+      "dark": "黑色",
+      "system": "跟随系统"
     },
     "clash": {
       "title": "Clash 设置",

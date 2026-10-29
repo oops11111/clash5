@@ -32,6 +32,7 @@ export interface TranslationResources {
       appSaved: string
       appSaveRoute: string
       appTarget: string
+      chainsTab: string
       create: string
       createPool: string
       delete: string
@@ -290,6 +291,11 @@ export interface TranslationResources {
           networkSettings: string
           proxyMode: string
           trafficStats: string
+        }
+        sections: {
+          status: string
+          tools: string
+          traffic: string
         }
         settings: {
           cards: {
