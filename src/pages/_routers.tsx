@@ -2,6 +2,8 @@ import { createBrowserRouter, RouteObject } from 'react-router'
 
 import Layout from './_layout'
 import { navItems } from './_navigation'
+import ConnectionsPage from './connections'
+import LogsPage from './logs'
 import ProxyPage from './proxies'
 import UnlockPage from './unlock'
 
@@ -20,6 +22,9 @@ export const router = createBrowserRouter([
       .concat([
         { path: '/proxies', Component: ProxyPage },
         { path: '/unlock', Component: UnlockPage },
+        // Still routed so a saved start page keeps working; the sidebar shows Diagnostics.
+        { path: '/connections', Component: ConnectionsPage },
+        { path: '/logs', Component: LogsPage },
       ]),
   },
 ])

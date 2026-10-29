@@ -5,12 +5,10 @@ import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined'
 import LanguageOutlinedIcon from '@mui/icons-material/LanguageOutlined'
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
-import SubjectOutlinedIcon from '@mui/icons-material/SubjectOutlined'
 import { type ComponentType, type ReactNode } from 'react'
 
 import ConnectionsSvg from '@/assets/image/itemicon/connections.svg?react'
 import HomeSvg from '@/assets/image/itemicon/home.svg?react'
-import LogsSvg from '@/assets/image/itemicon/logs.svg?react'
 import ProfilesSvg from '@/assets/image/itemicon/profiles.svg?react'
 import ProxiesSvg from '@/assets/image/itemicon/proxies.svg?react'
 import RulesSvg from '@/assets/image/itemicon/rules.svg?react'
@@ -18,9 +16,8 @@ import SettingsSvg from '@/assets/image/itemicon/settings.svg?react'
 
 import { navigationItems } from './_navigation-meta'
 import ChainsPage from './chains'
-import ConnectionsPage from './connections'
+import DiagnosticsPage from './diagnostics'
 import HomePage from './home'
-import LogsPage from './logs'
 import NodePoolPage from './node-pool'
 import PluginsPage from './plugins'
 import ProfilePage from './profiles'
@@ -72,14 +69,9 @@ export const navItems: NavigationItem[] = [
     Component: PluginsPage,
   },
   {
-    ...navigationItems.connections,
+    ...navigationItems.diagnostics,
     icon: [<LanguageOutlinedIcon key="mui" />, <ConnectionsSvg key="svg" />],
-    Component: ConnectionsPage,
-  },
-  {
-    ...navigationItems.logs,
-    icon: [<SubjectOutlinedIcon key="mui" />, <LogsSvg key="svg" />],
-    Component: LogsPage,
+    Component: DiagnosticsPage,
   },
   {
     ...navigationItems.settings,

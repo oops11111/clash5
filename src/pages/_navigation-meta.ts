@@ -17,6 +17,10 @@ export const navigationItems = {
     label: 'layout.components.navigation.tabs.plugins',
     path: '/plugins',
   },
+  diagnostics: {
+    label: 'layout.components.navigation.tabs.diagnostics',
+    path: '/diagnostics',
+  },
   connections: {
     label: 'layout.components.navigation.tabs.connections',
     path: '/connections',

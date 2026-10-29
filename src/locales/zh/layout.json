@@ -12,7 +12,8 @@
         "rules": "规则",
         "logs": "日志",
         "unlock": "测 试",
-        "settings": "设置"
+        "settings": "设置",
+        "diagnostics": "诊断"
       },
       "proxyGroups": "代理组",
       "diagnostics": "解锁测试",

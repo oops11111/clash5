@@ -12,7 +12,8 @@
         "rules": "Rules",
         "logs": "Logs",
         "unlock": "Test",
-        "settings": "Settings"
+        "settings": "Settings",
+        "diagnostics": "Diagnostics"
       },
       "proxyGroups": "Proxy groups",
       "diagnostics": "Unlock tests",

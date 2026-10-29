@@ -20,6 +20,7 @@ import {
 } from '@mui/material'
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router'
 
 import { BasePage } from '@/components/base'
 import {
@@ -145,6 +146,7 @@ const failureCode = (error: unknown) => {
 
 const ChainsPage = () => {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [workspace, setWorkspace] = useState<ChainWorkspace | null>(null)
   const [draft, setDraft] = useState<Clash5Chain | null>(null)
   const [tab, setTab] = useState('chains')
@@ -628,13 +630,18 @@ const ChainsPage = () => {
                     </Fragment>
                   ))}
                 </Stack>
-                <Button
-                  size="small"
-                  disabled={busy || draft.hops.length >= MAX_HOPS}
-                  onClick={addHop}
-                >
-                  {t('chains.addHop')}
-                </Button>
+                <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
+                  <Button
+                    size="small"
+                    disabled={busy || draft.hops.length >= MAX_HOPS}
+                    onClick={addHop}
+                  >
+                    {t('chains.addHop')}
+                  </Button>
+                  <Button size="small" onClick={() => navigate('/nodes')}>
+                    {t('chains.manageNodes')}
+                  </Button>
+                </Stack>
                 <Typography color="text.secondary" variant="body2">
                   {t('chains.hopsHint')}
                 </Typography>

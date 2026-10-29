@@ -60,6 +60,7 @@ export interface TranslationResources {
       inspector: string
       landing: string
       list: string
+      manageNodes: string
       manual: string
       missingChain: string
       missingNode: string
@@ -439,6 +440,7 @@ export interface TranslationResources {
           tabs: {
             chains: string
             connections: string
+            diagnostics: string
             home: string
             logs: string
             nodePool: string

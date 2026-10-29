@@ -50,7 +50,7 @@
   "hopsHint": "A chain has 2 to 6 hops. Each hop is a node or a pool. Traffic dials through the hops in order.",
   "adjacentHops": "Two adjacent hops cannot be the same node.",
   "missingPool": "Missing pool",
-  "pools": "Pools",
+  "pools": "Node groups",
   "createPool": "Create a pool",
   "poolName": "Pool name",
   "poolMembers": "Members (1 to 32)",
@@ -117,5 +117,6 @@
     "failed": "failed",
     "failedRun": "The quality test could not run through this chain."
   },
-  "chainsTab": "Chains"
+  "chainsTab": "Chains",
+  "manageNodes": "Manage nodes"
 }
