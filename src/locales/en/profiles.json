@@ -131,7 +131,8 @@
         "useSystemProxy": "Use System Proxy",
         "useClashProxy": "Use Clash Proxy",
         "acceptInvalidCerts": "Allows Invalid Certificates (Danger)",
-        "allowAutoUpdate": "Allow Auto Update"
+        "allowAutoUpdate": "Allow Auto Update",
+        "decoupleRules": "Send subscription rules to the default proxy"
       },
       "types": {
         "remote": "Remote",

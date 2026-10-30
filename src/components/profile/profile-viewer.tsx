@@ -56,6 +56,7 @@ export function ProfileViewer({ onChange, ref }: ProfileViewerProps) {
         option: {
           with_proxy: false,
           self_proxy: false,
+          decouple_rules: true,
           allow_auto_update: true,
         },
       },
@@ -427,6 +428,23 @@ export function ProfileViewer({ onChange, ref }: ProfileViewerProps) {
                   {t('profiles.modals.profileForm.fields.useClashProxy')}
                 </InputLabel>
                 <Switch checked={field.value} {...field} color="primary" />
+              </StyledBox>
+            )}
+          />
+
+          <Controller
+            name="option.decouple_rules"
+            control={control}
+            render={({ field }) => (
+              <StyledBox>
+                <InputLabel>
+                  {t('profiles.modals.profileForm.fields.decoupleRules')}
+                </InputLabel>
+                <Switch
+                  checked={field.value ?? true}
+                  onChange={(_, checked) => field.onChange(checked)}
+                  color="primary"
+                />
               </StyledBox>
             )}
           />

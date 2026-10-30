@@ -244,6 +244,7 @@ interface IProfileOption {
   user_agent?: string
   with_proxy?: boolean
   self_proxy?: boolean
+  decouple_rules?: boolean
   update_interval?: number
   timeout_seconds?: number
   danger_accept_invalid_certs?: boolean

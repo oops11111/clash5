@@ -111,6 +111,10 @@ pub struct PrfOption {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub self_proxy: Option<bool>,
 
+    /// Replace this subscription's proxy policies with the default proxy. `None` means `true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decouple_rules: Option<bool>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     #[specta(type = Option<specta_typescript::Number>)]
     pub update_interval: Option<u64>,

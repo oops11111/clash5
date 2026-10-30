@@ -525,6 +525,7 @@ export const translationKeys = [
   'profiles.modals.profileForm.fields.useClashProxy',
   'profiles.modals.profileForm.fields.acceptInvalidCerts',
   'profiles.modals.profileForm.fields.allowAutoUpdate',
+  'profiles.modals.profileForm.fields.decoupleRules',
   'profiles.modals.profileForm.types.remote',
   'profiles.modals.profileForm.types.local',
   'profiles.modals.profileForm.errors.typeRequired',

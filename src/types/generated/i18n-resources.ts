@@ -701,6 +701,7 @@ export interface TranslationResources {
           fields: {
             acceptInvalidCerts: string
             allowAutoUpdate: string
+            decoupleRules: string
             description: string
             httpTimeout: string
             subscriptionUrl: string

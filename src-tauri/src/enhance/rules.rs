@@ -171,7 +171,8 @@ const fn target_policy(target: RuleTarget, default: &str) -> &str {
 }
 
 /// Applies the rule pipeline to a subscription config before its rules-editor sequences.
-pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet]) -> Mapping {
+/// With `decouple` off, the subscription's own policies are kept and only text rules are merged.
+pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decouple: bool) -> Mapping {
     let groups: Vec<String> = config
         .get("proxy-groups")
         .and_then(Value::as_sequence)
@@ -196,7 +197,11 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet]) -> Mapp
         .iter()
         .flat_map(|set| parse_text_rules(&set.content, target_policy(set.target, &default)).rules)
         .collect();
-    let decoupled: Vec<String> = subscription.iter().map(|rule| decouple_rule(rule, &default)).collect();
+    let decoupled: Vec<String> = if decouple {
+        subscription.iter().map(|rule| decouple_rule(rule, &default)).collect()
+    } else {
+        subscription.clone()
+    };
 
     if decoupled.is_empty() && custom.is_empty() {
         return config;
@@ -289,6 +294,30 @@ mod tests {
                 merged: 0,
                 conflicts: 1
             }
+        );
+    }
+
+    #[test]
+    fn turning_decoupling_off_keeps_subscription_policies() {
+        let config: Mapping = serde_yaml_ng::from_str(
+            "proxy-groups: [{name: Auto}, {name: Proxy}]\nrules: ['DOMAIN-SUFFIX,a.com,Auto', 'MATCH,Proxy']",
+        )
+        .unwrap();
+        let rules_of = |config: &Mapping| -> Vec<String> {
+            config["rules"]
+                .as_sequence()
+                .unwrap()
+                .iter()
+                .map(|rule| rule.as_str().unwrap().to_owned())
+                .collect()
+        };
+        assert_eq!(
+            rules_of(&apply(config.clone(), &[], true)),
+            rules(&["DOMAIN-SUFFIX,a.com,Proxy", "MATCH,Proxy"])
+        );
+        assert_eq!(
+            rules_of(&apply(config, &[], false)),
+            rules(&["DOMAIN-SUFFIX,a.com,Auto", "MATCH,Proxy"])
         );
     }
 }

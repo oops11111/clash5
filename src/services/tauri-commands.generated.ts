@@ -544,6 +544,8 @@ export const commands = {
       user_agent?: string | null
       with_proxy?: boolean | null
       self_proxy?: boolean | null
+      /**  Replace this subscription's proxy policies with the default proxy. `None` means `true`. */
+      decouple_rules?: boolean | null
       update_interval?: number | null
       /**
        *  HTTP request timeout in seconds
@@ -573,6 +575,8 @@ export const commands = {
       user_agent?: string | null
       with_proxy?: boolean | null
       self_proxy?: boolean | null
+      /**  Replace this subscription's proxy policies with the default proxy. `None` means `true`. */
+      decouple_rules?: boolean | null
       update_interval?: number | null
       /**
        *  HTTP request timeout in seconds
@@ -1412,6 +1416,8 @@ export type PrfOption_Deserialize = {
   user_agent?: string | null
   with_proxy?: boolean | null
   self_proxy?: boolean | null
+  /**  Replace this subscription's proxy policies with the default proxy. `None` means `true`. */
+  decouple_rules?: boolean | null
   update_interval?: number | null
   /**
    *  HTTP request timeout in seconds
@@ -1432,6 +1438,8 @@ export type PrfOption_Serialize = {
   user_agent?: string | null
   with_proxy?: boolean | null
   self_proxy?: boolean | null
+  /**  Replace this subscription's proxy policies with the default proxy. `None` means `true`. */
+  decouple_rules?: boolean | null
   update_interval?: number | null
   /**
    *  HTTP request timeout in seconds

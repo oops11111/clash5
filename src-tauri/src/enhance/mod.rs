@@ -908,7 +908,13 @@ pub async fn enhance(
         dns_override_confirmation,
     );
     let enable_dns_settings = dns_override.enabled;
-    let config = rules::apply(profile.config, &text_rule_sets);
+    let decouple_rules = profiles
+        .get_item(profile_uid)
+        .ok()
+        .and_then(|item| item.option.as_ref())
+        .and_then(|option| option.decouple_rules)
+        .unwrap_or(true);
+    let config = rules::apply(profile.config, &text_rule_sets, decouple_rules);
     let merge_item = profile.merge_item;
     let script_item = profile.script_item;
     let rules_item = profile.rules_item;
