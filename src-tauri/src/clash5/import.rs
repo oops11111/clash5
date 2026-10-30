@@ -94,6 +94,9 @@ pub(crate) fn ensure_separate_data_dirs(source: &Path, target: &Path) -> Result<
 }
 
 fn safe_profile_filename(raw: &str) -> Result<&Path> {
+    if raw.contains('\\') {
+        bail!("profile path must be a filename");
+    }
     let path = Path::new(raw);
     let mut components = path.components();
     if !matches!(components.next(), Some(Component::Normal(_))) || components.next().is_some() {
