@@ -1,4 +1,11 @@
-import { Box } from '@mui/material'
+import { ExpandMoreRounded } from '@mui/icons-material'
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Box,
+  Typography,
+} from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -12,6 +19,7 @@ import {
 import { ScrollTopButton } from '@/components/layout/scroll-top-button'
 import { ProviderButton } from '@/components/rule/provider-button'
 import RuleItem from '@/components/rule/rule-item'
+import { TextRuleSets } from '@/components/rule/text-rule-sets'
 import { useVisibility } from '@/hooks/use-visibility'
 import { useAppRefreshers, useRulesData } from '@/providers/app-data-context'
 
@@ -69,6 +77,17 @@ const RulesPage = () => {
         </Box>
       }
     >
+      <Accordion disableGutters variant="outlined" sx={{ mx: '10px', mt: 1 }}>
+        <AccordionSummary expandIcon={<ExpandMoreRounded />}>
+          <Typography sx={{ fontWeight: 600 }}>
+            {t('rules.textRules.title')}
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <TextRuleSets rules={rules} />
+        </AccordionDetails>
+      </Accordion>
+
       <Box
         sx={{
           pt: 1,

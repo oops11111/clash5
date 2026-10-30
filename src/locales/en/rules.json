@@ -78,5 +78,23 @@
       },
       "title": "Edit Rules"
     }
+  },
+  "textRules": {
+    "title": "Text rules",
+    "hint": "Paste rules as TYPE,content lines. They take precedence over subscription rules.",
+    "empty": "No text rule sets yet.",
+    "name": "Name",
+    "content": "Rules",
+    "placeholder": "DOMAIN-SUFFIX,example.com\nIP-CIDR,10.0.0.0/8",
+    "targetLabel": "Target",
+    "targets": {
+      "default": "Default proxy",
+      "direct": "Direct",
+      "reject": "Reject"
+    },
+    "count": "{{count}} rules",
+    "delete": "Delete {{name}}",
+    "add": "Add",
+    "preview": "{{valid}} valid: {{added}} new, {{merged}} merged, {{invalid}} invalid"
   }
 }

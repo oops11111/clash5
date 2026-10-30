@@ -1019,6 +1019,24 @@ export interface TranslationResources {
         }
         title: string
       }
+      textRules: {
+        add: string
+        content: string
+        count: string
+        delete: string
+        empty: string
+        hint: string
+        name: string
+        placeholder: string
+        preview: string
+        targetLabel: string
+        targets: {
+          default: string
+          direct: string
+          reject: string
+        }
+        title: string
+      }
     }
     settings: {
       components: {

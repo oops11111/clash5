@@ -948,6 +948,12 @@ interface IVergeConfig {
   home_cards?: Record<string, boolean>
   traffic_refresh_seconds?: number
   ip_auto_refresh_minutes?: number
+  text_rule_sets?: {
+    id: string
+    name: string
+    target: 'default' | 'direct' | 'reject'
+    content: string
+  }[]
   enable_hover_jump_navigator?: boolean
   hover_jump_navigator_delay?: number
   enable_external_controller?: boolean

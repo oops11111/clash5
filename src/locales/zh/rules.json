@@ -78,5 +78,23 @@
       },
       "title": "编辑规则"
     }
+  },
+  "textRules": {
+    "title": "文本规则",
+    "hint": "每行一条，格式：类型,内容。文本规则优先于订阅规则。",
+    "empty": "还没有文本规则。",
+    "name": "名称",
+    "content": "规则内容",
+    "placeholder": "DOMAIN-SUFFIX,example.com\nIP-CIDR,10.0.0.0/8",
+    "targetLabel": "目标",
+    "targets": {
+      "default": "默认代理",
+      "direct": "直连",
+      "reject": "拒绝"
+    },
+    "count": "{{count}} 条",
+    "delete": "删除 {{name}}",
+    "add": "添加",
+    "preview": "有效 {{valid}} 条：新增 {{added}} 条，合并 {{merged}} 条，无效 {{invalid}} 条"
   }
 }
