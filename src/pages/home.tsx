@@ -69,6 +69,11 @@ const LazyTestCard = lazy(preloadTestCard)
 const LazyIpInfoCard = lazy(preloadIpInfoCard)
 const LazyClashInfoCard = lazy(preloadClashInfoCard)
 const LazySystemInfoCard = lazy(preloadSystemInfoCard)
+const LazyDnsCheckCard = lazy(() =>
+  import('@/components/home/dns-check-card').then((module) => ({
+    default: module.DnsCheckCard,
+  })),
+)
 
 // Used by bootstrap to initiate optional card imports without blocking render.
 // eslint-disable-next-line react-refresh/only-export-components
@@ -90,6 +95,7 @@ interface HomeCardsSettings {
   info: boolean
   clashinfo: boolean
   systeminfo: boolean
+  dns: boolean
   test: boolean
   ip: boolean
   [key: string]: boolean
@@ -104,6 +110,7 @@ const DEFAULT_HOME_CARDS: HomeCardsSettings = {
   traffic: true,
   clashinfo: true,
   systeminfo: true,
+  dns: true,
   test: true,
   ip: false,
 }
@@ -136,7 +143,7 @@ const HomeSettingsDialog = ({
   const handleToggle = (key: string) => {
     setCards((prev: HomeCardsSettings) => ({
       ...prev,
-      [key]: !prev[key],
+      [key]: !(prev[key] ?? DEFAULT_HOME_CARDS[key]),
     }))
   }
 
@@ -270,6 +277,15 @@ const HomeSettingsDialog = ({
               />
             }
             label={t('home.page.settings.cards.systemInfo')}
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={cards.dns ?? DEFAULT_HOME_CARDS.dns}
+                onChange={() => handleToggle('dns')}
+              />
+            }
+            label={t('home.page.settings.cards.dns')}
           />
         </FormGroup>
         <Typography variant="overline" color="text.secondary">
@@ -406,7 +422,7 @@ const HomePage = () => {
 
   const renderCard = useCallback(
     (cardKey: string, component: React.ReactNode, size: number = 6) => {
-      if (!homeCards[cardKey]) return null
+      if (!(homeCards[cardKey] ?? DEFAULT_HOME_CARDS[cardKey])) return null
 
       return (
         <Grid size={size} key={cardKey}>
@@ -465,6 +481,12 @@ const HomePage = () => {
         'systeminfo',
         <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
           <LazySystemInfoCard />
+        </Suspense>,
+      ),
+      renderCard(
+        'dns',
+        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
+          <LazyDnsCheckCard />
         </Suspense>,
       ),
     ],

@@ -20,7 +20,8 @@
         "tests": "网站测试卡",
         "ip": "IP 信息卡",
         "clashInfo": "Clash 信息卡",
-        "systemInfo": "系统信息卡"
+        "systemInfo": "系统信息卡",
+        "dns": "DNS 检测卡"
       },
       "title": "首页设置",
       "appearance": "外观",
@@ -173,6 +174,20 @@
         "rule": "基于预设规则智能判断流量走向，提供灵活的代理策略",
         "global": "所有流量均通过代理服务器，适用于需要全局科学上网的场景",
         "direct": "所有流量不经过代理节点，但经过 Clash 内核转发连接目标服务器，适用于需要通过内核进行分流的特定场景"
+      }
+    },
+    "dnsCheck": {
+      "title": "DNS 检测",
+      "primary": "主解析器",
+      "status": {
+        "checking": "检测中…",
+        "clean": "未发现明文 DNS 外发",
+        "unsupported": "当前平台暂不支持检测",
+        "leak": "发现 {{count}} 个明文 DNS 外发目标"
+      },
+      "actions": {
+        "refresh": "重新检测",
+        "details": "查看详情"
       }
     }
   }

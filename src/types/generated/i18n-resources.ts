@@ -211,6 +211,20 @@ export interface TranslationResources {
           }
           title: string
         }
+        dnsCheck: {
+          actions: {
+            details: string
+            refresh: string
+          }
+          primary: string
+          status: {
+            checking: string
+            clean: string
+            leak: string
+            unsupported: string
+          }
+          title: string
+        }
         ipInfo: {
           errors: {
             load: string
@@ -304,6 +318,7 @@ export interface TranslationResources {
           cards: {
             clashInfo: string
             currentProxy: string
+            dns: string
             ip: string
             network: string
             profile: string

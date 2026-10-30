@@ -20,7 +20,8 @@
         "tests": "Website Tests Card",
         "ip": "IP Information Card",
         "clashInfo": "Clash Info Cards",
-        "systemInfo": "System Info Cards"
+        "systemInfo": "System Info Cards",
+        "dns": "DNS Check Card"
       },
       "title": "Home Settings",
       "appearance": "Appearance",
@@ -173,6 +174,20 @@
         "rule": "Automatically choose proxies according to the rule set.",
         "global": "Forward all network requests through the selected proxy.",
         "direct": "Bypass the proxy and connect to the internet directly."
+      }
+    },
+    "dnsCheck": {
+      "title": "DNS check",
+      "primary": "Primary resolver",
+      "status": {
+        "checking": "Checking…",
+        "clean": "No plaintext DNS leaving this device",
+        "unsupported": "Not supported on this platform yet",
+        "leak": "{{count}} plaintext DNS query target(s) leaving this device"
+      },
+      "actions": {
+        "refresh": "Run again",
+        "details": "View details"
       }
     }
   }
