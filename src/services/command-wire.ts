@@ -104,6 +104,10 @@ export function vergeFromWire(value: IVerge_Serialize): IVergeConfig {
       0, 5, 30,
     ] as const),
     home_cards: config.home_cards == null ? undefined : homeCards,
+    text_rule_sets: config.text_rule_sets?.map((set) => ({
+      ...set,
+      url: set.url ?? null,
+    })),
     test_list: config.test_list?.flatMap((item) =>
       item.uid && item.url ? [{ ...item, uid: item.uid, url: item.url }] : [],
     ),
