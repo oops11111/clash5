@@ -22,15 +22,38 @@ import RuleItem from '@/components/rule/rule-item'
 import { TextRuleSets } from '@/components/rule/text-rule-sets'
 import { useVisibility } from '@/hooks/use-visibility'
 import { useAppRefreshers, useRulesData } from '@/providers/app-data-context'
+import { getClash5RuleNotes } from '@/services/cmds'
+import type { RuleNote } from '@/services/tauri-commands.generated'
+import { ruleKind } from '@/utils/text-rules'
 
 const RulesPage = () => {
   const { t } = useTranslation()
-  const { rules = [] } = useRulesData()
+  const { rules: rawRules } = useRulesData()
+  const rules = useMemo(() => rawRules ?? [], [rawRules])
   const { refreshRules, refreshRuleProviders } = useAppRefreshers()
   const [match, setMatch] = useState(() => (_: string) => true)
   const virtuosoRef = useRef<VirtualListHandle>(null)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const pageVisible = useVisibility()
+  const [notes, setNotes] = useState<RuleNote[]>([])
+
+  // Notes are produced when the config is built, so they refresh with the rule list.
+  useEffect(() => {
+    getClash5RuleNotes()
+      .then(setNotes)
+      .catch(() => setNotes([]))
+  }, [rules])
+
+  const noteByRule = useMemo(
+    () =>
+      new Map(
+        notes.map((note) => [
+          `${note.kind},${note.payload},${note.policy}`,
+          note,
+        ]),
+      ),
+    [notes],
+  )
 
   // 在组件挂载时和页面获得焦点时刷新规则数据
   useEffect(() => {
@@ -107,7 +130,13 @@ const RulesPage = () => {
             ref={virtuosoRef}
             count={filteredRules.length}
             estimateSize={40}
-            renderItem={(i) => <RuleItem value={filteredRules[i]} />}
+            renderItem={(i) => {
+              const rule = filteredRules[i]
+              const note = noteByRule.get(
+                `${ruleKind(rule.type)},${rule.payload ?? ''},${rule.proxy}`,
+              )
+              return <RuleItem value={rule} note={note} />
+            }}
             style={{ flex: 1 }}
             onScroll={handleScroll}
           />

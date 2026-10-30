@@ -17,6 +17,7 @@ import { showNotice } from '@/services/notice-service'
 import {
   parseTextRules,
   previewTextRules,
+  ruleKind,
   type TextRuleEntry,
 } from '@/utils/text-rules'
 
@@ -26,14 +27,6 @@ const TARGETS: RuleTargetKey[] = ['default', 'direct', 'reject']
 
 interface Props {
   rules: { type: unknown; payload?: string }[]
-}
-
-const ruleKind = (type: unknown): string => {
-  if (typeof type === 'string') return type.toUpperCase()
-  if (type && typeof type === 'object' && 'Unknown' in type) {
-    return String((type as { Unknown: unknown }).Unknown).toUpperCase()
-  }
-  return ''
 }
 
 export const TextRuleSets = ({ rules }: Props) => {

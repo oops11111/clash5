@@ -2,7 +2,7 @@ use crate::core::notify::NoticeStatus;
 mod chain;
 pub mod field;
 mod merge;
-mod rules;
+pub(crate) mod rules;
 mod script;
 pub mod seq;
 mod tun;
@@ -914,7 +914,8 @@ pub async fn enhance(
         .and_then(|item| item.option.as_ref())
         .and_then(|option| option.decouple_rules)
         .unwrap_or(true);
-    let config = rules::apply(profile.config, &text_rule_sets, decouple_rules);
+    let (config, rule_notes) = rules::apply(profile.config, &text_rule_sets, decouple_rules);
+    rules::store_notes(rule_notes);
     let merge_item = profile.merge_item;
     let script_item = profile.script_item;
     let rules_item = profile.rules_item;

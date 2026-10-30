@@ -724,6 +724,8 @@ export const translationKeys = [
   'rules.textRules.delete',
   'rules.textRules.add',
   'rules.textRules.preview',
+  'rules.notes.subscription',
+  'rules.notes.merged',
   'settings.page.groupsLabel',
   'settings.page.groups.appearance',
   'settings.page.groups.system',

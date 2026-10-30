@@ -16,6 +16,15 @@ const RULE_TYPES = new Set([
   'RULE-SET',
 ])
 
+// Runtime rules report their type as a string or as `{ Unknown: string }`.
+export const ruleKind = (type: unknown): string => {
+  if (typeof type === 'string') return type.toUpperCase()
+  if (type && typeof type === 'object' && 'Unknown' in type) {
+    return String((type as { Unknown: unknown }).Unknown).toUpperCase()
+  }
+  return ''
+}
+
 export interface TextRuleEntry {
   kind: string
   payload: string

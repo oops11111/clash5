@@ -518,6 +518,10 @@ export const commands = {
     typedError<DnsCheckReport, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_dns_check'),
     ),
+  clash5RuleNotes: () =>
+    typedError<RuleNote[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_rule_notes'),
+    ),
   enhanceProfiles: () =>
     typedError<ValidationOutcome, CommandFailure_Serialize>(
       __TAURI_INVOKE('enhance_profiles'),
@@ -1668,6 +1672,17 @@ export type RouteTarget =
   | { kind: 'chain'; chain_id: string }
   | { kind: 'direct' }
   | { kind: 'reject' }
+
+/**  How a rule in the generated config was produced, for the rules page. */
+export type RuleNote = {
+  kind: string
+  payload: string
+  policy: string
+  /**  Name of the text rule set that supplied the rule first; `None` for subscription rules. */
+  source: string | null
+  /**  Number of identical rules merged into this one. */
+  merged: number
+}
 
 /**  Where the rules of a text rule set send traffic. */
 export type RuleTarget =

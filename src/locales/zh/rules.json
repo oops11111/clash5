@@ -96,5 +96,9 @@
     "delete": "删除 {{name}}",
     "add": "添加",
     "preview": "有效 {{valid}} 条：新增 {{added}} 条，合并 {{merged}} 条，无效 {{invalid}} 条"
+  },
+  "notes": {
+    "subscription": "订阅规则",
+    "merged": "合并 {{count}} 条"
   }
 }

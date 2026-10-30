@@ -1009,6 +1009,10 @@ export interface TranslationResources {
           title: string
         }
       }
+      notes: {
+        merged: string
+        subscription: string
+      }
       page: {
         provider: {
           actions: {

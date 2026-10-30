@@ -96,5 +96,9 @@
     "delete": "Delete {{name}}",
     "add": "Add",
     "preview": "{{valid}} valid: {{added}} new, {{merged}} merged, {{invalid}} invalid"
+  },
+  "notes": {
+    "subscription": "Subscription rules",
+    "merged": "Merged {{count}}"
   }
 }

@@ -1,5 +1,8 @@
 import { styled, Box, Typography } from '@mui/material'
+import { useTranslation } from 'react-i18next'
 import { Rule } from 'tauri-plugin-mihomo-api'
+
+import type { RuleNote } from '@/services/tauri-commands.generated'
 
 const Item = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -17,6 +20,7 @@ const COLOR = [
 
 interface Props {
   value: Rule & { lineNo: number }
+  note?: RuleNote
 }
 
 const parseColor = (text: string) => {
@@ -31,7 +35,8 @@ const parseColor = (text: string) => {
 }
 
 const RuleItem = (props: Props) => {
-  const { value } = props
+  const { value, note } = props
+  const { t } = useTranslation()
 
   return (
     <Item sx={{ borderBottom: '1px solid var(--divider-color)' }}>
@@ -64,6 +69,19 @@ const RuleItem = (props: Props) => {
         >
           {value.proxy}
         </Typography>
+
+        {note && (
+          <Typography
+            component="div"
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 0.25 }}
+          >
+            {note.source ?? t('rules.notes.subscription')}
+            {note.merged > 0 &&
+              ` · ${t('rules.notes.merged', { count: note.merged })}`}
+          </Typography>
+        )}
       </Box>
     </Item>
   )

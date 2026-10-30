@@ -7,8 +7,32 @@
 
 use crate::config::{RuleTarget, TextRuleSet};
 use clash_verge_logging::{Type, logging};
+use parking_lot::Mutex;
+use serde::Serialize;
 use serde_yaml_ng::{Mapping, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, btree_map::Entry};
+
+/// How a rule in the generated config was produced, for the rules page.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct RuleNote {
+    pub kind: std::string::String,
+    pub payload: std::string::String,
+    pub policy: std::string::String,
+    /// Name of the text rule set that supplied the rule first; `None` for subscription rules.
+    pub source: Option<std::string::String>,
+    /// Number of identical rules merged into this one.
+    pub merged: u32,
+}
+
+static NOTES: Mutex<Vec<RuleNote>> = Mutex::new(Vec::new());
+
+pub(crate) fn store_notes(notes: Vec<RuleNote>) {
+    *NOTES.lock() = notes;
+}
+
+pub(crate) fn rule_notes() -> Vec<RuleNote> {
+    NOTES.lock().clone()
+}
 
 const KEPT_POLICIES: [&str; 4] = ["DIRECT", "REJECT", "REJECT-DROP", "PASS"];
 
@@ -172,7 +196,7 @@ const fn target_policy(target: RuleTarget, default: &str) -> &str {
 
 /// Applies the rule pipeline to a subscription config before its rules-editor sequences.
 /// With `decouple` off, the subscription's own policies are kept and only text rules are merged.
-pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decouple: bool) -> Mapping {
+pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decouple: bool) -> (Mapping, Vec<RuleNote>) {
     let groups: Vec<String> = config
         .get("proxy-groups")
         .and_then(Value::as_sequence)
@@ -190,12 +214,18 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
     let rule_refs: Vec<&str> = subscription.iter().map(String::as_str).collect();
 
     let Some(default) = default_target(&rule_refs, &groups) else {
-        return config;
+        return (config, Vec::new());
     };
 
-    let custom: Vec<String> = text_rule_sets
+    let custom: Vec<(String, String)> = text_rule_sets
         .iter()
-        .flat_map(|set| parse_text_rules(&set.content, target_policy(set.target, &default)).rules)
+        .flat_map(|set| {
+            let target = target_policy(set.target, &default);
+            parse_text_rules(&set.content, target)
+                .rules
+                .into_iter()
+                .map(move |rule| (set.name.clone(), rule))
+        })
         .collect();
     let decoupled: Vec<String> = if decouple {
         subscription.iter().map(|rule| decouple_rule(rule, &default)).collect()
@@ -204,10 +234,12 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
     };
 
     if decoupled.is_empty() && custom.is_empty() {
-        return config;
+        return (config, Vec::new());
     }
 
-    let (merged, report) = merge_rules(custom, decoupled);
+    let notes = notes_for(&custom, &decoupled);
+    let custom_rules: Vec<String> = custom.into_iter().map(|(_, rule)| rule).collect();
+    let (merged, report) = merge_rules(custom_rules, decoupled);
     if report.conflicts > 0 {
         logging!(
             warn,
@@ -220,7 +252,37 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
         Value::from("rules"),
         Value::Sequence(merged.into_iter().map(Value::from).collect()),
     );
-    config
+    (config, notes)
+}
+
+/// Notes for rules that came from a text rule set or were merged; `custom` precedes `subscription`.
+fn notes_for(custom: &[(String, String)], subscription: &[String]) -> Vec<RuleNote> {
+    let mut by_key: BTreeMap<(String, String, String), RuleNote> = BTreeMap::new();
+    let rules = custom
+        .iter()
+        .map(|(name, rule)| (Some(name.as_str()), rule.as_str()))
+        .chain(subscription.iter().map(|rule| (None, rule.as_str())));
+    for (source, rule) in rules {
+        let Some((kind, payload, policy)) = content_key(rule) else {
+            continue;
+        };
+        match by_key.entry((kind.clone(), payload.clone(), policy.clone())) {
+            Entry::Occupied(mut entry) => entry.get_mut().merged += 1,
+            Entry::Vacant(entry) => {
+                entry.insert(RuleNote {
+                    kind,
+                    payload,
+                    policy,
+                    source: source.map(str::to_owned),
+                    merged: 0,
+                });
+            }
+        }
+    }
+    by_key
+        .into_values()
+        .filter(|note| note.source.is_some() || note.merged > 0)
+        .collect()
 }
 
 #[cfg(test)]
@@ -312,12 +374,25 @@ mod tests {
                 .collect()
         };
         assert_eq!(
-            rules_of(&apply(config.clone(), &[], true)),
+            rules_of(&apply(config.clone(), &[], true).0),
             rules(&["DOMAIN-SUFFIX,a.com,Proxy", "MATCH,Proxy"])
         );
         assert_eq!(
-            rules_of(&apply(config, &[], false)),
+            rules_of(&apply(config, &[], false).0),
             rules(&["DOMAIN-SUFFIX,a.com,Auto", "MATCH,Proxy"])
         );
+    }
+
+    #[test]
+    fn notes_name_the_first_text_source_and_count_merges() {
+        let custom = vec![
+            ("广告".to_owned(), "DOMAIN-SUFFIX,ads.com,REJECT".to_owned()),
+            ("广告".to_owned(), "DOMAIN-SUFFIX,ads.com,REJECT".to_owned()),
+        ];
+        let decoupled = rules(&["DOMAIN-SUFFIX,ads.com,REJECT", "MATCH,Proxy"]);
+        let notes = notes_for(&custom, &decoupled);
+        assert_eq!(notes.len(), 1);
+        assert_eq!(notes[0].source.as_deref(), Some("广告"));
+        assert_eq!(notes[0].merged, 2);
     }
 }
