@@ -82,7 +82,7 @@ export const TextRuleSets = ({ rules }: Props) => {
             name: name.trim(),
             target,
             content: mode === 'paste' ? content : '',
-            ...(mode === 'link' ? { url: url.trim() } : {}),
+            url: mode === 'link' ? url.trim() : null,
           },
         ],
       })
