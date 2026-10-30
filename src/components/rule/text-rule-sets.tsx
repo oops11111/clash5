@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useVerge } from '@/hooks/use-verge'
 import { showNotice } from '@/services/notice-service'
+import { isValidUrl } from '@/utils/network'
 import {
   parseTextRules,
   previewTextRules,
@@ -23,7 +24,17 @@ import {
 
 type RuleTargetKey = 'default' | 'direct' | 'reject'
 
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host
+  } catch {
+    return url
+  }
+}
+
 const TARGETS: RuleTargetKey[] = ['default', 'direct', 'reject']
+
+type Mode = 'paste' | 'link'
 
 interface Props {
   rules: { type: unknown; payload?: string }[]
@@ -34,8 +45,10 @@ export const TextRuleSets = ({ rules }: Props) => {
   const { verge, patchVerge } = useVerge()
   const sets = verge?.text_rule_sets ?? []
 
+  const [mode, setMode] = useState<Mode>('paste')
   const [name, setName] = useState('')
   const [content, setContent] = useState('')
+  const [url, setUrl] = useState('')
   const [target, setTarget] = useState<RuleTargetKey>('reject')
 
   const existing = useMemo<TextRuleEntry[]>(
@@ -55,7 +68,9 @@ export const TextRuleSets = ({ rules }: Props) => {
     [parsed, existing],
   )
 
-  const canAdd = name.trim() !== '' && preview.valid > 0
+  const linkValid = isValidUrl(url.trim())
+  const canAdd =
+    name.trim() !== '' && (mode === 'link' ? linkValid : preview.valid > 0)
 
   const onAdd = async () => {
     try {
@@ -66,12 +81,14 @@ export const TextRuleSets = ({ rules }: Props) => {
             id: crypto.randomUUID(),
             name: name.trim(),
             target,
-            content,
+            content: mode === 'paste' ? content : '',
+            ...(mode === 'link' ? { url: url.trim() } : {}),
           },
         ],
       })
       setName('')
       setContent('')
+      setUrl('')
     } catch (err) {
       showNotice.error(err)
     }
@@ -112,9 +129,11 @@ export const TextRuleSets = ({ rules }: Props) => {
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {t(`rules.textRules.targets.${set.target}`)} ·{' '}
-                  {t('rules.textRules.count', {
-                    count: parseTextRules(set.content).entries.length,
-                  })}
+                  {set.url
+                    ? t('rules.textRules.linked', { host: hostOf(set.url) })
+                    : t('rules.textRules.count', {
+                        count: parseTextRules(set.content).entries.length,
+                      })}
                 </Typography>
               </Box>
               <IconButton
@@ -130,20 +149,52 @@ export const TextRuleSets = ({ rules }: Props) => {
       )}
 
       <Stack spacing={1.5}>
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          aria-label={t('rules.textRules.modeLabel')}
+          value={mode}
+          onChange={(_, value: Mode | null) => {
+            if (value) setMode(value)
+          }}
+        >
+          <ToggleButton value="paste">
+            {t('rules.textRules.modes.paste')}
+          </ToggleButton>
+          <ToggleButton value="link">
+            {t('rules.textRules.modes.link')}
+          </ToggleButton>
+        </ToggleButtonGroup>
         <TextField
           size="small"
           label={t('rules.textRules.name')}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <TextField
-          multiline
-          minRows={4}
-          label={t('rules.textRules.content')}
-          placeholder={t('rules.textRules.placeholder')}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-        />
+        {mode === 'paste' ? (
+          <TextField
+            multiline
+            minRows={4}
+            label={t('rules.textRules.content')}
+            placeholder={t('rules.textRules.placeholder')}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+          />
+        ) : (
+          <>
+            <TextField
+              size="small"
+              label={t('rules.textRules.url')}
+              placeholder="https://"
+              value={url}
+              error={url.trim() !== '' && !linkValid}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+            <Typography variant="caption" color="text.secondary">
+              {t('rules.textRules.linkHint')}
+            </Typography>
+          </>
+        )}
         <Stack
           direction="row"
           spacing={1}
@@ -168,7 +219,7 @@ export const TextRuleSets = ({ rules }: Props) => {
             {t('rules.textRules.add')}
           </Button>
         </Stack>
-        {content.trim() !== '' && (
+        {mode === 'paste' && content.trim() !== '' && (
           <Typography variant="body2" color="text.secondary" role="status">
             {t('rules.textRules.preview', {
               valid: preview.valid,

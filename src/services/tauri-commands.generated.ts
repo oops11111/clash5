@@ -1768,6 +1768,8 @@ export type TextRuleSet = {
   name: string
   target: RuleTarget
   content: string
+  /**  Remote rule list; mihomo downloads it as a rule provider and `content` is unused. */
+  url: string | null
 }
 
 export type ToggleableProxyPort = {

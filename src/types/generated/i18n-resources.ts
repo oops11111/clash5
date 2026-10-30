@@ -1046,6 +1046,13 @@ export interface TranslationResources {
         delete: string
         empty: string
         hint: string
+        linked: string
+        linkHint: string
+        modeLabel: string
+        modes: {
+          link: string
+          paste: string
+        }
         name: string
         placeholder: string
         preview: string
@@ -1056,6 +1063,7 @@ export interface TranslationResources {
           reject: string
         }
         title: string
+        url: string
       }
     }
     settings: {

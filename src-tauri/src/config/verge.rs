@@ -55,6 +55,8 @@ pub struct TextRuleSet {
     pub name: std::string::String,
     pub target: RuleTarget,
     pub content: std::string::String,
+    /// Remote rule list; mihomo downloads it as a rule provider and `content` is unused.
+    pub url: Option<std::string::String>,
 }
 
 /// ### `verge.yaml` schema

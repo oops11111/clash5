@@ -95,7 +95,15 @@
     "count": "{{count}} 条",
     "delete": "删除 {{name}}",
     "add": "添加",
-    "preview": "有效 {{valid}} 条：新增 {{added}} 条，合并 {{merged}} 条，无效 {{invalid}} 条"
+    "preview": "有效 {{valid}} 条：新增 {{added}} 条，合并 {{merged}} 条，无效 {{invalid}} 条",
+    "modeLabel": "来源",
+    "modes": {
+      "paste": "粘贴规则",
+      "link": "从链接"
+    },
+    "url": "规则集链接",
+    "linkHint": "由 mihomo 下载并每天更新；可在规则提供者中更新或删除。",
+    "linked": "链接 · {{host}}"
   },
   "notes": {
     "subscription": "订阅规则",

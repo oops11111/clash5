@@ -954,6 +954,7 @@ interface IVergeConfig {
     name: string
     target: 'default' | 'direct' | 'reject'
     content: string
+    url?: string | null
   }[]
   enable_hover_jump_navigator?: boolean
   hover_jump_navigator_delay?: number

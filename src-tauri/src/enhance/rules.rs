@@ -221,12 +221,32 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
         .iter()
         .flat_map(|set| {
             let target = target_policy(set.target, &default);
-            parse_text_rules(&set.content, target)
-                .rules
-                .into_iter()
-                .map(move |rule| (set.name.clone(), rule))
+            let rules = match set.url {
+                Some(_) => vec![format!("RULE-SET,{},{target}", provider_name(&set.id))],
+                None => parse_text_rules(&set.content, target).rules,
+            };
+            rules.into_iter().map(move |rule| (set.name.clone(), rule))
         })
         .collect();
+    let providers: Vec<(Value, Value)> = text_rule_sets
+        .iter()
+        .filter_map(|set| {
+            let url = set.url.as_deref()?;
+            Some((
+                Value::from(provider_name(&set.id)),
+                provider_entry(&provider_name(&set.id), url),
+            ))
+        })
+        .collect();
+    if !providers.is_empty() {
+        let mut rule_providers = config
+            .get("rule-providers")
+            .and_then(Value::as_mapping)
+            .cloned()
+            .unwrap_or_default();
+        rule_providers.extend(providers);
+        config.insert(Value::from("rule-providers"), Value::Mapping(rule_providers));
+    }
     let decoupled: Vec<String> = if decouple {
         subscription.iter().map(|rule| decouple_rule(rule, &default)).collect()
     } else {
@@ -253,6 +273,22 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
         Value::Sequence(merged.into_iter().map(Value::from).collect()),
     );
     (config, notes)
+}
+
+fn provider_name(id: &str) -> String {
+    format!("clash5-set-{id}")
+}
+
+/// A classical-text rule provider that mihomo downloads and refreshes daily.
+fn provider_entry(name: &str, url: &str) -> Value {
+    let mut entry = Mapping::new();
+    entry.insert(Value::from("type"), Value::from("http"));
+    entry.insert(Value::from("behavior"), Value::from("classical"));
+    entry.insert(Value::from("format"), Value::from("text"));
+    entry.insert(Value::from("url"), Value::from(url));
+    entry.insert(Value::from("path"), Value::from(format!("./ruleset/{name}.txt")));
+    entry.insert(Value::from("interval"), Value::from(86_400u64));
+    Value::Mapping(entry)
 }
 
 /// Notes for rules that came from a text rule set or were merged; `custom` precedes `subscription`.
@@ -394,5 +430,30 @@ mod tests {
         assert_eq!(notes.len(), 1);
         assert_eq!(notes[0].source.as_deref(), Some("广告"));
         assert_eq!(notes[0].merged, 2);
+    }
+
+    #[test]
+    fn linked_sets_become_rule_providers_placed_before_subscription_rules() {
+        let config: Mapping = serde_yaml_ng::from_str("proxy-groups: [{name: Proxy}]\nrules: ['MATCH,Proxy']").unwrap();
+        let sets = vec![TextRuleSet {
+            id: "abc".into(),
+            name: "广告".into(),
+            target: RuleTarget::Reject,
+            content: String::new(),
+            url: Some("https://example.com/ads.txt".into()),
+        }];
+        let (out, notes) = apply(config, &sets, true);
+        assert_eq!(
+            out["rule-providers"]["clash5-set-abc"]["url"].as_str(),
+            Some("https://example.com/ads.txt")
+        );
+        let rules: Vec<&str> = out["rules"]
+            .as_sequence()
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(rules, vec!["RULE-SET,clash5-set-abc,REJECT", "MATCH,Proxy"]);
+        assert_eq!(notes[0].source.as_deref(), Some("广告"));
     }
 }

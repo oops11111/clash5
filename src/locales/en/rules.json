@@ -95,7 +95,15 @@
     "count": "{{count}} rules",
     "delete": "Delete {{name}}",
     "add": "Add",
-    "preview": "{{valid}} valid: {{added}} new, {{merged}} merged, {{invalid}} invalid"
+    "preview": "{{valid}} valid: {{added}} new, {{merged}} merged, {{invalid}} invalid",
+    "modeLabel": "Source",
+    "modes": {
+      "paste": "Paste rules",
+      "link": "From link"
+    },
+    "url": "Rule list URL",
+    "linkHint": "mihomo downloads the list and refreshes it daily. Update or remove it from the rule providers dialog.",
+    "linked": "Link · {{host}}"
   },
   "notes": {
     "subscription": "Subscription rules",
