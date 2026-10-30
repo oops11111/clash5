@@ -1,4 +1,6 @@
 //! Local DNS leak checks. Everything runs on this device and nothing is uploaded.
+// Only the Linux probes call these helpers; other platforms report every check as unsupported.
+#![cfg_attr(not(target_os = "linux"), allow(dead_code))]
 
 use serde::Serialize;
 use serde_yaml_ng::{Mapping, Value};

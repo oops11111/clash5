@@ -120,7 +120,9 @@ export const DnsCheckPanel = () => {
               >
                 <Box sx={{ minWidth: 0 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {t(`tests.dns.checks.${check.id}`)}
+                    {check.id === 'system_resolver'
+                      ? t('tests.dns.checks.system_resolver')
+                      : t('tests.dns.checks.plaintext_dns')}
                   </Typography>
                   <Typography
                     variant="caption"
