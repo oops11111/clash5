@@ -31,6 +31,8 @@ pub struct RuleOverview {
     pub subscription_rules: u32,
     /// Whether the subscription's proxy policies were replaced by the default proxy.
     pub decoupled: bool,
+    /// The group that serves as the default proxy, when the config has one.
+    pub default_group: Option<std::string::String>,
 }
 
 static OVERVIEW: Mutex<Option<RuleOverview>> = Mutex::new(None);
@@ -43,11 +45,17 @@ pub(crate) fn rule_overview() -> RuleOverview {
     OVERVIEW.lock().clone().unwrap_or_default()
 }
 
-fn overview(notes: Vec<RuleNote>, subscription: &[String], decoupled: bool) -> RuleOverview {
+fn overview(
+    notes: Vec<RuleNote>,
+    subscription: &[String],
+    decoupled: bool,
+    default_group: Option<&str>,
+) -> RuleOverview {
     RuleOverview {
         notes,
         subscription_rules: u32::try_from(subscription.len()).unwrap_or(u32::MAX),
         decoupled,
+        default_group: default_group.map(str::to_owned),
     }
 }
 
@@ -231,7 +239,7 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
     let rule_refs: Vec<&str> = subscription.iter().map(String::as_str).collect();
 
     let Some(default) = default_target(&rule_refs, &groups) else {
-        return (config, overview(Vec::new(), &subscription, false));
+        return (config, overview(Vec::new(), &subscription, false, None));
     };
 
     let custom: Vec<(String, String)> = text_rule_sets
@@ -271,7 +279,7 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
     };
 
     if decoupled.is_empty() && custom.is_empty() {
-        return (config, overview(Vec::new(), &subscription, false));
+        return (config, overview(Vec::new(), &subscription, false, Some(&default)));
     }
 
     let notes = notes_for(&custom, &decoupled);
@@ -289,7 +297,7 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
         Value::from("rules"),
         Value::Sequence(merged.into_iter().map(Value::from).collect()),
     );
-    (config, overview(notes, &subscription, decouple))
+    (config, overview(notes, &subscription, decouple, Some(&default)))
 }
 
 fn provider_name(id: &str) -> String {

@@ -129,5 +129,9 @@
     "reject": "拒绝",
     "add": "添加",
     "remove": "移除"
+  },
+  "systemEgress": {
+    "title": "系统流量",
+    "hint": "未被程序路由接管的流量走默认代理组：{{group}}"
   }
 }

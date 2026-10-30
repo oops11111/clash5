@@ -129,5 +129,9 @@
     "reject": "Reject",
     "add": "Add",
     "remove": "Remove"
+  },
+  "systemEgress": {
+    "title": "System traffic",
+    "hint": "Traffic no program route claims uses the default group: {{group}}"
   }
 }

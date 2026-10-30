@@ -9,6 +9,7 @@ import { BasePage } from '@/components/base'
 import { AppRoutesPanel } from '@/components/proxy/app-routes-panel'
 import { ProviderButton } from '@/components/proxy/provider-button'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
+import { SystemEgressRow } from '@/components/proxy/system-egress-row'
 import {
   useAppRefreshers,
   useClashConfigData,
@@ -95,6 +96,7 @@ const ProxyPage = () => {
         }}
       >
         <Box sx={{ px: 2, pt: 2 }}>
+          <SystemEgressRow />
           <AppRoutesPanel />
         </Box>
         <Box sx={{ flex: 1, minHeight: 0 }}>

@@ -667,6 +667,8 @@ export const translationKeys = [
   'proxies.apps.reject',
   'proxies.apps.add',
   'proxies.apps.remove',
+  'proxies.systemEgress.title',
+  'proxies.systemEgress.hint',
   'rules.page.provider.trigger',
   'rules.page.provider.dialogTitle',
   'rules.page.provider.actions.updateAll',

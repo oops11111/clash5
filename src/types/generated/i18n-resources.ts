@@ -953,6 +953,10 @@ export interface TranslationResources {
           sortName: string
         }
       }
+      systemEgress: {
+        hint: string
+        title: string
+      }
     }
     rules: {
       feedback: {

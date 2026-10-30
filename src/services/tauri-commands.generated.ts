@@ -1701,6 +1701,8 @@ export type RuleOverview = {
   subscription_rules: number
   /**  Whether the subscription's proxy policies were replaced by the default proxy. */
   decoupled: boolean
+  /**  The group that serves as the default proxy, when the config has one. */
+  default_group: string | null
 }
 
 /**  Where the rules of a text rule set send traffic. */
