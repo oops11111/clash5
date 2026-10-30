@@ -22,8 +22,11 @@ import RuleItem from '@/components/rule/rule-item'
 import { TextRuleSets } from '@/components/rule/text-rule-sets'
 import { useVisibility } from '@/hooks/use-visibility'
 import { useAppRefreshers, useRulesData } from '@/providers/app-data-context'
-import { getClash5RuleNotes } from '@/services/cmds'
-import type { RuleNote } from '@/services/tauri-commands.generated'
+import { getClash5RuleOverview } from '@/services/cmds'
+import type {
+  RuleNote,
+  RuleOverview,
+} from '@/services/tauri-commands.generated'
 import { ruleKind } from '@/utils/text-rules'
 
 const RulesPage = () => {
@@ -35,13 +38,14 @@ const RulesPage = () => {
   const virtuosoRef = useRef<VirtualListHandle>(null)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const pageVisible = useVisibility()
-  const [notes, setNotes] = useState<RuleNote[]>([])
+  const [overview, setOverview] = useState<RuleOverview | null>(null)
+  const notes = useMemo<RuleNote[]>(() => overview?.notes ?? [], [overview])
 
-  // Notes are produced when the config is built, so they refresh with the rule list.
+  // The overview is produced when the config is built, so it refreshes with the rule list.
   useEffect(() => {
-    getClash5RuleNotes()
-      .then(setNotes)
-      .catch(() => setNotes([]))
+    getClash5RuleOverview()
+      .then(setOverview)
+      .catch(() => setOverview(null))
   }, [rules])
 
   const noteByRule = useMemo(
@@ -110,6 +114,20 @@ const RulesPage = () => {
           <TextRuleSets rules={rules} />
         </AccordionDetails>
       </Accordion>
+
+      {overview && overview.subscription_rules > 0 && (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ mx: '10px', mt: 1 }}
+        >
+          {overview.decoupled
+            ? t('rules.overview.decoupled', {
+                count: overview.subscription_rules,
+              })
+            : t('rules.overview.kept', { count: overview.subscription_rules })}
+        </Typography>
+      )}
 
       <Box
         sx={{

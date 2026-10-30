@@ -522,9 +522,9 @@ export const commands = {
     typedError<DnsSample[], CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_dns_samples'),
     ),
-  clash5RuleNotes: () =>
-    typedError<RuleNote[], CommandFailure_Serialize>(
-      __TAURI_INVOKE('clash5_rule_notes'),
+  clash5RuleOverview: () =>
+    typedError<RuleOverview, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_rule_overview'),
     ),
   enhanceProfiles: () =>
     typedError<ValidationOutcome, CommandFailure_Serialize>(
@@ -1693,6 +1693,14 @@ export type RuleNote = {
   source: string | null
   /**  Number of identical rules merged into this one. */
   merged: number
+}
+
+/**  What the pipeline produced for the current profile, for the rules page. */
+export type RuleOverview = {
+  notes: RuleNote[]
+  subscription_rules: number
+  /**  Whether the subscription's proxy policies were replaced by the default proxy. */
+  decoupled: boolean
 }
 
 /**  Where the rules of a text rule set send traffic. */

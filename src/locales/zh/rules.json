@@ -108,5 +108,9 @@
   "notes": {
     "subscription": "订阅规则",
     "merged": "合并 {{count}} 条"
+  },
+  "overview": {
+    "decoupled": "订阅规则 · {{count}} 条 · 代理策略已替换为默认代理",
+    "kept": "订阅规则 · {{count}} 条 · 保留原代理策略"
   }
 }

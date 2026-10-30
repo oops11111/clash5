@@ -1028,6 +1028,10 @@ export interface TranslationResources {
         merged: string
         subscription: string
       }
+      overview: {
+        decoupled: string
+        kept: string
+      }
       page: {
         provider: {
           actions: {

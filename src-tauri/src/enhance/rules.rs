@@ -24,14 +24,31 @@ pub struct RuleNote {
     pub merged: u32,
 }
 
-static NOTES: Mutex<Vec<RuleNote>> = Mutex::new(Vec::new());
-
-pub(crate) fn store_notes(notes: Vec<RuleNote>) {
-    *NOTES.lock() = notes;
+/// What the pipeline produced for the current profile, for the rules page.
+#[derive(Debug, Clone, Default, Serialize, specta::Type)]
+pub struct RuleOverview {
+    pub notes: Vec<RuleNote>,
+    pub subscription_rules: u32,
+    /// Whether the subscription's proxy policies were replaced by the default proxy.
+    pub decoupled: bool,
 }
 
-pub(crate) fn rule_notes() -> Vec<RuleNote> {
-    NOTES.lock().clone()
+static OVERVIEW: Mutex<Option<RuleOverview>> = Mutex::new(None);
+
+pub(crate) fn store_overview(overview: RuleOverview) {
+    *OVERVIEW.lock() = Some(overview);
+}
+
+pub(crate) fn rule_overview() -> RuleOverview {
+    OVERVIEW.lock().clone().unwrap_or_default()
+}
+
+fn overview(notes: Vec<RuleNote>, subscription: &[String], decoupled: bool) -> RuleOverview {
+    RuleOverview {
+        notes,
+        subscription_rules: u32::try_from(subscription.len()).unwrap_or(u32::MAX),
+        decoupled,
+    }
 }
 
 const KEPT_POLICIES: [&str; 4] = ["DIRECT", "REJECT", "REJECT-DROP", "PASS"];
@@ -196,7 +213,7 @@ const fn target_policy(target: RuleTarget, default: &str) -> &str {
 
 /// Applies the rule pipeline to a subscription config before its rules-editor sequences.
 /// With `decouple` off, the subscription's own policies are kept and only text rules are merged.
-pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decouple: bool) -> (Mapping, Vec<RuleNote>) {
+pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decouple: bool) -> (Mapping, RuleOverview) {
     let groups: Vec<String> = config
         .get("proxy-groups")
         .and_then(Value::as_sequence)
@@ -214,7 +231,7 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
     let rule_refs: Vec<&str> = subscription.iter().map(String::as_str).collect();
 
     let Some(default) = default_target(&rule_refs, &groups) else {
-        return (config, Vec::new());
+        return (config, overview(Vec::new(), &subscription, false));
     };
 
     let custom: Vec<(String, String)> = text_rule_sets
@@ -254,7 +271,7 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
     };
 
     if decoupled.is_empty() && custom.is_empty() {
-        return (config, Vec::new());
+        return (config, overview(Vec::new(), &subscription, false));
     }
 
     let notes = notes_for(&custom, &decoupled);
@@ -272,7 +289,7 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
         Value::from("rules"),
         Value::Sequence(merged.into_iter().map(Value::from).collect()),
     );
-    (config, notes)
+    (config, overview(notes, &subscription, decouple))
 }
 
 fn provider_name(id: &str) -> String {
@@ -442,7 +459,7 @@ mod tests {
             content: String::new(),
             url: Some("https://example.com/ads.txt".into()),
         }];
-        let (out, notes) = apply(config, &sets, true);
+        let (out, pipeline) = apply(config, &sets, true);
         assert_eq!(
             out["rule-providers"]["clash5-set-abc"]["url"].as_str(),
             Some("https://example.com/ads.txt")
@@ -454,6 +471,6 @@ mod tests {
             .filter_map(Value::as_str)
             .collect();
         assert_eq!(rules, vec!["RULE-SET,clash5-set-abc,REJECT", "MATCH,Proxy"]);
-        assert_eq!(notes[0].source.as_deref(), Some("广告"));
+        assert_eq!(pipeline.notes[0].source.as_deref(), Some("广告"));
     }
 }

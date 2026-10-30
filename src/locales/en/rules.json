@@ -108,5 +108,9 @@
   "notes": {
     "subscription": "Subscription rules",
     "merged": "Merged {{count}}"
+  },
+  "overview": {
+    "decoupled": "Subscription rules · {{count}} rules · proxy policies replaced by the default proxy",
+    "kept": "Subscription rules · {{count}} rules · proxy policies kept"
   }
 }

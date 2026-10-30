@@ -28,7 +28,7 @@ import type {
   PluginAuditEvent as GeneratedPluginAuditEvent,
   DnsCheckReport,
   DnsSample,
-  RuleNote,
+  RuleOverview,
   QualityReport as GeneratedQualityReport,
   PluginEffectiveConfig as GeneratedPluginEffectiveConfig,
   ProxyViewV1_Serialize,
@@ -99,7 +99,8 @@ export const saveClash5AppRoute = (route: AppRouteDef) =>
   invoke<null>('clash5_save_app_route', { route })
 export const deleteClash5AppRoute = (id: string) =>
   invoke<null>('clash5_delete_app_route', { id })
-export const getClash5RuleNotes = () => invoke<RuleNote[]>('clash5_rule_notes')
+export const getClash5RuleOverview = () =>
+  invoke<RuleOverview>('clash5_rule_overview')
 export const runClash5DnsSamples = () =>
   invoke<DnsSample[]>('clash5_dns_samples')
 export const runClash5DnsCheck = () =>
