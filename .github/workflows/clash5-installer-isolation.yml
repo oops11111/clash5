@@ -63,6 +63,12 @@ jobs:
           $installer = Get-ChildItem -LiteralPath $bundle -Filter '*-setup.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if (-not $installer -or $installer.Name -notmatch '2\.5\.9') { throw 'clash5 2.5.9 NSIS installer was not produced' }
           Copy-Item -LiteralPath $installer.FullName -Destination (Join-Path $env:RUNNER_TEMP 'clash5-2.5.9-setup.exe')
+      - name: Upload clash5 2.5.9 installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: clash5-2.5.9-windows-x64-setup
+          path: ${{ runner.temp }}/clash5-2.5.9-setup.exe
+          if-no-files-found: error
       - name: Build clash5 2.5.10 upgrade installer
         shell: pwsh
         run: |
