@@ -518,6 +518,10 @@ export const commands = {
     typedError<DnsCheckReport, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_dns_check'),
     ),
+  clash5DnsSamples: () =>
+    typedError<DnsSample[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_dns_samples'),
+    ),
   clash5RuleNotes: () =>
     typedError<RuleNote[], CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_rule_notes'),
@@ -848,6 +852,13 @@ export type DnsResolvers = {
   fallback: string[]
   default_nameserver: string[]
   listen: string | null
+}
+
+export type DnsSample = {
+  domain: string
+  answer: string | null
+  error: string | null
+  duration_ms: number
 }
 
 /**  Same wire shape as the updater plugin's JS `DownloadEvent`. */

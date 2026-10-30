@@ -1319,6 +1319,11 @@ export const translationKeys = [
   'tests.dns.status.fail',
   'tests.dns.status.unsupported',
   'tests.dns.checkedAt',
+  'tests.dns.samples.title',
+  'tests.dns.samples.hint',
+  'tests.dns.samples.noAnswer',
+  'tests.dns.samples.duration',
+  'tests.dns.samples.loading',
 ] as const
 
 export type TranslationKey = (typeof translationKeys)[number]

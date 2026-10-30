@@ -23,6 +23,38 @@ pub struct LeakCheck {
     pub details: Vec<std::string::String>,
 }
 
+/// Domains resolved through the local listener as samples; they are never used to judge a leak.
+pub const SAMPLE_DOMAINS: [&str; 3] = ["www.baidu.com", "api.github.com", "registry.npmjs.org"];
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct DnsSample {
+    pub domain: std::string::String,
+    pub answer: Option<std::string::String>,
+    pub error: Option<std::string::String>,
+    pub duration_ms: u32,
+}
+
+/// First IPv4 answer in a mihomo `/dns/query` body.
+pub fn parse_dns_answer(body: &str) -> Result<Option<std::string::String>, std::string::String> {
+    let value: serde_json::Value = serde_json::from_str(body).map_err(|_| "unreadable DNS answer".to_owned())?;
+    let status = value.get("Status").and_then(serde_json::Value::as_i64).unwrap_or(-1);
+    if status != 0 {
+        return Err(format!("DNS status {status}"));
+    }
+    Ok(value
+        .get("Answer")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|record| record.get("type").and_then(serde_json::Value::as_u64) == Some(1))
+        .find_map(|record| {
+            record
+                .get("data")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+        }))
+}
+
 #[derive(Debug, Clone, Default, Serialize, specta::Type)]
 pub struct DnsResolvers {
     pub nameserver: Vec<std::string::String>,
@@ -222,5 +254,15 @@ UNCONN 0 0 127.0.0.1:41002 127.0.0.53:53
         assert_eq!(check.details, vec!["1.1.1.1".to_owned()]);
 
         assert_eq!(plaintext_leak_check(&[], &upstreams).status, CheckStatus::Pass);
+    }
+
+    #[test]
+    fn dns_answers_come_from_the_first_ipv4_record() {
+        let body =
+            r#"{"Status":0,"Answer":[{"name":"x.","type":5,"data":"alias."},{"name":"x.","type":1,"data":"1.2.3.4"}]}"#;
+        assert_eq!(parse_dns_answer(body).unwrap().as_deref(), Some("1.2.3.4"));
+        assert_eq!(parse_dns_answer(r#"{"Status":0}"#).unwrap(), None);
+        assert_eq!(parse_dns_answer(r#"{"Status":3}"#).unwrap_err(), "DNS status 3");
+        assert!(parse_dns_answer("not json").is_err());
     }
 }

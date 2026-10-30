@@ -27,6 +27,7 @@ import type {
   PendingIdentityRebind as GeneratedPendingIdentityRebind,
   PluginAuditEvent as GeneratedPluginAuditEvent,
   DnsCheckReport,
+  DnsSample,
   RuleNote,
   QualityReport as GeneratedQualityReport,
   PluginEffectiveConfig as GeneratedPluginEffectiveConfig,
@@ -99,6 +100,8 @@ export const saveClash5AppRoute = (route: AppRouteDef) =>
 export const deleteClash5AppRoute = (id: string) =>
   invoke<null>('clash5_delete_app_route', { id })
 export const getClash5RuleNotes = () => invoke<RuleNote[]>('clash5_rule_notes')
+export const runClash5DnsSamples = () =>
+  invoke<DnsSample[]>('clash5_dns_samples')
 export const runClash5DnsCheck = () =>
   invoke<DnsCheckReport>('clash5_dns_check')
 export const runClash5QualityTest = (

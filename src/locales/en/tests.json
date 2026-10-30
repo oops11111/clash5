@@ -80,6 +80,13 @@
       "fail": "Fail",
       "unsupported": "Not checked"
     },
-    "checkedAt": "Last checked {{time}}"
+    "checkedAt": "Last checked {{time}}",
+    "samples": {
+      "title": "Resolution samples",
+      "hint": "Sample domains are sent to the configured resolver. They are not used to judge a leak.",
+      "noAnswer": "No answer",
+      "duration": "{{ms}} ms",
+      "loading": "Resolving…"
+    }
   }
 }

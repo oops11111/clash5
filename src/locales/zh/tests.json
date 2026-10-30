@@ -80,6 +80,13 @@
       "fail": "失败",
       "unsupported": "未检测"
     },
-    "checkedAt": "上次检测：{{time}}"
+    "checkedAt": "上次检测：{{time}}",
+    "samples": {
+      "title": "解析测试",
+      "hint": "测试域名会发送到解析器，只作抽样，不用于判断泄漏。",
+      "noAnswer": "无应答",
+      "duration": "{{ms}} ms",
+      "loading": "解析中…"
+    }
   }
 }

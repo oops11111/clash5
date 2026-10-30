@@ -1965,6 +1965,13 @@ export interface TranslationResources {
           nameserver: string
           title: string
         }
+        samples: {
+          duration: string
+          hint: string
+          loading: string
+          noAnswer: string
+          title: string
+        }
         status: {
           fail: string
           pass: string
