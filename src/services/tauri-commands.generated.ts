@@ -514,6 +514,10 @@ export const commands = {
     typedError<QualityReport, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_run_quality_test', { id, downloadBytes }),
     ),
+  clash5DnsCheck: () =>
+    typedError<DnsCheckReport, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_dns_check'),
+    ),
   enhanceProfiles: () =>
     typedError<ValidationOutcome, CommandFailure_Serialize>(
       __TAURI_INVOKE('enhance_profiles'),
@@ -757,6 +761,8 @@ export type ChainWorkspace = {
   policy_groups: string[]
 }
 
+export type CheckStatus = 'pass' | 'fail' | 'unsupported'
+
 export type Clash5IdentityStatus = {
   recovery_mode: boolean
   pending_rebinds: number
@@ -819,9 +825,22 @@ export type DelayHistoryContract = {
   delay: number
 }
 
+export type DnsCheckReport = {
+  resolvers: DnsResolvers
+  checks: LeakCheck[]
+  checked_at: string
+}
+
 export type DnsOverrideOutcome =
   | { status: 'applied' }
   | { status: 'confirmation_required'; source: string }
+
+export type DnsResolvers = {
+  nameserver: string[]
+  fallback: string[]
+  default_nameserver: string[]
+  listen: string | null
+}
 
 /**  Same wire shape as the updater plugin's JS `DownloadEvent`. */
 export type DownloadEvent =
@@ -1116,6 +1135,13 @@ export type IconInfo = {
   name: string
   previous_t: string
   current_t: string
+}
+
+export type LeakCheck = {
+  id: string
+  status: CheckStatus
+  /**  Addresses that caused a failure, or the reason a check is unsupported. */
+  details: string[]
 }
 
 export type ListenerProbe = {

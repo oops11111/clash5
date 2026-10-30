@@ -56,5 +56,30 @@
       },
       "title": "解锁测试"
     }
+  },
+  "dns": {
+    "title": "DNS 检测",
+    "hint": "检查域名解析是否经过 clash5。检测在本机完成，结果不上传。",
+    "rerun": "重新检测",
+    "resolvers": {
+      "title": "当前解析器",
+      "nameserver": "主解析器",
+      "fallback": "备用解析器",
+      "defaultNameserver": "引导解析",
+      "listen": "本地监听"
+    },
+    "checks": {
+      "title": "泄漏检测",
+      "hint": "读取系统解析器设置，并检查是否有明文 DNS（53 端口）从本机发出。",
+      "passDetail": "未发现问题",
+      "system_resolver": "系统解析器指向本机",
+      "plaintext_dns": "明文 DNS 直接外发"
+    },
+    "status": {
+      "pass": "通过",
+      "fail": "失败",
+      "unsupported": "未检测"
+    },
+    "checkedAt": "上次检测：{{time}}"
   }
 }

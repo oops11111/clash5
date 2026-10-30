@@ -56,5 +56,30 @@
       },
       "title": "Unlock Test"
     }
+  },
+  "dns": {
+    "title": "DNS check",
+    "hint": "Checks whether DNS queries go through clash5. Runs on this device; nothing is uploaded.",
+    "rerun": "Run again",
+    "resolvers": {
+      "title": "Resolvers",
+      "nameserver": "Nameserver",
+      "fallback": "Fallback",
+      "defaultNameserver": "Bootstrap",
+      "listen": "Local listener"
+    },
+    "checks": {
+      "title": "Leak checks",
+      "hint": "Reads the system resolver and looks for plaintext DNS (port 53) leaving the device.",
+      "passDetail": "No issue found",
+      "system_resolver": "System resolver points to this device",
+      "plaintext_dns": "Plaintext DNS leaving the device"
+    },
+    "status": {
+      "pass": "Pass",
+      "fail": "Fail",
+      "unsupported": "Not checked"
+    },
+    "checkedAt": "Last checked {{time}}"
   }
 }

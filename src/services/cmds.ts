@@ -26,6 +26,7 @@ import type {
   NodeRecord,
   PendingIdentityRebind as GeneratedPendingIdentityRebind,
   PluginAuditEvent as GeneratedPluginAuditEvent,
+  DnsCheckReport,
   QualityReport as GeneratedQualityReport,
   PluginEffectiveConfig as GeneratedPluginEffectiveConfig,
   ProxyViewV1_Serialize,
@@ -96,6 +97,8 @@ export const saveClash5AppRoute = (route: AppRouteDef) =>
   invoke<null>('clash5_save_app_route', { route })
 export const deleteClash5AppRoute = (id: string) =>
   invoke<null>('clash5_delete_app_route', { id })
+export const runClash5DnsCheck = () =>
+  invoke<DnsCheckReport>('clash5_dns_check')
 export const runClash5QualityTest = (
   id: string,
   downloadBytes: number | null = null,

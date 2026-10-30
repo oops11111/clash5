@@ -1290,6 +1290,23 @@ export const translationKeys = [
   'tests.unlock.page.messages.detectionFailedWithName',
   'tests.unlock.page.messages.detectionTimeout',
   'tests.unlock.page.title',
+  'tests.dns.title',
+  'tests.dns.hint',
+  'tests.dns.rerun',
+  'tests.dns.resolvers.title',
+  'tests.dns.resolvers.nameserver',
+  'tests.dns.resolvers.fallback',
+  'tests.dns.resolvers.defaultNameserver',
+  'tests.dns.resolvers.listen',
+  'tests.dns.checks.title',
+  'tests.dns.checks.hint',
+  'tests.dns.checks.passDetail',
+  'tests.dns.checks.system_resolver',
+  'tests.dns.checks.plaintext_dns',
+  'tests.dns.status.pass',
+  'tests.dns.status.fail',
+  'tests.dns.status.unsupported',
+  'tests.dns.checkedAt',
 ] as const
 
 export type TranslationKey = (typeof translationKeys)[number]

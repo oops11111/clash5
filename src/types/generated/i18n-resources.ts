@@ -1927,6 +1927,31 @@ export interface TranslationResources {
           }
         }
       }
+      dns: {
+        checkedAt: string
+        checks: {
+          hint: string
+          passDetail: string
+          plaintext_dns: string
+          system_resolver: string
+          title: string
+        }
+        hint: string
+        rerun: string
+        resolvers: {
+          defaultNameserver: string
+          fallback: string
+          listen: string
+          nameserver: string
+          title: string
+        }
+        status: {
+          fail: string
+          pass: string
+          unsupported: string
+        }
+        title: string
+      }
       modals: {
         test: {
           errors: {

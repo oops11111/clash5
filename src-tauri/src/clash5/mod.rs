@@ -1,5 +1,6 @@
 pub(crate) mod catalog;
 pub(crate) mod chains;
+pub(crate) mod dns_check;
 pub(crate) mod exit_ip;
 pub(crate) mod import;
 pub(crate) mod manual;
