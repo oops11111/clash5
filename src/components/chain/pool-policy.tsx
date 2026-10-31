@@ -45,7 +45,7 @@ export const PoolPolicy = ({
         : t('chains.poolPolicy.reasons.initial')
   const pinnedKey = pool.pinned ? JSON.stringify(pool.pinned) : ''
 
-  const save = async (patch: Partial<NodePool>) => {
+  const save = async (patch: Partial<Omit<NodePool, 'schema_version'>>) => {
     setSaving(true)
     try {
       await saveClash5NodePool({
