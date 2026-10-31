@@ -62,14 +62,24 @@ fn member_key(member: &NodeRef) -> String {
 }
 
 async fn run_once() {
-    // Probing refreshes the node quality the scores are built from. A probe already running is fine.
-    let _ = crate::cmd::clash5_probe_nodes().await;
-
-    let loaded = with_clash5_binding_store(|store| Ok((store.node_pools()?, store.node_records(false)?))).await;
-    let Ok((pools, records)) = loaded else {
+    let Ok(pools) = with_clash5_binding_store(|store| store.node_pools()).await else {
         return;
     };
-    for pool in pools.into_iter().filter(|pool| pool.mode == PoolMode::Quality) {
+    let pools: Vec<NodePool> = pools
+        .into_iter()
+        .filter(|pool| pool.mode == PoolMode::Quality)
+        .collect();
+    let members: Vec<NodeRef> = pools.iter().flat_map(|pool| pool.members.clone()).collect();
+    if members.is_empty() {
+        return;
+    }
+    // Only the members of quality pools are probed. A probe already running is fine.
+    let _ = crate::cmd::clash5_data::probe_nodes(Some(members)).await;
+
+    let Ok(records) = with_clash5_binding_store(|store| store.node_records(false)).await else {
+        return;
+    };
+    for pool in pools {
         let qualities: Vec<Option<NodeQuality>> = pool
             .members
             .iter()

@@ -1372,6 +1372,11 @@ where
 #[tauri::command]
 #[specta::specta]
 pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
+    probe_nodes(None).await
+}
+
+/// Probes the given nodes, or every node when `only` is `None`.
+pub(crate) async fn probe_nodes(only: Option<Vec<clash5_data::NodeRef>>) -> CmdResult<ProbeBatch> {
     let _guard = PROBE_LOCK
         .try_lock()
         .map_err(|_| super::coded_error("PROBE_BUSY", "a node probe is already running"))?;
@@ -1408,6 +1413,13 @@ pub async fn clash5_probe_nodes() -> CmdResult<ProbeBatch> {
     let mut targets = Vec::new();
     let provider_prefix = format!("proxy-provider:{}:", current.as_deref().unwrap_or_default());
     for record in records {
+        if let Some(only) = &only
+            && !only
+                .iter()
+                .any(|member| member.source == record.source && member.stable_id == record.stable_id)
+        {
+            continue;
+        }
         let target = match &record.source {
             Source::Subscription { provider_id } if current.as_deref() == Some(provider_id.as_str()) => core_names
                 .contains(&record.display_name)
