@@ -48,9 +48,9 @@ export const PoolScoreList = ({ poolId, refreshKey }: Props) => {
       <Typography variant="caption" color="text.secondary">
         {t('chains.poolScores.hint')}
       </Typography>
-      {rows.map((row, index) => (
+      {rows.map((row) => (
         <Stack
-          key={`${row.display_name}-${index}`}
+          key={JSON.stringify(row.reference)}
           direction="row"
           spacing={1}
           sx={{ alignItems: 'center', justifyContent: 'space-between' }}
