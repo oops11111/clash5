@@ -48,7 +48,11 @@ export const PoolPolicy = ({
   const save = async (patch: Partial<NodePool>) => {
     setSaving(true)
     try {
-      await saveClash5NodePool({ ...pool, schema_version: 2, ...patch })
+      await saveClash5NodePool({
+        ...pool,
+        schema_version: 2 as const,
+        ...patch,
+      })
       await onSaved()
     } catch (err) {
       showNotice.error(err)
@@ -114,9 +118,7 @@ export const PoolPolicy = ({
         <Typography variant="caption" color="text.secondary">
           {t('chains.poolPolicy.lastSwitch', {
             member: lastSwitch.member,
-            reason: t(
-              `chains.poolPolicy.reasons.${lastSwitch.reason}` as const,
-            ),
+            reason: reasonLabel(lastSwitch.reason),
           })}
         </Typography>
       )}
