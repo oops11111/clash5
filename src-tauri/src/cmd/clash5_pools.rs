@@ -79,5 +79,5 @@ pub async fn clash5_pool_scores(id: String) -> CmdResult<Vec<PoolMemberScore>> {
 #[tauri::command]
 #[specta::specta]
 pub async fn clash5_pool_switch_events() -> CmdResult<Vec<SwitchEvent>> {
-    Ok(crate::clash5::pool_scheduler::events())
+    Ok(crate::clash5::pool_scheduler::recent_events().await)
 }

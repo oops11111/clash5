@@ -18,15 +18,14 @@ use clash5_data::{NodePool, NodeQuality, NodeRecord, NodeRef, PoolMode};
 use parking_lot::Mutex;
 use serde::Serialize;
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 const INTERVAL: Duration = Duration::from_secs(10 * 60);
-const LOG_CAPACITY: usize = 20;
+const LOG_SHOWN: usize = 20;
 
 static SWITCHERS: Mutex<Option<HashMap<String, PoolSwitcher>>> = Mutex::new(None);
-static EVENTS: Mutex<VecDeque<SwitchEvent>> = Mutex::new(VecDeque::new());
 
 #[derive(Clone, Debug, Serialize, specta::Type)]
 pub struct SwitchEvent {
@@ -47,8 +46,25 @@ pub fn spawn() {
     });
 }
 
-pub fn events() -> Vec<SwitchEvent> {
-    EVENTS.lock().iter().cloned().collect()
+/// The newest switches, with pool names filled in.
+pub async fn recent_events() -> Vec<SwitchEvent> {
+    let loaded = with_clash5_binding_store(|store| Ok((store.pool_switches(LOG_SHOWN)?, store.node_pools()?))).await;
+    let Ok((records, pools)) = loaded else {
+        return Vec::new();
+    };
+    records
+        .into_iter()
+        .map(|record| SwitchEvent {
+            pool_name: pools
+                .iter()
+                .find(|pool| pool.id == record.pool_id)
+                .map_or_else(|| "—".to_owned(), |pool| pool.name.clone()),
+            pool_id: record.pool_id,
+            member: record.member,
+            reason: record.reason,
+            at_ms: record.at_ms,
+        })
+        .collect()
 }
 
 fn now_ms() -> u64 {
@@ -161,24 +177,20 @@ async fn apply(pool: &NodePool, switch: &Switch, records: &[NodeRecord]) {
     updated.pinned = Some(member.clone());
     let _ = with_clash5_binding_store(move |store| store.save_node_pool(&updated)).await;
 
-    let event = SwitchEvent {
-        pool_id: pool.id.clone(),
-        pool_name: pool.name.clone(),
-        member: records
-            .iter()
-            .find(|record| record.source == member.source && record.stable_id == member.stable_id)
-            .map_or_else(|| "—".to_owned(), |record| record.display_name.clone()),
-        reason: match switch.reason {
-            SwitchReason::Initial => "initial",
-            SwitchReason::Failure => "failure",
-            SwitchReason::Score => "score",
-        }
-        .to_owned(),
-        at_ms: now_ms(),
+    let reason = match switch.reason {
+        SwitchReason::Initial => "initial",
+        SwitchReason::Failure => "failure",
+        SwitchReason::Score => "score",
     };
-    let mut events = EVENTS.lock();
-    if events.len() == LOG_CAPACITY {
-        events.pop_front();
+    let member_name = records
+        .iter()
+        .find(|record| record.source == member.source && record.stable_id == member.stable_id)
+        .map_or_else(|| "—".to_owned(), |record| record.display_name.clone());
+    let pool_id = pool.id.clone();
+    let at_ms = now_ms();
+    let recorded =
+        with_clash5_binding_store(move |store| store.record_pool_switch(&pool_id, &member_name, reason, at_ms)).await;
+    if recorded.is_err() {
+        logging!(warn, Type::Config, "pool switch was not recorded");
     }
-    events.push_back(event);
 }

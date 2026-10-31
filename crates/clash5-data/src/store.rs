@@ -788,7 +788,7 @@ impl BindingStore {
         db.pragma_update(None, "foreign_keys", true)?;
         db.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if !(0..=9).contains(&version) {
+        if !(0..=10).contains(&version) {
             return Err(DataError::SchemaVersion);
         }
         let mut version = version;
@@ -995,6 +995,19 @@ CREATE TABLE IF NOT EXISTS quality_samples(
 ) STRICT;
 CREATE INDEX IF NOT EXISTS quality_samples_chain ON quality_samples(chain_id,id);
 PRAGMA user_version=9;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 10 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS pool_switch_log(
+ id INTEGER PRIMARY KEY, pool_id TEXT NOT NULL, member TEXT NOT NULL,
+ reason TEXT NOT NULL CHECK(reason IN ('initial','failure','score')), at_ms INTEGER NOT NULL
+) STRICT;
+PRAGMA user_version=10;
 "#,
             )?;
             tx.commit()?;
@@ -1591,6 +1604,44 @@ PRAGMA user_version=9;
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
+    /// Keeps the newest 200 switches across all pools.
+    pub fn record_pool_switch(
+        &mut self,
+        pool_id: &str,
+        member: &str,
+        reason: &str,
+        at_ms: u64,
+    ) -> Result<(), DataError> {
+        self.ensure_writable()?;
+        text(pool_id)?;
+        text(member)?;
+        let at_ms = i64::try_from(at_ms).map_err(|_| DataError::InvalidInput)?;
+        self.db.execute(
+            "INSERT INTO pool_switch_log(pool_id,member,reason,at_ms) VALUES(?1,?2,?3,?4)",
+            params![pool_id, member, reason, at_ms],
+        )?;
+        self.db.execute(
+            "DELETE FROM pool_switch_log WHERE id NOT IN (SELECT id FROM pool_switch_log ORDER BY id DESC LIMIT 200)",
+            [],
+        )?;
+        Ok(())
+    }
+    /// Newest first.
+    pub fn pool_switches(&self, limit: usize) -> Result<Vec<PoolSwitchRecord>, DataError> {
+        let limit = i64::try_from(limit).map_err(|_| DataError::InvalidInput)?;
+        let mut statement = self
+            .db
+            .prepare("SELECT pool_id,member,reason,at_ms FROM pool_switch_log ORDER BY id DESC LIMIT ?1")?;
+        let rows = statement.query_map(params![limit], |row| {
+            Ok(PoolSwitchRecord {
+                pool_id: row.get(0)?,
+                member: row.get(1)?,
+                reason: row.get(2)?,
+                at_ms: u64::try_from(row.get::<_, i64>(3)?).unwrap_or(0),
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
     pub fn save_quality(&mut self, source: &Source, stable_id: &str, quality: &NodeQuality) -> Result<(), DataError> {
         self.ensure_writable()?;
         let (kind, provider) = source.scope()?;
@@ -1840,4 +1891,12 @@ PRAGMA user_version=9;
         tx.commit()?;
         Ok(())
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PoolSwitchRecord {
+    pub pool_id: String,
+    pub member: String,
+    pub reason: String,
+    pub at_ms: u64,
 }
