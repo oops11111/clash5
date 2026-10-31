@@ -50,7 +50,7 @@
   "hopsHint": "一条链路有 2 到 6 跳。每一跳可以是节点或代理池，流量按顺序逐跳拨号。",
   "adjacentHops": "相邻两跳不能是同一个节点。",
   "missingPool": "缺少代理池",
-  "pools": "节点组",
+  "pools": "节点池",
   "createPool": "创建代理池",
   "poolName": "池名称",
   "poolMembers": "成员（1 到 32 个）",
@@ -118,5 +118,11 @@
     "failedRun": "无法经过这条链路完成质量检测。"
   },
   "chainsTab": "链路",
-  "manageNodes": "管理节点"
+  "manageNodes": "管理节点",
+  "poolScores": {
+    "empty": "还没有成员。",
+    "hint": "按分数从好到差排列，分数越低越好（延迟与近期失败）。",
+    "failed": "失败",
+    "unmeasured": "未测量"
+  }
 }

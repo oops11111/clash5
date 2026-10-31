@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 
 import { BasePage } from '@/components/base'
+import { PoolScoreList } from '@/components/chain/pool-scores'
 import {
   activateClash5Chain,
   deleteClash5AppRoute,
@@ -1332,6 +1333,7 @@ const ChainsPage = () => {
                     {t('chains.deletePool')}
                   </Button>
                 </Stack>
+                <PoolScoreList poolId={pool.id} refreshKey={workspace} />
               </Paper>
             ))}
           </Stack>

@@ -83,6 +83,12 @@ export interface TranslationResources {
       poolOption: string
       pools: string
       poolSaved: string
+      poolScores: {
+        empty: string
+        failed: string
+        hint: string
+        unmeasured: string
+      }
       quality: {
         bytesUsed: string
         confirm: string

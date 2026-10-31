@@ -526,6 +526,10 @@ export const commands = {
     typedError<RuleOverview, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_rule_overview'),
     ),
+  clash5PoolScores: (id: string) =>
+    typedError<PoolMemberScore[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_pool_scores', { id }),
+    ),
   enhanceProfiles: () =>
     typedError<ValidationOutcome, CommandFailure_Serialize>(
       __TAURI_INVOKE('enhance_profiles'),
@@ -1382,6 +1386,17 @@ export type PluginSummary = {
   enabled: boolean
   has_previous: boolean
   bundled: boolean
+}
+
+export type PoolMemberScore = {
+  reference: NodeRef
+  display_name: string
+  /**  Position among scored members, best first; `None` when the member has no usable score. */
+  rank: number | null
+  score: number | null
+  delay_ms: number | null
+  failure_streak: number
+  failed: boolean
 }
 
 export type PrfExtra = {
