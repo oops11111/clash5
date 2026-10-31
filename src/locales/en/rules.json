@@ -110,7 +110,7 @@
     "merged": "Merged {{count}}"
   },
   "overview": {
-    "decoupled": "Subscription rules · {{count}} rules · proxy policies replaced by the default proxy",
-    "kept": "Subscription rules · {{count}} rules · proxy policies kept"
+    "decoupled": "Subscription rules · {{count}} rules · policies replaced by the default exit",
+    "kept": "Subscription rules · {{count}} rules · grouped routing kept, unmatched traffic uses the default exit"
   }
 }

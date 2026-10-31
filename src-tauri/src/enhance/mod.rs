@@ -913,7 +913,7 @@ pub async fn enhance(
         .ok()
         .and_then(|item| item.option.as_ref())
         .and_then(|option| option.decouple_rules)
-        .unwrap_or(true);
+        .unwrap_or(false);
     let (config, rule_overview) = rules::apply(profile.config, &text_rule_sets, decouple_rules);
     rules::store_overview(rule_overview);
     let merge_item = profile.merge_item;

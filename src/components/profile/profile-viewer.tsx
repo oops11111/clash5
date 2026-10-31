@@ -56,7 +56,7 @@ export function ProfileViewer({ onChange, ref }: ProfileViewerProps) {
         option: {
           with_proxy: false,
           self_proxy: false,
-          decouple_rules: true,
+          decouple_rules: false,
           allow_auto_update: true,
         },
       },
@@ -441,7 +441,7 @@ export function ProfileViewer({ onChange, ref }: ProfileViewerProps) {
                   {t('profiles.modals.profileForm.fields.decoupleRules')}
                 </InputLabel>
                 <Switch
-                  checked={field.value ?? true}
+                  checked={field.value ?? false}
                   onChange={(_, checked) => field.onChange(checked)}
                   color="primary"
                 />

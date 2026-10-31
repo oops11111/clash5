@@ -132,7 +132,7 @@
         "useClashProxy": "Use Clash Proxy",
         "acceptInvalidCerts": "Allows Invalid Certificates (Danger)",
         "allowAutoUpdate": "Allow Auto Update",
-        "decoupleRules": "Send subscription rules to the default proxy"
+        "decoupleRules": "Send all subscription policies to the default exit"
       },
       "types": {
         "remote": "Remote",

@@ -90,13 +90,6 @@ fn is_kept(policy: &str) -> bool {
     KEPT_POLICIES.iter().any(|kept| policy.eq_ignore_ascii_case(kept))
 }
 
-/// The proxy policy a subscription rule names; `None` for `DIRECT`/`REJECT`.
-fn proxy_policy(rule: &str) -> Option<&str> {
-    let parts = fields(rule);
-    let policy = *parts.get(policy_index(parts.first()?))?;
-    (!is_kept(policy)).then_some(policy)
-}
-
 fn decouple_rule(rule: &str, target: &str) -> String {
     let mut parts = fields(rule);
     let Some(first) = parts.first() else {
@@ -110,21 +103,6 @@ fn decouple_rule(rule: &str, target: &str) -> String {
     } else {
         rule.to_owned()
     }
-}
-
-/// The subscription's `MATCH` target when it is a group, else the first group.
-fn default_target(rules: &[&str], groups: &[String]) -> Option<String> {
-    let final_policy = rules
-        .iter()
-        .rev()
-        .find(|rule| {
-            fields(rule)
-                .first()
-                .is_some_and(|kind| kind.eq_ignore_ascii_case("MATCH"))
-        })
-        .and_then(|rule| proxy_policy(rule))
-        .filter(|policy| groups.iter().any(|group| group.as_str() == *policy));
-    final_policy.map(str::to_owned).or_else(|| groups.first().cloned())
 }
 
 /// Rules from one text rule set, plus the lines that could not be read.
@@ -211,6 +189,75 @@ fn merge_rules(custom: Vec<String>, subscription: Vec<String>) -> (Vec<String>, 
     (merged, report)
 }
 
+/// clash5-owned group that holds every subscription node and provider; unmatched traffic exits here.
+pub(crate) const DEFAULT_GROUP: &str = "clash5-default";
+
+/// Adds `DEFAULT_GROUP` to the config when it has any node or provider to hold.
+fn ensure_default_group(config: &mut Mapping) -> bool {
+    let names: Vec<Value> = config
+        .get("proxies")
+        .and_then(Value::as_sequence)
+        .into_iter()
+        .flatten()
+        .filter_map(|proxy| proxy.as_mapping()?.get("name")?.as_str().map(Value::from))
+        .collect();
+    let providers: Vec<Value> = config
+        .get("proxy-providers")
+        .and_then(Value::as_mapping)
+        .into_iter()
+        .flatten()
+        .filter_map(|(name, _)| name.as_str().map(Value::from))
+        .collect();
+    if names.is_empty() && providers.is_empty() {
+        return false;
+    }
+
+    let mut group = Mapping::new();
+    group.insert(Value::from("name"), Value::from(DEFAULT_GROUP));
+    group.insert(Value::from("type"), Value::from("select"));
+    group.insert(Value::from("proxies"), Value::Sequence(names));
+    if !providers.is_empty() {
+        group.insert(Value::from("use"), Value::Sequence(providers));
+    }
+
+    let mut groups: Vec<Value> = config
+        .get("proxy-groups")
+        .and_then(Value::as_sequence)
+        .cloned()
+        .unwrap_or_default();
+    groups.retain(|group| {
+        group
+            .as_mapping()
+            .and_then(|group| group.get("name"))
+            .and_then(Value::as_str)
+            != Some(DEFAULT_GROUP)
+    });
+    groups.insert(0, Value::Mapping(group));
+    config.insert(Value::from("proxy-groups"), Value::Sequence(groups));
+    true
+}
+
+/// Subscription rules with their groups kept. The final `MATCH` always moves to the default
+/// group; with `decouple` on, every proxy policy moves there too.
+fn route_subscription(rules: &[String], decouple: bool, default: &str) -> Vec<String> {
+    let last_match = rules.iter().rposition(|rule| {
+        fields(rule)
+            .first()
+            .is_some_and(|kind| kind.eq_ignore_ascii_case("MATCH"))
+    });
+    rules
+        .iter()
+        .enumerate()
+        .map(|(index, rule)| {
+            if decouple || Some(index) == last_match {
+                decouple_rule(rule, default)
+            } else {
+                rule.clone()
+            }
+        })
+        .collect()
+}
+
 const fn target_policy(target: RuleTarget, default: &str) -> &str {
     match target {
         RuleTarget::Default => default,
@@ -222,13 +269,6 @@ const fn target_policy(target: RuleTarget, default: &str) -> &str {
 /// Applies the rule pipeline to a subscription config before its rules-editor sequences.
 /// With `decouple` off, the subscription's own policies are kept and only text rules are merged.
 pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decouple: bool) -> (Mapping, RuleOverview) {
-    let groups: Vec<String> = config
-        .get("proxy-groups")
-        .and_then(Value::as_sequence)
-        .into_iter()
-        .flatten()
-        .filter_map(|group| group.as_mapping()?.get("name")?.as_str().map(str::to_owned))
-        .collect();
     let rules_value = config.get("rules").and_then(Value::as_sequence);
     let subscription: Vec<String> = rules_value
         .into_iter()
@@ -236,11 +276,11 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
         .filter_map(Value::as_str)
         .map(str::to_owned)
         .collect();
-    let rule_refs: Vec<&str> = subscription.iter().map(String::as_str).collect();
 
-    let Some(default) = default_target(&rule_refs, &groups) else {
+    if !ensure_default_group(&mut config) {
         return (config, overview(Vec::new(), &subscription, false, None));
-    };
+    }
+    let default = DEFAULT_GROUP.to_owned();
 
     let custom: Vec<(String, String)> = text_rule_sets
         .iter()
@@ -272,11 +312,7 @@ pub(crate) fn apply(mut config: Mapping, text_rule_sets: &[TextRuleSet], decoupl
         rule_providers.extend(providers);
         config.insert(Value::from("rule-providers"), Value::Mapping(rule_providers));
     }
-    let decoupled: Vec<String> = if decouple {
-        subscription.iter().map(|rule| decouple_rule(rule, &default)).collect()
-    } else {
-        subscription.clone()
-    };
+    let decoupled = route_subscription(&subscription, decouple, &default);
 
     if decoupled.is_empty() && custom.is_empty() {
         return (config, overview(Vec::new(), &subscription, false, Some(&default)));
@@ -370,11 +406,20 @@ mod tests {
     }
 
     #[test]
-    fn default_target_follows_the_final_match_then_the_first_group() {
-        let groups = vec!["Auto".to_owned(), "Proxy".to_owned()];
-        assert_eq!(default_target(&["MATCH,Proxy"], &groups).as_deref(), Some("Proxy"));
-        assert_eq!(default_target(&["MATCH,DIRECT"], &groups).as_deref(), Some("Auto"));
-        assert_eq!(default_target(&["MATCH,Missing"], &groups).as_deref(), Some("Auto"));
+    fn routing_keeps_groups_and_moves_only_the_final_match_by_default() {
+        let subscription = rules(&["DOMAIN-SUFFIX,a.com,Auto", "GEOIP,CN,DIRECT", "MATCH,Proxy"]);
+        assert_eq!(
+            route_subscription(&subscription, false, DEFAULT_GROUP),
+            rules(&["DOMAIN-SUFFIX,a.com,Auto", "GEOIP,CN,DIRECT", "MATCH,clash5-default"])
+        );
+        assert_eq!(
+            route_subscription(&subscription, true, DEFAULT_GROUP),
+            rules(&[
+                "DOMAIN-SUFFIX,a.com,clash5-default",
+                "GEOIP,CN,DIRECT",
+                "MATCH,clash5-default"
+            ])
+        );
     }
 
     #[test]
@@ -421,9 +466,9 @@ mod tests {
     }
 
     #[test]
-    fn turning_decoupling_off_keeps_subscription_policies() {
+    fn decoupling_switch_moves_every_policy_to_the_default_group() {
         let config: Mapping = serde_yaml_ng::from_str(
-            "proxy-groups: [{name: Auto}, {name: Proxy}]\nrules: ['DOMAIN-SUFFIX,a.com,Auto', 'MATCH,Proxy']",
+            "proxies: [{name: n1}]\nproxy-groups: [{name: Auto}, {name: Proxy}]\nrules: ['DOMAIN-SUFFIX,a.com,Auto', 'MATCH,Proxy']",
         )
         .unwrap();
         let rules_of = |config: &Mapping| -> Vec<String> {
@@ -436,11 +481,11 @@ mod tests {
         };
         assert_eq!(
             rules_of(&apply(config.clone(), &[], true).0),
-            rules(&["DOMAIN-SUFFIX,a.com,Proxy", "MATCH,Proxy"])
+            rules(&["DOMAIN-SUFFIX,a.com,clash5-default", "MATCH,clash5-default"])
         );
         assert_eq!(
             rules_of(&apply(config, &[], false).0),
-            rules(&["DOMAIN-SUFFIX,a.com,Auto", "MATCH,Proxy"])
+            rules(&["DOMAIN-SUFFIX,a.com,Auto", "MATCH,clash5-default"])
         );
     }
 
@@ -459,7 +504,7 @@ mod tests {
 
     #[test]
     fn linked_sets_become_rule_providers_placed_before_subscription_rules() {
-        let config: Mapping = serde_yaml_ng::from_str("proxy-groups: [{name: Proxy}]\nrules: ['MATCH,Proxy']").unwrap();
+        let config: Mapping = serde_yaml_ng::from_str("proxies: [{name: n1}]\nrules: ['MATCH,Proxy']").unwrap();
         let sets = vec![TextRuleSet {
             id: "abc".into(),
             name: "广告".into(),
@@ -478,7 +523,7 @@ mod tests {
             .iter()
             .filter_map(Value::as_str)
             .collect();
-        assert_eq!(rules, vec!["RULE-SET,clash5-set-abc,REJECT", "MATCH,Proxy"]);
+        assert_eq!(rules, vec!["RULE-SET,clash5-set-abc,REJECT", "MATCH,clash5-default"]);
         assert_eq!(pipeline.notes[0].source.as_deref(), Some("广告"));
     }
 }

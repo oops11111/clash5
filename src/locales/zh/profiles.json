@@ -132,7 +132,7 @@
         "useClashProxy": "使用内核代理更新",
         "acceptInvalidCerts": "允许无效证书（危险）",
         "allowAutoUpdate": "允许自动更新",
-        "decoupleRules": "订阅规则统一使用默认代理"
+        "decoupleRules": "订阅规则全部改走默认出口"
       },
       "types": {
         "remote": "远程",
