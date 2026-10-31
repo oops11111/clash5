@@ -37,6 +37,12 @@ export const PoolPolicy = ({
   const nameOf = (reference: NodeRef) =>
     names.get(JSON.stringify(reference)) ?? '—'
   const mode = pool.mode ?? 'delay'
+  const reasonLabel = (reason: string) =>
+    reason === 'failure'
+      ? t('chains.poolPolicy.reasons.failure')
+      : reason === 'score'
+        ? t('chains.poolPolicy.reasons.score')
+        : t('chains.poolPolicy.reasons.initial')
   const pinnedKey = pool.pinned ? JSON.stringify(pool.pinned) : ''
 
   const save = async (patch: Partial<NodePool>) => {
@@ -108,7 +114,9 @@ export const PoolPolicy = ({
         <Typography variant="caption" color="text.secondary">
           {t('chains.poolPolicy.lastSwitch', {
             member: lastSwitch.member,
-            reason: t(`chains.poolPolicy.reasons.${lastSwitch.reason}`),
+            reason: t(
+              `chains.poolPolicy.reasons.${lastSwitch.reason}` as const,
+            ),
           })}
         </Typography>
       )}

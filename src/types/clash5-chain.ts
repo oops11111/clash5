@@ -10,10 +10,12 @@ export type ChainHopRef =
   | { kind: 'pool'; pool_id: string }
 
 export interface NodePoolDef {
-  schema_version: 1
+  schema_version: 1 | 2
   id: string
   name: string
   members: ChainNodeRef[]
+  mode?: 'delay' | 'pinned' | 'quality'
+  pinned?: ChainNodeRef | null
 }
 
 export interface Clash5Chain {

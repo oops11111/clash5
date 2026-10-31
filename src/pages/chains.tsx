@@ -41,6 +41,7 @@ import {
   saveClash5NodePool,
   testClash5Chain,
 } from '@/services/cmds'
+import type { SwitchEvent } from '@/services/tauri-commands.generated'
 import type {
   AppMatcherRef,
   AppRouteDef,
@@ -53,7 +54,6 @@ import type {
   ExitIpResult,
   RouteTargetRef,
 } from '@/types/clash5-chain'
-import type { SwitchEvent } from '@/services/tauri-commands.generated'
 
 // Matches the backend default for the long-lived connection quality test.
 const QUALITY_DEFAULT_BYTES = 5_000_000
