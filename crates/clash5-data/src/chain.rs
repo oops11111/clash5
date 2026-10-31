@@ -43,6 +43,19 @@ pub struct ChainSample {
     pub delay_ms: Option<u32>,
 }
 
+/// How a pool picks its member when a chain uses it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum PoolMode {
+    /// Lowest latency, as mihomo's url-test does. Pools saved before modes existed use this.
+    #[default]
+    Delay,
+    /// Always the pinned member.
+    Pinned,
+    /// Automatic by quality score. `pinned` holds the member picked last, so a rebuilt config starts from it.
+    Quality,
+}
+
 /// A pool is an independent object. Chains refer to it by ID, so one pool can serve many chains.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(deny_unknown_fields)]
@@ -51,6 +64,10 @@ pub struct NodePool {
     pub id: String,
     pub name: String,
     pub members: Vec<NodeRef>,
+    #[serde(default)]
+    pub mode: PoolMode,
+    #[serde(default)]
+    pub pinned: Option<NodeRef>,
 }
 
 /// Deserialized by hand so the schema 1 front and landing pair can be read.
@@ -189,7 +206,7 @@ impl ProxyChain {
 
 impl NodePool {
     pub fn validate(&self) -> Result<(), DataError> {
-        if self.schema_version != 1
+        if !(1..=2).contains(&self.schema_version)
             || !uuid_v4(&self.id)
             || self.name.trim().is_empty()
             || self.name.len() > 256
@@ -204,6 +221,11 @@ impl NodePool {
             if self.members[..index].contains(member) {
                 return Err(DataError::InvalidInput);
             }
+        }
+        if let Some(pinned) = &self.pinned
+            && !self.members.contains(pinned)
+        {
+            return Err(DataError::InvalidInput);
         }
         Ok(())
     }
@@ -350,13 +372,22 @@ pub fn compile_chains(
                     if !names.insert(hop_name.clone()) {
                         return Err(ChainError::NameConflict);
                     }
-                    let mut probe = Mapping::new();
-                    probe.insert("name".into(), hop_name.clone().into());
-                    probe.insert("type".into(), "url-test".into());
-                    probe.insert("proxies".into(), Value::Sequence(members));
-                    probe.insert("url".into(), PROBE_URL.into());
-                    probe.insert("interval".into(), PROBE_INTERVAL_SECONDS.into());
-                    groups.push(Value::Mapping(probe));
+                    let mut group = Mapping::new();
+                    group.insert("name".into(), hop_name.clone().into());
+                    match pool.mode {
+                        PoolMode::Delay => {
+                            group.insert("type".into(), "url-test".into());
+                            group.insert("proxies".into(), Value::Sequence(members));
+                            group.insert("url".into(), PROBE_URL.into());
+                            group.insert("interval".into(), PROBE_INTERVAL_SECONDS.into());
+                        }
+                        // The selected member is the first entry: mihomo's select group starts there.
+                        PoolMode::Pinned | PoolMode::Quality => {
+                            group.insert("type".into(), "select".into());
+                            group.insert("proxies".into(), Value::Sequence(select_order(pool, &members)));
+                        }
+                    }
+                    groups.push(Value::Mapping(group));
                     hop_name
                 }
             };
@@ -397,4 +428,19 @@ pub fn compile_chains(
     candidate.insert("proxy-groups".into(), Value::Sequence(groups));
     *config = candidate;
     Ok(compiled)
+}
+
+/// Member names with the pinned (or last picked) member first, so mihomo's select starts there.
+fn select_order(pool: &NodePool, members: &[Value]) -> Vec<Value> {
+    let Some(pinned) = pool
+        .pinned
+        .as_ref()
+        .and_then(|pinned| pool.members.iter().position(|member| member == pinned))
+    else {
+        return members.to_vec();
+    };
+    let mut ordered = members.to_vec();
+    let chosen = ordered.remove(pinned);
+    ordered.insert(0, chosen);
+    ordered
 }

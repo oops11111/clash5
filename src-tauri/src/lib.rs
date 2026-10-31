@@ -158,6 +158,7 @@ pub fn export_frontend_command_contract() -> Result<(), Box<dyn std::error::Erro
             cmd::clash5_dns_samples,
             cmd::clash5_rule_overview,
             cmd::clash5_pool_scores,
+            cmd::clash5_pool_switch_events,
             cmd::enhance_profiles,
             cmd::patch_profiles_config,
             cmd::view_profile,
@@ -413,6 +414,7 @@ mod app_init {
             cmd::clash5_dns_samples,
             cmd::clash5_rule_overview,
             cmd::clash5_pool_scores,
+            cmd::clash5_pool_switch_events,
             cmd::clash5_list_nodes,
             cmd::clash5_probe_nodes,
             cmd::clash5_import_manual_proxies,
@@ -504,6 +506,7 @@ pub fn run() -> std::process::ExitCode {
 
     let builder = app_init::setup_plugins(tauri::Builder::default())
         .setup(|app| {
+            clash5::pool_scheduler::spawn();
             // Logger may not be ready yet, so mirror setup panics to stderr.
             fn log_setup_panic(stage: &str, panic: Box<dyn std::any::Any + Send>) {
                 let msg = panic

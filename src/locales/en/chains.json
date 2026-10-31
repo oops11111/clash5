@@ -124,5 +124,21 @@
     "hint": "Best first. Score is lower-is-better: latency and recent failures.",
     "failed": "failed",
     "unmeasured": "not measured"
+  },
+  "poolPolicy": {
+    "mode": "Mode",
+    "member": "Member",
+    "applyHint": "Changes take effect when a line using this pool is activated again.",
+    "lastSwitch": "Last switch: {{member}} ({{reason}})",
+    "modes": {
+      "delay": "Lowest latency",
+      "pinned": "Fixed member",
+      "quality": "Automatic by quality"
+    },
+    "reasons": {
+      "initial": "first pick",
+      "failure": "failure",
+      "score": "better score"
+    }
   }
 }

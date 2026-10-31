@@ -81,6 +81,22 @@ export interface TranslationResources {
       poolName: string
       poolNone: string
       poolOption: string
+      poolPolicy: {
+        applyHint: string
+        lastSwitch: string
+        member: string
+        mode: string
+        modes: {
+          delay: string
+          pinned: string
+          quality: string
+        }
+        reasons: {
+          failure: string
+          initial: string
+          score: string
+        }
+      }
       pools: string
       poolSaved: string
       poolScores: {

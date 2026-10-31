@@ -1,4 +1,6 @@
-use clash5_data::{BindingStore, ExitPolicy, Hop, NodePool, NodeRef, ProxyChain, ScopedProxy, Source, compile_chains};
+use clash5_data::{
+    BindingStore, ExitPolicy, Hop, NodePool, NodeRef, PoolMode, ProxyChain, ScopedProxy, Source, compile_chains,
+};
 use serde_yaml_ng::{Mapping, Value};
 
 const CHAIN_ID: &str = "18dc0b8a-7485-49bc-8a91-f48bdc736846";
@@ -52,6 +54,8 @@ fn pool() -> NodePool {
         id: POOL_ID.into(),
         name: "Pool".into(),
         members: vec![node("p1"), node("p2")],
+        mode: PoolMode::Delay,
+        pinned: None,
     }
 }
 
@@ -205,4 +209,29 @@ fn a_pinned_exit_address_must_be_an_ip_and_samples_return_newest_first() {
             .is_err()
     );
     assert!(store.chain_samples(CHAIN_ID, 0).is_err());
+}
+
+#[test]
+fn a_pinned_pool_is_a_select_group_that_starts_on_the_pinned_member() {
+    let mut config = empty_config();
+    let mut pinned = pool();
+    pinned.mode = PoolMode::Pinned;
+    pinned.pinned = Some(node("p2"));
+    let hops = vec![
+        Hop::Node { node: node("a") },
+        Hop::Pool {
+            pool_id: POOL_ID.into(),
+        },
+    ];
+    compile_chains(&mut config, &[chain(hops)], &[pinned], &catalog()).unwrap();
+    let group = format!("clash5-chain-{CHAIN_ID}-h1");
+    let pool_group = config["proxy-groups"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .find(|value| value["name"] == group)
+        .unwrap();
+    assert_eq!(pool_group["type"], "select");
+    assert_eq!(pool_group["proxies"][0], format!("{group}-m1"));
+    assert_eq!(pool_group["proxies"][1], format!("{group}-m0"));
 }

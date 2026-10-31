@@ -1,5 +1,8 @@
 use super::{CmdResult, CommandFailure, coded_error};
-use crate::{clash5::pool_score, config::profiles::with_clash5_binding_store};
+use crate::{
+    clash5::{pool_scheduler::SwitchEvent, pool_score},
+    config::profiles::with_clash5_binding_store,
+};
 use clash5_data::{NodeQuality, NodeRecord, NodeRef, QualityStatus};
 use serde::Serialize;
 
@@ -71,4 +74,10 @@ pub async fn clash5_pool_scores(id: String) -> CmdResult<Vec<PoolMemberScore>> {
             }
         })
         .collect())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_pool_switch_events() -> CmdResult<Vec<SwitchEvent>> {
+    Ok(crate::clash5::pool_scheduler::events())
 }

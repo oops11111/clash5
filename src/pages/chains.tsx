@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 
 import { BasePage } from '@/components/base'
+import { PoolPolicy } from '@/components/chain/pool-policy'
 import { PoolScoreList } from '@/components/chain/pool-scores'
 import {
   activateClash5Chain,
@@ -32,6 +33,7 @@ import {
   deleteClash5NodePool,
   detectClash5ExitIp,
   getClash5ChainWorkspace,
+  getClash5PoolSwitchEvents,
   listClash5AppRoutes,
   runClash5QualityTest,
   saveClash5AppRoute,
@@ -51,6 +53,7 @@ import type {
   ExitIpResult,
   RouteTargetRef,
 } from '@/types/clash5-chain'
+import type { SwitchEvent } from '@/services/tauri-commands.generated'
 
 // Matches the backend default for the long-lived connection quality test.
 const QUALITY_DEFAULT_BYTES = 5_000_000
@@ -163,6 +166,7 @@ const ChainsPage = () => {
   const [samples, setSamples] = useState<ChainSample[]>([])
   const [routeDraft, setRouteDraft] = useState<AppRouteDef | null>(null)
   const [poolName, setPoolName] = useState('')
+  const [switchEvents, setSwitchEvents] = useState<SwitchEvent[]>([])
   const [poolMemberKeys, setPoolMemberKeys] = useState<string[]>([])
   const [exitEnabled, setExitEnabled] = useState(
     () => localStorage.getItem('clash5-exit-ip-enabled') !== 'false',
@@ -201,6 +205,12 @@ const ChainsPage = () => {
   const refreshWorkspace = useCallback(async () => {
     setWorkspace(await getClash5ChainWorkspace())
   }, [])
+
+  useEffect(() => {
+    getClash5PoolSwitchEvents()
+      .then(setSwitchEvents)
+      .catch(() => setSwitchEvents([]))
+  }, [workspace])
 
   const refreshSamples = useCallback(async (chainId: string) => {
     try {
@@ -1276,10 +1286,12 @@ const ChainsPage = () => {
                         )
                         .map((entry) => entry.reference)
                       await saveClash5NodePool({
-                        schema_version: 1,
+                        schema_version: 2,
                         id: crypto.randomUUID(),
                         name: poolName.trim(),
                         members,
+                        mode: 'pinned',
+                        pinned: members[0],
                       })
                       setPoolName('')
                       setPoolMemberKeys([])
@@ -1333,6 +1345,15 @@ const ChainsPage = () => {
                     {t('chains.deletePool')}
                   </Button>
                 </Stack>
+                <PoolPolicy
+                  pool={pool}
+                  nodes={workspace.nodes}
+                  lastSwitch={switchEvents
+                    .filter((event) => event.pool_id === pool.id)
+                    .at(-1)}
+                  busy={busy}
+                  onSaved={refreshWorkspace}
+                />
                 <PoolScoreList poolId={pool.id} refreshKey={workspace} />
               </Paper>
             ))}

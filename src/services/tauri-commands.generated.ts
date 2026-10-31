@@ -530,6 +530,10 @@ export const commands = {
     typedError<PoolMemberScore[], CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_pool_scores', { id }),
     ),
+  clash5PoolSwitchEvents: () =>
+    typedError<SwitchEvent[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_pool_switch_events'),
+    ),
   enhanceProfiles: () =>
     typedError<ValidationOutcome, CommandFailure_Serialize>(
       __TAURI_INVOKE('enhance_profiles'),
@@ -1241,6 +1245,8 @@ export type NodePool = {
   id: string
   name: string
   members: NodeRef[]
+  mode?: PoolMode
+  pinned?: NodeRef | null
 }
 
 export type NodeQuality = {
@@ -1398,6 +1404,15 @@ export type PoolMemberScore = {
   failure_streak: number
   failed: boolean
 }
+
+/**  How a pool picks its member when a chain uses it. */
+export type PoolMode =
+  /**  Lowest latency, as mihomo's url-test does. Pools saved before modes existed use this. */
+  | 'delay'
+  /**  Always the pinned member. */
+  | 'pinned'
+  /**  Automatic by quality score. `pinned` holds the member picked last, so a rebuilt config starts from it. */
+  | 'quality'
 
 export type PrfExtra = {
   upload: number
@@ -1770,6 +1785,14 @@ export type SingboxRouteStatus = {
 export type Source =
   | { kind: 'manual' }
   | { kind: 'subscription'; provider_id: string }
+
+export type SwitchEvent = {
+  pool_id: string
+  pool_name: string
+  member: string
+  reason: string
+  at_ms: number
+}
 
 export type SystemInfo = {
   system_name: string

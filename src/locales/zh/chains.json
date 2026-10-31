@@ -124,5 +124,21 @@
     "hint": "按分数从好到差排列，分数越低越好（延迟与近期失败）。",
     "failed": "失败",
     "unmeasured": "未测量"
+  },
+  "poolPolicy": {
+    "mode": "模式",
+    "member": "成员",
+    "applyHint": "修改后，重新激活使用此节点池的线路才会生效。",
+    "lastSwitch": "最近切换：{{member}}（{{reason}}）",
+    "modes": {
+      "delay": "延迟最低",
+      "pinned": "固定成员",
+      "quality": "按质量自动"
+    },
+    "reasons": {
+      "initial": "首次选择",
+      "failure": "故障切换",
+      "score": "分数更优"
+    }
   }
 }
