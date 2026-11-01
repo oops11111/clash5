@@ -188,24 +188,6 @@ fn filename_from_disposition(disposition: &str) -> Option<String> {
     }
 }
 
-#[cfg(test)]
-mod filename_tests {
-    use super::filename_from_disposition;
-
-    #[test]
-    fn quoted_and_encoded_file_names_come_out_without_quotes() {
-        assert_eq!(
-            filename_from_disposition("attachment; filename=\"name.yaml\"").as_deref(),
-            Some("name.yaml")
-        );
-        assert_eq!(
-            filename_from_disposition("attachment; filename*=UTF-8''%E5%90%8D.yaml").as_deref(),
-            Some("名.yaml")
-        );
-        assert_eq!(filename_from_disposition("attachment").as_deref(), None);
-    }
-}
-
 impl PrfItem {
     /// Builds an item from a partial value that must include `itype`.
     pub(super) async fn from(item: &Self, file_data: Option<String>) -> Result<Self> {
@@ -609,4 +591,22 @@ fn fix_dirty_url(input: &str) -> Result<Url> {
     }
 
     Ok(url)
+}
+
+#[cfg(test)]
+mod filename_tests {
+    use super::filename_from_disposition;
+
+    #[test]
+    fn quoted_and_encoded_file_names_come_out_without_quotes() {
+        assert_eq!(
+            filename_from_disposition("attachment; filename=\"name.yaml\"").as_deref(),
+            Some("name.yaml")
+        );
+        assert_eq!(
+            filename_from_disposition("attachment; filename*=UTF-8''%E5%90%8D.yaml").as_deref(),
+            Some("名.yaml")
+        );
+        assert_eq!(filename_from_disposition("attachment").as_deref(), None);
+    }
 }

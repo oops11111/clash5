@@ -346,6 +346,7 @@ pub fn listener_check(listeners: &[std::string::String]) -> LeakCheck {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod platform_parser_tests {
     use super::*;
 
