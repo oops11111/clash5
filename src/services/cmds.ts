@@ -29,6 +29,7 @@ import type {
   DnsCheckReport,
   DnsSample,
   PoolMemberScore,
+  RunningProcess,
   SwitchEvent,
   RuleOverview,
   QualityReport as GeneratedQualityReport,
@@ -101,6 +102,8 @@ export const saveClash5AppRoute = (route: AppRouteDef) =>
   invoke<null>('clash5_save_app_route', { route })
 export const deleteClash5AppRoute = (id: string) =>
   invoke<null>('clash5_delete_app_route', { id })
+export const listClash5Processes = () =>
+  invoke<RunningProcess[]>('clash5_list_processes')
 export const getClash5PoolSwitchEvents = () =>
   invoke<SwitchEvent[]>('clash5_pool_switch_events')
 export const getClash5PoolScores = (id: string) =>

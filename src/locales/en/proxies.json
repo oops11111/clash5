@@ -123,7 +123,7 @@
     "title": "Programs",
     "hint": "Choose where each program goes. Programs without a choice use the default proxy.",
     "empty": "No program routes yet.",
-    "placeholder": "Process name, e.g. curl.exe",
+    "placeholder": "Running program or name",
     "target": "Egress",
     "direct": "Direct",
     "reject": "Reject",

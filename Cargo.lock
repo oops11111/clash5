@@ -1255,6 +1255,7 @@ dependencies = [
  "socket2",
  "specta",
  "specta-typescript",
+ "sysinfo",
  "sysproxy",
  "tauri",
  "tauri-build",

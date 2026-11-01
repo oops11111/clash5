@@ -46,6 +46,7 @@ clash-verge-signal = { workspace = true }
 clash-verge-i18n = { workspace = true }
 clash-verge-limiter = { workspace = true }
 tauri-plugin-clash-verge-sysinfo = { workspace = true }
+sysinfo = "0.39.6"
 tauri-plugin-clipboard-manager = { workspace = true }
 tauri = { workspace = true, features = [
   "protocol-asset",

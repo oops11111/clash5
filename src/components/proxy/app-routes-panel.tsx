@@ -1,4 +1,5 @@
 import {
+  Autocomplete,
   Button,
   MenuItem,
   Paper,
@@ -14,6 +15,7 @@ import {
   deleteClash5AppRoute,
   getClash5ChainWorkspace,
   listClash5AppRoutes,
+  listClash5Processes,
   saveClash5AppRoute,
 } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
@@ -31,6 +33,17 @@ export const AppRoutesPanel = () => {
   const [chains, setChains] = useState<Clash5Chain[]>([])
   const [name, setName] = useState('')
   const [target, setTarget] = useState<string>('default')
+  const [processes, setProcesses] = useState<string[]>([])
+
+  // Opening the field lists the programs running now; typing a name that is not listed still works.
+  const loadProcesses = useLockFn(async () => {
+    try {
+      const running = await listClash5Processes()
+      setProcesses(running.map((process) => process.name))
+    } catch (error) {
+      showNotice.error(error)
+    }
+  })
 
   const load = useLockFn(async () => {
     try {
@@ -168,12 +181,20 @@ export const AppRoutesPanel = () => {
           spacing={1}
           sx={{ alignItems: 'center', flexWrap: 'wrap' }}
         >
-          <TextField
+          <Autocomplete
+            freeSolo
             size="small"
-            placeholder={t('proxies.apps.placeholder')}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
             sx={{ minWidth: 200 }}
+            options={processes}
+            inputValue={name}
+            onInputChange={(_, value) => setName(value)}
+            onOpen={() => void loadProcesses()}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder={t('proxies.apps.placeholder')}
+              />
+            )}
           />
           <TextField
             select

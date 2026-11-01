@@ -534,6 +534,10 @@ export const commands = {
     typedError<SwitchEvent[], CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_pool_switch_events'),
     ),
+  clash5ListProcesses: () =>
+    typedError<RunningProcess[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_processes'),
+    ),
   enhanceProfiles: () =>
     typedError<ValidationOutcome, CommandFailure_Serialize>(
       __TAURI_INVOKE('enhance_profiles'),
@@ -1754,6 +1758,12 @@ export type RunStateView = {
 }
 
 export type RunningMode = 'Service' | 'Sidecar' | 'NotRunning'
+
+export type RunningProcess = {
+  name: string
+  /**  Executable path when the system reports it; a process owned by another user may not. */
+  path: string | null
+}
 
 export type SaveProxyPortsOutcome =
   | { status: 'saved' }
