@@ -112,7 +112,8 @@
         "noSchedule": "没有计划",
         "unknown": "未知",
         "autoUpdateDisabled": "自动更新已禁用"
-      }
+      },
+      "localFile": "本地文件"
     }
   },
   "modals": {

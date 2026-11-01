@@ -183,7 +183,7 @@
         "checking": "Checking…",
         "clean": "No plaintext DNS leaving this device",
         "unsupported": "Not supported on this platform yet",
-        "leak": "{{count}} plaintext DNS query target(s) leaving this device"
+        "leak": "{{count}} DNS problem(s) found"
       },
       "actions": {
         "refresh": "Run again",

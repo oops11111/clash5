@@ -245,7 +245,10 @@ const ProfileItemBase = (props: ProfileItemProps) => {
   const hasHome = !!itemData.home // only subscription url has home page
 
   const { upload = 0, download = 0, total = 0 } = extra ?? {}
-  const from = parseUrl(itemData.url)
+  // Remote subscriptions show their host; local files say so.
+  const subtitle = hasUrl
+    ? parseUrl(itemData.url)
+    : t('profiles.components.profileItem.localFile')
   const description = itemData.desc
   const expire = parseExpire(extra?.expire)
   const progress = Math.min(
@@ -737,16 +740,14 @@ const ProfileItemBase = (props: ProfileItemProps) => {
               >
                 {name}
               </Typography>
-              {hasUrl && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  noWrap
-                  title={from}
-                >
-                  {from}
-                </Typography>
-              )}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                noWrap
+                title={subtitle}
+              >
+                {subtitle}
+              </Typography>
             </Box>
           </Box>
 

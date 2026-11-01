@@ -539,7 +539,19 @@ pub async fn clash5_run_quality_test(id: String, download_bytes: Option<u32>) ->
         disconnects: report.disconnects,
         bytes_used: report.bytes_used,
     };
-    let _ = with_clash5_binding_store(move |store| store.record_quality_sample(&sample)).await;
+    // The chain history shows one row per check, so a quality run also adds a history row.
+    let history = clash5_data::ChainSample {
+        chain_id: chain.id.clone(),
+        measured_at: String::new(),
+        status: report.status.clone(),
+        exit_ip: None,
+        delay_ms: u32::try_from(report.first_byte_ms).ok(),
+    };
+    let _ = with_clash5_binding_store(move |store| {
+        store.record_quality_sample(&sample)?;
+        store.record_chain_sample(&history)
+    })
+    .await;
     Ok(report)
 }
 

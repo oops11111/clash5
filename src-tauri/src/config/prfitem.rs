@@ -175,6 +175,37 @@ impl PrfOption {
     }
 }
 
+/// The file name a `Content-Disposition` header names, with quotes removed. `filename*` (RFC 5987) wins over `filename`.
+fn filename_from_disposition(disposition: &str) -> Option<String> {
+    match help::parse_str::<String>(disposition, "filename*") {
+        Some(encoded) => {
+            let decoded = percent_encoding::percent_decode(encoded.as_bytes())
+                .decode_utf8()
+                .unwrap_or_default();
+            decoded.split("''").last().map(|name| name.trim_matches('"').into())
+        }
+        None => help::parse_str::<String>(disposition, "filename").map(|name| name.trim_matches('"').into()),
+    }
+}
+
+#[cfg(test)]
+mod filename_tests {
+    use super::filename_from_disposition;
+
+    #[test]
+    fn quoted_and_encoded_file_names_come_out_without_quotes() {
+        assert_eq!(
+            filename_from_disposition("attachment; filename=\"name.yaml\"").as_deref(),
+            Some("name.yaml")
+        );
+        assert_eq!(
+            filename_from_disposition("attachment; filename*=UTF-8''%E5%90%8D.yaml").as_deref(),
+            Some("名.yaml")
+        );
+        assert_eq!(filename_from_disposition("attachment").as_deref(), None);
+    }
+}
+
 impl PrfItem {
     /// Builds an item from a partial value that must include `itype`.
     pub(super) async fn from(item: &Self, file_data: Option<String>) -> Result<Self> {
@@ -345,27 +376,12 @@ impl PrfItem {
         }
 
         let filename = match header.get("Content-Disposition") {
-            Some(value) => {
-                let filename = format!("{value:?}");
-                let filename = filename.trim_matches('"');
-                match help::parse_str::<String>(filename, "filename*") {
-                    Some(filename) => {
-                        let iter = percent_encoding::percent_decode(filename.as_bytes());
-                        let filename = iter.decode_utf8().unwrap_or_default();
-                        filename.split("''").last().map(|s| s.into())
-                    }
-                    None => match help::parse_str::<String>(filename, "filename") {
-                        Some(filename) => {
-                            let filename = filename.trim_matches('"');
-                            Some(filename.into())
-                        }
-                        None => None,
-                    },
-                }
-            }
-            None => {
-                Some(crate::utils::help::get_last_part_and_decode(url.as_str()).unwrap_or_else(|| "Remote File".into()))
-            }
+            Some(value) => value.to_str().ok().and_then(filename_from_disposition),
+            None => Some(
+                crate::utils::help::get_last_part_and_decode(url.as_str())
+                    .unwrap_or_else(|| "Remote File".into())
+                    .into(),
+            ),
         };
         let update_interval = match update_interval {
             Some(val) => Some(val),
@@ -386,9 +402,7 @@ impl PrfItem {
         let uid = help::get_uid("R").into();
         let file = format!("{uid}.yaml").into();
         let name = name.map(|s| s.to_owned()).unwrap_or_else(|| {
-            filename
-                .map(|s| s.into())
-                .unwrap_or_else(|| url.host_str().map_or_else(|| "Remote File".into(), Into::into))
+            filename.unwrap_or_else(|| url.host_str().map_or_else(|| "Remote File".into(), Into::into))
         });
         let data = resp.text();
 

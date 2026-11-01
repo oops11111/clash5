@@ -62,6 +62,13 @@ export const DnsCheckPanel = () => {
     void sample()
   }, [run, sample])
 
+  const checkLabel = (id: string) =>
+    id === 'system_resolver'
+      ? t('tests.dns.checks.system_resolver')
+      : id === 'dns_listener'
+        ? t('tests.dns.checks.dns_listener')
+        : t('tests.dns.checks.plaintext_dns')
+
   const checkDetail = (check: LeakCheck) => {
     if (check.status === 'fail') return check.details.join(', ')
     if (check.status === 'unsupported') return check.details[0] ?? ''
@@ -138,9 +145,7 @@ export const DnsCheckPanel = () => {
               >
                 <Box sx={{ minWidth: 0 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {check.id === 'system_resolver'
-                      ? t('tests.dns.checks.system_resolver')
-                      : t('tests.dns.checks.plaintext_dns')}
+                    {checkLabel(check.id)}
                   </Typography>
                   <Typography
                     variant="caption"

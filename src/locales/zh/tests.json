@@ -73,7 +73,8 @@
       "hint": "读取系统解析器设置，并检查是否有明文 DNS（53 端口）从本机发出。",
       "passDetail": "未发现问题",
       "system_resolver": "系统解析器指向本机",
-      "plaintext_dns": "明文 DNS 直接外发"
+      "plaintext_dns": "明文 DNS 直接外发",
+      "dns_listener": "53 端口监听范围超出本机"
     },
     "status": {
       "pass": "通过",

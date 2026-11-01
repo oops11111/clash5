@@ -183,7 +183,7 @@
         "checking": "检测中…",
         "clean": "未发现明文 DNS 外发",
         "unsupported": "当前平台暂不支持检测",
-        "leak": "发现 {{count}} 个明文 DNS 外发目标"
+        "leak": "发现 {{count}} 个 DNS 问题"
       },
       "actions": {
         "refresh": "重新检测",

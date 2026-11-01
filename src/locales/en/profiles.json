@@ -112,7 +112,8 @@
         "noSchedule": "No schedule",
         "unknown": "Unknown",
         "autoUpdateDisabled": "Auto update disabled"
-      }
+      },
+      "localFile": "Local file"
     }
   },
   "modals": {

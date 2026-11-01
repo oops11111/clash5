@@ -73,7 +73,8 @@
       "hint": "Reads the system resolver and looks for plaintext DNS (port 53) leaving the device.",
       "passDetail": "No issue found",
       "system_resolver": "System resolver points to this device",
-      "plaintext_dns": "Plaintext DNS leaving the device"
+      "plaintext_dns": "Plaintext DNS leaving the device",
+      "dns_listener": "Port 53 listening beyond this device"
     },
     "status": {
       "pass": "Pass",

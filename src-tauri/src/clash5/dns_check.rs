@@ -266,3 +266,135 @@ UNCONN 0 0 127.0.0.1:41002 127.0.0.53:53
         assert!(parse_dns_answer("not json").is_err());
     }
 }
+
+/// Every IPv4 server address in `Get-DnsClientServerAddress | ConvertTo-Json` output.
+/// PowerShell prints one object for a single interface and an array otherwise.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn parse_dns_server_json(json: &str) -> Option<Vec<std::string::String>> {
+    let value: serde_json::Value = serde_json::from_str(json).ok()?;
+    let interfaces = match value {
+        serde_json::Value::Array(items) => items,
+        other => vec![other],
+    };
+    Some(
+        interfaces
+            .iter()
+            .filter_map(|item| item.get("ServerAddresses")?.as_array())
+            .flatten()
+            .filter_map(serde_json::Value::as_str)
+            .map(str::to_owned)
+            .collect(),
+    )
+}
+
+/// Local addresses listening on port 53 in `netstat -ano -p UDP|TCP` output, with the owning process.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn parse_netstat_listeners(output: &str) -> Vec<std::string::String> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let fields: Vec<&str> = line.split_whitespace().collect();
+            let protocol = fields.first()?;
+            if !protocol.eq_ignore_ascii_case("UDP") && !protocol.eq_ignore_ascii_case("TCP") {
+                return None;
+            }
+            let local = fields.get(1)?;
+            let (_, port) = local.rsplit_once(':')?;
+            if port != "53" {
+                return None;
+            }
+            let pid = fields.last().filter(|pid| pid.chars().all(|c| c.is_ascii_digit()))?;
+            Some(format!("{local} (pid {pid})"))
+        })
+        .collect()
+}
+
+/// Local addresses listening on port 53 in `ss -H -l -n -t -u` output.
+pub fn parse_ss_listeners(output: &str) -> Vec<std::string::String> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let local = line.split_whitespace().nth(3)?;
+            let (_, port) = local.rsplit_once(':')?;
+            (port == "53").then(|| local.to_owned())
+        })
+        .collect()
+}
+
+/// Port 53 must only be bound to loopback. An address bound on any other interface, or on all of them, is a failure.
+pub fn listener_check(listeners: &[std::string::String]) -> LeakCheck {
+    let exposed: Vec<std::string::String> = listeners
+        .iter()
+        .filter(|listener| {
+            let address = listener.split(" (").next().unwrap_or_default();
+            let host = address.rsplit_once(':').map_or(address, |(host, _)| host);
+            let host = host.trim_start_matches('[').trim_end_matches(']');
+            !is_loopback(host)
+        })
+        .cloned()
+        .collect();
+    let (status, details) = if exposed.is_empty() {
+        (CheckStatus::Pass, Vec::new())
+    } else {
+        (CheckStatus::Fail, exposed)
+    };
+    LeakCheck {
+        id: "dns_listener".into(),
+        status,
+        details,
+    }
+}
+
+#[cfg(test)]
+mod platform_parser_tests {
+    use super::*;
+
+    #[test]
+    fn windows_server_lists_are_read_for_one_or_many_interfaces() {
+        let many = r#"[{"InterfaceAlias":"Wi-Fi","InterfaceIndex":4,"AddressFamily":2,"ServerAddresses":["192.0.2.1","192.0.2.2"]},{"InterfaceAlias":"Loopback Pseudo-Interface 1","InterfaceIndex":1,"AddressFamily":2,"ServerAddresses":[]}]"#;
+        assert_eq!(
+            parse_dns_server_json(many).unwrap(),
+            vec!["192.0.2.1".to_owned(), "192.0.2.2".to_owned()]
+        );
+        let one =
+            r#"{"InterfaceAlias":"Ethernet","InterfaceIndex":7,"AddressFamily":2,"ServerAddresses":["127.0.0.1"]}"#;
+        assert_eq!(parse_dns_server_json(one).unwrap(), vec!["127.0.0.1".to_owned()]);
+        assert!(parse_dns_server_json("not json").is_none());
+    }
+
+    #[test]
+    fn netstat_port_53_listeners_keep_their_owner() {
+        let output = "\
+Active Connections
+
+  Proto  Local Address          Foreign Address        State           PID
+  UDP    0.0.0.0:53             *:*                                    4312
+  UDP    127.0.0.1:53           *:*                                    9001
+  UDP    [::1]:5353             *:*                                    1200
+  TCP    0.0.0.0:53             0.0.0.0:0              LISTENING       4312
+";
+        assert_eq!(
+            parse_netstat_listeners(output),
+            vec![
+                "0.0.0.0:53 (pid 4312)".to_owned(),
+                "127.0.0.1:53 (pid 9001)".to_owned(),
+                "0.0.0.0:53 (pid 4312)".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn only_non_loopback_port_53_listeners_fail_the_check() {
+        let loopback_only = listener_check(&["127.0.0.1:53 (pid 9001)".to_owned(), "[::1]:53".to_owned()]);
+        assert_eq!(loopback_only.status, CheckStatus::Pass);
+        let exposed = listener_check(&["0.0.0.0:53 (pid 4312)".to_owned(), "127.0.0.1:53".to_owned()]);
+        assert_eq!(exposed.status, CheckStatus::Fail);
+        assert_eq!(exposed.details, vec!["0.0.0.0:53 (pid 4312)".to_owned()]);
+    }
+
+    #[test]
+    fn ss_listeners_are_read_from_the_local_column() {
+        let output = "UNCONN 0 0 127.0.0.53%lo:53 0.0.0.0:*\nLISTEN 0 4096 0.0.0.0:22 0.0.0.0:*\n";
+        assert_eq!(parse_ss_listeners(output), vec!["127.0.0.53%lo:53".to_owned()]);
+    }
+}

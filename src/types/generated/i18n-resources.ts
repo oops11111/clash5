@@ -643,6 +643,7 @@ export interface TranslationResources {
           }
         }
         profileItem: {
+          localFile: string
           status: {
             autoUpdateDisabled: string
             lastUpdateFailed: string
@@ -1988,6 +1989,7 @@ export interface TranslationResources {
       dns: {
         checkedAt: string
         checks: {
+          dns_listener: string
           hint: string
           passDetail: string
           plaintext_dns: string
