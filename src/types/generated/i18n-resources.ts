@@ -382,6 +382,9 @@ export interface TranslationResources {
     layout: {
       components: {
         navigation: {
+          browserPrivacyDescription: string
+          browserPrivacyLimit: string
+          browserPrivacyTitle: string
           cancel: string
           chooseCandidate: string
           diagnostics: string

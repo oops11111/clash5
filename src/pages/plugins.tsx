@@ -18,6 +18,7 @@ import {
   Tabs,
   Typography,
 } from '@mui/material'
+import { dirname, resolveResource } from '@tauri-apps/api/path'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -114,6 +115,7 @@ const PluginsPage = () => {
   const { t } = useTranslation()
   const [tab, setTab] = useState<PluginTab>('installed')
   const [bindings, setBindings] = useState<Clash5PluginBinding[] | null>(null)
+  const [browserExtensionPath, setBrowserExtensionPath] = useState<string | null>(null)
   const [bindingError, setBindingError] = useState(false)
   const [effectiveConfig, setEffectiveConfig] =
     useState<Clash5PluginEffectiveConfig | null>(null)
@@ -143,6 +145,19 @@ const PluginsPage = () => {
   const [bindingFormError, setBindingFormError] = useState(false)
   const [bindingEditId, setBindingEditId] = useState<string | null>(null)
   const [bindingEditEnabled, setBindingEditEnabled] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    resolveResource('resources/browser-privacy-extension/manifest.json')
+      .then(dirname)
+      .then((path) => {
+        if (!cancelled) setBrowserExtensionPath(path)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (tab !== 'binding') return
@@ -574,6 +589,24 @@ const PluginsPage = () => {
     }
     return (
       <Stack spacing={2}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          <Stack spacing={1}>
+            <Typography sx={{ fontWeight: 600 }}>
+              {t('layout.components.navigation.browserPrivacyTitle')}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t('layout.components.navigation.browserPrivacyDescription')}
+            </Typography>
+            {browserExtensionPath && (
+              <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+                {browserExtensionPath}
+              </Typography>
+            )}
+            <Typography variant="caption" color="text.secondary">
+              {t('layout.components.navigation.browserPrivacyLimit')}
+            </Typography>
+          </Stack>
+        </Paper>
         <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
           <Button
             variant="contained"

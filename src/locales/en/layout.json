@@ -46,6 +46,9 @@
         "settings": "Settings"
       },
       "pluginInstall": "Install from file",
+      "browserPrivacyTitle": "Browser fingerprint companion",
+      "browserPrivacyDescription": "Chrome/Edge: open Extensions, enable Developer mode, then Load unpacked and select this folder. Set site profiles in the extension and reload pages.",
+      "browserPrivacyLimit": "The browser extension is separate from the built-in IPv6/DNS guard. It changes regional browser values, not IP, DNS routing, WebRTC, hardware, or every fingerprint signal.",
       "pluginInstallTitle": "Review plugin installation",
       "pluginSigner": "Signer fingerprint: {{fingerprint}}",
       "pluginProvenanceTitle": "Effective configuration sources",

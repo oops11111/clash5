@@ -46,6 +46,9 @@
         "settings": "设置"
       },
       "pluginInstall": "从文件安装",
+      "browserPrivacyTitle": "浏览器指纹切换组件",
+      "browserPrivacyDescription": "在 Chrome/Edge 的扩展页开启开发者模式，选择“加载已解压的扩展程序”并选中下方目录。到扩展中设置网站配置，再刷新页面。",
+      "browserPrivacyLimit": "此浏览器扩展与内置 IPv6/DNS 插件分别生效。它只修改部分区域指纹，不改变 IP、DNS 路由、WebRTC、硬件或全部指纹信号。",
       "pluginInstallTitle": "确认安装插件",
       "pluginSigner": "签名者指纹：{{fingerprint}}",
       "pluginProvenanceTitle": "当前配置来源",
