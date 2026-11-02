@@ -45,6 +45,8 @@ export type AppMatcherRef =
 
 export type RouteTargetRef =
   | { kind: 'chain'; chain_id: string }
+  | { kind: 'group'; name: string }
+  | { kind: 'node'; node: ChainNodeRef }
   | { kind: 'direct' }
   | { kind: 'reject' }
 
@@ -64,6 +66,7 @@ export interface ChainWorkspace {
   pools: NodePoolDef[]
   nodes: ChainNodeOption[]
   policy_groups: string[]
+  route_groups: string[]
 }
 
 interface ExitObservation {

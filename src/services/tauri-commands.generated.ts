@@ -783,6 +783,7 @@ export type ChainWorkspace = {
   pools: NodePool[]
   nodes: ChainNodeOption[]
   policy_groups: string[]
+  route_groups: string[]
 }
 
 export type CheckStatus = 'pass' | 'fail' | 'unsupported'
@@ -1715,6 +1716,8 @@ export type QualityStatus = 'healthy' | 'slow' | 'failed'
 
 export type RouteTarget =
   | { kind: 'chain'; chain_id: string }
+  | { kind: 'group'; name: string }
+  | { kind: 'node'; node: NodeRef }
   | { kind: 'direct' }
   | { kind: 'reject' }
 

@@ -1,4 +1,8 @@
 {
+  "appMissingTarget": "Target unavailable",
+  "appPolicyGroup": "Policy group",
+  "appSingleNode": "Single node",
+  "appMultiHop": "Multi-hop chain",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",

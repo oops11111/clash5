@@ -22,17 +22,21 @@ import { showNotice } from '@/services/notice-service'
 import type {
   AppRouteDef,
   Clash5Chain,
+  ChainWorkspace,
+  ChainNodeRef,
   RouteTargetRef,
 } from '@/types/clash5-chain'
 
-// Per-program egress: each process name gets one route that goes to a chain, direct, or reject.
+// Per-program egress uses an explicit target; removing a route restores the default egress.
 // Removing a route returns that program to the default egress.
 export const AppRoutesPanel = () => {
   const { t } = useTranslation()
   const [routes, setRoutes] = useState<AppRouteDef[]>([])
   const [chains, setChains] = useState<Clash5Chain[]>([])
+  const [groups, setGroups] = useState<string[]>([])
+  const [nodes, setNodes] = useState<ChainWorkspace['nodes']>([])
   const [name, setName] = useState('')
-  const [target, setTarget] = useState<string>('default')
+  const [target, setTarget] = useState<string>('direct')
   const [processes, setProcesses] = useState<string[]>([])
 
   // Opening the field lists the programs running now; typing a name that is not listed still works.
@@ -53,6 +57,8 @@ export const AppRoutesPanel = () => {
       ])
       setRoutes(nextRoutes)
       setChains(workspace.chains.filter((chain) => chain.enabled))
+      setGroups(workspace.route_groups)
+      setNodes(workspace.nodes)
     } catch (error) {
       showNotice.error(error)
     }
@@ -63,6 +69,10 @@ export const AppRoutesPanel = () => {
   }, [load])
 
   const toTarget = (value: string): RouteTargetRef | null => {
+    if (value.startsWith('group:'))
+      return { kind: 'group', name: value.slice(6) }
+    if (value.startsWith('node:'))
+      return { kind: 'node', node: JSON.parse(value.slice(5)) as ChainNodeRef }
     if (value === 'direct') return { kind: 'direct' }
     if (value === 'reject') return { kind: 'reject' }
     if (value.startsWith('chain:')) {
@@ -72,16 +82,39 @@ export const AppRoutesPanel = () => {
   }
 
   const targetValue = (routeTarget: RouteTargetRef) =>
-    routeTarget.kind === 'chain'
-      ? `chain:${routeTarget.chain_id}`
-      : routeTarget.kind
+    routeTarget.kind === 'group'
+      ? `group:${routeTarget.name}`
+      : routeTarget.kind === 'node'
+        ? `node:${JSON.stringify(routeTarget.node)}`
+        : routeTarget.kind === 'chain'
+          ? `chain:${routeTarget.chain_id}`
+          : routeTarget.kind
+
+  const targets = [
+    { value: 'direct', label: t('proxies.apps.direct') },
+    { value: 'reject', label: t('proxies.apps.reject') },
+    ...groups.map((group) => ({
+      value: `group:${group}`,
+      label: `${t('chains.appPolicyGroup')}: ${group}`,
+    })),
+    ...nodes.map((node) => ({
+      value: `node:${JSON.stringify(node.reference)}`,
+      label: `${t('chains.appSingleNode')}: ${node.display_name}${node.source_name ? ` · ${node.source_name}` : ''}`,
+    })),
+    ...chains.map((chain) => ({
+      value: `chain:${chain.id}`,
+      label: `${t('chains.appMultiHop')}: ${chain.name}`,
+    })),
+  ]
 
   const save = async (route: AppRouteDef) => {
     try {
       await saveClash5AppRoute(route)
       await load()
+      return true
     } catch (error) {
       showNotice.error(error)
+      return false
     }
   }
 
@@ -98,7 +131,7 @@ export const AppRoutesPanel = () => {
     const processName = name.trim()
     const routeTarget = toTarget(target)
     if (!processName || !routeTarget) return
-    await save({
+    const saved = await save({
       schema_version: 1,
       id: crypto.randomUUID(),
       name: processName,
@@ -107,7 +140,7 @@ export const AppRoutesPanel = () => {
       enabled: true,
       nameserver: null,
     })
-    setName('')
+    if (saved) setName('')
   }
 
   const programRoutes = routes.filter((route) =>
@@ -157,11 +190,16 @@ export const AppRoutesPanel = () => {
                   },
                 }}
               >
-                <MenuItem value="direct">{t('proxies.apps.direct')}</MenuItem>
-                <MenuItem value="reject">{t('proxies.apps.reject')}</MenuItem>
-                {chains.map((chain) => (
-                  <MenuItem key={chain.id} value={`chain:${chain.id}`}>
-                    {chain.name}
+                {!targets.some(
+                  (option) => option.value === targetValue(route.target),
+                ) && (
+                  <MenuItem value={targetValue(route.target)} disabled>
+                    {t('chains.appMissingTarget')}
+                  </MenuItem>
+                )}
+                {targets.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
                   </MenuItem>
                 ))}
               </TextField>
@@ -203,11 +241,9 @@ export const AppRoutesPanel = () => {
             value={target}
             onChange={(event) => setTarget(event.target.value)}
           >
-            <MenuItem value="direct">{t('proxies.apps.direct')}</MenuItem>
-            <MenuItem value="reject">{t('proxies.apps.reject')}</MenuItem>
-            {chains.map((chain) => (
-              <MenuItem key={chain.id} value={`chain:${chain.id}`}>
-                {chain.name}
+            {targets.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
               </MenuItem>
             ))}
           </TextField>

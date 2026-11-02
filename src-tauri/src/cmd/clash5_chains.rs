@@ -32,6 +32,7 @@ pub struct ChainWorkspace {
     pools: Vec<NodePool>,
     nodes: Vec<ChainNodeOption>,
     policy_groups: Vec<String>,
+    route_groups: Vec<String>,
 }
 
 #[tauri::command]
@@ -95,6 +96,15 @@ pub async fn clash5_chain_workspace() -> CmdResult<ChainWorkspace> {
         .await
         .map_err(|_| storage_failure())?;
     Ok(ChainWorkspace {
+        route_groups: config
+            .get("proxy-groups")
+            .and_then(Value::as_sequence)
+            .into_iter()
+            .flatten()
+            .filter_map(|group| group.get("name").and_then(Value::as_str))
+            .filter(|name| !name.starts_with("clash5-chain-"))
+            .map(str::to_owned)
+            .collect(),
         pools,
         chains: definitions
             .into_iter()
@@ -569,8 +579,9 @@ mod tests {
                 pools: vec![],
                 nodes: vec![],
                 policy_groups: vec!["PROXY".into()],
+                route_groups: vec!["PROXY".into()],
             })?,
-            json!({"profile_id":null,"chains":[],"pools":[],"nodes":[],"policy_groups":["PROXY"]})
+            json!({"profile_id":null,"chains":[],"pools":[],"nodes":[],"policy_groups":["PROXY"],"route_groups":["PROXY"]})
         );
         assert_eq!(
             serde_json::to_value(ChainTestResult {
@@ -658,6 +669,38 @@ pub async fn clash5_save_app_route(route: clash5_data::AppRoute) -> CmdResult {
     route
         .validate()
         .map_err(|_| coded_error("C5-ROUTE-002", "app route definition is invalid"))?;
+    if matches!(
+        &route.target,
+        clash5_data::RouteTarget::Node { .. } | clash5_data::RouteTarget::Group { .. }
+    ) {
+        let runtime = Config::runtime().await.data_arc();
+        let config = runtime
+            .config
+            .as_ref()
+            .ok_or_else(|| coded_error("C5-ROUTE-003", "route target is unavailable"))?;
+        let known = match &route.target {
+            clash5_data::RouteTarget::Group { name } => config
+                .get("proxy-groups")
+                .and_then(Value::as_sequence)
+                .is_some_and(|groups| {
+                    groups
+                        .iter()
+                        .any(|group| group.get("name").and_then(Value::as_str) == Some(name.as_str()))
+                }),
+            clash5_data::RouteTarget::Node { node } => {
+                let profiles = Config::profiles().await.latest_arc();
+                chains::catalog(config, profiles.current.as_deref())
+                    .await
+                    .map_err(|_| storage_failure())?
+                    .iter()
+                    .any(|entry| entry.reference == *node)
+            }
+            _ => false,
+        };
+        if !known {
+            return Err(coded_error("C5-ROUTE-003", "route target is unavailable"));
+        }
+    }
     if let clash5_data::RouteTarget::Chain { chain_id } = &route.target {
         let known = chains::definitions()
             .await
@@ -668,16 +711,48 @@ pub async fn clash5_save_app_route(route: clash5_data::AppRoute) -> CmdResult {
             return Err(coded_error("C5-ROUTE-003", "the route's chain is not an enabled chain"));
         }
     }
+    let id = route.id.clone();
+    let previous = with_clash5_binding_store(|store| store.app_routes())
+        .await
+        .map_err(|_| storage_failure())?
+        .into_iter()
+        .find(|saved| saved.id == id);
     with_clash5_binding_store(move |store| store.save_app_route(&route))
         .await
-        .map_err(|_| storage_failure())
+        .map_err(|_| storage_failure())?;
+    if let Err(failure) = apply_saved_chains().await {
+        restore_app_route(id, previous).await?;
+        return Err(failure);
+    }
+    Ok(())
+}
+
+async fn restore_app_route(id: String, previous: Option<clash5_data::AppRoute>) -> CmdResult {
+    with_clash5_binding_store(move |store| match previous {
+        Some(route) => store.save_app_route(&route),
+        None => store.delete_app_route(&id),
+    })
+    .await
+    .map_err(|_| storage_failure())?;
+    apply_saved_chains().await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn clash5_delete_app_route(id: String) -> CmdResult {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
+    let previous = with_clash5_binding_store(|store| store.app_routes())
+        .await
+        .map_err(|_| storage_failure())?
+        .into_iter()
+        .find(|route| route.id == id);
+    let deleted_id = id.clone();
     with_clash5_binding_store(move |store| store.delete_app_route(&id))
         .await
-        .map_err(|_| storage_failure())
+        .map_err(|_| storage_failure())?;
+    if let Err(failure) = apply_saved_chains().await {
+        restore_app_route(deleted_id, previous).await?;
+        return Err(failure);
+    }
+    Ok(())
 }

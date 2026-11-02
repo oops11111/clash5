@@ -19,9 +19,12 @@ export interface TranslationResources {
       appEmpty: string
       appMatcherKind: string
       appMatcherValue: string
+      appMissingTarget: string
+      appMultiHop: string
       appNameserver: string
       appNameserverHint: string
       appNewRoute: string
+      appPolicyGroup: string
       appProcessName: string
       appProcessPath: string
       appReject: string
@@ -31,6 +34,7 @@ export interface TranslationResources {
       apps: string
       appSaved: string
       appSaveRoute: string
+      appSingleNode: string
       appTarget: string
       chainsTab: string
       create: string

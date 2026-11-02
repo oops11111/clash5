@@ -6,6 +6,31 @@ use serde_yaml_ng::Mapping;
 const CHAIN_ID: &str = "18dc0b8a-7485-49bc-8a91-f48bdc736846";
 const ROUTE_ID: &str = "4a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 
+#[test]
+fn process_routes_select_groups_and_materialized_nodes() {
+    for (target, destination) in [
+        (RouteTarget::Group { name: "Work".into() }, "Work".to_owned()),
+        (
+            RouteTarget::Node { node: node("one") },
+            format!("clash5-app-node-{ROUTE_ID}"),
+        ),
+    ] {
+        let mut config: Mapping = serde_yaml_ng::from_str(&format!(
+            "proxy-groups: [{{name: Work, type: select, proxies: [DIRECT]}}]\nproxies: [{{name: clash5-app-node-{ROUTE_ID}, type: socks5, server: localhost, port: 1080}}]\nrules: []\n"
+        )).unwrap();
+        let definition = route(
+            vec![AppMatcher::ProcessName {
+                name: "browser.exe".into(),
+            }],
+            target,
+            true,
+        );
+        compile_app_routes(&mut config, &[definition.clone()], &[]).unwrap();
+        assert_eq!(rules(&config), vec![format!("PROCESS-NAME,browser.exe,{destination}")]);
+        assert!(compile_app_routes(&mut Mapping::new(), &[definition], &[]).is_err());
+    }
+}
+
 fn node(name: &str) -> NodeRef {
     NodeRef {
         source: Source::Manual,

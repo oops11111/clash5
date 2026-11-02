@@ -18,6 +18,8 @@ pub enum AppMatcher {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RouteTarget {
     Chain { chain_id: String },
+    Group { name: String },
+    Node { node: crate::NodeRef },
     Direct,
     Reject,
 }
@@ -102,6 +104,11 @@ impl AppRoute {
             return Err(DataError::InvalidInput);
         }
         text(&self.name)?;
+        match &self.target {
+            RouteTarget::Group { name } if !rule_safe(name) => return Err(DataError::InvalidInput),
+            RouteTarget::Node { node } if node.stable_id.is_empty() => return Err(DataError::InvalidInput),
+            _ => {}
+        }
         for matcher in &self.matchers {
             matcher.validate()?;
         }
@@ -145,6 +152,35 @@ pub fn compile_app_routes(
         let target = match &route.target {
             RouteTarget::Direct => "DIRECT".to_owned(),
             RouteTarget::Reject => "REJECT".to_owned(),
+            RouteTarget::Group { name } => {
+                if !config
+                    .get("proxy-groups")
+                    .and_then(Value::as_sequence)
+                    .is_some_and(|groups| {
+                        groups
+                            .iter()
+                            .any(|group| group.get("name").and_then(Value::as_str) == Some(name.as_str()))
+                    })
+                {
+                    return Err(ChainError::InvalidDefinition);
+                }
+                name.clone()
+            }
+            RouteTarget::Node { .. } => {
+                let name = format!("clash5-app-node-{}", route.id);
+                if !config
+                    .get("proxies")
+                    .and_then(Value::as_sequence)
+                    .is_some_and(|proxies| {
+                        proxies
+                            .iter()
+                            .any(|proxy| proxy.get("name").and_then(Value::as_str) == Some(name.as_str()))
+                    })
+                {
+                    return Err(ChainError::InvalidDefinition);
+                }
+                name
+            }
             RouteTarget::Chain { chain_id } => {
                 let chain = chains
                     .iter()

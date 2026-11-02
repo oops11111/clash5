@@ -78,6 +78,13 @@ pub(crate) async fn catalog(config: &Mapping, profile_id: Option<&str>) -> Resul
     };
     if let Some(proxies) = config.get("proxies").and_then(Value::as_sequence) {
         for proxy in proxies {
+            if proxy
+                .get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|name| name.starts_with("clash5-app-node-"))
+            {
+                continue;
+            }
             let Ok(node) = parse_proxy_node(proxy) else {
                 continue;
             };
@@ -174,9 +181,39 @@ pub(crate) async fn generate(config: &mut Mapping, profile_id: Option<&str>) -> 
         .into_iter()
         .filter(|route| match &route.target {
             RouteTarget::Chain { chain_id } => chains.iter().any(|chain| chain.id == *chain_id),
-            RouteTarget::Direct | RouteTarget::Reject => true,
+            RouteTarget::Direct | RouteTarget::Reject | RouteTarget::Group { .. } | RouteTarget::Node { .. } => true,
         })
         .collect();
+    if routes
+        .iter()
+        .any(|route| route.enabled && matches!(route.target, RouteTarget::Node { .. }))
+    {
+        let nodes = catalog(config, profile_id).await?;
+        for route in routes.iter().filter(|route| route.enabled) {
+            if let RouteTarget::Node { node } = &route.target {
+                let mut proxy = nodes
+                    .iter()
+                    .find(|entry| entry.reference == *node)
+                    .ok_or_else(|| anyhow!("C5-ROUTE-003"))?
+                    .proxy
+                    .clone();
+                let name = format!("clash5-app-node-{}", route.id);
+                proxy.insert("name".into(), name.clone().into());
+                let proxies = config
+                    .entry(Value::from("proxies"))
+                    .or_insert_with(|| Value::Sequence(vec![]))
+                    .as_sequence_mut()
+                    .ok_or_else(|| anyhow!("C5-ROUTE-003"))?;
+                if proxies
+                    .iter()
+                    .any(|existing| existing.get("name").and_then(Value::as_str) == Some(name.as_str()))
+                {
+                    anyhow::bail!("C5-ROUTE-003");
+                }
+                proxies.push(Value::Mapping(proxy));
+            }
+        }
+    }
     if chains.is_empty() {
         compile_app_routes(config, &routes, &chains).map_err(anyhow::Error::from)?;
         return Ok(vec![]);

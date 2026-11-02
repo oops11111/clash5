@@ -1,4 +1,8 @@
 {
+  "appMissingTarget": "目标不可用",
+  "appPolicyGroup": "分流组",
+  "appSingleNode": "单节点",
+  "appMultiHop": "多跳链路",
   "visual": "可视化编排",
   "list": "链路列表",
   "templates": "模板",

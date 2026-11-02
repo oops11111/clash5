@@ -116,18 +116,35 @@ const matcherWith = (
       ? { kind, path: value }
       : { kind, suffix: value }
 const targetValue = (target: RouteTargetRef) =>
-  target.kind === 'chain' ? `chain:${target.chain_id}` : target.kind
+  target.kind === 'chain'
+    ? `chain:${target.chain_id}`
+    : target.kind === 'group'
+      ? `group:${target.name}`
+      : target.kind === 'node'
+        ? `node:${nodeKey(target.node)}`
+        : target.kind
 const targetFromValue = (value: string): RouteTargetRef =>
-  value.startsWith('chain:')
-    ? { kind: 'chain', chain_id: value.slice(6) }
-    : value === 'reject'
-      ? { kind: 'reject' }
-      : { kind: 'direct' }
+  value.startsWith('group:')
+    ? { kind: 'group', name: value.slice(6) }
+    : value.startsWith('node:')
+      ? { kind: 'node', node: JSON.parse(value.slice(5)) as ChainNodeRef }
+      : value.startsWith('chain:')
+        ? { kind: 'chain', chain_id: value.slice(6) }
+        : value === 'reject'
+          ? { kind: 'reject' }
+          : { kind: 'direct' }
 const targetLabel = (
   target: RouteTargetRef,
   chains: readonly { id: string; name: string }[],
   labels: { missing: string; direct: string; reject: string },
+  nodes: ChainWorkspace['nodes'],
 ) => {
+  if (target.kind === 'group') return target.name
+  if (target.kind === 'node')
+    return (
+      nodes.find((entry) => sameNode(entry.reference, target.node))
+        ?.display_name ?? labels.missing
+    )
   if (target.kind !== 'chain') {
     return target.kind === 'direct' ? labels.direct : labels.reject
   }
@@ -1111,11 +1128,47 @@ const ChainsPage = () => {
                   >
                     <MenuItem value="direct">{t('chains.appDirect')}</MenuItem>
                     <MenuItem value="reject">{t('chains.appReject')}</MenuItem>
+                    {((routeDraft.target.kind === 'chain' &&
+                      !workspace.chains.some(
+                        (chain) =>
+                          chain.enabled &&
+                          chain.id ===
+                            (routeDraft.target as { chain_id: string })
+                              .chain_id,
+                      )) ||
+                      (routeDraft.target.kind === 'group' &&
+                        !workspace.route_groups.includes(
+                          routeDraft.target.name,
+                        )) ||
+                      (routeDraft.target.kind === 'node' &&
+                        !workspace.nodes.some((entry) =>
+                          sameNode(
+                            entry.reference,
+                            (routeDraft.target as { node: ChainNodeRef }).node,
+                          ),
+                        ))) && (
+                      <MenuItem value={targetValue(routeDraft.target)} disabled>
+                        {t('chains.appMissingTarget')}
+                      </MenuItem>
+                    )}
+                    {workspace.route_groups.map((name) => (
+                      <MenuItem key={`group:${name}`} value={`group:${name}`}>
+                        {t('chains.appPolicyGroup')}: {name}
+                      </MenuItem>
+                    ))}
+                    {workspace.nodes.map((entry) => (
+                      <MenuItem
+                        key={`node:${nodeKey(entry.reference)}`}
+                        value={`node:${nodeKey(entry.reference)}`}
+                      >
+                        {t('chains.appSingleNode')}: {entry.display_name}
+                      </MenuItem>
+                    ))}
                     {workspace.chains
                       .filter((chain) => chain.enabled)
                       .map((chain) => (
                         <MenuItem key={chain.id} value={`chain:${chain.id}`}>
-                          {chain.name}
+                          {t('chains.appMultiHop')}: {chain.name}
                         </MenuItem>
                       ))}
                   </TextField>
@@ -1187,11 +1240,16 @@ const ChainsPage = () => {
                     <Typography variant="caption" color="text.secondary">
                       {route.matchers.map(matcherValue).join(', ')}
                       {' → '}
-                      {targetLabel(route.target, workspace.chains, {
-                        missing: t('chains.missingChain'),
-                        direct: t('chains.appDirect'),
-                        reject: t('chains.appReject'),
-                      })}
+                      {targetLabel(
+                        route.target,
+                        workspace.chains,
+                        {
+                          missing: t('chains.missingChain'),
+                          direct: t('chains.appDirect'),
+                          reject: t('chains.appReject'),
+                        },
+                        workspace.nodes,
+                      )}
                     </Typography>
                   </Stack>
                   <Stack direction="row" sx={{ gap: 1, alignItems: 'center' }}>
