@@ -526,7 +526,7 @@
 | **来源** | R11 **Q4 A**、**Q5 A**、**Q8 A**；R13 **Q7 A** |
 | **拍板** | 只用 `clash5://`；Win 不接管 `clash://`；每次确认主机名不自动激活；Linux 只注册 clash5，卸载清除；不兼容 `clash-verge://` |
 | **文件:行** | `tauri.conf.json:40-42` schemes `["clash5"]`；但 `utils/init.rs:600` `DEEP_LINK_SCHEMES = ["clash","clash-verge"]`；`resolve/scheme.rs:43` 只匹配 `clash|clash-verge` |
-| **现状** | **部分落地** — tauri 声明 clash5；运行时/解析仍旧 scheme，**未**解析 clash5 |
+| **现状** | **部分落地** — 注册与运行时解析已统一为 `clash5://`，旧 scheme 被拒绝；“显示主机名并确认后导入”仍需桌面 UI 验收 |
 
 ### P1-37 · 危险热键系统通知（R11 Q6 A）
 

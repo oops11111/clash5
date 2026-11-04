@@ -40,7 +40,7 @@ pub(super) async fn resolve_scheme(param: &str) -> Result<()> {
 }
 
 fn extract_subscription_info(link_parsed: &Url) -> Option<(std::string::String, Option<String>)> {
-    if !matches!(link_parsed.scheme(), "clash" | "clash-verge") {
+    if link_parsed.scheme() != "clash5" {
         return None;
     }
 
@@ -50,6 +50,22 @@ fn extract_subscription_info(link_parsed: &Url) -> Option<(std::string::String, 
         .map(|(_, value)| value.into_owned().into());
     let url = extract_subscription_url(link_parsed)?;
     Some((url, name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_clash5_links_are_accepted() {
+        let accepted = Url::parse("clash5://import?url=https%3A%2F%2Fexample.com%2Fsub").unwrap();
+        let rejected = Url::parse("clash://import?url=https%3A%2F%2Fexample.com%2Fsub").unwrap();
+        let legacy = Url::parse("clash-verge://import?url=https%3A%2F%2Fexample.com%2Fsub").unwrap();
+
+        assert!(extract_subscription_info(&accepted).is_some());
+        assert!(extract_subscription_info(&rejected).is_none());
+        assert!(extract_subscription_info(&legacy).is_none());
+    }
 }
 
 fn extract_subscription_url(link_parsed: &Url) -> Option<std::string::String> {

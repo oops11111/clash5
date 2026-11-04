@@ -38,6 +38,7 @@ the original review records before release; the present registry is a skeleton.
 - P1-32：移除 macOS 默认绕过中的 `*.crashlytics.com`；日志保留本地 panic hook，诊断导出经 `clash_verge_logging::redact` 后复制到本机剪贴板，无自动上报。静态门禁：`npm run check:local-diagnostics`。
 - P1-33：新增 `scripts/perf/redline.json`，将流量图三个阶段、主进程/WebView 的 CPU 均值和 RSS P50 固定为 20% 最大回归；`npm run perf:gate` 要求基线和候选各至少 3 次独立 macOS 运行且使用不同构建。当前 Windows 环境不能运行 macOS WKWebView 采样，RC 前仍需上传真实基线/候选报告作为验收证据。
 - P1-34：新增 `appStorage`，所有应用端浏览器存储键统一写入 `clash5:v1:`，首次读取旧键时迁移并删除旧键；窗口初始化脚本和桌面 smoke fixture 使用同一命名空间。静态门禁：`npm run check:storage-namespace`；Vitest 覆盖迁移、读写删除和无窗口执行。
+- P1-36：Windows 仅注册 `Clash5`，Linux 仅维护 `clash5` MIME handler，解析器拒绝旧 `clash://` / `clash-verge://`；已有且明确指向当前可执行文件的旧 Windows 注册项会被清理。静态门禁：`npm run check:deep-link-scheme`；运行时仍需补“显示订阅主机名并由用户确认后导入”的桌面验收。
 
 Issue: https://github.com/oops11111/clash5/issues/68.
 `tsc --noEmit`, Vite production build, and offline Rust library `cargo check`
