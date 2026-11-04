@@ -1,0 +1,21 @@
+<html><head><meta charset=utf-8><style>*{box-sizing:border-box}body{margin:0;font-family:"Segoe UI","PingFang SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,Roboto,"Noto Sans CJK SC",sans-serif;background:#F0F4FA;color:#1A2332;width:900px;height:560px;position:relative;overflow:hidden}
+.stamp{position:absolute;right:12px;top:10px;font-size:12px;padding:3px 8px;border:1px solid #EF4444;color:#EF4444;border-radius:4px;background:#FFFFFF;z-index:99}
+.legend{position:absolute;left:14px;bottom:10px;font-size:11.5px;color:#5A6B82}
+.scene{position:absolute;left:14px;top:10px;font-size:12px;color:#5A6B82}
+.sg{color:#2F6BFF;font-weight:700}
+.app{position:absolute;left:40px;top:44px;right:40px;bottom:40px;background:#FFFFFF;border:1px solid #E2E8F2;border-radius:8px;display:flex;overflow:hidden}
+.side{width:150px;border-right:1px solid #E2E8F2;padding:14px 10px;font-size:14px}
+.side div{padding:8px 12px;border-radius:6px;color:#5A6B82;margin-bottom:2px} .side .on{background:#E8F0FF;color:#2F6BFF;font-weight:600}
+.main{flex:1;padding:18px 22px;position:relative} h2{margin:0 0 14px;font-size:20px;font-weight:600}
+.btn{display:inline-flex;align-items:center;gap:8px;font:inherit;font-size:14px;font-weight:500;padding:6px 16px;border-radius:4px;border:1px solid transparent;cursor:pointer;line-height:1.75}
+.c{background:#2F6BFF;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)} .o{background:transparent;color:#2F6BFF;border-color:#2F6BFF80}
+.d{background:#EF4444;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)} .dis{background:#1A23321f;color:#1A233261;box-shadow:none}
+.spin{width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block}
+.veil{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+.dlg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:400px;background:#FFFFFF;border-radius:4px;box-shadow:0 11px 15px -7px rgba(0,0,0,.2),0 24px 38px 3px rgba(0,0,0,.14);}
+.dlg .t{padding:16px 24px;font-size:20px;font-weight:500} .dlg .b{padding:0 24px 20px;color:#5A6B82;font-size:15px;line-height:1.6} .dlg .a{padding:8px 16px 16px;display:flex;justify-content:flex-end;gap:8px}
+.sk{background:#E6ECF5;border-radius:4px} .card{border:1px solid #E2E8F2;border-radius:8px;padding:14px;margin-bottom:12px}
+.focus{outline:2px solid #2F6BFF;outline-offset:2px}
+.note{font-size:12px;color:#5A6B82;margin-top:6px}</style></head><body><div class=scene>V5 Q6A · 空状态（BaseEmpty + 操作按钮） · 浅色</div><div class=stamp>概念图·非现有界面</div><div class=app><div class=side><div class="">首页</div><div class="on">代理</div><div class="">订阅</div><div class="">连接</div><div class="">规则</div><div class="">日志</div><div class="">测试</div><div class="">设置</div></div><div class=main><h2>链路</h2><div style="position:absolute;inset:60px 0 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#5A6B82">
+<svg width=64 height=64 viewBox="0 0 24 24" fill="#5A6B82" opacity=.75><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 12h-4c0 1.66-1.34 3-3 3s-3-1.34-3-3H5V5h14v10z"/></svg>
+<div style="font-size:20px;margin-top:6px">暂无链路</div><div class=note style="font-size:14px">当前订阅尚无已保存链路。</div><button class="btn c" style="margin-top:16px">＋ 新建链路</button></div></div></div><div class=legend>文案来源：locales/zh 语言包；† = 建议文案（语言包无此键） · 键：layout.components.navigation.empty.chainsTitle、chains.empty、chains.create；结构同 base-empty.tsx（InboxRounded 4em、文字 1.25em、extra 插槽）</div></body></html>

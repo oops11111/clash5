@@ -1,0 +1,54 @@
+<!DOCTYPE html><html><head><meta charset=utf-8><style>*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",-apple-system,BlinkMacSystemFont,Roboto,"Noto Sans CJK SC",sans-serif;background:#000000;color:#FFFFFF;width:960px;height:640px;position:relative;overflow:hidden}
+.stamp{position:absolute;right:14px;top:10px;font-size:12px;padding:3px 8px;border:1px solid #FF453A;color:#FF453A;border-radius:4px;background:#1C1C1E;z-index:20}
+.scene{position:absolute;left:14px;top:10px;font-size:12px;color:#EBEBF599}
+.legend{position:absolute;left:14px;right:14px;bottom:8px;font-size:11px;color:#EBEBF599;line-height:1.35}
+.win{position:absolute;left:28px;top:40px;right:28px;bottom:36px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.12);background:#000000;box-shadow:0 8px 28px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.title{height:36px;background:#000000;border-bottom:1px solid rgba(255,255,255,.12);display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0}
+.dots span{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+.dots .r{background:#FF5F57}.dots .y{background:#FEBC2E}.dots .g{background:#28C840}
+.tt{flex:1;text-align:center;font-size:13px;color:#EBEBF599}
+.wc{font-size:12px;color:#EBEBF599;letter-spacing:4px}
+.tabs{height:44px;background:#000000;border-bottom:1px solid rgba(255,255,255,.12);display:flex;align-items:stretch;padding:0 16px;gap:4px;flex-shrink:0}
+.tab{padding:0 18px;display:flex;align-items:center;font-size:14px;color:#EBEBF599;position:relative}
+.tab.on{color:#0A84FF;font-weight:600}
+.tab.on::after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:2.5px;background:#0A84FF;border-radius:2px 2px 0 0}
+.main{flex:1;padding:16px 18px;overflow:hidden}
+.island{background:#1C1C1E;border:1px solid rgba(255,255,255,.12);border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.55),0 1px 3px rgba(0,0,0,.4);padding:14px 16px}
+.h{font-size:14px;font-weight:600;margin-bottom:10px}
+.note{font-size:12px;color:#EBEBF599}
+.btn{display:inline-flex;align-items:center;justify-content:center;font:inherit;font-size:13px;font-weight:500;padding:5px 14px;border-radius:4px;border:1px solid transparent;line-height:1.6}
+.bp{background:#0A84FF;color:#fff}.bo{background:transparent;color:#0A84FF;border-color:#0A84FF66}
+.chip{display:inline-flex;padding:4px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.12);font-size:12.5px;margin-right:6px}
+.chip.on{background:#0A84FF;color:#fff;border-color:#0A84FF}
+.tog{width:44px;height:24px;border-radius:12px;background:rgba(255,255,255,.12);position:relative;display:inline-block;vertical-align:middle}
+.tog.on{background:#0A84FF}
+.tog i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.tog.on i{left:22px}
+.row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;margin-bottom:6px;font-size:13px}
+.listitem{padding:8px 10px;border-radius:6px;font-size:13px;color:#EBEBF599}
+.listitem.on{background:#3E3E3E;color:#0A84FF;font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid21{display:grid;grid-template-columns:240px 1fr;gap:14px;height:100%}
+.input{flex:1;border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:7px 10px;font-size:13px;color:#EBEBF599;background:transparent}
+.src{padding:10px 12px;border:1px solid rgba(255,255,255,.12);border-radius:6px;margin-bottom:8px}
+.src.on{border-color:#0A84FF;background:#3E3E3E}
+</style></head><body><div class=scene>横向五 Tab + 浮岛 · 03-proxies · 暗色</div><div class=stamp>概念图·非现有界面</div><div class=win><div class=title><div class=dots><span class=r></span><span class=y></span><span class=g></span></div><div class=tt>Clash5</div><div class=wc>— □ ×</div></div><div class=tabs><div class="tab">首页</div><div class="tab on">代理</div><div class="tab">订阅</div><div class="tab">插件</div><div class="tab">设置</div></div><div class=main>
+<div class=grid21>
+  <div class=island style="height:100%">
+    <div class=h>代理组</div>
+    <div class="listitem">自动选择</div><div class="listitem on">香港</div><div class="listitem">日本</div><div class="listitem">美国</div><div class="listitem">直连</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:14px;height:100%">
+    <div class=island style="flex:1">
+      <div class=h>当前组 · 香港</div>
+      <div class=row><span>HK-01</span><span class=note style="color:#30D158">42 ms</span></div><div class=row><span>HK-02</span><span class=note style="color:#30D158">55 ms</span></div><div class=row><span>HK-03</span><span class=note style="color:#30D158">61 ms</span></div><div class=row><span>HK-04</span><span class=note >88 ms</span></div>
+    </div>
+    <div class=island>
+      <div class=h>规则（页内可达）</div>
+      <div class=note style="margin-bottom:10px">原「规则」并入代理；进程路由唯一入口保留</div>
+      <button class="btn bp">规则集</button>
+      <button class="btn bo" style="margin-left:8px">进程路由</button>
+    </div>
+  </div>
+</div></div></div><div class=legend>五 Tab 已定；合并：节点→订阅；规则→代理页内；链路→首页；诊断/连接/日志→设置·诊断 · 规则并代理页内可达</div></body></html>
