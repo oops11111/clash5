@@ -9,6 +9,7 @@ import {
   ListItemText,
   Typography,
 } from '@mui/material'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -84,7 +85,7 @@ const SettingVergeAdvanced = ({ section }: Props) => {
   }, [])
 
   const copyVersion = useCallback(() => {
-    navigator.clipboard.writeText(`v${version}`).then(() => {
+    writeText(`v${version}`).then(() => {
       showNotice.success(
         'settings.components.verge.advanced.notifications.versionCopied',
         1000,

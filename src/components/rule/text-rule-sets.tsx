@@ -68,8 +68,7 @@ export const TextRuleSets = ({ rules }: Props) => {
     [parsed, existing],
   )
 
-  const linkValid =
-    isValidUrl(url.trim()) && /^https:\/\//i.test(url.trim())
+  const linkValid = isValidUrl(url.trim()) && /^https:\/\//i.test(url.trim())
   const canAdd =
     name.trim() !== '' && (mode === 'link' ? linkValid : preview.valid > 0)
 

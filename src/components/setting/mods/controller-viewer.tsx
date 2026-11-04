@@ -11,6 +11,7 @@ import {
   TextField,
   Tooltip,
 } from '@mui/material'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { useLockFn } from 'ahooks'
 import { useImperativeHandle, useState, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -92,7 +93,7 @@ export function ControllerViewer({ ref }: { ref?: Ref<DialogRef> }) {
   const handleCopyToClipboard = useLockFn(
     async (text: string, type: string) => {
       try {
-        await navigator.clipboard.writeText(text)
+        await writeText(text)
         setCopySuccess(type)
         setTimeout(() => setCopySuccess(null))
       } catch (err) {

@@ -15,6 +15,7 @@ import {
   IconButton,
 } from '@mui/material'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import { useLockFn } from 'ahooks'
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -111,7 +112,7 @@ export const EditorViewer = ({
     try {
       if (readOnly || loading || !editorRef.current) return
 
-      const text = await navigator.clipboard.readText()
+      const text = await readText()
       if (!text) return
 
       const editorInstance = editorRef.current

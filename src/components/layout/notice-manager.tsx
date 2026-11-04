@@ -8,6 +8,7 @@ import {
   Stack,
   type SnackbarOrigin,
 } from '@mui/material'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import React, { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -295,7 +296,7 @@ export const NoticeManager: React.FC<NoticeManagerProps> = ({ position }) => {
       const text = resolveNoticeCopyText(notice, t)
       if (!text) return
       try {
-        await navigator.clipboard.writeText(text)
+        await writeText(text)
         showNotice.success(
           'shared.feedback.notifications.common.copySuccess',
           1000,
