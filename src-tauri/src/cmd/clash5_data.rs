@@ -862,6 +862,7 @@ pub async fn clash5_revoke_plugin_signer(signer_fingerprint: String) -> CmdResul
         |result| result.is_valid(),
     )
     .await?;
+    plugins::revoke_signer(&root, &signer_fingerprint).map_err(plugin_failure)?;
     let details = serde_json::json!({ "signer_fingerprint": signer_fingerprint });
     let audit_result = crate::config::profiles::with_clash5_binding_store(move |store| {
         store.record_plugin_audit("plugin.signer.revoke", &details)

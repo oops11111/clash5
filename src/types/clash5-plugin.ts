@@ -102,6 +102,8 @@ export interface Clash5CatalogView {
   name: string
   url: string
   signer_fingerprint: string
+  sequence: number
+  expires: string | null
   plugins: Clash5CatalogEntry[]
 }
 
@@ -110,5 +112,7 @@ export interface Clash5CatalogPreview {
   name: string
   signer: string
   signer_fingerprint: string
+  sequence: number
+  expires: string | null
   plugin_count: number
 }

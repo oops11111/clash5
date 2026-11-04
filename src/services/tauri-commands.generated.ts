@@ -1335,6 +1335,8 @@ export type PluginCatalogPreview = {
   name: string
   signer: string
   signer_fingerprint: string
+  sequence: number
+  expires: string | null
   plugin_count: number
 }
 
@@ -1343,6 +1345,8 @@ export type PluginCatalogView = {
   name: string
   url: string
   signer_fingerprint: string
+  sequence: number
+  expires: string | null
   plugins: CatalogEntry[]
 }
 

@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow, ensure};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use std::{collections::HashSet, path::Path};
@@ -25,6 +26,13 @@ pub(crate) struct CatalogEntry {
 #[serde(deny_unknown_fields)]
 pub(crate) struct CatalogIndex {
     pub schema_version: u16,
+    /// Monotonically increasing catalog revision. Legacy catalogs without this field are treated
+    /// as revision zero and can be upgraded, but never replace a newer stored revision.
+    #[serde(default)]
+    pub sequence: u64,
+    /// Optional RFC3339 expiry for legacy indexes. New catalogs should publish this field.
+    #[serde(default)]
+    pub expires: Option<String>,
     pub name: String,
     pub plugins: Vec<CatalogEntry>,
 }
@@ -38,6 +46,8 @@ pub(crate) struct CatalogRecord {
     pub signer: String,
     pub index_json: String,
     pub signature: String,
+    #[serde(default)]
+    pub sequence: u64,
 }
 
 pub(crate) fn validate_catalog_url(raw: &str) -> Result<reqwest::Url> {
@@ -87,6 +97,9 @@ pub(crate) fn parse_index(bytes: &[u8]) -> Result<CatalogIndex> {
     ensure!(bytes.len() <= INDEX_MAX_BYTES, "catalog index is too large");
     let index: CatalogIndex = serde_json::from_slice(bytes).map_err(|_| anyhow!("catalog index is malformed"))?;
     ensure!(index.schema_version == 1, "unsupported catalog schema");
+    if let Some(expires) = &index.expires {
+        DateTime::parse_from_rfc3339(expires).map_err(|_| anyhow!("catalog expiry is invalid"))?;
+    }
     ensure!(
         !index.name.trim().is_empty() && index.name.len() <= 128,
         "catalog name is invalid"
@@ -112,6 +125,25 @@ pub(crate) fn parse_index(bytes: &[u8]) -> Result<CatalogIndex> {
         ensure!(ids.insert(entry.id.as_str()), "catalog lists a plugin ID twice");
     }
     Ok(index)
+}
+
+pub(crate) fn ensure_fresh(index: &CatalogIndex, now: DateTime<Utc>) -> Result<()> {
+    let Some(expires) = &index.expires else {
+        return Ok(());
+    };
+    let expires = DateTime::parse_from_rfc3339(expires)
+        .map_err(|_| anyhow!("catalog expiry is invalid"))?
+        .with_timezone(&Utc);
+    ensure!(expires > now, "catalog index is expired");
+    Ok(())
+}
+
+pub(crate) fn ensure_sequence_not_older(stored: u64, candidate: u64) -> Result<()> {
+    ensure!(
+        candidate >= stored,
+        "catalog sequence moved backwards; refusing a downgrade"
+    );
+    Ok(())
 }
 
 fn valid_plugin_id(id: &str) -> bool {
@@ -192,6 +224,36 @@ mod tests {
         assert!(parse_index(base("dir/p.c5p", &good).as_bytes()).is_err());
         assert!(parse_index(base("p.zip", &good).as_bytes()).is_err());
         assert!(parse_index(base("p.c5p", "xyz").as_bytes()).is_err());
+    }
+
+    #[test]
+    fn legacy_indexes_default_sequence_and_expiry() -> Result<()> {
+        let index = parse_index(br#"{"schema_version":1,"name":"c","plugins":[]}"#)?;
+        assert_eq!(index.sequence, 0);
+        assert!(index.expires.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn expired_catalog_indexes_are_rejected() -> Result<()> {
+        let mut index: CatalogIndex = serde_json::from_value(serde_json::json!({
+            "schema_version": 1,
+            "sequence": 2,
+            "expires": "2020-01-01T00:00:00Z",
+            "name": "c",
+            "plugins": []
+        }))?;
+        assert!(ensure_fresh(&index, Utc::now()).is_err());
+        index.expires = Some("2999-01-01T00:00:00Z".into());
+        assert!(ensure_fresh(&index, Utc::now()).is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn catalog_sequence_cannot_roll_back() {
+        assert!(ensure_sequence_not_older(2, 2).is_ok());
+        assert!(ensure_sequence_not_older(2, 3).is_ok());
+        assert!(ensure_sequence_not_older(2, 1).is_err());
     }
 
     #[test]

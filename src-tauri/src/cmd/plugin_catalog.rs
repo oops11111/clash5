@@ -6,6 +6,7 @@ use crate::clash5::{
     plugins,
 };
 use crate::utils::dirs;
+use chrono::Utc;
 use std::path::PathBuf;
 
 #[derive(serde::Serialize, specta::Type)]
@@ -14,6 +15,9 @@ pub struct PluginCatalogView {
     name: String,
     url: String,
     signer_fingerprint: String,
+    #[specta(type = specta_typescript::Number)]
+    sequence: u64,
+    expires: Option<String>,
     plugins: Vec<CatalogEntry>,
 }
 
@@ -23,6 +27,9 @@ pub struct PluginCatalogPreview {
     name: String,
     signer: String,
     signer_fingerprint: String,
+    #[specta(type = specta_typescript::Number)]
+    sequence: u64,
+    expires: Option<String>,
     plugin_count: u32,
 }
 
@@ -52,6 +59,7 @@ async fn fetch_catalog(url: &str) -> CmdResult<(CatalogIndex, String, String, St
         .map_err(|_| failure("catalog signer is not text"))?;
     catalog::verify_index(&index_bytes, &signature, &signer).map_err(failure)?;
     let index = catalog::parse_index(&index_bytes).map_err(failure)?;
+    catalog::ensure_fresh(&index, Utc::now()).map_err(failure)?;
     let index_json = String::from_utf8(index_bytes).map_err(|_| failure("catalog index is not UTF-8"))?;
     Ok((index, index_json, signature, signer))
 }
@@ -64,6 +72,8 @@ fn view(record: &CatalogRecord) -> CmdResult<PluginCatalogView> {
         name: index.name,
         url: record.url.clone(),
         signer_fingerprint: fingerprint(&record.signer),
+        sequence: record.sequence,
+        expires: index.expires.clone(),
         plugins: index.plugins,
     })
 }
@@ -85,6 +95,8 @@ pub async fn clash5_preview_plugin_catalog(url: String) -> CmdResult<PluginCatal
         name: index.name,
         signer_fingerprint: fingerprint(&signer),
         signer,
+        sequence: index.sequence,
+        expires: index.expires,
         plugin_count: index.plugins.len() as u32,
     })
 }
@@ -96,7 +108,7 @@ pub async fn clash5_save_plugin_catalog(
     confirmed_signer_fingerprint: String,
 ) -> CmdResult<PluginCatalogView> {
     let path = records_path()?;
-    let (_, index_json, signature, signer) = fetch_catalog(&url).await?;
+    let (index, index_json, signature, signer) = fetch_catalog(&url).await?;
     if fingerprint(&signer) != confirmed_signer_fingerprint {
         return Err(failure("catalog signer changed since it was previewed"));
     }
@@ -110,6 +122,7 @@ pub async fn clash5_save_plugin_catalog(
         signer,
         index_json,
         signature,
+        sequence: index.sequence,
     };
     let view = view(&record)?;
     records.push(record);
@@ -128,13 +141,15 @@ pub async fn clash5_refresh_plugin_catalog(catalog_id: String) -> CmdResult<Plug
         .ok_or_else(|| failure("catalog is not known"))?;
     let url = records[position].url.clone();
     let pinned = records[position].signer.clone();
-    let (_, index_json, signature, signer) = fetch_catalog(&url).await?;
+    let (index, index_json, signature, signer) = fetch_catalog(&url).await?;
     // The pinned signer is never replaced by a refresh. A new signer needs a new confirmation.
     if fingerprint(&signer) != fingerprint(&pinned) {
         return Err(failure("catalog signer changed; remove the catalog and add it again"));
     }
+    catalog::ensure_sequence_not_older(records[position].sequence, index.sequence).map_err(failure)?;
     records[position].index_json = index_json;
     records[position].signature = signature;
+    records[position].sequence = index.sequence;
     let view = view(&records[position])?;
     catalog::save_records(&path, &records).map_err(failure)?;
     Ok(view)

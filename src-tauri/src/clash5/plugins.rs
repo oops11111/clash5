@@ -235,6 +235,9 @@ pub(crate) async fn apply_bound_plugins(
 
 const DISABLED_MARKER: &str = "disabled";
 const BUNDLED_MARKER: &str = "bundled";
+const TRUSTED_SIGNERS_FILE: &str = ".trusted-signers.json";
+const MAX_TRUSTED_SIGNERS: usize = 128;
+const TRUSTED_SIGNERS_MAX_BYTES: usize = 256 * 1024;
 /// Project signing key for built-in presets. `None` until the maintainer pins the key; nothing is
 /// installed as built-in without it.
 pub(crate) const BUNDLED_SIGNER: Option<&str> = Some(
@@ -244,6 +247,77 @@ pub(crate) const BUNDLED_SIGNER: Option<&str> = Some(
 const BUNDLED_PACKAGES: &[&[u8]] = &[include_bytes!(
     "../../../plugins/presets/ipv6-dns-guard/ipv6-dns-guard.c5p"
 )];
+
+fn trusted_signers_path(plugin_root: &Path) -> std::path::PathBuf {
+    plugin_root.join(TRUSTED_SIGNERS_FILE)
+}
+
+fn load_trusted_signers(plugin_root: &Path) -> Result<Vec<String>, PluginFailure> {
+    let bytes = match fs::read(trusted_signers_path(plugin_root)) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(_) => return Err(PluginFailure::ExecutionFailed),
+    };
+    if bytes.len() > TRUSTED_SIGNERS_MAX_BYTES {
+        return Err(PluginFailure::InvalidPackage);
+    }
+    let signers: Vec<String> = serde_json::from_slice(&bytes).map_err(|_| PluginFailure::InvalidPackage)?;
+    if signers.len() > MAX_TRUSTED_SIGNERS
+        || signers
+            .iter()
+            .any(|signer| signer.len() > 1_024 || minisign_verify::PublicKey::decode(signer.trim()).is_err())
+    {
+        return Err(PluginFailure::InvalidPackage);
+    }
+    Ok(signers)
+}
+
+fn save_trusted_signers(plugin_root: &Path, signers: &[String]) -> Result<(), PluginFailure> {
+    if signers.len() > MAX_TRUSTED_SIGNERS {
+        return Err(PluginFailure::PermissionDenied);
+    }
+    fs::create_dir_all(plugin_root).map_err(|_| PluginFailure::ExecutionFailed)?;
+    let temporary = plugin_root.join(format!("{TRUSTED_SIGNERS_FILE}.tmp"));
+    fs::write(
+        &temporary,
+        serde_json::to_vec_pretty(signers).map_err(|_| PluginFailure::ExecutionFailed)?,
+    )
+    .map_err(|_| PluginFailure::ExecutionFailed)?;
+    fs::rename(&temporary, trusted_signers_path(plugin_root)).map_err(|_| PluginFailure::ExecutionFailed)
+}
+
+fn signer_is_trusted(plugin_root: &Path, signer: &str) -> Result<bool, PluginFailure> {
+    if BUNDLED_SIGNER.is_some_and(|bundled| bundled.trim() == signer.trim()) {
+        return Ok(true);
+    }
+    Ok(load_trusted_signers(plugin_root)?
+        .iter()
+        .any(|trusted| trusted.trim() == signer.trim()))
+}
+
+pub(crate) fn trust_signer(plugin_root: &Path, signer: &str) -> Result<(), PluginFailure> {
+    let signer = signer.trim();
+    if signer.is_empty() || minisign_verify::PublicKey::decode(signer).is_err() {
+        return Err(PluginFailure::InvalidPackage);
+    }
+    let mut signers = load_trusted_signers(plugin_root)?;
+    if !signers.iter().any(|trusted| trusted.trim() == signer) {
+        signers.push(signer.to_owned());
+        save_trusted_signers(plugin_root, &signers)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn revoke_signer(plugin_root: &Path, fingerprint: &str) -> Result<bool, PluginFailure> {
+    let mut signers = load_trusted_signers(plugin_root)?;
+    let before = signers.len();
+    signers.retain(|signer| hex_digest(signer.trim().as_bytes()) != fingerprint);
+    if signers.len() == before {
+        return Ok(false);
+    }
+    save_trusted_signers(plugin_root, &signers)?;
+    Ok(true)
+}
 
 fn valid_plugin_id(id: &str) -> bool {
     !id.is_empty()
@@ -263,6 +337,13 @@ pub(crate) fn set_plugin_enabled(plugin_root: &Path, id: &str, enabled: bool) ->
         return Err(PluginFailure::InvalidPackage);
     }
     let directory = plugin_root.join(id);
+    if enabled && directory.join("manifest.json").is_file() {
+        let signer = read_installed_file(&directory, "signer.pub", 1_024)?;
+        let signer = std::str::from_utf8(&signer).map_err(|_| PluginFailure::InvalidPackage)?;
+        if !signer_is_trusted(plugin_root, signer)? {
+            return Err(PluginFailure::PermissionDenied);
+        }
+    }
     let metadata = fs::symlink_metadata(&directory).map_err(|_| PluginFailure::InvalidPackage)?;
     if !metadata.file_type().is_dir() {
         return Err(PluginFailure::InvalidPackage);
@@ -321,6 +402,12 @@ fn load_installed_plugin(plugin_root: &Path, id: &str) -> Result<(PluginManifest
             .map_err(|_| PluginFailure::InvalidPackage)?
             .trim(),
     )?;
+    if !signer_is_trusted(
+        plugin_root,
+        std::str::from_utf8(&signer).map_err(|_| PluginFailure::InvalidPackage)?,
+    )? {
+        return Err(PluginFailure::PermissionDenied);
+    }
     Ok((manifest, module))
 }
 
@@ -534,6 +621,7 @@ pub(crate) fn upgrade_package(
     if is_bundled(plugin_root, &package.manifest.id) {
         return Err(PluginFailure::PermissionDenied);
     }
+    trust_signer(plugin_root, &package.signer)?;
     let id = package.manifest.id.clone();
     let destination = plugin_root.join(&id);
     let installed_metadata = fs::symlink_metadata(&destination).map_err(|_| PluginFailure::InvalidPackage)?;
@@ -663,6 +751,7 @@ pub(crate) fn install_package(
     if is_bundled(plugin_root, &package.manifest.id) {
         return Err(PluginFailure::PermissionDenied);
     }
+    trust_signer(plugin_root, &package.signer)?;
     install_into(package, plugin_root, false)
 }
 
@@ -671,6 +760,7 @@ fn install_into(
     plugin_root: &Path,
     bundled: bool,
 ) -> Result<PluginSummary, PluginFailure> {
+    trust_signer(plugin_root, &package.signer)?;
     fs::create_dir_all(plugin_root).map_err(|_| PluginFailure::ExecutionFailed)?;
     let id = &package.manifest.id;
     let destination = plugin_root.join(id);
@@ -782,7 +872,7 @@ pub(crate) fn installed_plugins(plugin_root: &Path) -> Result<Vec<PluginSummary>
             return Err(PluginFailure::InvalidPackage);
         }
         let mut item = summary(&manifest, signer);
-        item.enabled = plugin_enabled(plugin_root, &manifest.id);
+        item.enabled = plugin_enabled(plugin_root, &manifest.id) && signer_is_trusted(plugin_root, signer)?;
         item.has_previous = has_previous_version(plugin_root, &manifest.id);
         item.bundled = is_bundled(plugin_root, &manifest.id);
         plugins.push(item);
@@ -998,6 +1088,31 @@ mod tests {
         };
         let patch = execute_blocking(inspected.module, input, inspected.manifest.writable_paths);
         assert_eq!(patch, Ok(serde_json::json!({"tun":{"mtu":1360}})));
+    }
+
+    #[test]
+    fn trusted_signers_persist_and_can_be_revoked() -> Result<(), PluginFailure> {
+        let package = include_bytes!("../../../scripts/fixtures/m3-acceptance-plugin.c5p");
+        let inspected = inspect_package(package)?;
+        let signer = inspected.signer.clone();
+        let id = inspected.manifest.id.clone();
+        let root = std::env::temp_dir().join(format!("clash5-plugin-trust-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+
+        install_package(verify_package(package, std::slice::from_ref(&signer))?, &root)?;
+        assert!(signer_is_trusted(&root, &signer)?);
+        let fingerprint = hex_digest(signer.as_bytes());
+        assert!(revoke_signer(&root, &fingerprint)?);
+        assert!(!signer_is_trusted(&root, &signer)?);
+        set_plugin_enabled(&root, &id, false)?;
+        assert_eq!(
+            set_plugin_enabled(&root, &id, true),
+            Err(PluginFailure::PermissionDenied)
+        );
+        assert!(!revoke_signer(&root, &fingerprint)?);
+
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
     }
 
     #[test]
