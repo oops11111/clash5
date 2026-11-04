@@ -26,7 +26,7 @@ the original review records before release; the present registry is a skeleton.
 | G-15 | P0-15 | blocked | - | Corrupt config preservation and write protection |
 | G-16 | P0-16 | partial | scripts/check-privacy-defaults.mjs | Updater disabled in config, frontend and backend; signing and RC artifact policy still unverified |
 | P0-12 | P0-12 | partial | scripts/check-privacy-defaults.mjs | Upgrade UI, command and downloader removed; packaged-core service hash acceptance remains |
-| P0-13 | P0-13 | partial | - | Strict TLS source fixed; invalid-cert runtime, restore sandbox and optional encryption remain |
+| P0-13 | P0-13 | partial | - | Strict TLS and bounded staged restore implemented; invalid-cert server acceptance, optional encryption and CA/pin UX remain |
 | P0-17 | P0-17 | partial | scripts/check-release-gates.mjs | Complete executable gate coverage, evidence and later-round reconciliation |
 
 ## Local implementation evidence (2026-11-04)
@@ -42,8 +42,21 @@ with null CSP and unrestricted filesystem scope. Registry validation passed;
 The Windows native save dialog, out-of-scope IPC rejection, icon loading and
 Monaco workers still require desktop acceptance. WebDAV now uses the default
 certificate verifier, but invalid-certificate server acceptance has not run.
-Restore staging, archive limits and optional encryption are not implemented in
-this tranche. Core upgrade code was removed and the generated command contract
+Restore now uses a private staging directory, an explicit file whitelist,
+64 MiB archive/entry limits, a 512 MiB expanded limit and at most 10,000 entries.
+Config files and referenced profile paths are checked before publication; SQLite
+snapshots require a valid header and integrity check. File replacements are atomic
+per file, with rollback on publication/database errors; this is not a crash-atomic
+transaction across all config files and OS effects. Failed database restoration
+retains recovery snapshots. Eleven Windows archive/database regression tests passed;
+the Unix destination-link test is wired into CI but has not run locally.
+All 75 data-layer tests passed. Clippy passed for the backend library and the
+backup restore integration test with warnings denied.
+Optional encryption and custom CA/pin controls remain unimplemented.
+Backup creation shares the restore limits and excludes unexpected profile files;
+WebDAV restore downloads are streamed into a random temporary filename with the
+same archive-size cap, rather than joining the remote name into the app directory.
+Core upgrade code was removed and the generated command contract
 was regenerated. The frontend test verifies that an empty release channel never
 invokes the updater plugin; updater permissions and artifact generation are off.
 No installer was built,

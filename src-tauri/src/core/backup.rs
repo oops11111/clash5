@@ -207,13 +207,32 @@ impl WebDavClient {
     }
 
     pub async fn download(&self, filename: String, storage_path: PathBuf) -> Result<(), Error> {
+        use tokio::io::AsyncWriteExt as _;
+
         let client = self.get_client(Operation::Download).await?;
         let path = format!("{}/{}", dirs::BACKUP_DIR, filename);
 
         let fut = async {
-            let response = client.get(path.as_str()).await?;
-            let content = response.bytes().await?;
-            fs::write(&storage_path, &content).await?;
+            let mut response = client.get(path.as_str()).await?.error_for_status()?;
+            let limit = crate::feat::backup_archive::MAX_ARCHIVE_BYTES;
+            anyhow::ensure!(
+                response.content_length().is_none_or(|size| size <= limit),
+                "Backup download exceeds 64 MiB"
+            );
+            let mut output = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&storage_path)
+                .await?;
+            let mut received = 0_u64;
+            while let Some(chunk) = response.chunk().await? {
+                received = received
+                    .checked_add(chunk.len() as u64)
+                    .ok_or_else(|| anyhow::anyhow!("Backup size overflow"))?;
+                anyhow::ensure!(received <= limit, "Backup download exceeds 64 MiB");
+                output.write_all(&chunk).await?;
+            }
+            output.sync_all().await?;
             Ok::<(), Error>(())
         };
 
@@ -271,14 +290,29 @@ fn parse_webdav_list(xml: &str) -> Result<Vec<ListEntity>, reqwest_dav::Error> {
 pub async fn create_backup() -> Result<(String, PathBuf), Error> {
     let now = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
     let zip_file_name: String = format!("{OS}-backup-{now}.zip").into();
-    let zip_path = temp_dir().join(zip_file_name.as_str());
+    let zip_path = temp_dir().join(format!("clash5-backup-{}.zip", nanoid::nanoid!()));
 
     let value = zip_path.clone();
-    let file = AsyncHandler::spawn_blocking(move || std::fs::File::create(&value)).await??;
+    let file = AsyncHandler::spawn_blocking(move || {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt as _;
+            options.mode(0o600);
+        }
+        options.open(value)
+    })
+    .await??;
+    let cleanup = scopeguard::guard(zip_path.clone(), |path| {
+        let _ = std::fs::remove_file(path);
+    });
     let mut zip = zip::ZipWriter::new(file);
     zip.add_directory("profiles/", SimpleFileOptions::default())?;
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     let data_db_path = dirs::app_home_dir()?.join(dirs::CLASH5_DATA_DB);
+    let dns_config_path = dirs::app_home_dir()?.join(DNS_CONFIG);
+    let mut entry_count = 5 + usize::from(data_db_path.is_file()) + usize::from(dns_config_path.is_file());
     let mut includes = vec![
         "profiles/",
         dirs::CLASH_CONFIG,
@@ -302,22 +336,30 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
     if let Ok(mut entries) = fs::read_dir(dirs::app_profiles_dir()?).await {
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.is_file() {
+            if entry.file_type().await?.is_file() {
                 let file_name_os = entry.file_name();
                 let file_name = file_name_os
                     .to_str()
                     .ok_or_else(|| anyhow::Error::msg("Invalid file name encoding"))?;
+                if !crate::feat::backup_archive::safe_profile_file(file_name) {
+                    continue;
+                }
+                entry_count += 1;
+                anyhow::ensure!(
+                    entry_count <= crate::feat::backup_archive::MAX_ENTRIES,
+                    "Backup has too many entries"
+                );
                 let backup_path = format!("profiles/{}", file_name);
                 zip.start_file(backup_path, options)?;
-                let file_content = fs::read(&path).await?;
+                let file_content = read_backup_file(&path).await?;
                 zip.write_all(&file_content)?;
             }
         }
     }
     zip.start_file(dirs::CLASH_CONFIG, options)?;
-    zip.write_all(fs::read(dirs::clash_path()?).await?.as_slice())?;
+    zip.write_all(read_backup_file(&dirs::clash_path()?).await?.as_slice())?;
 
-    let verge_text = fs::read_to_string(dirs::verge_path()?).await?;
+    let verge_text = std::string::String::from_utf8(read_backup_file(&dirs::verge_path()?).await?)?;
     let mut verge_config: serde_json::Value = serde_yaml_ng::from_str(&verge_text)?;
     if let Some(obj) = verge_config.as_object_mut() {
         obj.remove("webdav_username");
@@ -327,14 +369,13 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
     zip.start_file(dirs::VERGE_CONFIG, options)?;
     zip.write_all(serde_yaml_ng::to_string(&verge_config)?.as_bytes())?;
 
-    let dns_config_path = dirs::app_home_dir()?.join(DNS_CONFIG);
     if dns_config_path.exists() {
         zip.start_file(DNS_CONFIG, options)?;
-        zip.write_all(fs::read(&dns_config_path).await?.as_slice())?;
+        zip.write_all(read_backup_file(&dns_config_path).await?.as_slice())?;
     }
 
     zip.start_file(dirs::PROFILE_YAML, options)?;
-    zip.write_all(fs::read(dirs::profiles_path()?).await?.as_slice())?;
+    zip.write_all(read_backup_file(&dirs::profiles_path()?).await?.as_slice())?;
 
     if data_db_path.is_file() {
         let snapshot_path = temp_dir().join(format!("clash5-snapshot-{}.sqlite", nanoid::nanoid!()));
@@ -342,13 +383,31 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
         let destination = snapshot_path.clone();
         AsyncHandler::spawn_blocking(move || clash5_data::BindingStore::open(source)?.snapshot_to(destination))
             .await??;
-        let snapshot = fs::read(&snapshot_path).await;
+        let snapshot = read_backup_file(&snapshot_path).await;
         let _ = fs::remove_file(&snapshot_path).await;
         zip.start_file(dirs::CLASH5_DATA_DB, options)?;
         zip.write_all(snapshot?.as_slice())?;
     }
-    zip.finish()?;
+    let output = zip.finish()?;
+    output.sync_all()?;
+    anyhow::ensure!(
+        output.metadata()?.len() <= crate::feat::backup_archive::MAX_ARCHIVE_BYTES,
+        "Backup archive exceeds 64 MiB"
+    );
+    drop(output);
+    let _ = scopeguard::ScopeGuard::into_inner(cleanup);
     Ok((zip_file_name, zip_path))
+}
+
+async fn read_backup_file(path: &std::path::Path) -> Result<Vec<u8>, Error> {
+    use tokio::io::AsyncReadExt as _;
+
+    let limit = crate::feat::backup_archive::MAX_ENTRY_BYTES;
+    let file = fs::File::open(path).await?;
+    let mut content = Vec::new();
+    file.take(limit + 1).read_to_end(&mut content).await?;
+    anyhow::ensure!(content.len() as u64 <= limit, "Backup entry exceeds 64 MiB");
+    Ok(content)
 }
 
 #[cfg(test)]

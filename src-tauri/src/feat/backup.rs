@@ -13,10 +13,7 @@ use clash_verge_logging::{Type, logging, logging_error};
 use reqwest_dav::list_cmd::ListFile;
 use serde::Serialize;
 use smartstring::alias::String;
-use std::{
-    io,
-    path::{Path, PathBuf},
-};
+use std::{io, path::PathBuf};
 use tokio::fs;
 
 #[derive(Debug, Serialize, specta::Type)]
@@ -31,41 +28,65 @@ pub struct LocalBackupFile {
     pub content_length: u64,
 }
 
-fn extract_backup(zip: &mut zip::ZipArchive<std::fs::File>, home: &Path) -> Result<()> {
-    let snapshot_path = std::env::temp_dir().join(format!("clash5-restore-{}.sqlite", nanoid::nanoid!()));
-    let mut has_snapshot = false;
-    let result = (|| -> Result<()> {
-        for index in 0..zip.len() {
-            let mut entry = zip.by_index(index)?;
-            let relative = entry
-                .enclosed_name()
-                .ok_or_else(|| anyhow!("Invalid backup entry path"))?;
-            let target = if relative == Path::new(crate::utils::dirs::CLASH5_DATA_DB) {
-                has_snapshot = true;
-                snapshot_path.clone()
-            } else {
-                home.join(relative)
-            };
-            if entry.is_dir() {
-                std::fs::create_dir_all(&target)?;
-            } else {
-                if let Some(parent) = target.parent() {
-                    std::fs::create_dir_all(parent)?;
-                }
-                let mut output = std::fs::File::create(&target)?;
-                io::copy(&mut entry, &mut output)?;
+async fn restore_backup_file(
+    source: PathBuf,
+    webdav_url: Option<String>,
+    webdav_username: Option<String>,
+    webdav_password: Option<String>,
+) -> Result<()> {
+    let home = app_home_dir()?;
+    let stage_home = home.clone();
+    let staged = AsyncHandler::spawn_blocking(move || {
+        super::backup_archive::StagedBackup::prepare(std::fs::File::open(source)?, &stage_home)
+    })
+    .await??;
+
+    let mut verge: serde_yaml_ng::Mapping = help::read_yaml(&staged.path("verge.yaml")).await?;
+    for key in ["webdav_url", "webdav_username", "webdav_password"] {
+        verge.remove(serde_yaml_ng::Value::String(key.into()));
+    }
+    let mut restored = crate::config::with_encryption(|| async {
+        serde_yaml_ng::from_value::<IVerge>(serde_yaml_ng::Value::Mapping(verge))
+    })
+    .await?;
+    restored.webdav_url = webdav_url.clone();
+    restored.webdav_username = webdav_username.clone();
+    restored.webdav_password = webdav_password.clone();
+    help::save_yaml(&staged.path("verge.yaml"), &restored, None).await?;
+    let _: serde_yaml_ng::Mapping = help::read_yaml(&staged.path("config.yaml")).await?;
+    let dns = staged.path(crate::constants::files::DNS_CONFIG);
+    if dns.is_file() {
+        let _: serde_yaml_ng::Mapping = help::read_yaml(&dns).await?;
+    }
+    let profiles: IProfiles = help::read_yaml(&staged.path("profiles.yaml")).await?;
+    for item in profiles.items.as_deref().unwrap_or_default() {
+        if let Some(file) = &item.file {
+            anyhow::ensure!(
+                super::backup_archive::safe_profile_file(file),
+                "Invalid profile filename in backup"
+            );
+            anyhow::ensure!(
+                staged.path("profiles").join(file.as_str()).is_file(),
+                "Backup is missing a referenced profile"
+            );
+            if !file.ends_with(".js") {
+                let _: serde_yaml_ng::Mapping = help::read_yaml(&staged.path("profiles").join(file.as_str())).await?;
             }
         }
-        if has_snapshot {
-            clash5_data::BindingStore::open(home.join(crate::utils::dirs::CLASH5_DATA_DB))?
-                .restore_from(&snapshot_path)?;
-        }
-        Ok(())
-    })();
-    if has_snapshot {
-        let _ = std::fs::remove_file(snapshot_path);
     }
-    result
+    let snapshot = staged.path(crate::utils::dirs::CLASH5_DATA_DB);
+    if snapshot.is_file() {
+        AsyncHandler::spawn_blocking(move || super::backup_archive::validate_database(&snapshot)).await??;
+    }
+    let _profile_write = crate::config::profiles::PROFILE_WRITE_LOCK.lock().await;
+    AsyncHandler::spawn_blocking(move || {
+        staged.publish(&home, |snapshot, previous| {
+            let path = home.join(crate::utils::dirs::CLASH5_DATA_DB);
+            super::backup_archive::restore_database(snapshot, previous, &path)
+        })
+    })
+    .await??;
+    finalize_restored_verge_config(webdav_url, webdav_username, webdav_password).await
 }
 
 /// Reloads restored configs into memory while preserving WebDAV credentials.
@@ -164,6 +185,7 @@ pub async fn list_wevdav_backup() -> Result<Vec<ListFile>> {
 }
 
 pub async fn delete_webdav_backup(filename: String) -> Result<()> {
+    super::backup_path::validate_backup_filename(filename.as_str())?;
     let name = filename.to_string();
     backup::WebDavClient::global().delete(filename).await.map_err(|err| {
         logging!(
@@ -177,15 +199,18 @@ pub async fn delete_webdav_backup(filename: String) -> Result<()> {
 
 #[tracing::instrument(skip_all, level = "info", fields(filename = %filename))]
 pub async fn restore_webdav_backup(filename: String) -> Result<()> {
+    super::backup_path::validate_backup_filename(filename.as_str())?;
     let verge = Config::verge().await;
     let verge_data = verge.latest_arc();
     let webdav_url = verge_data.webdav_url.clone();
     let webdav_username = verge_data.webdav_username.clone();
     let webdav_password = verge_data.webdav_password.clone();
 
-    let backup_storage_path = app_home_dir()
-        .map_err(|e| anyhow::anyhow!("Failed to get app home dir: {e}"))?
-        .join(filename.as_str());
+    let backup_storage_path = app_home_dir()?.join(format!(".clash5-download-{}.zip", nanoid::nanoid!()));
+    let cleanup_path = backup_storage_path.clone();
+    let _download_cleanup = scopeguard::guard(cleanup_path, |path| {
+        let _ = std::fs::remove_file(path);
+    });
     let name = filename.to_string();
     backup::WebDavClient::global()
         .download(filename, backup_storage_path.clone())
@@ -199,14 +224,7 @@ pub async fn restore_webdav_backup(filename: String) -> Result<()> {
             err
         })?;
 
-    let value = backup_storage_path.clone();
-    let file = AsyncHandler::spawn_blocking(move || std::fs::File::open(&value)).await??;
-    let mut zip = zip::ZipArchive::new(file)?;
-    let _profile_write = crate::config::profiles::PROFILE_WRITE_LOCK.lock().await;
-    extract_backup(&mut zip, &app_home_dir()?)?;
-    let res = finalize_restored_verge_config(webdav_url, webdav_username, webdav_password).await;
-    let _ = backup_storage_path.remove_if_exists().await;
-    res
+    restore_backup_file(backup_storage_path, webdav_url, webdav_username, webdav_password).await
 }
 
 pub async fn create_local_backup() -> Result<()> {
@@ -250,7 +268,19 @@ where
 
 #[tracing::instrument(skip_all, level = "info", fields(source = %source))]
 pub async fn import_local_backup(source: String) -> Result<String> {
+    use tauri_plugin_fs::FsExt as _;
+
     let source_path = PathBuf::from(source.as_str());
+    anyhow::ensure!(
+        crate::core::handle::Handle::app_handle()
+            .fs_scope()
+            .is_allowed(&source_path),
+        "Backup source must be selected through the open dialog"
+    );
+    anyhow::ensure!(
+        fs::metadata(&source_path).await?.len() <= super::backup_archive::MAX_ARCHIVE_BYTES,
+        "Backup archive exceeds 64 MiB"
+    );
     if !source_path.exists() {
         return Err(anyhow!("Backup file not found: {source}"));
     }
@@ -380,12 +410,7 @@ pub async fn restore_local_backup(filename: String) -> Result<()> {
         )
     };
 
-    let file = AsyncHandler::spawn_blocking(move || std::fs::File::open(&target_path)).await??;
-    let mut zip = zip::ZipArchive::new(file)?;
-    let _profile_write = crate::config::profiles::PROFILE_WRITE_LOCK.lock().await;
-    extract_backup(&mut zip, &app_home_dir()?)?;
-    finalize_restored_verge_config(webdav_url, webdav_username, webdav_password).await?;
-    Ok(())
+    restore_backup_file(target_path, webdav_url, webdav_username, webdav_password).await
 }
 
 #[tracing::instrument(skip_all, level = "info", fields(filename = %filename, destination = %destination))]

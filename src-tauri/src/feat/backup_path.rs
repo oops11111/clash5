@@ -3,24 +3,32 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-pub(crate) fn backup_source(directory: &Path, filename: &str) -> io::Result<PathBuf> {
+pub(crate) fn validate_backup_filename(filename: &str) -> io::Result<()> {
     let invalid = || io::Error::new(io::ErrorKind::InvalidInput, "Invalid backup filename");
     let mut components = Path::new(filename).components();
-    if filename.contains(['/', '\\', ':'])
+    if filename.contains(['/', '\\', ':', '%', '?', '#'])
+        || filename.chars().any(char::is_control)
+        || filename.ends_with(['.', ' '])
         || !matches!(components.next(), Some(Component::Normal(_)))
         || components.next().is_some()
     {
         return Err(invalid());
     }
+    Ok(())
+}
+
+pub(crate) fn backup_source(directory: &Path, filename: &str) -> io::Result<PathBuf> {
+    validate_backup_filename(filename)?;
     let root = directory.canonicalize()?;
     let source = root.join(filename).canonicalize()?;
     if source.parent() != Some(root.as_path()) || !source.is_file() {
-        return Err(invalid());
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Invalid backup filename"));
     }
     Ok(source)
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

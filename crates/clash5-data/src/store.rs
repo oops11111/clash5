@@ -423,6 +423,14 @@ impl BindingStore {
         Ok(())
     }
 
+    pub fn integrity_check(&self) -> Result<(), DataError> {
+        let result: String = self.db.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+        if result != "ok" {
+            return Err(DataError::InvalidInput);
+        }
+        Ok(())
+    }
+
     pub fn restore_from(&mut self, path: impl AsRef<Path>) -> Result<(), DataError> {
         self.db.restore(DatabaseName::Main, path, None::<fn(Progress)>)?;
         Ok(())
