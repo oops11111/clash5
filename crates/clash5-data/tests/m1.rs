@@ -264,6 +264,10 @@ fn quality_is_source_scoped_and_obeys_ten_minute_throttle() {
         handshake_delay_ms: Some(5100),
         checked_at_ms: 1000,
         failure_streak: 0,
+        recent_attempts: vec![clash5_data::QualityAttempt {
+            checked_at_ms: 1000,
+            delay_ms: None,
+        }],
     };
     db.save_quality(
         &Source::Subscription {

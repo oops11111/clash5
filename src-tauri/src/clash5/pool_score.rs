@@ -1,44 +1,81 @@
 //! Scoring for node pool members. Lower scores are better.
 //!
-//! M1 scores from latency and recent failures, the only node-level signals stored today.
-//! Throughput and exit drift are chain-level, so they join the score once node samples carry them.
+//! M1 scores from the recent latency median and failure rate. Throughput and exit drift are
+//! chain-level, so they do not participate in node-pool selection.
 
-use clash5_data::{NodeQuality, QualityStatus};
+use clash5_data::{NodeQuality, QualityAttempt, QualityStatus};
 
-/// Share of the score taken by latency; the rest comes from failures.
-const DELAY_WEIGHT: f64 = 0.8;
-const FAILURE_WEIGHT: f64 = 0.2;
-/// A streak at this length counts as the worst recent failure record.
-const FAILURE_STREAK_CAP: f64 = 3.0;
+const LATENCY_CAP_MS: f64 = 1_000.0;
+const RECENT_LATENCY_SAMPLES: usize = 5;
 
 /// One score per member, aligned with the input. `None` when the member has no usable score:
 /// it has never been probed, or its last probe failed.
 pub fn score(members: &[Option<&NodeQuality>]) -> Vec<Option<f64>> {
-    let usable: Vec<(usize, &NodeQuality)> = members
+    let now_ms = members
         .iter()
-        .enumerate()
-        .filter_map(|(index, quality)| {
-            quality
-                .filter(|quality| quality.status != QualityStatus::Failed)
-                .map(|quality| (index, quality))
-        })
-        .collect();
-    let max_delay = usable
-        .iter()
-        .filter_map(|(_, quality)| quality.short_delay_ms)
+        .filter_map(|quality| quality.map(|quality| quality.checked_at_ms))
         .max()
-        .map_or(0.0, f64::from);
+        .unwrap_or_default();
+    score_at(members, now_ms)
+}
 
-    let mut scores = vec![None; members.len()];
-    for (index, quality) in usable {
-        // Measured delays stay below 1; a member without a delay sample is the worst at 1.
-        let delay_term = quality
-            .short_delay_ms
-            .map_or(1.0, |delay| f64::from(delay) / (max_delay + 1.0));
-        let failure_term = f64::from(quality.failure_streak).min(FAILURE_STREAK_CAP) / FAILURE_STREAK_CAP;
-        scores[index] = Some(DELAY_WEIGHT * delay_term + FAILURE_WEIGHT * failure_term);
+/// Score at a shared clock so all members use the same 30-minute failure window.
+pub fn score_at(members: &[Option<&NodeQuality>], now_ms: u64) -> Vec<Option<f64>> {
+    members
+        .iter()
+        .map(|quality| quality.and_then(|quality| score_one(quality, now_ms)))
+        .collect()
+}
+
+fn score_one(quality: &NodeQuality, now_ms: u64) -> Option<f64> {
+    if quality.status == QualityStatus::Failed {
+        return None;
     }
-    scores
+    let mut attempts = if quality.recent_attempts.is_empty() {
+        vec![QualityAttempt {
+            checked_at_ms: quality.checked_at_ms,
+            delay_ms: quality.short_delay_ms,
+        }]
+    } else {
+        quality
+            .recent_attempts
+            .iter()
+            .filter(|attempt| {
+                now_ms >= attempt.checked_at_ms && now_ms - attempt.checked_at_ms <= NodeQuality::FAILURE_WINDOW_MS
+            })
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    if attempts.is_empty() {
+        attempts.push(QualityAttempt {
+            checked_at_ms: quality.checked_at_ms,
+            delay_ms: quality.short_delay_ms,
+        });
+    }
+    let delays = attempts
+        .iter()
+        .filter_map(|attempt| attempt.delay_ms)
+        .collect::<Vec<_>>();
+    let mut recent = delays
+        .into_iter()
+        .rev()
+        .take(RECENT_LATENCY_SAMPLES)
+        .collect::<Vec<_>>();
+    recent.sort_unstable();
+    let latency_ms = if recent.is_empty() {
+        1_000.0
+    } else {
+        let middle = recent.len() / 2;
+        if recent.len() % 2 == 0 {
+            (f64::from(recent[middle - 1]) + f64::from(recent[middle])) / 2.0
+        } else {
+            f64::from(recent[middle])
+        }
+    };
+    let failures = attempts.iter().filter(|attempt| attempt.delay_ms.is_none()).count();
+    let latency_term = (latency_ms / LATENCY_CAP_MS).min(1.0);
+    let failure_term = failures as f64 / attempts.len() as f64;
+    Some(latency_term + failure_term)
 }
 
 #[cfg(test)]
@@ -47,12 +84,23 @@ mod tests {
     use super::*;
 
     fn quality(status: QualityStatus, delay: Option<u32>, streak: u8) -> NodeQuality {
+        let mut recent_attempts = (0..streak)
+            .map(|_| clash5_data::QualityAttempt {
+                checked_at_ms: 0,
+                delay_ms: None,
+            })
+            .collect::<Vec<_>>();
+        recent_attempts.push(clash5_data::QualityAttempt {
+            checked_at_ms: 0,
+            delay_ms: delay,
+        });
         NodeQuality {
             status,
             short_delay_ms: delay,
             handshake_delay_ms: None,
             checked_at_ms: 0,
             failure_streak: streak,
+            recent_attempts,
         }
     }
 
@@ -75,6 +123,68 @@ mod tests {
         let scores = score(&[Some(&steady), Some(&flaky), Some(&untimed)]);
         assert!(scores[0].unwrap() < scores[1].unwrap());
         assert!(scores[0].unwrap() < scores[2].unwrap());
+    }
+
+    #[test]
+    fn score_uses_the_recent_five_median_and_caps_latency_at_one_second() {
+        let quality = NodeQuality {
+            status: QualityStatus::Healthy,
+            short_delay_ms: Some(1_500),
+            handshake_delay_ms: Some(1_500),
+            checked_at_ms: 1_800_000,
+            failure_streak: 0,
+            recent_attempts: vec![
+                clash5_data::QualityAttempt {
+                    checked_at_ms: 0,
+                    delay_ms: Some(10),
+                },
+                clash5_data::QualityAttempt {
+                    checked_at_ms: 1_700_000,
+                    delay_ms: Some(100),
+                },
+                clash5_data::QualityAttempt {
+                    checked_at_ms: 1_710_000,
+                    delay_ms: Some(200),
+                },
+                clash5_data::QualityAttempt {
+                    checked_at_ms: 1_720_000,
+                    delay_ms: Some(300),
+                },
+                clash5_data::QualityAttempt {
+                    checked_at_ms: 1_730_000,
+                    delay_ms: Some(400),
+                },
+                clash5_data::QualityAttempt {
+                    checked_at_ms: 1_740_000,
+                    delay_ms: Some(2_000),
+                },
+            ],
+        };
+        let score = score_at(&[Some(&quality)], 1_800_000)[0].unwrap();
+        assert!((score - 0.3).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn failures_older_than_thirty_minutes_do_not_penalize_the_score() {
+        let quality = NodeQuality {
+            status: QualityStatus::Healthy,
+            short_delay_ms: Some(100),
+            handshake_delay_ms: Some(100),
+            checked_at_ms: 1_800_000,
+            failure_streak: 0,
+            recent_attempts: vec![
+                clash5_data::QualityAttempt {
+                    checked_at_ms: 0,
+                    delay_ms: None,
+                },
+                clash5_data::QualityAttempt {
+                    checked_at_ms: 1_800_000,
+                    delay_ms: Some(100),
+                },
+            ],
+        };
+        let score = score_at(&[Some(&quality)], 1_800_001)[0].unwrap();
+        assert!((score - 0.1).abs() < f64::EPSILON);
     }
 }
 

@@ -107,7 +107,7 @@ async fn run_once() {
             })
             .collect();
         let refs: Vec<Option<&NodeQuality>> = qualities.iter().map(Option::as_ref).collect();
-        let scores = pool_score::score(&refs);
+        let scores = pool_score::score_at(&refs, now_ms());
         let round: Vec<(String, Option<f64>)> = pool
             .members
             .iter()

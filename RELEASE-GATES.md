@@ -142,3 +142,15 @@ TUN controls, proxy mode/group switching, current-node quality, and DNS leak
 checking. The old traffic and diagnostic cards remain available from their
 dedicated pages. Frontend type checking, formatting, and the full frontend test
 suite are the executable local checks; desktop visual acceptance remains open.
+
+## P1-18 and P1-19 evidence
+
+The node workspace follows the approved high-fidelity layout: a selectable node
+list on the left and a fixed-width source/effective-configuration table on the
+right, with real inventory records, source filtering, quality sorting and probe
+actions. Quality-pool scores now use the median of the latest five delay samples
+plus the failure rate in the latest 30 minutes; each latency median is capped at
+1000 ms before normalization. Existing caches without history fall back to their
+current sample, and the history is bounded to 30 attempts. The data-crate suite
+and desktop pool-score tests cover cache compatibility, the median/cap rule and
+the time window.

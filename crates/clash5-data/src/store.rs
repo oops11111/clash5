@@ -124,6 +124,12 @@ pub enum QualityStatus {
     Failed,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+pub struct QualityAttempt {
+    #[specta(type = specta_typescript::Number)]
+    pub checked_at_ms: u64,
+    pub delay_ms: Option<u32>,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 pub struct NodeQuality {
     pub status: QualityStatus,
     pub short_delay_ms: Option<u32>,
@@ -132,10 +138,18 @@ pub struct NodeQuality {
     pub checked_at_ms: u64,
     #[serde(default)]
     pub failure_streak: u8,
+    /// Recent probe attempts used by quality-pool scoring. This is deliberately capped by
+    /// `from_probe_after` so the cache remains small while retaining enough history for the
+    /// 30-minute failure window and five-sample latency median.
+    #[serde(default)]
+    #[specta(skip)]
+    pub recent_attempts: Vec<QualityAttempt>,
 }
 impl NodeQuality {
     pub const MIN_INTERVAL_MS: u64 = 600_000;
     pub const MAX_INTERVAL_MS: u64 = 3_600_000;
+    pub const FAILURE_WINDOW_MS: u64 = 30 * 60 * 1_000;
+    const MAX_ATTEMPTS: usize = 30;
 
     pub fn from_probe(short_delay_ms: Option<u32>, handshake_delay_ms: Option<u32>, checked_at_ms: u64) -> Self {
         Self::from_probe_after(short_delay_ms, handshake_delay_ms, checked_at_ms, None)
@@ -159,12 +173,33 @@ impl NodeQuality {
         } else {
             0
         };
+        let mut recent_attempts = previous.map_or_else(Vec::new, |quality| quality.recent_attempts.clone());
+        if recent_attempts.is_empty()
+            && let Some(previous) = previous
+        {
+            recent_attempts.push(QualityAttempt {
+                checked_at_ms: previous.checked_at_ms,
+                delay_ms: previous.short_delay_ms,
+            });
+        }
+        recent_attempts.push(QualityAttempt {
+            checked_at_ms,
+            delay_ms: short_delay_ms,
+        });
+        recent_attempts.retain(|attempt| {
+            checked_at_ms >= attempt.checked_at_ms && checked_at_ms - attempt.checked_at_ms <= Self::FAILURE_WINDOW_MS
+        });
+        if recent_attempts.len() > Self::MAX_ATTEMPTS {
+            let first = recent_attempts.len() - Self::MAX_ATTEMPTS;
+            recent_attempts.drain(..first);
+        }
         Self {
             status,
             short_delay_ms,
             handshake_delay_ms,
             checked_at_ms,
             failure_streak,
+            recent_attempts,
         }
     }
 

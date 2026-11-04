@@ -21,5 +21,5 @@ pub use quality::{QUALITY_STATUSES, QualitySample};
 pub use store::{
     Binding, BindingStore, IdentitySourceSnapshot, NodeQuality, NodeRecord, OrphanCleanupPreview,
     PendingIdentityRebind, PluginAuditEvent, PluginBinding, PluginBindingTarget, PoolSwitchRecord, ProviderDiff,
-    QualityStatus, Source,
+    QualityAttempt, QualityStatus, Source,
 };
