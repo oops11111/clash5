@@ -1111,9 +1111,14 @@ export interface TranslationResources {
             actions: {
               copyVersion: string
             }
+            confirmation: {
+              exitMessage: string
+              exitTitle: string
+            }
             fields: {
               backupSetting: string
               checkUpdates: string
+              disclosure: string
               exit: string
               exportDiagnostics: string
               liteModeSettings: string
@@ -1131,6 +1136,7 @@ export interface TranslationResources {
             title: string
             tooltips: {
               backupInfo: string
+              disclosure: string
               liteMode: string
               openConfDir: string
             }

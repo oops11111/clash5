@@ -119,3 +119,8 @@ P1-13 issue #75 scopes the traffic subscription cache to the app's observed
 core-running session. A stop/start transition advances the session revision,
 so stale cumulative totals cannot cross a core restart while live rates and
 graph samples continue to use the current stream.
+
+P1-14 issue #76 keeps the advanced settings actions collapsed until explicitly
+expanded and places an explicit confirmation in front of the app-exit action.
+The disclosure remains keyboard reachable and the existing advanced dialogs are
+unchanged once the section is opened.

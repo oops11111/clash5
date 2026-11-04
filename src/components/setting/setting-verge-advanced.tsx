@@ -1,9 +1,18 @@
-import { ContentCopyRounded } from '@mui/icons-material'
-import { Typography } from '@mui/material'
-import { useCallback, useRef } from 'react'
+import {
+  ContentCopyRounded,
+  ExpandMoreRounded,
+  WarningAmberRounded,
+} from '@mui/icons-material'
+import {
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Typography,
+} from '@mui/material'
+import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { DialogRef, TooltipIcon } from '@/components/base'
+import { BaseDialog, type DialogRef, TooltipIcon } from '@/components/base'
 import { updateLastCheckTime } from '@/hooks/use-update'
 import {
   exitApp,
@@ -27,7 +36,7 @@ import { HotkeyViewer } from './mods/hotkey-viewer'
 import { LayoutViewer } from './mods/layout-viewer'
 import { LiteModeViewer } from './mods/lite-mode-viewer'
 import { MiscViewer } from './mods/misc-viewer'
-import { SettingItem, SettingSection } from './mods/setting-comp'
+import { SettingItem, type SettingSection } from './mods/setting-comp'
 import { ThemeViewer } from './mods/theme-viewer'
 import { UpdateViewer } from './mods/update-viewer'
 
@@ -46,6 +55,8 @@ const SettingVergeAdvanced = ({ section }: Props) => {
   const updateRef = useRef<DialogRef>(null)
   const backupRef = useRef<DialogRef>(null)
   const liteModeRef = useRef<DialogRef>(null)
+  const [advancedExpanded, setAdvancedExpanded] = useState(false)
+  const [exitConfirmationOpen, setExitConfirmationOpen] = useState(false)
 
   const onCheckUpdate = async () => {
     try {
@@ -108,13 +119,37 @@ const SettingVergeAdvanced = ({ section }: Props) => {
       )}
 
       {section === 'advanced' && (
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={() => setAdvancedExpanded((expanded) => !expanded)}
+            aria-expanded={advancedExpanded}
+          >
+            <ListItemText
+              primary={t(
+                'settings.components.verge.advanced.fields.disclosure',
+              )}
+              secondary={t(
+                'settings.components.verge.advanced.tooltips.disclosure',
+              )}
+            />
+            <ExpandMoreRounded
+              sx={{
+                transform: advancedExpanded ? 'rotate(180deg)' : 'none',
+                transition: 'transform 160ms ease',
+              }}
+            />
+          </ListItemButton>
+        </ListItem>
+      )}
+
+      {section === 'advanced' && advancedExpanded && (
         <SettingItem
           onClick={() => configRef.current?.open()}
           label={t('settings.components.verge.advanced.fields.runtimeConfig')}
         />
       )}
 
-      {section === 'advanced' && (
+      {section === 'advanced' && advancedExpanded && (
         <SettingItem
           onClick={openAppDir}
           label={t('settings.components.verge.advanced.fields.openConfDir')}
@@ -129,28 +164,28 @@ const SettingVergeAdvanced = ({ section }: Props) => {
         />
       )}
 
-      {section === 'advanced' && (
+      {section === 'advanced' && advancedExpanded && (
         <SettingItem
           onClick={openCoreDir}
           label={t('settings.components.verge.advanced.fields.openCoreDir')}
         />
       )}
 
-      {section === 'advanced' && (
+      {section === 'advanced' && advancedExpanded && (
         <SettingItem
           onClick={openLogsDir}
           label={t('settings.components.verge.advanced.fields.openLogsDir')}
         />
       )}
 
-      {section === 'advanced' && UPDATER_AVAILABLE && (
+      {section === 'advanced' && advancedExpanded && UPDATER_AVAILABLE && (
         <SettingItem
           onClick={onCheckUpdate}
           label={t('settings.components.verge.advanced.fields.checkUpdates')}
         />
       )}
 
-      {section === 'advanced' && (
+      {section === 'advanced' && advancedExpanded && (
         <SettingItem
           onClick={() => {
             void mutate(() => openDevTools(), {
@@ -162,7 +197,7 @@ const SettingVergeAdvanced = ({ section }: Props) => {
         />
       )}
 
-      {section === 'advanced' && (
+      {section === 'advanced' && advancedExpanded && (
         <SettingItem
           label={t(
             'settings.components.verge.advanced.fields.liteModeSettings',
@@ -177,13 +212,10 @@ const SettingVergeAdvanced = ({ section }: Props) => {
         />
       )}
 
-      {section === 'advanced' && (
+      {section === 'advanced' && advancedExpanded && (
         <SettingItem
           onClick={() => {
-            void mutate(() => exitApp(), {
-              id: 'exit-app',
-              errorNotice: false,
-            }).catch(() => {})
+            setExitConfirmationOpen(true)
           }}
           label={t('settings.components.verge.advanced.fields.exit')}
         />
@@ -203,7 +235,7 @@ const SettingVergeAdvanced = ({ section }: Props) => {
         ></SettingItem>
       )}
 
-      {section === 'advanced' && (
+      {section === 'advanced' && advancedExpanded && (
         <SettingItem
           label={t('settings.components.verge.advanced.fields.vergeVersion')}
           extra={
@@ -219,6 +251,27 @@ const SettingVergeAdvanced = ({ section }: Props) => {
           <Typography sx={{ py: '7px', pr: 1 }}>v{version}</Typography>
         </SettingItem>
       )}
+
+      <BaseDialog
+        open={exitConfirmationOpen}
+        title={t('settings.components.verge.advanced.confirmation.exitTitle')}
+        okBtn={t('shared.actions.confirm')}
+        cancelBtn={t('shared.actions.cancel')}
+        onCancel={() => setExitConfirmationOpen(false)}
+        onClose={() => setExitConfirmationOpen(false)}
+        onOk={() => {
+          setExitConfirmationOpen(false)
+          void mutate(() => exitApp(), {
+            id: 'exit-app',
+            errorNotice: false,
+          }).catch(() => {})
+        }}
+      >
+        <Typography variant="body2" sx={{ display: 'flex', gap: 1 }}>
+          <WarningAmberRounded color="warning" fontSize="small" />
+          {t('settings.components.verge.advanced.confirmation.exitMessage')}
+        </Typography>
+      </BaseDialog>
     </>
   )
 }

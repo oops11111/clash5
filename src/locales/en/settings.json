@@ -207,7 +207,8 @@
         "tooltips": {
           "backupInfo": "Support local or WebDAV backup of configuration files",
           "openConfDir": "If the software runs abnormally, BACKUP and delete all files in this folder then restart the software",
-          "liteMode": "Close the GUI and keep only the kernel running"
+          "liteMode": "Close the GUI and keep only the kernel running",
+          "disclosure": "These options can affect the app runtime or exit the app"
         },
         "actions": {
           "copyVersion": "Copy Version"
@@ -217,6 +218,7 @@
           "versionCopied": "Version copied to clipboard"
         },
         "fields": {
+          "disclosure": "Show advanced settings",
           "backupSetting": "Backup Setting",
           "runtimeConfig": "Runtime Config",
           "openConfDir": "Open Conf Dir",
@@ -228,6 +230,10 @@
           "exit": "Exit",
           "exportDiagnostics": "Copy Redacted Diagnostic Info",
           "vergeVersion": "Verge Version"
+        },
+        "confirmation": {
+          "exitTitle": "Exit Clash5?",
+          "exitMessage": "Exiting closes the app interface and proxy controls. Continue?"
         }
       },
       "theme": {

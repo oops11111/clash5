@@ -207,7 +207,8 @@
         "tooltips": {
           "backupInfo": "支持本地或 WebDAV 方式备份配置文件",
           "openConfDir": "如果软件运行异常，!备份!并删除此文件夹下的所有文件，重启软件",
-          "liteMode": "关闭 GUI 界面，仅保留内核运行"
+          "liteMode": "关闭 GUI 界面，仅保留内核运行",
+          "disclosure": "这些选项可能影响应用运行或退出应用"
         },
         "actions": {
           "copyVersion": "复制 Verge 版本号"
@@ -217,6 +218,7 @@
           "versionCopied": "Verge 版本已复制到剪贴板"
         },
         "fields": {
+          "disclosure": "展开高级设置",
           "backupSetting": "备份设置",
           "runtimeConfig": "当前配置",
           "openConfDir": "配置目录",
@@ -228,6 +230,10 @@
           "exit": "退出",
           "exportDiagnostics": "复制已脱敏诊断信息",
           "vergeVersion": "Verge 版本"
+        },
+        "confirmation": {
+          "exitTitle": "确认退出 Clash5？",
+          "exitMessage": "退出应用会结束当前界面和代理控制。确认继续吗？"
         }
       },
       "theme": {
