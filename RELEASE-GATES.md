@@ -124,3 +124,8 @@ P1-14 issue #76 keeps the advanced settings actions collapsed until explicitly
 expanded and places an explicit confirmation in front of the app-exit action.
 The disclosure remains keyboard reachable and the existing advanced dialogs are
 unchanged once the section is opened.
+
+P1-15 issue #77 adds a single first-run empty-state card on the home profile
+surface with exactly three native buttons: Profiles, Node Pool, and Plugins.
+The actions use normal buttons (no click-only container), so keyboard traversal
+reaches all three entry points.

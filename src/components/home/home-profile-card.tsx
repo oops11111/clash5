@@ -2,6 +2,7 @@ import {
   CloudUploadOutlined,
   DnsOutlined,
   EventOutlined,
+  ExtensionOutlined,
   LaunchOutlined,
   SpeedOutlined,
   StorageOutlined,
@@ -101,8 +102,7 @@ const ProfileDetails = ({
   }, [current.extra])
 
   const trafficPercentage = useMemo(() => {
-    if (!current.extra || !current.extra.total || current.extra.total <= 0)
-      return 0
+    if (!current.extra?.total || current.extra.total <= 0) return 0
     return Math.min(Math.round((usedTraffic / current.extra.total) * 100), 100)
   }, [current.extra, usedTraffic])
 
@@ -252,7 +252,11 @@ const ProfileDetails = ({
 }
 
 // 提取空配置组件
-const EmptyProfile = ({ onClick }: { onClick: () => void }) => {
+const EmptyProfile = ({
+  onNavigate,
+}: {
+  onNavigate: (path: string) => void
+}) => {
   const { t } = useTranslation()
 
   return (
@@ -263,11 +267,8 @@ const EmptyProfile = ({ onClick }: { onClick: () => void }) => {
         alignItems: 'center',
         justifyContent: 'center',
         py: 2.4,
-        cursor: 'pointer',
-        '&:hover': { bgcolor: 'action.hover' },
         borderRadius: 2,
       }}
-      onClick={onClick}
     >
       <CloudUploadOutlined
         sx={{ fontSize: 60, color: 'primary.main', mb: 2 }}
@@ -278,6 +279,37 @@ const EmptyProfile = ({ onClick }: { onClick: () => void }) => {
       <Typography variant="body2" color="text.secondary">
         {t('profiles.components.card.labels.clickToImport')}
       </Typography>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1}
+        useFlexGap
+        sx={{ mt: 2, justifyContent: 'center', flexWrap: 'wrap' }}
+      >
+        <Button
+          size="small"
+          variant="contained"
+          startIcon={<CloudUploadOutlined fontSize="small" />}
+          onClick={() => onNavigate('/profile')}
+        >
+          {t('layout.components.navigation.tabs.profiles')}
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<DnsOutlined fontSize="small" />}
+          onClick={() => onNavigate('/nodes')}
+        >
+          {t('layout.components.navigation.tabs.nodePool')}
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<ExtensionOutlined fontSize="small" />}
+          onClick={() => onNavigate('/plugins')}
+        >
+          {t('layout.components.navigation.tabs.plugins')}
+        </Button>
+      </Stack>
     </Box>
   )
 }
@@ -392,7 +424,7 @@ export const HomeProfileCard = ({
           updating={updating}
         />
       ) : (
-        <EmptyProfile onClick={goToProfiles} />
+        <EmptyProfile onNavigate={navigate} />
       )}
     </EnhancedCard>
   )
