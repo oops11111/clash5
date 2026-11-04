@@ -363,6 +363,11 @@ export const NoticeManager: React.FC<NoticeManagerProps> = ({ position }) => {
             }
           >
             {resolveNoticeMessage(notice, t)}
+            {notice.repeatCount > 1 && (
+              <Box component="span" sx={{ ml: 0.75, fontWeight: 700 }}>
+                ×{notice.repeatCount}
+              </Box>
+            )}
           </Alert>
         </Snackbar>
       ))}

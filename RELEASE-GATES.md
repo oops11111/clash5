@@ -154,3 +154,9 @@ plus the failure rate in the latest 30 minutes; each latency median is capped at
 current sample, and the history is bounded to 30 attempts. The data-crate suite
 and desktop pool-score tests cover cache compatibility, the median/cap rule and
 the time window.
+
+P1-20 notification evidence: non-coded notices now use a stable type/content
+key and merge repeated emissions within a 60-second window. The merged item
+keeps one dismissal/timer and renders its repeat count; coded failure notices
+retain their existing per-code replacement and dialog suppression behavior.
+Service-level tests cover the window boundary, severity separation and count.

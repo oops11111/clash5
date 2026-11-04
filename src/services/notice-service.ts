@@ -15,6 +15,9 @@ interface NoticeItem {
   readonly id: number
   readonly type: NoticeType
   readonly duration: number
+  readonly createdAt: number
+  readonly mergeKey?: string
+  readonly repeatCount: number
   readonly message?: ReactNode
   readonly i18n?: NoticeTranslationDescriptor
   readonly code?: string
@@ -58,6 +61,8 @@ const DEFAULT_DURATIONS: Readonly<Record<NoticeType, number>> = {
   warning: 6000,
   error: 8000,
 }
+
+export const NOTICE_MERGE_WINDOW_MS = 60_000
 
 const TRANSLATION_KEY_PATTERN = /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+$/
 const CODED_ERROR_TRANSLATION_KEYS: Readonly<Record<string, TranslationKey>> = {
@@ -203,21 +208,48 @@ function buildNotice(
   id: number,
   type: NoticeType,
   duration: number,
+  createdAt: number,
   payload: {
     message?: ReactNode
     i18n?: NoticeTranslationDescriptor
     code?: string
     operation?: FailedOperation
   },
+  mergeKey?: string,
+  repeatCount = 1,
   timerId?: ReturnType<typeof setTimeout>,
 ): NoticeItem {
   return {
     id,
     type,
     duration,
+    createdAt,
+    mergeKey,
+    repeatCount,
     timerId,
     ...payload,
   }
+}
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`
+  return `{${Object.keys(value as Record<string, unknown>)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableSerialize((value as Record<string, unknown>)[key])}`)
+    .join(',')}}`
+}
+
+function noticeMergeKey(
+  type: NoticeType,
+  payload: { message?: ReactNode; i18n?: NoticeTranslationDescriptor },
+): string | undefined {
+  if (payload.i18n) {
+    return `${type}:${stableSerialize(payload.i18n)}`
+  }
+  return typeof payload.message === 'string'
+    ? `${type}:${payload.message}`
+    : undefined
 }
 
 function isMaybeTranslationDescriptor(
@@ -472,17 +504,54 @@ const baseShowNotice = (
   // Sidecar failures come only from versioned backend state, never delayed command rejections.
   if (isReportedByDialog(code) || code === 'SERVICE_SIDECAR_FAILED') return id
   const effectiveDuration = resolveDuration(type, duration)
+  const normalizedMessage = normalizeNoticeMessage(message, params, raw)
+  const now = Date.now()
+  const mergeKey = code ? undefined : noticeMergeKey(type, normalizedMessage)
+
+  if (mergeKey) {
+    const existing = notices.find(
+      (candidate) =>
+        candidate.mergeKey === mergeKey &&
+        now - candidate.createdAt < NOTICE_MERGE_WINDOW_MS,
+    )
+    if (existing) {
+      if (existing.timerId) clearTimeout(existing.timerId)
+      const timerId =
+        effectiveDuration > 0
+          ? setTimeout(() => hideNotice(existing.id), effectiveDuration)
+          : undefined
+      notices = notices.map((candidate) =>
+        candidate.id === existing.id
+          ? buildNotice(
+              existing.id,
+              type,
+              effectiveDuration,
+              now,
+              normalizedMessage,
+              mergeKey,
+              existing.repeatCount + 1,
+              timerId,
+            )
+          : candidate,
+      )
+      notifySubscribers()
+      return existing.id
+    }
+  }
+
   const timerId =
     effectiveDuration > 0
       ? setTimeout(() => hideNotice(id), effectiveDuration)
       : undefined
 
-  const normalizedMessage = normalizeNoticeMessage(message, params, raw)
   const notice = buildNotice(
     id,
     type,
     effectiveDuration,
+    now,
     { ...normalizedMessage, code, operation },
+    mergeKey,
+    1,
     timerId,
   )
 
@@ -548,7 +617,7 @@ export function syncSidecarFailure(snapshot: SidecarFailureSnapshot) {
   const failure = { code: 'SERVICE_SIDECAR_FAILED', detail: snapshot.detail }
   notices = [
     ...notices,
-    buildNotice(nextId++, 'error', 0, {
+    buildNotice(nextId++, 'error', 0, Date.now(), {
       ...normalizeNoticeMessage(failure),
       code: failure.code,
     }),
