@@ -673,17 +673,36 @@ const CORE_HASHES_NSH = path.join(
   'windows',
   'core-hashes.nsh',
 )
+const CORE_HASHES_JSON = path.join(RESOURCES_DIR, 'core-hashes.json')
 async function resolveCoreHashes() {
-  const lines = []
-  for (const [define, name] of [['MIHOMO_SHA256', 'verge-mihomo']]) {
-    const sidecar = path.join(SIDECAR_DIR, `${name}-${SIDECAR_HOST}.exe`)
-    const digest = createHash('sha256')
-      .update(await fsp.readFile(sidecar))
-      .digest('hex')
-    lines.push(`!define ${define} "${digest}"`)
+  const core = clashMeta()
+  const sidecar = path.join(SIDECAR_DIR, core.targetFile)
+  const digest = createHash('sha256')
+    .update(await fsp.readFile(sidecar))
+    .digest('hex')
+  const installedName = `${platform === 'linux' ? 'clash5-mihomo' : 'verge-mihomo'}${platform === 'win32' ? '.exe' : ''}`
+
+  await fsp.mkdir(RESOURCES_DIR, { recursive: true })
+  await fsp.writeFile(
+    CORE_HASHES_JSON,
+    `${JSON.stringify(
+      {
+        schema_version: 1,
+        target: SIDECAR_HOST,
+        cores: {
+          'verge-mihomo': { filename: installedName, sha256: digest },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  )
+
+  if (platform === 'win32') {
+    await fsp.writeFile(CORE_HASHES_NSH, `!define MIHOMO_SHA256 "${digest}"\n`)
+    log_success(`Generated ${CORE_HASHES_NSH}`)
   }
-  await fsp.writeFile(CORE_HASHES_NSH, `${lines.join('\n')}\n`)
-  log_success(`Generated ${CORE_HASHES_NSH}`)
+  log_success(`Generated ${CORE_HASHES_JSON}`)
 }
 
 const resolveMmdb = () =>
@@ -796,7 +815,7 @@ const tasks = [
     retry: 5,
   },
   // After both sidecar tasks: it hashes what they downloaded.
-  { name: 'core_hashes', func: resolveCoreHashes, retry: 1, winOnly: true },
+  { name: 'core_hashes', func: resolveCoreHashes, retry: 1 },
   { name: 'plugin', func: resolvePlugin, retry: 5, winOnly: true },
   { name: 'service', func: resolveServiceBundle, retry: 5 },
   { name: 'mmdb', func: resolveMmdb, retry: 5 },

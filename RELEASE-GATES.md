@@ -31,6 +31,8 @@ the original review records before release; the present registry is a skeleton.
 
 ## Local implementation evidence (2026-11-04)
 
+- P1-28：`scripts/prebuild.mjs` 将 mihomo 实际字节写入 `resources/core-hashes.json`；服务安装前读取该清单并重新计算核心 SHA-256，清单缺失仅允许开发会话，清单存在但哈希不匹配时拒绝安装。Windows NSIS 仍使用同一构建摘要调用服务安装器。静态门禁：`npm run check:core-hash-gate`；Rust 单测覆盖精确字节接受、篡改拒绝及开发会话无清单。
+
 Issue: https://github.com/oops11111/clash5/issues/68.
 `tsc --noEmit`, Vite production build, and offline Rust library `cargo check`
 passed. The standalone backup path test binary passed all three Windows tests;

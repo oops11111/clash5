@@ -27,10 +27,12 @@ use clash_verge_service_ipc::{
     StageRuntimeOutcome, StartClashRequest, WriterConfig,
 };
 use parking_lot::Mutex;
+use sha2::{Digest as _, Sha256};
 use std::{
     collections::HashMap,
     env::current_exe,
     future::Future,
+    io::Read,
     path::{Path, PathBuf},
     process::Command as StdCommand,
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
@@ -796,7 +798,74 @@ fn install_service() -> Result<()> {
             }
         })
         .collect::<Vec<_>>();
+    for core in &cores {
+        verify_packaged_core_hash(&executable, &core.name, &core.path)?;
+    }
     invoke_service_install(&cores, false)
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct CoreHashManifest {
+    schema_version: u8,
+    cores: HashMap<String, CoreHashEntry>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct CoreHashEntry {
+    sha256: String,
+}
+
+fn load_expected_core_hash(manifest_path: &Path, core_name: &str) -> Result<Option<String>> {
+    if !manifest_path.exists() {
+        // Development sessions do not run prebuild and therefore have no release manifest.
+        // The service IPC still verifies that the source exists; release packages are gated
+        // by the generated manifest below.
+        return Ok(None);
+    }
+
+    let manifest: CoreHashManifest = serde_json::from_slice(&std::fs::read(manifest_path)?)
+        .with_context(|| format!("invalid core hash manifest: {}", manifest_path.display()))?;
+    if manifest.schema_version != 1 {
+        bail!("unsupported core hash manifest schema {}", manifest.schema_version);
+    }
+    let Some(entry) = manifest.cores.get(core_name) else {
+        bail!("core {core_name} is missing from {}", manifest_path.display());
+    };
+    let expected = entry.sha256.to_ascii_lowercase();
+    if expected.len() != 64 || !expected.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        bail!("invalid SHA-256 for core {core_name} in {}", manifest_path.display());
+    }
+    Ok(Some(expected))
+}
+
+fn sha256_file(path: &Path) -> Result<String> {
+    let mut file = std::fs::File::open(path).with_context(|| format!("open packaged core {}", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 1024 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn verify_packaged_core_hash(executable: &Path, core_name: &str, core_path: &Path) -> Result<()> {
+    let manifest_path = executable
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("resources")
+        .join("core-hashes.json");
+    let Some(expected) = load_expected_core_hash(&manifest_path, core_name)? else {
+        return Ok(());
+    };
+    let actual = sha256_file(core_path)?;
+    if actual != expected {
+        bail!("packaged core {core_name} failed SHA-256 verification: expected {expected}, got {actual}");
+    }
+    Ok(())
 }
 
 fn invoke_service_install(cores: &[clash_verge_service_ipc::management::CoreSource], core_only: bool) -> Result<()> {
@@ -2101,8 +2170,8 @@ pub static SERVICE_MANAGER: ServiceManager = ServiceManager;
 mod tests {
     use super::{
         ServiceHealth, ServiceStatus, capture_generation_before, claim_owner_recovery_generation,
-        generate_service_session_token, mark_service_unavailable_after_owner_loss, owner_recovery_policy,
-        service_core_path_for, session_matches_status,
+        generate_service_session_token, load_expected_core_hash, mark_service_unavailable_after_owner_loss,
+        owner_recovery_policy, service_core_path_for, session_matches_status, sha256_file, verify_packaged_core_hash,
     };
     #[cfg(target_os = "linux")]
     use super::{StagedServiceTools, bundled_core_name};
@@ -2156,6 +2225,40 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn packaged_core_hash_manifest_accepts_exact_bytes_and_rejects_tampering() -> anyhow::Result<()> {
+        let root = TestDirectory::new("core-hash")?;
+        let executable = root.path().join("clash5.exe");
+        let resources = root.path().join("resources");
+        let core = root.path().join("verge-mihomo.exe");
+        std::fs::create_dir_all(&resources)?;
+        std::fs::write(&core, b"pinned core")?;
+        let digest = sha256_file(&core)?;
+        std::fs::write(
+            resources.join("core-hashes.json"),
+            format!(
+                r#"{{"schema_version":1,"target":"test","cores":{{"verge-mihomo":{{"filename":"verge-mihomo.exe","sha256":"{digest}"}}}}}}"#
+            ),
+        )?;
+
+        verify_packaged_core_hash(&executable, "verge-mihomo.exe", &core)
+            .expect_err("manifest key must match logical core name");
+        verify_packaged_core_hash(&executable, "verge-mihomo", &core)?;
+        std::fs::write(&core, b"tampered core")?;
+        let error =
+            verify_packaged_core_hash(&executable, "verge-mihomo", &core).expect_err("tampered core must be rejected");
+        assert!(error.to_string().contains("failed SHA-256 verification"));
+        Ok(())
+    }
+
+    #[test]
+    fn missing_core_hash_manifest_is_allowed_for_development_sessions() -> anyhow::Result<()> {
+        let root = TestDirectory::new("core-hash-missing")?;
+        let manifest = root.path().join("resources/core-hashes.json");
+        assert_eq!(load_expected_core_hash(&manifest, "verge-mihomo")?, None);
+        Ok(())
     }
 
     fn staging_directory(home: &Path) -> PathBuf {
