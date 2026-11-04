@@ -847,6 +847,7 @@ export interface TranslationResources {
           backupReminder: string
           chooseSource: string
           failure: string
+          skippedReasons: string
           success: string
         }
       }

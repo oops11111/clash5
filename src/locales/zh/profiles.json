@@ -11,6 +11,7 @@
       "chooseSource": "选择 Clash Verge Rev 数据目录",
       "backupReminder": "导入前请备份此源目录。clash5 只读取文件，不会修改源数据。是否继续？",
       "success": "已导入 {{imported}} 个配置；跳过 {{skipped}} 个不支持的项目；节点索引同步失败 {{syncFailures}} 项。源目录 SHA-256 清单：{{manifest}}",
+      "skippedReasons": "迁移跳过原因：{{reasons}}",
       "failure": "导入失败；clash5 无法验证或保证所选源目录未被更改。"
     },
     "batch": {

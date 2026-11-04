@@ -285,6 +285,13 @@ const ProfilePage = () => {
         manifest: report.source_manifest_after,
         syncFailures: report.binding_sync_failures,
       })
+      if (report.skipped.length > 0) {
+        showNotice.warning(
+          'profiles.page.vergeImport.skippedReasons',
+          { reasons: report.skipped.join('；') },
+          0,
+        )
+      }
     } catch (error) {
       showNotice.error(error)
     } finally {

@@ -129,3 +129,7 @@ P1-15 issue #77 adds a single first-run empty-state card on the home profile
 surface with exactly three native buttons: Profiles, Node Pool, and Plugins.
 The actions use normal buttons (no click-only container), so keyboard traversal
 reaches all three entry points.
+
+P1-16 reports migration skip reasons in a persistent warning notice after a
+successful Verge import, while retaining the aggregate success report. Reasons
+come directly from the backend import report and are not inferred from counts.
