@@ -95,3 +95,12 @@ which the global registry cache does not permit here. The temporary Cargo patch
 was only for verification; Cargo.lock was restored and no dependency override is
 part of the committed implementation. Rust formatting and static security gates
 also passed. Remote CI and desktop acceptance are still outstanding.
+
+## P1-10 session TUN evidence (issue #72)
+
+TUN generation now projects the saved preference onto the current session
+capability. Service loss no longer writes `enable_tun_mode: false`; a later
+Service-backed generation restores the saved preference. The projection test,
+the 16 Run State/TUN capability tests, formatting, and Windows library compile
+check passed locally. Live service handoff and real TUN re-enable remain desktop
+acceptance work.

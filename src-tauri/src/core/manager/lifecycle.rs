@@ -387,8 +387,8 @@ impl CoreManager {
         defer! {
             self.finish_config_update();
         }
-        // Lock order is config then lifecycle. disable_tun_and_persist commits the shared Verge
-        // draft without claiming it, so without this it can commit another transaction's staged patch.
+        // Lock order is config then lifecycle. The generated runtime projects TUN onto the
+        // current session capability without changing the saved Verge preference.
         let config_write = Config::lock_config_write().await;
         let _life = self.lifecycle_lock.lock().await;
         // Record failures before releasing the lifecycle lock, including preparation and rollback errors.
@@ -408,20 +408,9 @@ impl CoreManager {
             if !matches!(status, ServiceStatus::SidecarAllowed) {
                 SERVICE_MANAGER.allow_sidecar_for_session()?;
             }
-            // Settling on Sidecar is what makes the verdict final, so ask only once it is recorded.
-            // Elevation alone carries TUN on Sidecar; a Sidecar that cannot must write it off.
-            let prepared = async {
-                let tun_enabled = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
-                if crate::core::runstate::RUN_STATE
-                    .state()
-                    .tun_should_be_disabled(tun_enabled)
-                {
-                    tracing::Span::current().record("tun_disabled", true);
-                    Config::disable_tun_and_persist().await?;
-                }
-                Config::generate().await
-            }
-            .await;
+            // Settling on Sidecar is what makes the verdict final. Generation projects TUN onto
+            // this session, while the saved preference remains available for Service recovery.
+            let prepared = Config::generate().await;
             drop(config_write);
             if let Err(error) = prepared {
                 SERVICE_MANAGER.withdraw_sidecar_allowance();
@@ -477,13 +466,7 @@ impl CoreManager {
             },
             || async {
                 // Must be asked after the uninstall: until then the Service still makes TUN capable.
-                let tun_enabled = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
-                if crate::core::runstate::RUN_STATE
-                    .state()
-                    .tun_should_be_disabled(tun_enabled)
-                {
-                    Config::disable_tun_and_persist().await?;
-                }
+                // Generation projects the saved preference onto the now-unavailable session.
                 Config::generate().await
             },
             || async {

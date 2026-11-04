@@ -8,16 +8,17 @@ use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
 
 use crate::{
-    config::{Config, IVerge},
+    config::Config,
     core::{handle::Handle, manager::RunningMode, runstate::RUN_STATE},
 };
 
 /// Prevents recursive runtime disable writes.
 static DISABLING_TUN: AtomicBool = AtomicBool::new(false);
 
-/// Turn TUN off when startup confirms the Service is absent, so the Core can start on Sidecar.
+/// Project TUN off for this session when startup confirms the Service is absent.
 ///
-/// Runs before the runtime config is generated.
+/// The persisted preference remains enabled; configuration generation applies the
+/// session capability projection after this observation.
 pub async fn reconcile_startup_tun_availability() {
     // Read fresh state after prior config writes complete.
     let _config_write = Config::lock_config_write().await;
@@ -29,16 +30,11 @@ pub async fn reconcile_startup_tun_availability() {
     logging!(
         info,
         Type::Setup,
-        "Service is not installed; turning TUN mode off so the Core can start on Sidecar"
+        "Service is not installed; suspending TUN for this session without changing the saved preference"
     );
-    // Write the preference only: a patch would reach update_config_checked, which with no Core to
-    // reload starts one ahead of the rest of startup, and rolls the write back if that fails.
-    if let Err(error) = Config::disable_tun_and_persist().await {
-        logging!(error, Type::Setup, "failed to turn TUN mode off at startup: {error:#}");
-    }
 }
 
-/// Disable TUN when the current settled Run State cannot support it.
+/// Suspend or restore TUN when the current settled Run State changes capability.
 pub async fn reconcile_tun_availability() {
     if DISABLING_TUN.load(Ordering::Acquire) {
         return;
@@ -55,7 +51,19 @@ pub async fn reconcile_tun_availability() {
 
     // Legacy writers may still hold an uncommitted draft.
     let tun_enabled = Config::verge().await.data_arc().enable_tun_mode.unwrap_or(false);
-    if !state.tun_should_be_disabled(tun_enabled) {
+    let runtime_tun_enabled = Config::runtime()
+        .await
+        .latest_arc()
+        .config
+        .as_ref()
+        .and_then(|config| config.get("tun"))
+        .and_then(|tun| tun.get("enable"))
+        .and_then(serde_yaml_ng::Value::as_bool)
+        .unwrap_or(false);
+    let should_suspend = state.tun_should_be_disabled(tun_enabled) && runtime_tun_enabled;
+    let should_restore =
+        state.tun_capable() && tun_enabled && !runtime_tun_enabled && matches!(state.mode, RunningMode::Service);
+    if !should_suspend && !should_restore {
         return;
     }
 
@@ -65,21 +73,31 @@ pub async fn reconcile_tun_availability() {
         DISABLING_TUN.store(false, Ordering::Release);
     }
 
-    logging!(
-        info,
-        Type::Core,
-        "TUN mode cannot work in the current run state; turning it off"
-    );
-    let patch = IVerge {
-        enable_tun_mode: Some(false),
-        ..IVerge::default()
-    };
+    if should_suspend {
+        logging!(
+            info,
+            Type::Core,
+            "TUN mode cannot work in the current run state; suspending it for this session"
+        );
+    } else {
+        logging!(
+            info,
+            Type::Core,
+            "Service is ready again; restoring the saved TUN preference for this session"
+        );
+    }
 
-    // Skip recursive reconciliation for this internal patch.
-    match super::apply_verge_patch_locked(&config_write, &patch, false).await {
-        Ok(()) => Handle::notice(NoticeStatus::TunModeAutoDisabled, ""),
+    // Regenerate and apply the runtime config with the session capability projection. The
+    // persisted preference stays enabled, so a later Service-ready observation can restore it.
+    drop(config_write);
+    match crate::core::manager::CoreManager::global()
+        .update_config_checked()
+        .await
+    {
+        Ok(()) if should_suspend => Handle::notice(NoticeStatus::TunModeAutoDisabled, ""),
+        Ok(()) => Handle::refresh_clash(),
         Err(error) => {
-            logging!(error, Type::Core, "failed to turn TUN mode off: {error:#}");
+            logging!(error, Type::Core, "failed to suspend TUN for this session: {error:#}");
             Handle::notice(NoticeStatus::TunModeAutoDisableFailed, "");
         }
     }

@@ -51,6 +51,15 @@ struct ConfigValues {
     tproxy_enabled: bool,
 }
 
+/// TUN is a session capability, not a second persisted preference.
+///
+/// A user preference can remain enabled while a non-elevated session waits for the
+/// Service. Configuration generation projects that preference onto the current
+/// capability and the next Service-backed generation restores it automatically.
+const fn session_tun_enabled(preference: bool, tun_capable: bool) -> bool {
+    preference && tun_capable
+}
+
 #[derive(Debug)]
 struct ProfileItems {
     config: Mapping,
@@ -133,7 +142,10 @@ async fn get_config_values(profile_uid: &str) -> ConfigValues {
 
     let (clash_core, enable_tun, enable_builtin, socks_enabled, http_enabled, enable_dns_settings) = (
         Some(verge_arc.get_valid_clash_core()),
-        enable_tun_mode.unwrap_or(false),
+        session_tun_enabled(
+            enable_tun_mode.unwrap_or(false),
+            crate::core::runstate::RUN_STATE.state().tun_capable(),
+        ),
         enable_builtin_enhanced.unwrap_or(true),
         verge_socks_enabled.unwrap_or(false),
         verge_http_enabled.unwrap_or(false),
@@ -1479,6 +1491,13 @@ mod tests {
         process_global_items, process_profile_items, use_keys,
     };
     use std::collections::HashMap;
+
+    #[test]
+    fn tun_session_projection_preserves_preference_without_claiming_capability() {
+        assert!(!super::session_tun_enabled(true, false));
+        assert!(super::session_tun_enabled(true, true));
+        assert!(!super::session_tun_enabled(false, true));
+    }
 
     fn mapping(yaml: &str) -> serde_yaml_ng::Mapping {
         serde_yaml_ng::from_str(yaml).expect("test config should be valid")

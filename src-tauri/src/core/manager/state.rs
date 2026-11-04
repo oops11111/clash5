@@ -352,6 +352,9 @@ impl CoreManager {
     pub(super) async fn start_core_by_service(&self) -> Result<()> {
         self.core_starting();
         let service_ipc = dirs::ipc_path()?;
+        // A previous Sidecar session may have projected TUN off without changing the saved
+        // preference. Rebuild against the now-Service-capable session before handing it over.
+        Config::generate().await?;
         let config_file = Config::generate_file().await?;
         handle::Handle::app_handle()
             .mihomo()
