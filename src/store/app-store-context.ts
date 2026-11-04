@@ -37,6 +37,8 @@ export const useAppDispatch = (): AppStoreActionDispatcher => {
 
 export const useRunState = () => useSelector((s) => s.runState)
 
+export const useTrafficSession = () => useSelector((s) => s.trafficSession)
+
 export const usePendingFailureList = () => useSelector((s) => s.pendingFailures)
 
 export const useSidecarFailure = () => useSelector((s) => s.sidecarFailure)

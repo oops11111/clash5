@@ -114,3 +114,8 @@ P1-12 issue #74 aligns latency probing at a default concurrency of 10 with an
 explicit ceiling of 16 in both the frontend and backend. The cross-layer
 `check:probe-concurrency` guard and unit tests cover the default, ceiling, and
 legacy-36 regression.
+
+P1-13 issue #75 scopes the traffic subscription cache to the app's observed
+core-running session. A stop/start transition advances the session revision,
+so stale cumulative totals cannot cross a core restart while live rates and
+graph samples continue to use the current stream.

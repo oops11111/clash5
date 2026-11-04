@@ -14,6 +14,8 @@ export interface ProfileUpdatesState {
 export interface AppStoreState {
   /** Written by `run-state-changed` events and the store's safety-net poll. */
   readonly runState: RunState | null
+  /** Bumped when the observed core running mode enters a new session. */
+  readonly trafficSession: number
   /** Latest backend pending-failure snapshot; toasts/dialogs dedupe on sequence. */
   readonly pendingFailures: readonly PendingFailure[]
   readonly sidecarFailure: SidecarFailureSnapshot | null
@@ -24,6 +26,7 @@ export interface AppStoreState {
 
 export const initialAppStoreState: AppStoreState = {
   runState: null,
+  trafficSession: 0,
   pendingFailures: [],
   sidecarFailure: null,
   profileUpdates: {
@@ -77,8 +80,15 @@ export function appStoreReducer(
   action: AppStoreAction,
 ): AppStoreState {
   switch (action.type) {
-    case 'runState/loaded':
-      return { ...state, runState: action.runState }
+    case 'runState/loaded': {
+      const previousMode = state.runState?.mode
+      const nextMode = action.runState.mode
+      const trafficSession =
+        previousMode === nextMode
+          ? state.trafficSession
+          : state.trafficSession + 1
+      return { ...state, runState: action.runState, trafficSession }
+    }
     case 'pendingFailures/loaded':
       return { ...state, pendingFailures: action.failures }
     case 'sidecarFailure/loaded':

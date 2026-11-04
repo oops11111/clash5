@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { MihomoWebSocket, Traffic } from 'tauri-plugin-mihomo-api'
+import { MihomoWebSocket, type Traffic } from 'tauri-plugin-mihomo-api'
 
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 import { useTrafficMonitorEnhanced } from './use-traffic-monitor'
 import { useVerge } from './use-verge'
+
+import { useTrafficSession } from '@/store/app-store-context'
 
 const FALLBACK_TRAFFIC: Traffic = { up: 0, down: 0, upTotal: 0, downTotal: 0 }
 const DUPLICATE_TRAFFIC_WINDOW_MS = 50
@@ -29,6 +31,7 @@ const shouldSkipDuplicateTraffic = (traffic: Traffic) => {
 
 export const useTrafficData = (options?: { enabled?: boolean }) => {
   const enabled = options?.enabled ?? true
+  const trafficSession = useTrafficSession()
 
   const { verge } = useVerge()
   const sampleMs = (verge?.traffic_refresh_seconds ?? 2) * 1000
@@ -43,7 +46,8 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
   } = useTrafficMonitorEnhanced({ subscribe: false, enabled })
   const { response, refresh } = useMihomoWsSubscription<ITrafficItem>({
     storageKey: 'mihomo_traffic_date',
-    buildSubscriptKey: (date) => (enabled ? `getClashTraffic-${date}` : null),
+    buildSubscriptKey: (date) =>
+      enabled ? `getClashTraffic-${trafficSession}-${date}` : null,
     fallbackData: FALLBACK_TRAFFIC,
     connect: () => MihomoWebSocket.connect_traffic(),
     throttleMs: 200,
