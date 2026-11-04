@@ -68,6 +68,25 @@ const SIDECAR_DIR = path.join(cwd, 'src-tauri', 'sidecar')
 // Linux service binaries are bundled as externalBin sidecars (see tauri.linux.conf.json)
 const SERVICE_DIR = platform === 'linux' ? SIDECAR_DIR : RESOURCES_DIR
 
+// Geodata is published from a moving `latest` release tag. Keep the tag in the
+// URL for compatibility with the upstream release layout, but lock every
+// downloaded byte to the release asset digest below. If upstream moves the tag
+// without an intentional update here, the build fails closed instead of
+// silently packaging different routing data.
+const GEODATA_RELEASE_TAG = 'latest'
+const GEODATA_RELEASE_BASE =
+  `https://github.com/MetaCubeX/meta-rules-dat/releases/download/${GEODATA_RELEASE_TAG}`
+const GEODATA_SHA256 = {
+  'Country.mmdb':
+    'f604d54eb3d5a6fdab9747c0c62f0b489134b6d94df9e9eb20f1c5e2a537dbfa',
+  'ASN.mmdb':
+    '3169b9ea7dad762f6837b95408dadc1173f47be33be2d83b6c90e67a57a7eb2e',
+  'geosite.dat':
+    'da89d85fa3b6fc28f3878432f28e78c1e5bb9f603449fa2f0ec2deaddbb0b733',
+  'geoip.dat':
+    '06c1d50d0013af57ffe78c5af93f0dc6aa998890f3ee231393816f9117810c4a',
+}
+
 // Version cache
 async function loadVersionCache() {
   try {
@@ -359,7 +378,7 @@ async function resolveSidecar(binInfo) {
 }
 
 async function resolveResource(binInfo) {
-  const { file, downloadURL, localPath, dir } = binInfo
+  const { file, downloadURL, localPath, dir, sha256 } = binInfo
   const baseDir = dir ?? RESOURCES_DIR
   const targetPath = path.join(baseDir, file)
 
@@ -370,11 +389,29 @@ async function resolveResource(binInfo) {
 
   if (downloadURL) {
     if (!FORCE && fs.existsSync(targetPath)) {
-      log_success(`"${file}" already exists, skipping download`)
-      return
+      if (!sha256 || (await calculateFileHash(targetPath)) === sha256) {
+        log_success(`"${file}" already exists, skipping download`)
+        return
+      }
+      log_info(`"${file}" failed the pinned SHA-256 check; downloading again`)
     }
     await fsp.mkdir(baseDir, { recursive: true })
-    await downloadFile(downloadURL, targetPath)
+    const tempPath = `${targetPath}.download`
+    try {
+      await downloadFile(downloadURL, tempPath)
+      if (sha256) {
+        const actualSha256 = await calculateFileHash(tempPath)
+        if (actualSha256 !== sha256) {
+          throw new Error(
+            `SHA-256 mismatch for ${file}: expected ${sha256}, got ${actualSha256 ?? 'unreadable'}`,
+          )
+        }
+      }
+      await fsp.rm(targetPath, { force: true })
+      await fsp.rename(tempPath, targetPath)
+    } finally {
+      await fsp.rm(tempPath, { force: true })
+    }
     await updateHashCache(targetPath)
   }
 
@@ -587,22 +624,26 @@ async function resolveCoreHashes() {
 const resolveMmdb = () =>
   resolveResource({
     file: 'Country.mmdb',
-    downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country.mmdb`,
+    downloadURL: `${GEODATA_RELEASE_BASE}/country.mmdb`,
+    sha256: GEODATA_SHA256['Country.mmdb'],
   })
 const resolveASNMmdb = () =>
   resolveResource({
     file: 'ASN.mmdb',
-    downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/GeoLite2-ASN.mmdb`,
+    downloadURL: `${GEODATA_RELEASE_BASE}/GeoLite2-ASN.mmdb`,
+    sha256: GEODATA_SHA256['ASN.mmdb'],
   })
 const resolveGeosite = () =>
   resolveResource({
     file: 'geosite.dat',
-    downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat`,
+    downloadURL: `${GEODATA_RELEASE_BASE}/geosite.dat`,
+    sha256: GEODATA_SHA256['geosite.dat'],
   })
 const resolveGeoIP = () =>
   resolveResource({
     file: 'geoip.dat',
-    downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat`,
+    downloadURL: `${GEODATA_RELEASE_BASE}/geoip.dat`,
+    sha256: GEODATA_SHA256['geoip.dat'],
   })
 const resolveEnableLoopback = () =>
   resolveResource({

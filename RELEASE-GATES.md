@@ -169,3 +169,13 @@ the stable-only inventory. Existing legacy alpha process text remains only in
 diagnostic tests so stale processes can still be explained safely.
 `node scripts/check-stable-core.mjs` is the executable guard for these resource
 lists and passes locally.
+
+## P1-25 geodata pin evidence
+
+`prebuild.mjs` uses the upstream `meta-rules-dat` release tag recorded in
+`GEODATA_RELEASE_TAG` and four explicit SHA-256 values for `Country.mmdb`,
+`GeoLite2-ASN.mmdb`, `geosite.dat`, and `geoip.dat`. Existing files are checked
+against the same pins; a mismatch triggers a fresh download, and a mismatched
+download is deleted before the build can continue. The static guard
+`node scripts/check-geodata-pins.mjs` passes locally. Updating the upstream tag
+requires an intentional digest review and a matching source change.
