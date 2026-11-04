@@ -39,6 +39,7 @@
     "check:core-hash-gate": "node scripts/check-core-hash-gate.mjs",
     "check:rule-provider-policy": "node scripts/check-rule-provider-policy.mjs",
     "check:window-clipboard-policy": "node scripts/check-window-clipboard-policy.mjs",
+    "check:script-safety": "node scripts/check-script-safety.mjs",
     "plugin:package": "node scripts/plugin-package.mjs",
     "arch:check": "node scripts/check-architecture.mjs listen emit invoke",
     "typecheck": "tsc --noEmit",

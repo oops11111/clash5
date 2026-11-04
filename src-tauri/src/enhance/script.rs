@@ -7,13 +7,19 @@ use clash_verge_logging::{Type, logging};
 use parking_lot::Mutex;
 use serde_yaml_ng::Mapping;
 use smartstring::alias::String;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
+use tokio::sync::Semaphore;
 
 const MAX_OUTPUTS: usize = 1000;
 const MAX_OUTPUT_SIZE: usize = 1024 * 1024; // 1MB
 const MAX_JSON_SIZE: usize = 10 * 1024 * 1024; // 10MB
 const MAX_LOOP_ITERATIONS: u64 = 10_000_000;
+const MAX_RECURSION_DEPTH: usize = 128;
+const MAX_VM_STACK_SIZE: usize = 4_096;
+const MAX_SCRIPT_CONCURRENCY: usize = 2;
 const SCRIPT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+static SCRIPT_SEMAPHORE: LazyLock<Arc<Semaphore>> = LazyLock::new(|| Arc::new(Semaphore::new(MAX_SCRIPT_CONCURRENCY)));
 
 type ScriptResult = (Mapping, Vec<String>, Vec<(String, String)>);
 type EvalOutcome = (Result<Mapping, std::string::String>, Vec<(String, String)>);
@@ -34,7 +40,25 @@ pub(super) async fn use_script(script: String, config: Mapping, name: String) ->
         Err(err) => return (config, vec![], vec![("exception".into(), err.to_string().into())]),
     };
 
-    let evaluated = AsyncHandler::spawn_blocking(move || eval_script(&script, &json, &name));
+    let permit = match Arc::clone(&SCRIPT_SEMAPHORE).acquire_owned().await {
+        Ok(permit) => permit,
+        Err(error) => {
+            return (
+                config,
+                vec![],
+                vec![(
+                    "exception".into(),
+                    format!("script concurrency gate failed: {error}").into(),
+                )],
+            );
+        }
+    };
+    let evaluated = AsyncHandler::spawn_blocking(move || {
+        // Keep the permit inside the blocking task so a timeout cannot release the slot
+        // while Boa is still executing detached work.
+        let _permit = permit;
+        eval_script(&script, &json, &name)
+    });
     let (outcome, mut logs) = match tokio::time::timeout(SCRIPT_TIMEOUT, evaluated).await {
         Ok(Ok(evaluated)) => evaluated,
         Ok(Err(join_err)) => (Err(format!("script task panicked: {join_err}")), vec![]),
@@ -72,6 +96,8 @@ fn eval_script(script: &str, config_json: &str, name: &String) -> EvalOutcome {
     context
         .runtime_limits_mut()
         .set_loop_iteration_limit(MAX_LOOP_ITERATIONS);
+    context.runtime_limits_mut().set_recursion_limit(MAX_RECURSION_DEPTH);
+    context.runtime_limits_mut().set_stack_size_limit(MAX_VM_STACK_SIZE);
 
     let outputs = Arc::new(Mutex::new(vec![]));
     let total_size = Arc::new(Mutex::new(0usize));
@@ -221,4 +247,18 @@ fn escape_js_string_for_single_quote(s: &str) -> String {
         .replace('\n', "\\n") // 添加换行符转义
         .replace('\r', "\\r") // 添加回车转义
         .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn script_runtime_limits_are_explicit_and_bounded() {
+        assert!(MAX_LOOP_ITERATIONS <= 10_000_000);
+        assert!(MAX_RECURSION_DEPTH <= 128);
+        assert!(MAX_VM_STACK_SIZE <= 4_096);
+        assert!(MAX_SCRIPT_CONCURRENCY <= 2);
+        assert!(SCRIPT_TIMEOUT <= std::time::Duration::from_secs(5));
+    }
 }
