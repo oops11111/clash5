@@ -24,8 +24,8 @@ the original review records before release; the present registry is a skeleton.
 | G-13 | P0-11 | blocked | - | Explicit subscription transport policy and UA |
 | G-14 | P0-14 | blocked | - | Pre-migration snapshot, atomic v11 and downgrade rejection |
 | G-15 | P0-15 | blocked | - | Corrupt config preservation and write protection |
-| G-16 | P0-16 | blocked | - | Updater disabled consistently and verified signing |
-| P0-12 | P0-12 | blocked | - | No in-app core upgrade and verified packaged core |
+| G-16 | P0-16 | partial | scripts/check-privacy-defaults.mjs | Updater disabled in config, frontend and backend; signing and RC artifact policy still unverified |
+| P0-12 | P0-12 | partial | scripts/check-privacy-defaults.mjs | Upgrade UI, command and downloader removed; packaged-core service hash acceptance remains |
 | P0-13 | P0-13 | partial | - | Strict TLS source fixed; invalid-cert runtime, restore sandbox and optional encryption remain |
 | P0-17 | P0-17 | partial | scripts/check-release-gates.mjs | Complete executable gate coverage, evidence and later-round reconciliation |
 
@@ -42,6 +42,9 @@ with null CSP and unrestricted filesystem scope. Registry validation passed;
 The Windows native save dialog, out-of-scope IPC rejection, icon loading and
 Monaco workers still require desktop acceptance. WebDAV now uses the default
 certificate verifier, but invalid-certificate server acceptance has not run.
-Restore staging, archive limits, optional encryption, core-upgrade removal and
-updater shutdown are not implemented in this tranche. No installer was built,
+Restore staging, archive limits and optional encryption are not implemented in
+this tranche. Core upgrade code was removed and the generated command contract
+was regenerated. The frontend test verifies that an empty release channel never
+invokes the updater plugin; updater permissions and artifact generation are off.
+No installer was built,
 no system security settings changed, and no release was published.

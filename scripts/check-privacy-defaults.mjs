@@ -9,6 +9,32 @@ const read = (file) => fs.readFile(path.join(ROOT, file), 'utf8')
 
 const checks = [
   {
+    name: 'in-app core upgrade is not a registered command',
+    file: 'src-tauri/src/lib.rs',
+    ok: (text) => !text.includes('cmd::upgrade_clash_core'),
+  },
+  {
+    name: 'in-app core downloader is not compiled',
+    file: 'src-tauri/src/feat/mod.rs',
+    ok: (text) => !text.includes('core_upgrade'),
+  },
+  {
+    name: 'first-release updater has no endpoints or artifacts',
+    file: 'src-tauri/tauri.conf.json',
+    ok: (text) => {
+      const config = JSON.parse(text)
+      return (
+        config.plugins.updater.endpoints.length === 0 &&
+        config.bundle.createUpdaterArtifacts === false
+      )
+    },
+  },
+  {
+    name: 'backend updater never enables missing settings',
+    file: 'src-tauri/src/core/updater.rs',
+    ok: (text) => !/auto_check_update\.unwrap_or\(true\)/.test(text),
+  },
+  {
     name: 'update check is off by default',
     file: 'src-tauri/src/config/verge.rs',
     ok: (text) => text.includes('auto_check_update: Some(false)'),

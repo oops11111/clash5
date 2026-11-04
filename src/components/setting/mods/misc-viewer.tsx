@@ -16,6 +16,7 @@ import { BaseDialog, DialogRef, Switch, TooltipIcon } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
 import { getClash5SingboxDegraded } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
+import { UPDATER_AVAILABLE } from '@/services/update'
 
 export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
   const { t } = useTranslation()
@@ -49,7 +50,8 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
         autoCloseConnection: verge?.auto_close_connection ?? true,
         singboxPersistent: verge?.singbox_persistent ?? false,
         singboxDegraded: false,
-        autoCheckUpdate: verge?.auto_check_update ?? false,
+        autoCheckUpdate:
+          UPDATER_AVAILABLE && (verge?.auto_check_update ?? false),
         enableBuiltinEnhanced: verge?.enable_builtin_enhanced ?? true,
         proxyLayoutColumn: verge?.proxy_layout_column || 6,
         enableAutoDelayDetection: verge?.enable_auto_delay_detection ?? false,
@@ -76,7 +78,7 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
         app_log_max_count: values.appLogMaxCount,
         auto_close_connection: values.autoCloseConnection,
         singbox_persistent: values.singboxPersistent,
-        auto_check_update: values.autoCheckUpdate,
+        auto_check_update: UPDATER_AVAILABLE && values.autoCheckUpdate,
         enable_builtin_enhanced: values.enableBuiltinEnhanced,
         proxy_layout_column: values.proxyLayoutColumn,
         enable_auto_delay_detection: values.enableAutoDelayDetection,
@@ -241,6 +243,7 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
           <Switch
             edge="end"
             checked={values.autoCheckUpdate}
+            disabled={!UPDATER_AVAILABLE}
             onChange={(_, c) =>
               setValues((v) => ({ ...v, autoCheckUpdate: c }))
             }

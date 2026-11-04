@@ -105,17 +105,6 @@ pub async fn restart_core() -> CmdResult {
     result
 }
 
-/// Replaces the managed core binary atomically instead of letting mihomo overwrite itself.
-#[tauri::command]
-#[specta::specta]
-pub async fn upgrade_clash_core(force: bool) -> CmdResult<feat::CoreUpgradeReport> {
-    let report = feat::upgrade_core(force).await.with_error_code("CORE_UPGRADE_FAILED")?;
-    if report.upgraded {
-        handle::Handle::refresh_clash();
-    }
-    Ok(report)
-}
-
 #[tauri::command]
 #[specta::specta]
 pub async fn test_delay(url: std::string::String) -> CmdResult<u32> {

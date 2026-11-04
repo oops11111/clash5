@@ -7,6 +7,7 @@ on:
       - "src/services/monaco.ts"
       - "scripts/check-webview-security.mjs"
       - "scripts/check-release-gates.mjs"
+      - "scripts/check-privacy-defaults.mjs"
       - "RELEASE-GATES.md"
       - ".github/workflows/backend-guardrails.yml"
   workflow_dispatch:
@@ -29,6 +30,9 @@ jobs:
 
       - name: Release registry integrity
         run: node scripts/check-release-gates.mjs
+
+      - name: Privacy and installer-only update defaults
+        run: node scripts/check-privacy-defaults.mjs
 
       - name: Backup path regression tests
         run: |

@@ -15,7 +15,10 @@ import {
 } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
-import { checkUpdateSafe as checkUpdate } from '@/services/update'
+import {
+  checkUpdateSafe as checkUpdate,
+  UPDATER_AVAILABLE,
+} from '@/services/update'
 import { version } from '@root/package.json'
 
 import { BackupViewer } from './mods/backup-viewer'
@@ -140,7 +143,7 @@ const SettingVergeAdvanced = ({ section }: Props) => {
         />
       )}
 
-      {section === 'advanced' && (
+      {section === 'advanced' && UPDATER_AVAILABLE && (
         <SettingItem
           onClick={onCheckUpdate}
           label={t('settings.components.verge.advanced.fields.checkUpdates')}

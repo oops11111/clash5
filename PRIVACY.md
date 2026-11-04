@@ -3,7 +3,7 @@
 **Applies to:** clash5, a desktop client for the mihomo proxy core, built from
 this repository (Windows, macOS and Linux).
 
-**Last updated:** 2026-10-23
+**Last updated:** 2026-11-04
 
 clash5 is a fork of Clash Verge Rev. This document describes clash5's own
 behavior and defaults. Where clash5 still inherits upstream behavior, that is
@@ -73,14 +73,15 @@ sees your IP address and this request.
 
 ### 4.3 Application update check: **off by default**
 
-When enabled, clash5 checks for updates on startup. The default is off
-(`auto_check_update: false`). The updater endpoint list in this build is empty,
-so no update request is sent until a release channel is configured.
+In-app updates are disabled in this build. The endpoint list is empty, updater
+permissions are absent, and no automatic check or cached installer is started,
+including when an older settings file enabled update checks. Download and install
+a verified installer manually when a new version is available.
 
-### 4.4 Proxy core update: user-initiated
+### 4.4 Proxy core update: installer only
 
-Updating the mihomo core downloads it from the mihomo GitHub releases page,
-only when you start the update.
+The mihomo core is updated only with the application installer. The application
+does not download or replace its core through an in-app upgrade command.
 
 ### 4.5 Home page IP card: **off by default, opt-in**
 
@@ -188,7 +189,7 @@ settings or configuration values.
 
 | Behavior | Default | How to turn it off |
 | --- | --- | --- |
-| Update check | Off | *Settings → Miscellaneous → Auto Check Update* |
+| Update check | Disabled in this build | Install a verified application installer manually |
 | Home IP card | Off | Keep it disabled, or change it in Home page card settings |
 | Exit IP detection | Only when started | Do not start it, or change the service in the chain editor |
 | WebDAV backup | Off until configured | Remove the WebDAV settings |

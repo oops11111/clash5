@@ -33,6 +33,10 @@ for (const file of ['migrated.json', 'desktop.json', 'desktop-windows.json']) {
   for (const permission of capability.permissions) {
     if (typeof permission === 'string') {
       assert.ok(
+        !permission.startsWith('updater:'),
+        `${file}: updater must be disabled`,
+      )
+      assert.ok(
         ![
           'fs:allow-write-file',
           'core:window:allow-create',
