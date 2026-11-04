@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import http from 'node:http'
 import net from 'node:net'
 import { join, resolve } from 'node:path'
@@ -101,8 +102,18 @@ async function freeLoopbackPort() {
 async function startM4SingboxFixture() {
   const ssPort = await freeLoopbackPort()
   const password = randomBytes(24).toString('base64')
+  const singboxName = process.platform === 'win32' ? 'sing-box.exe' : 'sing-box'
+  const singboxBinary = resolve(
+    process.env.CLASH5_SINGBOX_BINARY ??
+      join('src-tauri', 'resources', singboxName),
+  )
+  if (!existsSync(singboxBinary)) {
+    throw new Error(
+      `Pinned sing-box fixture is missing at ${singboxBinary}; run prebuild first`,
+    )
+  }
   const child = spawn(
-    process.platform === 'win32' ? 'sing-box.exe' : 'sing-box',
+    singboxBinary,
     ['run', '-c', 'stdin'],
     { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true },
   )

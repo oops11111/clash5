@@ -187,3 +187,12 @@ longer download, bundle or invoke `enableLoopback.exe`. The helper was an
 external elevation surface; Windows users can use the built-in
 `CheckNetIsolation.exe LoopbackExempt` commands or TUN mode instead. The static
 guard `node scripts/check-no-loopback-helper.mjs` passes locally.
+
+## P1-27 sing-box pin evidence
+
+`prebuild.mjs` downloads sing-box `1.14.2` for every supported desktop target,
+checks the official archive SHA-256, extracts the binary into the bundled
+resources directory, and records the archive pin in the local build cache. The
+resolver accepts only that packaged binary (or the adjacent portable copy) and
+never searches `PATH`. CI desktop smoke now uses the same prebuilt resource;
+`node scripts/check-singbox-pins.mjs` is the executable guard.

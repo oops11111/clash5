@@ -87,6 +87,70 @@ const GEODATA_SHA256 = {
     '06c1d50d0013af57ffe78c5af93f0dc6aa998890f3ee231393816f9117810c4a',
 }
 
+// sing-box is an optional runtime sidecar, but it must be the exact version
+// shipped with the application. Every supported target has an explicit
+// release archive and digest; there is deliberately no PATH lookup fallback.
+const SINGBOX_VERSION = '1.14.2'
+const SINGBOX_RELEASE_BASE =
+  `https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}`
+const SINGBOX_ARCHIVE_MAP = {
+  'win32-x64': {
+    archive: `sing-box-${SINGBOX_VERSION}-windows-amd64.zip`,
+    sha256:
+      'c2d8bfff918755808781dfdeeb8581b6c91eb3a243d9a7b55483cfc0c0684d32',
+  },
+  'win32-ia32': {
+    archive: `sing-box-${SINGBOX_VERSION}-windows-386.zip`,
+    sha256:
+      '745b3ae034972244396414a54a1518aaa46fa55b6b9c4690dc7a4c2b71bac69b',
+  },
+  'win32-arm64': {
+    archive: `sing-box-${SINGBOX_VERSION}-windows-arm64.zip`,
+    sha256:
+      '2bb467039310452380958b821983d5bb4f78fb70a2583914e4bea8b011582b64',
+  },
+  'darwin-x64': {
+    archive: `sing-box-${SINGBOX_VERSION}-darwin-amd64.tar.gz`,
+    sha256:
+      'b0bfb0dc70a5fc708710b9f5ea98b9ee76d40fa4169928d25d73edc4331df2fe',
+  },
+  'darwin-arm64': {
+    archive: `sing-box-${SINGBOX_VERSION}-darwin-arm64.tar.gz`,
+    sha256:
+      '925c5382eca8492b0150f868a6db20b18290a38700e621724b3703fd453e032d',
+  },
+  'linux-x64': {
+    archive: `sing-box-${SINGBOX_VERSION}-linux-amd64.tar.gz`,
+    sha256:
+      'a684484d7477d1437282ee411f4d131d0340aaad60a7868841ebd5d87dd8a0c6',
+  },
+  'linux-ia32': {
+    archive: `sing-box-${SINGBOX_VERSION}-linux-386.tar.gz`,
+    sha256:
+      '041389d19756e40709516ee22fe6dcc2a9d7043439dd062ca486231bde8417cf',
+  },
+  'linux-arm64': {
+    archive: `sing-box-${SINGBOX_VERSION}-linux-arm64.tar.gz`,
+    sha256:
+      'b43a1fb1bda131c6653576741ce527eb2bdeab7c9308ca90ee8b972abb7e4a7f',
+  },
+  'linux-arm': {
+    archive: `sing-box-${SINGBOX_VERSION}-linux-armv7.tar.gz`,
+    sha256:
+      '1e2700de1cca1b58d410abc0ead40b595aa26ebe4812e0475311228d3e688db4',
+  },
+  'linux-riscv64': {
+    archive: `sing-box-${SINGBOX_VERSION}-linux-riscv64.tar.gz`,
+    sha256:
+      '7ee2d238081085a4047569b5a9f296763ede3f59742786a30a2ebc8a9f611e4f',
+  },
+  'linux-loong64': {
+    archive: `sing-box-${SINGBOX_VERSION}-linux-loong64.tar.gz`,
+    sha256:
+      '2dc49c812c95b48464469d413890642778738ea064209f853ed374d503e61e3d',
+  },
+}
+
 // Version cache
 async function loadVersionCache() {
   try {
@@ -258,6 +322,7 @@ async function downloadFile(url, outPath) {
     ...options,
     method: 'GET',
     headers: { 'Content-Type': 'application/octet-stream' },
+    signal: AbortSignal.timeout(120_000),
   })
   if (!response.ok) {
     const body = await response.text().catch(() => '')
@@ -645,6 +710,73 @@ const resolveGeoIP = () =>
     downloadURL: `${GEODATA_RELEASE_BASE}/geoip.dat`,
     sha256: GEODATA_SHA256['geoip.dat'],
   })
+
+const resolveSingbox = async () => {
+  const target = SINGBOX_ARCHIVE_MAP[`${platform}-${arch}`]
+  if (!target) {
+    throw new Error(`sing-box does not support ${platform}-${arch}`)
+  }
+
+  const targetFile = platform === 'win32' ? 'sing-box.exe' : 'sing-box'
+  const targetPath = path.join(RESOURCES_DIR, targetFile)
+  const cacheKey = `${targetPath}:sing-box-archive`
+  const binaryHashKey = `${targetPath}:sing-box-binary`
+  const hashCache = await loadHashCache()
+  const currentBinaryHash = fs.existsSync(targetPath)
+    ? await calculateFileHash(targetPath)
+    : null
+  if (
+    !FORCE &&
+    fs.existsSync(targetPath) &&
+    hashCache[cacheKey] === target.sha256 &&
+    hashCache[binaryHashKey] &&
+    hashCache[binaryHashKey] === currentBinaryHash
+  ) {
+    log_success(`"${targetFile}" ${SINGBOX_VERSION} already exists, skipping download`)
+    return
+  }
+
+  const tempDir = path.join(TEMP_DIR, 'sing-box')
+  const archivePath = path.join(tempDir, target.archive)
+  const extractDir = path.join(tempDir, 'extracted')
+  await fsp.mkdir(tempDir, { recursive: true })
+  await fsp.mkdir(extractDir, { recursive: true })
+
+  try {
+    await downloadFile(`${SINGBOX_RELEASE_BASE}/${target.archive}`, archivePath)
+    const actualSha256 = await calculateFileHash(archivePath)
+    if (actualSha256 !== target.sha256) {
+      throw new Error(
+        `SHA-256 mismatch for ${target.archive}: expected ${target.sha256}, got ${actualSha256 ?? 'unreadable'}`,
+      )
+    }
+
+    if (target.archive.endsWith('.zip')) {
+      new AdmZip(archivePath).extractAllTo(extractDir, true)
+    } else {
+      await extract({ cwd: extractDir, file: archivePath })
+    }
+
+    const candidates = glob.sync(path.join(extractDir, '**', targetFile), {
+      nodir: true,
+    })
+    const extracted = candidates.find((filePath) => fs.statSync(filePath).isFile())
+    if (!extracted) {
+      throw new Error(`Expected ${targetFile} was not found in ${target.archive}`)
+    }
+
+    await fsp.mkdir(RESOURCES_DIR, { recursive: true })
+    await fsp.copyFile(extracted, targetPath)
+    if (platform !== 'win32') await fsp.chmod(targetPath, 0o755)
+    hashCache[cacheKey] = target.sha256
+    hashCache[binaryHashKey] = await calculateFileHash(targetPath)
+    await saveHashCache(hashCache)
+    log_success(`Installed pinned sing-box ${SINGBOX_VERSION}: ${targetFile}`)
+  } finally {
+    await fsp.rm(tempDir, { recursive: true, force: true })
+  }
+}
+
 const resolveSetDnsScript = () =>
   resolveResource({
     file: 'set_dns.sh',
@@ -671,6 +803,7 @@ const tasks = [
   { name: 'asn_mmdb', func: resolveASNMmdb, retry: 5 },
   { name: 'geosite', func: resolveGeosite, retry: 5 },
   { name: 'geoip', func: resolveGeoIP, retry: 5 },
+  { name: 'singbox', func: resolveSingbox, retry: 5 },
   {
     name: 'service_chmod',
     func: resolveServicePermission,
