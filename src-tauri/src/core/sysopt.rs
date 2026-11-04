@@ -268,8 +268,7 @@ static DEFAULT_BYPASS: &str = "localhost,127.0.0.1,192.168.0.0/16,10.0.0.0/8,172
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 static BYPASS_SEPARATOR: &str = ",";
 #[cfg(target_os = "macos")]
-static DEFAULT_BYPASS: &str =
-    "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,localhost,*.local,*.crashlytics.com,<local>";
+static DEFAULT_BYPASS: &str = "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,localhost,*.local,<local>";
 
 fn format_bypass(use_default: bool, custom_bypass: &str) -> String {
     if custom_bypass.is_empty() {

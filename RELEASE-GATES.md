@@ -35,6 +35,7 @@ the original review records before release; the present registry is a skeleton.
 - P1-29：远程规则集在配置写入和运行时生成两处拒绝非 HTTPS/超长 URL；生成的 mihomo `rule-providers` 强制走 `clash5-default` 并设置 10 MiB `size-limit`。静态门禁：`npm run check:rule-provider-policy`；Rust 单测覆盖代理字段、大小限制和 HTTPS URL 策略。
 - P1-30：前端剪贴板读写统一使用 Tauri clipboard-manager 插件，能力文件保留最小读写权限；未声明 create-webview/window create 能力，源码无 `navigator.clipboard`。静态门禁：`npm run check:window-clipboard-policy`。
 - P1-31：Boa 自定义脚本设置 128 层递归、4096 VM 栈、1000 万次循环、5 秒超时和最多 2 个并发执行槽；超时后槽位由阻塞任务持有至实际结束。静态门禁：`npm run check:script-safety`；Rust 单测覆盖限制常量。
+- P1-32：移除 macOS 默认绕过中的 `*.crashlytics.com`；日志保留本地 panic hook，诊断导出经 `clash_verge_logging::redact` 后复制到本机剪贴板，无自动上报。静态门禁：`npm run check:local-diagnostics`。
 
 Issue: https://github.com/oops11111/clash5/issues/68.
 `tsc --noEmit`, Vite production build, and offline Rust library `cargo check`

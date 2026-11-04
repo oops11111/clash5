@@ -240,8 +240,7 @@ const fn refusal_classification(service_usable: Option<bool>) -> SysproxyFailure
 }
 
 const LOOPBACK_HOST: &str = "127.0.0.1";
-const MACOS_DEFAULT_BYPASS: &str =
-    "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,localhost,*.local,*.crashlytics.com,<local>";
+const MACOS_DEFAULT_BYPASS: &str = "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,localhost,*.local,<local>";
 const MAX_SERVICE_BYPASS_LEN: usize = 8192;
 
 static SERVICE_PROXY_OPERATIONS: ServiceProxyOperations = ServiceProxyOperations::new();
