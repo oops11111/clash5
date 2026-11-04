@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "example.plugin",
+  "version": "0.1.0",
+  "name": "Example plugin",
+  "description": "Minimal clash5 Host ABI template.",
+  "abi_version": 1,
+  "permissions": ["config.patch"],
+  "writable_paths": ["/tun/mtu"],
+  "module_sha256": "REPLACE_WITH_64_LOWERCASE_HEX_DIGEST"
+}
