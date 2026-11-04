@@ -26,6 +26,7 @@
 - Windows 安装包不再携带第三方 UWP loopback helper，避免发布外部提权工具
 - sing-box 固定为带 SHA-256 校验的随包版本，桌面验收不再从 PATH 取核心
 - 服务安装前校验构建时生成的核心 SHA-256 清单，拒绝被替换的核心文件
+- 远程规则集仅允许 HTTPS，经 clash5 默认代理下载，并限制为 10 MiB
 
 </details>
 

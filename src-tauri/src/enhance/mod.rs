@@ -911,6 +911,7 @@ pub async fn enhance(
         #[cfg(target_os = "linux")]
         tproxy_enabled,
     } = cfg_vals;
+    crate::config::validate_text_rule_sets(&text_rule_sets)?;
 
     let profile = collect_profile_items(profiles).await?;
     let dns_override = DnsOverrideState::new(

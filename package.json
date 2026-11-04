@@ -37,6 +37,7 @@
     "check:no-loopback-helper": "node scripts/check-no-loopback-helper.mjs",
     "check:singbox-pins": "node scripts/check-singbox-pins.mjs",
     "check:core-hash-gate": "node scripts/check-core-hash-gate.mjs",
+    "check:rule-provider-policy": "node scripts/check-rule-provider-policy.mjs",
     "plugin:package": "node scripts/plugin-package.mjs",
     "arch:check": "node scripts/check-architecture.mjs listen emit invoke",
     "typecheck": "tsc --noEmit",

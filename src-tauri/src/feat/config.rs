@@ -1,4 +1,4 @@
-use crate::config::{Config, IVerge};
+use crate::config::{Config, IVerge, validate_text_rule_sets};
 use anyhow::Result;
 use clash_verge_draft::SharedDraft;
 use serde_yaml_ng::Mapping;
@@ -38,6 +38,9 @@ pub(super) async fn apply_verge_patch_locked(
     patch: &IVerge,
     not_save_file: bool,
 ) -> Result<()> {
+    if let Some(sets) = patch.text_rule_sets.as_deref() {
+        validate_text_rule_sets(sets)?;
+    }
     super::executor::apply(
         _config_write,
         super::executor::Patch::Verge {

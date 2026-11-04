@@ -32,6 +32,7 @@ the original review records before release; the present registry is a skeleton.
 ## Local implementation evidence (2026-11-04)
 
 - P1-28：`scripts/prebuild.mjs` 将 mihomo 实际字节写入 `resources/core-hashes.json`；服务安装前读取该清单并重新计算核心 SHA-256，清单缺失仅允许开发会话，清单存在但哈希不匹配时拒绝安装。Windows NSIS 仍使用同一构建摘要调用服务安装器。静态门禁：`npm run check:core-hash-gate`；Rust 单测覆盖精确字节接受、篡改拒绝及开发会话无清单。
+- P1-29：远程规则集在配置写入和运行时生成两处拒绝非 HTTPS/超长 URL；生成的 mihomo `rule-providers` 强制走 `clash5-default` 并设置 10 MiB `size-limit`。静态门禁：`npm run check:rule-provider-policy`；Rust 单测覆盖代理字段、大小限制和 HTTPS URL 策略。
 
 Issue: https://github.com/oops11111/clash5/issues/68.
 `tsc --noEmit`, Vite production build, and offline Rust library `cargo check`

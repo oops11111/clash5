@@ -5,7 +5,7 @@
 //! Text rule sets are placed before the subscription rules, and a rule that is
 //! already present after decoupling is merged instead of added twice.
 
-use crate::config::{RuleTarget, TextRuleSet};
+use crate::config::{REMOTE_RULE_SET_MAX_BYTES, RuleTarget, TextRuleSet};
 use clash_verge_logging::{Type, logging};
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -346,9 +346,11 @@ fn provider_entry(name: &str, url: &str) -> Value {
     entry.insert(Value::from("type"), Value::from("http"));
     entry.insert(Value::from("behavior"), Value::from("classical"));
     entry.insert(Value::from("format"), Value::from("text"));
-    entry.insert(Value::from("url"), Value::from(url));
+    entry.insert(Value::from("url"), Value::from(url.trim()));
     entry.insert(Value::from("path"), Value::from(format!("./ruleset/{name}.txt")));
     entry.insert(Value::from("interval"), Value::from(86_400u64));
+    entry.insert(Value::from("proxy"), Value::from(DEFAULT_GROUP));
+    entry.insert(Value::from("size-limit"), Value::from(REMOTE_RULE_SET_MAX_BYTES));
     Value::Mapping(entry)
 }
 
@@ -516,6 +518,14 @@ mod tests {
         assert_eq!(
             out["rule-providers"]["clash5-set-abc"]["url"].as_str(),
             Some("https://example.com/ads.txt")
+        );
+        assert_eq!(
+            out["rule-providers"]["clash5-set-abc"]["proxy"].as_str(),
+            Some(DEFAULT_GROUP)
+        );
+        assert_eq!(
+            out["rule-providers"]["clash5-set-abc"]["size-limit"].as_u64(),
+            Some(REMOTE_RULE_SET_MAX_BYTES)
         );
         let rules: Vec<&str> = out["rules"]
             .as_sequence()

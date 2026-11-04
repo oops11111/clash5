@@ -4,7 +4,7 @@ use crate::{
     constants::network,
     utils::{dirs, help},
 };
-use anyhow::Result;
+use anyhow::{Context as _, Result, bail};
 use clash_verge_logging::{Type, logging};
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
@@ -57,6 +57,29 @@ pub struct TextRuleSet {
     pub content: std::string::String,
     /// Remote rule list; mihomo downloads it as a rule provider and `content` is unused.
     pub url: Option<std::string::String>,
+}
+
+/// Maximum bytes mihomo may download for a remote text rule set.
+pub const REMOTE_RULE_SET_MAX_BYTES: u64 = 10 * 1024 * 1024;
+const REMOTE_RULE_SET_MAX_URL_LENGTH: usize = 2_048;
+
+/// Remote rule sets are fetched by mihomo, so they must use an authenticated
+/// origin and carry an explicit bounded body size in the generated config.
+pub fn validate_text_rule_sets(sets: &[TextRuleSet]) -> Result<()> {
+    for set in sets {
+        let Some(raw_url) = set.url.as_deref() else {
+            continue;
+        };
+        let url = raw_url.trim();
+        if url.len() > REMOTE_RULE_SET_MAX_URL_LENGTH {
+            bail!("rule set URL is too long: {}", set.name);
+        }
+        let parsed = tauri::Url::parse(url).with_context(|| format!("invalid rule set URL: {}", set.name))?;
+        if parsed.scheme() != "https" || parsed.host_str().is_none_or(str::is_empty) {
+            bail!("rule set URL must use HTTPS: {}", set.name);
+        }
+    }
+    Ok(())
 }
 
 /// ### `verge.yaml` schema
@@ -645,5 +668,33 @@ mod performance_preset_tests {
         let restored: IVerge = serde_yaml_ng::from_str(&yaml)?;
         assert_eq!(restored.performance_preset, Some(PerformancePreset::PowerSaving));
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod text_rule_set_tests {
+    use super::*;
+
+    fn remote(url: &str) -> TextRuleSet {
+        TextRuleSet {
+            id: "remote".into(),
+            name: "Remote rules".into(),
+            target: RuleTarget::Default,
+            content: std::string::String::new(),
+            url: Some(url.into()),
+        }
+    }
+
+    #[test]
+    fn remote_rule_sets_require_https_with_a_host() {
+        assert!(validate_text_rule_sets(&[remote("https://rules.example/list.txt")]).is_ok());
+        assert!(validate_text_rule_sets(&[remote("http://rules.example/list.txt")]).is_err());
+        assert!(validate_text_rule_sets(&[remote("file:///list.txt")]).is_err());
+    }
+
+    #[test]
+    fn remote_rule_set_url_length_is_bounded() {
+        let url = format!("https://rules.example/{}", "a".repeat(REMOTE_RULE_SET_MAX_URL_LENGTH));
+        assert!(validate_text_rule_sets(&[remote(&url)]).is_err());
     }
 }
