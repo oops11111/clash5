@@ -160,3 +160,12 @@ key and merge repeated emissions within a 60-second window. The merged item
 keeps one dismissal/timer and renders its repeat count; coded failure notices
 retain their existing per-code replacement and dialog suppression behavior.
 Service-level tests cover the window boundary, severity separation and count.
+
+P1-24 release-resource evidence: `prebuild.mjs` discovers and downloads only the
+stable Mihomo release, generates one core digest, and no longer emits alpha
+sidecars. Tauri bundle manifests, the Windows installer hook, Linux external-bin
+list, development service preparation and shell-smoke placeholders all match
+the stable-only inventory. Existing legacy alpha process text remains only in
+diagnostic tests so stale processes can still be explained safely.
+`node scripts/check-stable-core.mjs` is the executable guard for these resource
+lists and passes locally.

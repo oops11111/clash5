@@ -24,8 +24,7 @@
       "./sidecar/clash5-service",
       "./sidecar/clash5-service-install",
       "./sidecar/clash5-service-uninstall",
-      "./sidecar/clash5-mihomo",
-      "./sidecar/clash5-mihomo-alpha"
+      "./sidecar/clash5-mihomo"
     ]
   }
 }

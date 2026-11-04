@@ -32,6 +32,7 @@
     "check:command-contract": "node scripts/check-command-contract.mjs",
     "check:privacy-defaults": "node scripts/check-privacy-defaults.mjs",
     "check:probe-concurrency": "node scripts/check-probe-concurrency.mjs",
+    "check:stable-core": "node scripts/check-stable-core.mjs",
     "plugin:package": "node scripts/plugin-package.mjs",
     "arch:check": "node scripts/check-architecture.mjs listen emit invoke",
     "typecheck": "tsc --noEmit",

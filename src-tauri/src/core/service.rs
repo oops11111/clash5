@@ -774,7 +774,6 @@ const fn bundled_core_name(core: &str) -> &str {
     {
         match core.as_bytes() {
             b"verge-mihomo" => "clash5-mihomo",
-            b"verge-mihomo-alpha" => "clash5-mihomo-alpha",
             _ => core,
         }
     }
@@ -2173,10 +2172,7 @@ mod tests {
     fn linux_core_sources_use_clash5_sidecar_names_and_upstream_install_names() {
         let executable = Path::new("/usr/bin/clash5");
 
-        for (core, sidecar) in [
-            ("verge-mihomo", "clash5-mihomo"),
-            ("verge-mihomo-alpha", "clash5-mihomo-alpha"),
-        ] {
+        for (core, sidecar) in [("verge-mihomo", "clash5-mihomo")] {
             let name = format!("{core}{}", std::env::consts::EXE_SUFFIX);
             let bundled_name = bundled_core_name(core);
             let source = executable.with_file_name(format!("{bundled_name}{}", std::env::consts::EXE_SUFFIX));
