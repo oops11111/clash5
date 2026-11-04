@@ -66,7 +66,7 @@ impl AutoBackupSettings {
         Self {
             schedule_enabled: verge.enable_auto_backup_schedule.unwrap_or(false),
             interval_hours: interval,
-            change_enabled: verge.auto_backup_on_change.unwrap_or(true),
+            change_enabled: verge.auto_backup_on_change.unwrap_or(false),
         }
     }
 }
@@ -76,7 +76,7 @@ impl Default for AutoBackupSettings {
         Self {
             schedule_enabled: false,
             interval_hours: DEFAULT_INTERVAL_HOURS,
-            change_enabled: true,
+            change_enabled: false,
         }
     }
 }
@@ -309,4 +309,16 @@ async fn cleanup_auto_backups() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn change_triggered_backups_are_disabled_by_default() {
+        let settings = AutoBackupSettings::from_verge(&IVerge::default());
+        assert!(!settings.change_enabled);
+        assert!(!AutoBackupSettings::default().change_enabled);
+    }
 }

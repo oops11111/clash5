@@ -511,7 +511,7 @@ impl IVerge {
             auto_log_clean: Some(2), // 1: 1天, 2: 7天, 3: 30天, 4: 90天
             enable_auto_backup_schedule: Some(false),
             auto_backup_interval_hours: Some(24),
-            auto_backup_on_change: Some(true),
+            auto_backup_on_change: Some(false),
             webdav_url: None,
             webdav_username: None,
             webdav_password: None,

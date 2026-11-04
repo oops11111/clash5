@@ -608,7 +608,7 @@
 |---|---|
 | **来源** | R17 **Q6 A** |
 | **文件:行** | `verge.rs:491` 仍 `auto_backup_on_change: Some(true)`；`auto_backup.rs:69` `unwrap_or(true)` |
-| **现状** | **未落地** |
+| **现状** | **已落地** — 新配置默认关闭按变更自动备份；旧配置显式为 true 时保持用户选择，缺失字段按 false 解释 |
 
 ### P1-48 · Linux 密钥迁 keystore（R19 Q1 A / C1）
 
