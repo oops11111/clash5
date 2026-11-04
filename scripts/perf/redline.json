@@ -1,0 +1,67 @@
+{
+  "schema": "traffic-webview-redline-v1",
+  "maxRegressionPercent": 20,
+  "minRunsPerGroup": 3,
+  "metrics": [
+    {
+      "key": "foreground/webview/cpuMean",
+      "unit": "percent",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "foreground/webview/rssP50",
+      "unit": "bytes",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "foreground/main/cpuMean",
+      "unit": "percent",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "foreground/main/rssP50",
+      "unit": "bytes",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "hidden/webview/cpuMean",
+      "unit": "percent",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "hidden/webview/rssP50",
+      "unit": "bytes",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "hidden/main/cpuMean",
+      "unit": "percent",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "hidden/main/rssP50",
+      "unit": "bytes",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "restored/webview/cpuMean",
+      "unit": "percent",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "restored/webview/rssP50",
+      "unit": "bytes",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "restored/main/cpuMean",
+      "unit": "percent",
+      "direction": "lower-is-better"
+    },
+    {
+      "key": "restored/main/rssP50",
+      "unit": "bytes",
+      "direction": "lower-is-better"
+    }
+  ]
+}

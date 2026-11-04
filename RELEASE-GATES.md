@@ -36,6 +36,7 @@ the original review records before release; the present registry is a skeleton.
 - P1-30：前端剪贴板读写统一使用 Tauri clipboard-manager 插件，能力文件保留最小读写权限；未声明 create-webview/window create 能力，源码无 `navigator.clipboard`。静态门禁：`npm run check:window-clipboard-policy`。
 - P1-31：Boa 自定义脚本设置 128 层递归、4096 VM 栈、1000 万次循环、5 秒超时和最多 2 个并发执行槽；超时后槽位由阻塞任务持有至实际结束。静态门禁：`npm run check:script-safety`；Rust 单测覆盖限制常量。
 - P1-32：移除 macOS 默认绕过中的 `*.crashlytics.com`；日志保留本地 panic hook，诊断导出经 `clash_verge_logging::redact` 后复制到本机剪贴板，无自动上报。静态门禁：`npm run check:local-diagnostics`。
+- P1-33：新增 `scripts/perf/redline.json`，将流量图三个阶段、主进程/WebView 的 CPU 均值和 RSS P50 固定为 20% 最大回归；`npm run perf:gate` 要求基线和候选各至少 3 次独立 macOS 运行且使用不同构建。当前 Windows 环境不能运行 macOS WKWebView 采样，RC 前仍需上传真实基线/候选报告作为验收证据。
 
 Issue: https://github.com/oops11111/clash5/issues/68.
 `tsc --noEmit`, Vite production build, and offline Rust library `cargo check`

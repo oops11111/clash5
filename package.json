@@ -41,6 +41,7 @@
     "check:window-clipboard-policy": "node scripts/check-window-clipboard-policy.mjs",
     "check:script-safety": "node scripts/check-script-safety.mjs",
     "check:local-diagnostics": "node scripts/check-local-diagnostics.mjs",
+    "check:perf-redline": "node scripts/check-perf-redline.mjs",
     "plugin:package": "node scripts/plugin-package.mjs",
     "arch:check": "node scripts/check-architecture.mjs listen emit invoke",
     "typecheck": "tsc --noEmit",
@@ -54,7 +55,8 @@
     "perf:build": "node scripts/perf/build.mjs",
     "perf:run": "node scripts/perf/run.mjs",
     "perf:compare": "node scripts/perf/compare.mjs",
-    "perf:test": "node --test scripts/perf/report.test.mjs"
+    "perf:gate": "node scripts/perf/gate.mjs",
+    "perf:test": "node --test scripts/perf/report.test.mjs scripts/perf/gate.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/collision": "^0.5.0",

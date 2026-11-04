@@ -18,6 +18,24 @@ pnpm perf:compare -- target/perf/baseline target/perf/baseline
 pnpm perf:test
 ```
 
+## Release redline
+
+The RC gate is deliberately stricter than the exploratory comparison. It reads
+the tracked `redline.json` policy and fails if any CPU mean or RSS P50 metric is
+more than 20% above the baseline median:
+
+```sh
+pnpm perf:gate -- target/perf/baseline target/perf/candidate
+```
+
+Each side must contain at least three independent runs, use the same harness and
+workload contract, and come from different binaries. The policy covers the
+foreground, hidden and restored phases for both the main process and WebView.
+The harness is macOS-only; a Windows workstation can review the policy and run
+the report unit tests, but cannot produce the required WKWebView evidence.
+Keep the baseline and candidate summaries as RC evidence rather than committing
+machine-specific reports to the repository.
+
 `perf:build [directory]` uses release optimization, Vite `--mode perf` and the
 explicit Cargo `perf-harness` feature. It preserves the binary and records HEAD,
 dirty state, compiled source, lockfile, frontend, build-settings and binary hashes.
