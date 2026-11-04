@@ -57,6 +57,36 @@ const checks = [
     ok: (text) => text.includes('Value::String("127.0.0.1:53".into())'),
   },
   {
+    name: 'IPv6 is opt-in in backend and DNS defaults',
+    file: 'src-tauri/src/config/clash.rs',
+    ok: (text) => text.includes('map.insert("ipv6".into(), false.into())'),
+  },
+  {
+    name: 'DNS follows routing rules and uses encrypted node bootstrap by default',
+    file: 'src-tauri/src/utils/init.rs',
+    ok: (text) => {
+      const start = text.indexOf('fn default_dns_section()')
+      const end = text.indexOf('pub(super) async fn init_dns_config()')
+      const section = text.slice(start, end)
+      return (
+        start >= 0 &&
+        end > start &&
+        section.includes('("ipv6".into(), Value::Bool(false))') &&
+        section.includes('("respect-rules".into(), Value::Bool(true))') &&
+        section.includes('https://doh.pub/dns-query') &&
+        section.includes('https://dns.alidns.com/dns-query')
+      )
+    },
+  },
+  {
+    name: 'DNS editor uses privacy-safe defaults for missing keys',
+    file: 'src/services/dns-defaults.ts',
+    ok: (text) =>
+      text.includes("'respect-rules': true") &&
+      text.includes('ipv6: false') &&
+      text.includes('resolveDnsBooleanDefaults'),
+  },
+  {
     name: 'default DNS has no plaintext UDP upstream and no system bootstrap',
     file: 'src-tauri/src/utils/init.rs',
     ok: (text) => {

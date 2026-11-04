@@ -41,6 +41,10 @@ import {
   saveDnsConfig,
   validateDnsConfig,
 } from '@/services/cmds'
+import {
+  DEFAULT_DNS_CONFIG,
+  resolveDnsBooleanDefaults,
+} from '@/services/dns-defaults'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
@@ -139,45 +143,6 @@ function parseList(str: string): string[] {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
-}
-
-const DEFAULT_DNS_CONFIG = {
-  enable: true,
-  listen: '127.0.0.1:53',
-  'enhanced-mode': 'fake-ip' as 'fake-ip' | 'redir-host',
-  'fake-ip-range': '198.18.0.1/16',
-  'fake-ip-range6': 'fdfe:dcba:9876::1/64',
-  'fake-ip-filter-mode': 'blacklist' as 'blacklist' | 'whitelist',
-  'prefer-h3': false,
-  'respect-rules': false,
-  'use-hosts': false,
-  'use-system-hosts': false,
-  ipv6: true,
-  'fake-ip-filter': [
-    '*.lan',
-    '*.local',
-    '*.arpa',
-    'time.*.com',
-    'ntp.*.com',
-    'time.*.com',
-    '+.market.xiaomi.com',
-    'localhost.ptlogin2.qq.com',
-    '*.msftncsi.com',
-    'www.msftconnecttest.com',
-  ],
-  'default-nameserver': ['223.6.6.6', '2400:3200::1'],
-  nameserver: ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query'],
-  fallback: [],
-  'nameserver-policy': {},
-  'proxy-server-nameserver': [],
-  'direct-nameserver': [],
-  'direct-nameserver-follow-policy': false,
-  'fallback-filter': {
-    geoip: true,
-    'geoip-code': 'CN',
-    ipcidr: ['240.0.0.0/4', '0.0.0.0/32'],
-    domain: ['+.google.com', '+.facebook.com', '+.youtube.com'],
-  },
 }
 
 export function DnsViewer({ ref }: { ref?: Ref<DialogRef> }) {
@@ -279,6 +244,8 @@ export function DnsViewer({ ref }: { ref?: Ref<DialogRef> }) {
         ? fakeIpFilterMode
         : DEFAULT_DNS_CONFIG['fake-ip-filter-mode']
 
+    const booleanDefaults = resolveDnsBooleanDefaults(dnsConfig)
+
     setValues({
       enable: dnsConfig.enable ?? DEFAULT_DNS_CONFIG.enable,
       listen: dnsConfig.listen ?? DEFAULT_DNS_CONFIG.listen,
@@ -289,12 +256,11 @@ export function DnsViewer({ ref }: { ref?: Ref<DialogRef> }) {
         dnsConfig['fake-ip-range6'] ?? DEFAULT_DNS_CONFIG['fake-ip-range6'],
       fakeIpFilterMode: validFakeIpFilterMode,
       preferH3: dnsConfig['prefer-h3'] ?? DEFAULT_DNS_CONFIG['prefer-h3'],
-      respectRules:
-        dnsConfig['respect-rules'] ?? DEFAULT_DNS_CONFIG['respect-rules'],
+      respectRules: booleanDefaults.respectRules,
       useHosts: dnsConfig['use-hosts'] ?? DEFAULT_DNS_CONFIG['use-hosts'],
       useSystemHosts:
         dnsConfig['use-system-hosts'] ?? DEFAULT_DNS_CONFIG['use-system-hosts'],
-      ipv6: dnsConfig.ipv6 ?? DEFAULT_DNS_CONFIG.ipv6,
+      ipv6: booleanDefaults.ipv6,
       fakeIpFilter:
         dnsConfig['fake-ip-filter']?.join(', ') ??
         DEFAULT_DNS_CONFIG['fake-ip-filter'].join(', '),

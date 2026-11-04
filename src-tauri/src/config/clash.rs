@@ -40,12 +40,7 @@ impl IClashTemp {
 
         match map_result {
             Ok(mut map) => {
-                let template_map = Self::template().0;
-                for (key, value) in template_map.into_iter() {
-                    if !map.contains_key(&key) {
-                        map.insert(key, value);
-                    }
-                }
+                Self::fill_missing_template(&mut map);
 
                 // Replace the empty value and the legacy constant that older builds wrote to disk.
                 if let Some(val) = map.get_mut("secret")
@@ -64,6 +59,15 @@ impl IClashTemp {
                     "failed to load clash config, using template: {err:#}"
                 );
                 Self::template()
+            }
+        }
+    }
+
+    fn fill_missing_template(map: &mut Mapping) {
+        let template_map = Self::template().0;
+        for (key, value) in template_map {
+            if !map.contains_key(&key) {
+                map.insert(key, value);
             }
         }
     }
@@ -90,7 +94,9 @@ impl IClashTemp {
         map.insert("port".into(), network::ports::DEFAULT_HTTP.into());
         map.insert("log-level".into(), "info".into());
         map.insert("allow-lan".into(), false.into());
-        map.insert("ipv6".into(), true.into());
+        // IPv6 is opt-in. `new` only fills missing keys, so an existing explicit
+        // user choice remains unchanged on upgrade.
+        map.insert("ipv6".into(), false.into());
         map.insert("mode".into(), "rule".into());
         map.insert(
             "external-controller".into(),
@@ -454,5 +460,15 @@ mod tests {
             IClashTemp::template().0.get("secret").and_then(Value::as_str),
             Some(secret)
         );
+    }
+
+    #[test]
+    fn template_disables_ipv6_without_overwriting_an_explicit_opt_in() {
+        assert_eq!(IClashTemp::template().0.get("ipv6"), Some(&Value::Bool(false)));
+
+        let mut existing = Mapping::new();
+        existing.insert("ipv6".into(), Value::Bool(true));
+        IClashTemp::fill_missing_template(&mut existing);
+        assert_eq!(existing.get("ipv6"), Some(&Value::Bool(true)));
     }
 }

@@ -337,14 +337,14 @@ fn default_dns_section() -> serde_yaml_ng::Mapping {
     serde_yaml_ng::Mapping::from_iter([
         ("enable".into(), Value::Bool(true)),
         // Must match the frontend default used for authoritative `dns.ipv6`.
-        ("ipv6".into(), Value::Bool(true)),
+        ("ipv6".into(), Value::Bool(false)),
         ("listen".into(), Value::String("127.0.0.1:53".into())),
         ("enhanced-mode".into(), Value::String("fake-ip".into())),
         ("fake-ip-range".into(), Value::String("198.18.0.1/16".into())),
         ("fake-ip-range6".into(), Value::String("fdfe:dcba:9876::1/64".into())),
         ("fake-ip-filter-mode".into(), Value::String("blacklist".into())),
         ("prefer-h3".into(), Value::Bool(false)),
-        ("respect-rules".into(), Value::Bool(false)),
+        ("respect-rules".into(), Value::Bool(true)),
         ("use-hosts".into(), Value::Bool(false)),
         ("use-system-hosts".into(), Value::Bool(false)),
         (
@@ -381,7 +381,15 @@ fn default_dns_section() -> serde_yaml_ng::Mapping {
             "nameserver-policy".into(),
             Value::Mapping(serde_yaml_ng::Mapping::new()),
         ),
-        ("proxy-server-nameserver".into(), Value::Sequence(vec![])),
+        // Resolve proxy node hostnames with domestic encrypted DNS before the
+        // remaining DNS requests follow routing rules.
+        (
+            "proxy-server-nameserver".into(),
+            Value::Sequence(vec![
+                Value::String("https://doh.pub/dns-query".into()),
+                Value::String("https://dns.alidns.com/dns-query".into()),
+            ]),
+        ),
         ("direct-nameserver".into(), Value::Sequence(vec![])),
         ("direct-nameserver-follow-policy".into(), Value::Bool(false)),
         (
@@ -679,5 +687,14 @@ mod tests {
         assert!(!servers("default-nameserver").iter().any(|server| server == "system"));
         let listen = dns.get("listen").and_then(Value::as_str);
         assert_eq!(listen, Some("127.0.0.1:53"));
+        assert_eq!(dns.get("ipv6"), Some(&Value::Bool(false)));
+        assert_eq!(dns.get("respect-rules"), Some(&Value::Bool(true)));
+        assert_eq!(
+            servers("proxy-server-nameserver"),
+            vec![
+                "https://doh.pub/dns-query".to_owned(),
+                "https://dns.alidns.com/dns-query".to_owned(),
+            ]
+        );
     }
 }

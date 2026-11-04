@@ -122,8 +122,10 @@ AI services it tests. It runs only when you start it.
 
 ### 4.9 DNS
 
-The default DNS configuration for new installations uses encrypted DNS over
-HTTPS to `doh.pub` and `dns.alidns.com`. Only the names of these two DNS
+The default DNS configuration for new installations disables IPv6 and enables
+DNS rule routing. It uses encrypted DNS over HTTPS to `doh.pub` and `dns.alidns.com`.
+Proxy node hostnames use these domestic encrypted resolvers before other DNS
+requests follow routing rules. Only the names of these two DNS
 services are resolved in plain DNS, through the fixed addresses `223.6.6.6` and
 `2400:3200::1`. Those are the only plain-DNS requests in the default
 configuration.
