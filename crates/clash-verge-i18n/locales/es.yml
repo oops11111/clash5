@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: Perfiles
     body: Perfil reactivado.
+  subscriptionUpdateBackoff:
+    title: Actualización de suscripción
+    body: La actualización automática falló tres veces seguidas; se reintentará en una hora.
   appQuit:
     title: A punto de salir
     body: Clash Verge está a punto de salir.

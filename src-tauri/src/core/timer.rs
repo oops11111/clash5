@@ -1,5 +1,6 @@
 use crate::{
     config::{Config, PrfItem},
+    core::notify::desktop::{NotificationEvent, notify_event},
     feat,
     process::AsyncHandler,
     singleton,
@@ -27,7 +28,7 @@ use tokio_util::time::{DelayQueue, delay_queue::Key};
 enum TimerCommand {
     Apply(HashMap<String, TaskSchedule>),
     RunNow(String),
-    TaskFinished(String),
+    TaskFinished(String, bool),
 }
 
 /// Next update is due at `updated + interval`, but the queue only takes a delay from now.
@@ -59,6 +60,8 @@ struct TaskState {
     /// Disabled mid-update. Entry outlives removal so re-enabling reuses the `running` guard
     /// instead of building a fresh state that would fire a second update at zero delay.
     retired: bool,
+    /// Consecutive automatic update failures. A success resets the backoff.
+    failure_count: u8,
 }
 
 async fn run_timer_profile_update_transition<Started, Update, UpdateFuture, Finished, Completed, Output>(
@@ -86,6 +89,7 @@ impl TaskState {
             interval_minutes,
             running: false,
             retired: false,
+            failure_count: 0,
         }
     }
 }
@@ -250,8 +254,10 @@ impl Timer {
                         Some(TimerCommand::RunNow(uid)) => {
                             Self::run_task_now(&mut queue, &mut tasks, uid, command_tx.clone());
                         }
-                        Some(TimerCommand::TaskFinished(uid)) => {
-                            Self::finish_task(&mut queue, &mut tasks, uid);
+                        Some(TimerCommand::TaskFinished(uid, succeeded)) => {
+                            if Self::finish_task(&mut queue, &mut tasks, uid, succeeded) {
+                                notify_event(NotificationEvent::SubscriptionUpdateBackoff).await;
+                            }
                         }
                         None => break,
                     }
@@ -399,9 +405,14 @@ impl Timer {
         false
     }
 
-    fn finish_task(queue: &mut DelayQueue<String>, tasks: &mut HashMap<String, TaskState>, uid: String) {
+    fn finish_task(
+        queue: &mut DelayQueue<String>,
+        tasks: &mut HashMap<String, TaskState>,
+        uid: String,
+        succeeded: bool,
+    ) -> bool {
         let Some(state) = tasks.get_mut(&uid) else {
-            return;
+            return false;
         };
 
         state.running = false;
@@ -414,26 +425,54 @@ impl Timer {
                 "Dropped retired timer task now that its update finished: uid={}",
                 uid
             );
-            return;
+            return false;
         }
 
-        // Full interval, not from `updated`: a failed run leaves `updated` in the past, so
-        // counting from it would retry at zero delay and spin.
-        let key = Self::schedule_task(queue, &uid, Self::interval_duration(state.interval_minutes));
+        let should_notify = if succeeded {
+            state.failure_count = 0;
+            false
+        } else {
+            state.failure_count = state.failure_count.saturating_add(1);
+            state.failure_count == 3
+        };
+
+        let delay = if succeeded {
+            // Full interval, not from `updated`: a failed run leaves `updated` in the past, so
+            // counting from it would retry at zero delay and spin.
+            Self::interval_duration(state.interval_minutes)
+        } else {
+            Self::failure_retry_delay(state.failure_count)
+        };
+        let key = Self::schedule_task(queue, &uid, delay);
         state.key = Some(key);
+        should_notify
     }
 
     fn spawn_update_task(uid: String, command_tx: mpsc::UnboundedSender<TimerCommand>) {
         logging!(debug, Type::Timer, "Starting timer task: uid={}", uid);
         AsyncHandler::spawn(move || async move {
             Self::wait_until_resolve_done(Duration::from_millis(5000)).await;
-            Self::async_task(&uid).await;
-            let _ = command_tx.send(TimerCommand::TaskFinished(uid));
+            let succeeded = Self::async_task(&uid).await;
+            let _ = command_tx.send(TimerCommand::TaskFinished(uid, succeeded));
         });
     }
 
     const fn interval_duration(interval_minutes: u64) -> Duration {
-        Duration::from_secs(interval_minutes.saturating_mul(60))
+        let seconds = match interval_minutes.checked_mul(60) {
+            Some(seconds) => seconds,
+            None => u64::MAX,
+        };
+        Duration::from_secs(seconds)
+    }
+
+    const fn failure_retry_delay(failure_count: u8) -> Duration {
+        let minutes = match failure_count {
+            0 => 5,
+            1 => 5,
+            2 => 15,
+            _ => 60,
+        };
+        Duration::from_secs(minutes * 60)
     }
 
     fn schedule_task(queue: &mut DelayQueue<String>, uid: &str, delay: Duration) -> Key {
@@ -467,14 +506,16 @@ impl Timer {
     }
 
     #[tracing::instrument(skip_all, level = "info", fields(uid = %uid))]
-    async fn async_task(uid: &String) {
+    async fn async_task(uid: &String) -> bool {
         logging!(debug, Type::Timer, "Running timer task for profile: {}", uid);
 
+        let mut succeeded = false;
         run_timer_profile_update_transition(
             || Self::emit_update_event(uid, true),
             || feat::update_profile(uid, None, false),
             |result| match result {
                 Ok(_) => {
+                    succeeded = true;
                     logging!(debug, Type::Timer, "timer task completed for uid: {}", uid);
                 }
                 Err(e) => {
@@ -484,6 +525,7 @@ impl Timer {
             || Self::emit_update_event(uid, false),
         )
         .await;
+        succeeded
     }
 
     async fn wait_until_resolve_done(max_wait: Duration) {
@@ -656,7 +698,7 @@ mod tests {
 
         // After it reports back, the next one is a whole interval away.
         mark_running(&mut tasks, "uid");
-        Timer::finish_task(&mut queue, &mut tasks, String::from("uid"));
+        Timer::finish_task(&mut queue, &mut tasks, String::from("uid"), true);
 
         tokio::time::advance(Duration::from_secs(1439 * 60)).await;
         assert!(
@@ -699,7 +741,7 @@ mod tests {
         );
 
         // Original run reports back, re-arms exactly once.
-        Timer::finish_task(&mut queue, &mut tasks, String::from("uid"));
+        Timer::finish_task(&mut queue, &mut tasks, String::from("uid"), true);
         tokio::time::advance(Duration::from_secs(3601)).await;
         assert_eq!(take_expired(&mut queue).await.as_deref(), Some("uid"));
         assert!(nothing_due(&mut queue).await, "exactly one key, no orphan");
@@ -722,7 +764,7 @@ mod tests {
         mark_running(&mut tasks, "uid");
 
         Timer::apply_timer_map(&mut queue, &mut tasks, HashMap::new());
-        Timer::finish_task(&mut queue, &mut tasks, String::from("uid"));
+        Timer::finish_task(&mut queue, &mut tasks, String::from("uid"), true);
 
         assert!(
             tasks.is_empty(),
@@ -791,5 +833,35 @@ mod tests {
             &["update-started", "terminal-result", "update-completed"]
         );
         Ok(())
+    }
+
+    #[test]
+    fn failed_updates_back_off_at_five_fifteen_and_sixty_minutes() {
+        assert_eq!(Timer::failure_retry_delay(1), Duration::from_secs(5 * 60));
+        assert_eq!(Timer::failure_retry_delay(2), Duration::from_secs(15 * 60));
+        assert_eq!(Timer::failure_retry_delay(3), Duration::from_secs(60 * 60));
+        assert_eq!(Timer::failure_retry_delay(9), Duration::from_secs(60 * 60));
+    }
+
+    #[test]
+    fn interval_duration_clamps_checked_multiplication() {
+        assert_eq!(Timer::interval_duration(2), Duration::from_secs(120));
+        assert_eq!(Timer::interval_duration(u64::MAX), Duration::from_secs(u64::MAX));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn third_consecutive_failure_requests_a_single_notification_and_success_resets_backoff() {
+        let mut queue = DelayQueue::new();
+        let mut tasks = HashMap::new();
+        let mut map = HashMap::new();
+        map.insert(String::from("uid"), TaskSchedule::new(60, None, 1_700_000_000));
+        Timer::apply_timer_map(&mut queue, &mut tasks, map);
+
+        assert!(!Timer::finish_task(&mut queue, &mut tasks, String::from("uid"), false));
+        assert!(!Timer::finish_task(&mut queue, &mut tasks, String::from("uid"), false));
+        assert!(Timer::finish_task(&mut queue, &mut tasks, String::from("uid"), false));
+        assert_eq!(tasks.get("uid").map(|state| state.failure_count), Some(3));
+        assert!(!Timer::finish_task(&mut queue, &mut tasks, String::from("uid"), true));
+        assert_eq!(tasks.get("uid").map(|state| state.failure_count), Some(0));
     }
 }

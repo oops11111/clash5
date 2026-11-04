@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: Профильләр
     body: Профиль яңадан активлаштырылды.
+  subscriptionUpdateBackoff:
+    title: Язылуны яңарту
+    body: Автоматик яңарту өч тапкыр рәттән уңышсыз булды; бер сәгатьтән кабатланачак.
   appQuit:
     title: Чыгар алдыннан
     body: Clash Verge чыгарга җыена.

@@ -1,5 +1,5 @@
 use crate::config::MixedPort;
-use anyhow::Result;
+use anyhow::{Context as _, Result, bail};
 use base64::{Engine as _, engine::general_purpose};
 use reqwest::{
     Client, Proxy, StatusCode,
@@ -15,6 +15,45 @@ pub struct HttpResponse {
     status: StatusCode,
     headers: HeaderMap,
     body: String,
+}
+
+/// Maximum decompressed response size accepted for subscription-style text downloads.
+///
+/// reqwest transparently decompresses gzip/deflate/br responses before yielding chunks, so
+/// applying this limit while consuming chunks bounds the actual memory used by the caller.
+pub const MAX_TEXT_RESPONSE_BYTES: usize = 32 * 1024 * 1024;
+
+fn append_response_chunk(body: &mut Vec<u8>, chunk: &[u8]) -> Result<()> {
+    let next_len = body
+        .len()
+        .checked_add(chunk.len())
+        .context("response body length overflow")?;
+    if next_len > MAX_TEXT_RESPONSE_BYTES {
+        bail!("response body exceeds 32 MiB after decompression");
+    }
+    body.extend_from_slice(chunk);
+    Ok(())
+}
+
+async fn read_text_response(mut response: reqwest::Response) -> Result<String> {
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_TEXT_RESPONSE_BYTES as u64)
+    {
+        bail!("response body exceeds 32 MiB after decompression");
+    }
+
+    let mut body = Vec::with_capacity(
+        response
+            .content_length()
+            .map_or(0, |length| length.min(MAX_TEXT_RESPONSE_BYTES as u64) as usize),
+    );
+    while let Some(chunk) = response.chunk().await.context("Failed to read response body")? {
+        append_response_chunk(&mut body, &chunk)?;
+    }
+    Ok(std::string::String::from_utf8(body)
+        .context("response body is not valid UTF-8")?
+        .into())
 }
 
 impl HttpResponse {
@@ -208,11 +247,9 @@ impl NetworkManager {
 
         let status = response.status();
         let headers = response.headers().to_owned();
-        let body = match response.text().await {
+        let body = match read_text_response(response).await {
             Ok(text) => text.into(),
-            Err(e) => {
-                return Err(Self::context_reqwest_error(e, "Failed to read response body"));
-            }
+            Err(e) => return Err(e),
         };
 
         Ok(HttpResponse::new(status, headers, body))
@@ -292,5 +329,17 @@ impl NetworkManager {
                 }),
             Err(err) => Err(err),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MAX_TEXT_RESPONSE_BYTES, append_response_chunk};
+
+    #[test]
+    fn decompressed_response_limit_is_enforced_without_overflow() {
+        let mut body = vec![0_u8; MAX_TEXT_RESPONSE_BYTES - 1];
+        assert!(append_response_chunk(&mut body, &[0]).is_ok());
+        assert!(append_response_chunk(&mut body, &[0]).is_err());
     }
 }

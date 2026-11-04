@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: پروفایل‌ها
     body: پروفایل دوباره فعال شد.
+  subscriptionUpdateBackoff:
+    title: به‌روزرسانی اشتراک
+    body: به‌روزرسانی خودکار سه بار پیاپی شکست خورد؛ یک ساعت دیگر دوباره تلاش می‌شود.
   appQuit:
     title: در آستانه خروج
     body: Clash Verge در آستانه خروج است.

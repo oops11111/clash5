@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: الملفات التعريفية
     body: تمت إعادة تفعيل الملف التعريفي.
+  subscriptionUpdateBackoff:
+    title: تحديث الاشتراك
+    body: فشل التحديث التلقائي ثلاث مرات متتالية؛ ستتم إعادة المحاولة بعد ساعة.
   appQuit:
     title: على وشك الخروج
     body: Clash Verge على وشك الخروج.

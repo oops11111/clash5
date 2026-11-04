@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: Profil
     body: Profil diaktifkan kembali.
+  subscriptionUpdateBackoff:
+    title: Pembaruan Langganan
+    body: Pembaruan otomatis gagal tiga kali berturut-turut; akan mencoba lagi dalam satu jam.
   appQuit:
     title: Akan Keluar
     body: Clash Verge akan keluar.

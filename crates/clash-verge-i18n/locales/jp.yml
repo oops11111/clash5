@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: プロファイル
     body: プロファイルが再有効化されました。
+  subscriptionUpdateBackoff:
+    title: サブスクリプション更新
+    body: 自動更新が3回連続で失敗しました。1時間後に再試行します。
   appQuit:
     title: 終了間近
     body: Clash Verge はまもなく終了します。

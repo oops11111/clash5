@@ -17,6 +17,8 @@ pub enum NotificationEvent<'a> {
     TunModeToggled(bool),
     LightweightModeEntered,
     ProfilesReactivated,
+    /// Automatic subscription updates failed three times in a row.
+    SubscriptionUpdateBackoff,
     AppQuit,
 }
 
@@ -86,6 +88,11 @@ pub async fn notify_event<'a>(event: NotificationEvent<'a>) {
         NotificationEvent::ProfilesReactivated => {
             let title = clash_verge_i18n::t!("notifications.profilesReactivated.title");
             let body = clash_verge_i18n::t!("notifications.profilesReactivated.body");
+            notify(title, body);
+        }
+        NotificationEvent::SubscriptionUpdateBackoff => {
+            let title = clash_verge_i18n::t!("notifications.subscriptionUpdateBackoff.title");
+            let body = clash_verge_i18n::t!("notifications.subscriptionUpdateBackoff.body");
             notify(title, body);
         }
         NotificationEvent::AppQuit => {

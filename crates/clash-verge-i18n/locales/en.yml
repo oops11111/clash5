@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: Profiles
     body: Profile Reactivated.
+  subscriptionUpdateBackoff:
+    title: Subscription Update
+    body: Automatic update failed three times in a row; retrying in one hour.
   appQuit:
     title: About to Exit
     body: Clash Verge is about to exit.

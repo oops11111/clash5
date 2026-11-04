@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: Профили
     body: Профиль повторно активирован.
+  subscriptionUpdateBackoff:
+    title: Обновление подписки
+    body: Автоматическое обновление не удалось три раза подряд; повторная попытка через час.
   appQuit:
     title: Скорый выход
     body: Clash Verge скоро завершит работу.

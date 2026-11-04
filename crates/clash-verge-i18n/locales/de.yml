@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: Profile
     body: Profil reaktiviert.
+  subscriptionUpdateBackoff:
+    title: Abonnement-Aktualisierung
+    body: Automatische Aktualisierung ist dreimal in Folge fehlgeschlagen; neuer Versuch in einer Stunde.
   appQuit:
     title: Beenden steht bevor
     body: Clash Verge wird gleich beendet.

@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: 訂閱
     body: 訂閱已啟用。
+  subscriptionUpdateBackoff:
+    title: 訂閱更新
+    body: 自動更新連續失敗 3 次，將於一小時後重試。
   appQuit:
     title: 即將退出
     body: Clash Verge 即將退出。

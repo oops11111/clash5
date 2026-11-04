@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: Profiller
     body: Profil yeniden etkinleştirildi.
+  subscriptionUpdateBackoff:
+    title: Abonelik Güncellemesi
+    body: Otomatik güncelleme art arda üç kez başarısız oldu; bir saat sonra yeniden denenecek.
   appQuit:
     title: Çıkış Yapılmak Üzere
     body: Clash Verge kapanmak üzere.

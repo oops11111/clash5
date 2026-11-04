@@ -26,6 +26,9 @@ notifications:
   profilesReactivated:
     title: 프로필
     body: 프로필이 다시 활성화되었습니다.
+  subscriptionUpdateBackoff:
+    title: 구독 업데이트
+    body: 자동 업데이트가 연속 3회 실패했습니다. 한 시간 후 다시 시도합니다.
   appQuit:
     title: 곧 종료
     body: Clash Verge가 곧 종료됩니다.
