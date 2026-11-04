@@ -914,12 +914,14 @@ export type IProfiles = IProfiles_Serialize | IProfiles_Deserialize
 
 /**  Define the `profiles.yaml` schema */
 export type IProfiles_Deserialize = {
+  schema_version?: number
   current?: string | null
   items?: PrfItem_Deserialize[] | null
 }
 
 /**  Define the `profiles.yaml` schema */
 export type IProfiles_Serialize = {
+  schema_version: number
   current: string | null
   items: PrfItem_Serialize[] | null
 }

@@ -48,14 +48,34 @@ const SELECTED_NODES_SETTLE_INTERVAL: Duration = Duration::from_secs(1);
 /// Bounds startup waiting; remaining selections continue restoring in the background.
 const SELECTED_NODES_FIRST_PASS_BUDGET: Duration = Duration::from_secs(3);
 
+/// Current on-disk schema for `profiles.yaml`.
+pub const PROFILES_SCHEMA_VERSION: u8 = 1;
+
+const fn default_profiles_schema_version() -> u8 {
+    PROFILES_SCHEMA_VERSION
+}
+
 /// Define the `profiles.yaml` schema
-#[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[derive(Debug, Clone, Deserialize, Serialize, specta::Type)]
 #[serde(default)]
 pub struct IProfiles {
+    #[serde(default = "default_profiles_schema_version")]
+    pub schema_version: u8,
+
     #[specta(type = Option<std::string::String>)]
     pub current: Option<String>,
 
     pub items: Option<Vec<PrfItem>>,
+}
+
+impl Default for IProfiles {
+    fn default() -> Self {
+        Self {
+            schema_version: PROFILES_SCHEMA_VERSION,
+            current: None,
+            items: None,
+        }
+    }
 }
 
 pub struct IProfilePreview<'a> {
@@ -112,6 +132,16 @@ impl IProfiles {
 
         match help::read_yaml::<Self>(&path).await {
             Ok(mut profiles) => {
+                if profiles.schema_version > PROFILES_SCHEMA_VERSION {
+                    logging!(
+                        error,
+                        Type::Config,
+                        "profiles.yaml uses unsupported schema version {}; refusing to rewrite it",
+                        profiles.schema_version
+                    );
+                    return profiles;
+                }
+                profiles.schema_version = PROFILES_SCHEMA_VERSION;
                 let items = profiles.items.get_or_insert_with(Vec::new);
                 let mut home_changed = false;
                 for item in items.iter_mut() {
@@ -148,7 +178,16 @@ impl IProfiles {
     }
 
     pub async fn save_file(&self) -> Result<()> {
-        help::save_yaml(&dirs::profiles_path()?, self, Some("# Profiles Config for clash5")).await
+        if self.schema_version > PROFILES_SCHEMA_VERSION {
+            anyhow::bail!(
+                "profiles.yaml schema version {} is newer than the supported version {}",
+                self.schema_version,
+                PROFILES_SCHEMA_VERSION
+            );
+        }
+        let mut profiles = self.clone();
+        profiles.schema_version = PROFILES_SCHEMA_VERSION;
+        help::save_yaml(&dirs::profiles_path()?, &profiles, Some("# Profiles Config for clash5")).await
     }
 
     /// 只修改current，valid和chain
@@ -1407,6 +1446,21 @@ mod tests {
     use tauri_plugin_mihomo::models::Proxy;
 
     #[test]
+    fn profiles_schema_defaults_for_legacy_yaml_and_new_instances() -> Result<()> {
+        let legacy: IProfiles = serde_yaml_ng::from_str("current: null\nitems: null\n")?;
+        assert_eq!(legacy.schema_version, PROFILES_SCHEMA_VERSION);
+        assert_eq!(IProfiles::default().schema_version, PROFILES_SCHEMA_VERSION);
+        Ok(())
+    }
+
+    #[test]
+    fn profiles_schema_serializes_version_one() -> Result<()> {
+        let yaml = serde_yaml_ng::to_string(&IProfiles::default())?;
+        assert!(yaml.contains("schema_version: 1"));
+        Ok(())
+    }
+
+    #[test]
     fn numbered_profile_name_skips_taken_suffixes() {
         assert_eq!(numbered_profile_name("example.com", &["other"]), None);
         assert_eq!(
@@ -1602,6 +1656,7 @@ mod tests {
     #[tokio::test]
     async fn missing_reorder_ids_preserve_ordered_items() -> Result<()> {
         let mut profiles = IProfiles {
+            schema_version: super::PROFILES_SCHEMA_VERSION,
             current: Some("a".into()),
             items: Some(vec![
                 PrfItem {
@@ -1639,6 +1694,7 @@ mod tests {
     #[test]
     fn raising_intervals_only_touches_those_scheduled_too_often() {
         let mut profiles = IProfiles {
+            schema_version: super::PROFILES_SCHEMA_VERSION,
             current: None,
             items: Some(vec![
                 interval_item("too-often", Some(60)),
@@ -1679,6 +1735,7 @@ mod tests {
     #[test]
     fn delete_plan_defers_files_and_selects_replacement() -> Result<()> {
         let mut profiles = IProfiles {
+            schema_version: super::PROFILES_SCHEMA_VERSION,
             current: Some("a".into()),
             items: Some(vec![
                 deletion_item("a", "remote", "a.yaml", Some("owned")),

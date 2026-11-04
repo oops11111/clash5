@@ -44,6 +44,7 @@ function choice<T extends string | number>(
 export function profilesFromWire(value: IProfiles_Serialize): IProfilesConfig {
   const profiles = withoutNulls(value)
   return {
+    schema_version: profiles.schema_version,
     current: profiles.current,
     items: profiles.items?.map((item) => {
       if (!item.uid) throw new Error('Profile response is missing its uid')

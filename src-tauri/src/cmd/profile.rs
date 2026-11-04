@@ -240,6 +240,7 @@ pub async fn delete_profile(index: std::string::String) -> CmdResult {
 async fn restore_previous_profile(prev_profile: &String) -> CmdResult<()> {
     logging!(info, Type::Cmd, "尝试恢复到之前的配置: {}", prev_profile);
     let restore_profiles = IProfiles {
+        schema_version: crate::config::profiles::PROFILES_SCHEMA_VERSION,
         current: Some(prev_profile.to_owned()),
         items: None,
     };
@@ -264,6 +265,7 @@ async fn commit_current_profile(profiles: &Draft<IProfiles>, current: Option<Str
     profiles
         .with_data_modify(|mut committed| async move {
             committed.patch_config(&IProfiles {
+                schema_version: crate::config::profiles::PROFILES_SCHEMA_VERSION,
                 current: Some(current),
                 items: None,
             });
@@ -374,6 +376,7 @@ pub async fn patch_profiles_config(profiles: IProfiles) -> CmdResult<ValidationO
 
 pub async fn patch_profiles_config_by_profile_index(profile_index: String) -> CmdResult<ValidationOutcome> {
     let profiles = IProfiles {
+        schema_version: crate::config::profiles::PROFILES_SCHEMA_VERSION,
         current: Some(profile_index),
         items: None,
     };
@@ -533,11 +536,13 @@ mod tests {
     #[tokio::test]
     async fn committing_profile_switch_preserves_profiles_added_after_draft_creation() -> anyhow::Result<()> {
         let profiles = Draft::new(IProfiles {
+            schema_version: crate::config::profiles::PROFILES_SCHEMA_VERSION,
             current: Some("a".into()),
             items: Some(vec![profile("a"), profile("b")]),
         });
         profiles.edit_draft(|draft| {
             draft.patch_config(&IProfiles {
+                schema_version: crate::config::profiles::PROFILES_SCHEMA_VERSION,
                 current: Some("b".into()),
                 items: None,
             });

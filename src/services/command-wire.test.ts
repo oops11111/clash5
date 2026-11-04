@@ -34,7 +34,10 @@ test('profile wire values retain identity while normalizing optional fields', ()
     updated: null,
     selected: [{ name: null, now: null }],
   }
-  expect(profilesFromWire({ current: null, items: [item] })).toEqual({
+  expect(
+    profilesFromWire({ schema_version: 1, current: null, items: [item] }),
+  ).toEqual({
+    schema_version: 1,
     current: undefined,
     items: [
       {
@@ -47,7 +50,11 @@ test('profile wire values retain identity while normalizing optional fields', ()
     ],
   })
   expect(() =>
-    profilesFromWire({ current: null, items: [{ ...item, uid: null }] }),
+    profilesFromWire({
+      schema_version: 1,
+      current: null,
+      items: [{ ...item, uid: null }],
+    }),
   ).toThrow('uid')
 })
 

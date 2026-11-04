@@ -257,6 +257,7 @@ interface IProfileOption {
 }
 
 interface IProfilesConfig {
+  schema_version?: number
   current?: string
   items?: IProfileItem[]
 }
