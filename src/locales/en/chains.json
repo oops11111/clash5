@@ -107,6 +107,7 @@
   "quality": {
     "run": "Quality test",
     "note": "Runs only when you start it. Sends real traffic through this chain, up to 20 MB and 60 seconds.",
+    "confirmTitle": "Run a quality test?",
     "confirm": "This sends about {{size}} MB of traffic through the chain and takes up to a minute. Continue?",
     "status": "Result",
     "median": "Median speed",

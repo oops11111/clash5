@@ -9,6 +9,7 @@
     "vergeImport": {
       "action": "Import Clash Verge Rev data",
       "chooseSource": "Choose the Clash Verge Rev data directory",
+      "confirmTitle": "Import Clash Verge Rev data?",
       "backupReminder": "Back up this source directory before importing. clash5 reads it without changing its files. Continue?",
       "success": "Imported {{imported}} profile(s); skipped {{skipped}} unsupported item(s); node-index sync failures: {{syncFailures}}. Source SHA-256 manifest: {{manifest}}",
       "skippedReasons": "Migration skipped these items because: {{reasons}}",

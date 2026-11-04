@@ -570,8 +570,8 @@
 | 字段 | 内容 |
 |---|---|
 | **来源** | R14 **Q1–Q8**；V3：47 个 C5 码仅译 7 个为 P1 |
-| **文件:行** | `window.confirm` 仍见 `profiles.tsx:277`、`chains.tsx:510` |
-| **现状** | **未落地** |
+| **文件:行** | `src/components/base/confirm-dialog.tsx`；调用点 `src/pages/profiles.tsx`、`src/pages/chains.tsx` |
+| **现状** | **部分落地** — 链路质量检测和 Verge 数据导入已从 `window.confirm` 切换到可键盘访问的 `ConfirmDialog`，新增中英文标题与加载态；R14 其余错误码、空状态和全页面 a11y 证据仍待补齐 |
 
 ### P1-43 · 配置写锁 / Busy / 托盘刷新（R15 Y1–Y2 等）
 

@@ -32,6 +32,7 @@ import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 import {
   BasePage,
   BaseStyledTextField,
+  ConfirmDialog,
   type DialogRef,
 } from '@/components/base'
 import { ManualNodesCard } from '@/components/profile/manual-nodes-card'
@@ -95,6 +96,9 @@ const ProfilePage = () => {
     string | null
   >(null)
   const [loading, setLoading] = useState(false)
+  const [vergeImportSource, setVergeImportSource] = useState<string | null>(
+    null,
+  )
 
   const [batchMode, setBatchMode] = useState(false)
   const [selectedProfiles, setSelectedProfiles] = useState<Set<string>>(
@@ -274,10 +278,20 @@ const ProfilePage = () => {
         title: t('profiles.page.vergeImport.chooseSource'),
       })
       if (typeof selected !== 'string') return
-      if (!window.confirm(t('profiles.page.vergeImport.backupReminder'))) return
+      setVergeImportSource(selected)
+    } catch (error) {
+      showNotice.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-      setLoading(true)
-      const report = await importClash5VergeData(selected)
+  const confirmVergeImport = async () => {
+    if (!vergeImportSource) return
+    setVergeImportSource(null)
+    setLoading(true)
+    try {
+      const report = await importClash5VergeData(vergeImportSource)
       await mutateProfiles()
       showNotice.success('profiles.page.vergeImport.success', {
         imported: report.imported,
@@ -1030,6 +1044,16 @@ const ProfilePage = () => {
         }}
       />
       <ConfigViewer ref={configRef} />
+      <ConfirmDialog
+        open={vergeImportSource !== null}
+        title={t('profiles.page.vergeImport.confirmTitle')}
+        message={t('profiles.page.vergeImport.backupReminder')}
+        confirmLabel={t('shared.actions.confirm')}
+        cancelLabel={t('layout.components.navigation.cancel')}
+        loading={loading}
+        onConfirm={() => void confirmVergeImport()}
+        onCancel={() => !loading && setVergeImportSource(null)}
+      />
     </BasePage>
   )
 }

@@ -22,7 +22,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 
-import { BasePage } from '@/components/base'
+import { BasePage, ConfirmDialog } from '@/components/base'
 import { PoolPolicy } from '@/components/chain/pool-policy'
 import { PoolScoreList } from '@/components/chain/pool-scores'
 import {
@@ -41,8 +41,8 @@ import {
   saveClash5NodePool,
   testClash5Chain,
 } from '@/services/cmds'
-import type { SwitchEvent } from '@/services/tauri-commands.generated'
 import { appStorage } from '@/services/storage'
+import type { SwitchEvent } from '@/services/tauri-commands.generated'
 import type {
   AppMatcherRef,
   AppRouteDef,
@@ -180,6 +180,7 @@ const ChainsPage = () => {
   const [policyGroup, setPolicyGroup] = useState('')
   const [exitResult, setExitResult] = useState<ExitIpResult | null>(null)
   const [quality, setQuality] = useState<ChainQualityReport | null>(null)
+  const [qualityConfirmOpen, setQualityConfirmOpen] = useState(false)
   const [appRoutes, setAppRoutes] = useState<AppRouteDef[]>([])
   const [samples, setSamples] = useState<ChainSample[]>([])
   const [routeDraft, setRouteDraft] = useState<AppRouteDef | null>(null)
@@ -299,6 +300,18 @@ const ChainsPage = () => {
   const report = (text: string, level: 'success' | 'warning' = 'success') => {
     setMessage(text)
     setSeverity(level)
+  }
+
+  const runQualityTest = () => {
+    setQualityConfirmOpen(false)
+    void perform(async () => {
+      if (!draft) return
+      const result = await runClash5QualityTest(draft.id)
+      setQuality(result)
+      void refreshSamples(draft.id)
+      if (result.status !== 'healthy')
+        report(t(`chains.quality.${result.status}`), 'warning')
+    })
   }
 
   const choose = (chain: Clash5Chain) => {
@@ -503,24 +516,7 @@ const ChainsPage = () => {
               size="small"
               disabled={!canTest}
               title={t('chains.quality.note')}
-              onClick={() =>
-                void perform(async () => {
-                  if (!draft) return
-                  if (
-                    !window.confirm(
-                      t('chains.quality.confirm', {
-                        size: Math.round(QUALITY_DEFAULT_BYTES / 1_000_000),
-                      }),
-                    )
-                  )
-                    return
-                  const result = await runClash5QualityTest(draft.id)
-                  setQuality(result)
-                  void refreshSamples(draft.id)
-                  if (result.status !== 'healthy')
-                    report(t(`chains.quality.${result.status}`), 'warning')
-                })
-              }
+              onClick={() => setQualityConfirmOpen(true)}
             >
               {t('chains.quality.run')}
             </Button>
@@ -1415,6 +1411,18 @@ const ChainsPage = () => {
           </Stack>
         )}
       </Stack>
+      <ConfirmDialog
+        open={qualityConfirmOpen}
+        title={t('chains.quality.confirmTitle')}
+        message={t('chains.quality.confirm', {
+          size: Math.round(QUALITY_DEFAULT_BYTES / 1_000_000),
+        })}
+        confirmLabel={t('shared.actions.confirm')}
+        cancelLabel={t('layout.components.navigation.cancel')}
+        loading={busy}
+        onConfirm={runQualityTest}
+        onCancel={() => !busy && setQualityConfirmOpen(false)}
+      />
     </BasePage>
   )
 }

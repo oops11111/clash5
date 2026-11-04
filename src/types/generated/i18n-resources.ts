@@ -112,6 +112,7 @@ export interface TranslationResources {
       quality: {
         bytesUsed: string
         confirm: string
+        confirmTitle: string
         disconnects: string
         failed: string
         failedRun: string
@@ -847,6 +848,7 @@ export interface TranslationResources {
           action: string
           backupReminder: string
           chooseSource: string
+          confirmTitle: string
           failure: string
           skippedReasons: string
           success: string
