@@ -1,0 +1,47 @@
+# Release gates
+
+This is the release-blocking registry for the [2026-11-04 reviewed backlog](docs/clash5/CLASH5-BACKLOG-ALL-ROUNDS-2026-11-04.md).
+An implementation or a static check alone is not a passed gate. Every row must be
+`passed`, have an executable check, and link acceptance evidence before RC approval.
+`node scripts/check-release-gates.mjs --release` rejects incomplete rows.
+The later-round G-17 through G-34 acceptance details must also be reconciled from
+the original review records before release; the present registry is a skeleton.
+
+| Gate | Backlog | Status | Check | Remaining evidence |
+| --- | --- | --- | --- | --- |
+| G-01 | P0-01 | blocked | - | Missing targets reject only their application; route health and UI |
+| G-02 | P0-03 | blocked | - | RC-only publication and environment approval |
+| G-03 | P0-02 | blocked | - | Profile isolation and retained materialized nodes |
+| G-04 | P0-04 | partial | scripts/check-webview-security.mjs | Desktop IPC, Monaco, dialog import, icons and denied out-of-scope reads |
+| G-05 | P0-05 | blocked | - | Trusted signer lifecycle and catalog rollback protection |
+| G-06 | P0-06 | partial | - | Backup path tests pass locally; native save dialog and denied destination runtime checks remain |
+| G-07 | P0-18 | blocked | - | First release excludes browser companion resources |
+| G-08 | P0-18 | blocked | - | Frozen driver artifacts and accurate product claims |
+| G-09 | P0-07 | blocked | - | Core exit and dirty-exit system proxy recovery |
+| G-10 | P0-08 | blocked | - | IPv6 off and respect-rules on; preserve explicit settings |
+| G-11 | P0-09 | blocked | - | Uninstall proxy ownership and scheduled-task cleanup |
+| G-12 | P0-10 | blocked | - | Token-safe subscription naming and migration |
+| G-13 | P0-11 | blocked | - | Explicit subscription transport policy and UA |
+| G-14 | P0-14 | blocked | - | Pre-migration snapshot, atomic v11 and downgrade rejection |
+| G-15 | P0-15 | blocked | - | Corrupt config preservation and write protection |
+| G-16 | P0-16 | blocked | - | Updater disabled consistently and verified signing |
+| P0-12 | P0-12 | blocked | - | No in-app core upgrade and verified packaged core |
+| P0-13 | P0-13 | partial | - | Strict TLS source fixed; invalid-cert runtime, restore sandbox and optional encryption remain |
+| P0-17 | P0-17 | partial | scripts/check-release-gates.mjs | Complete executable gate coverage, evidence and later-round reconciliation |
+
+## Local implementation evidence (2026-11-04)
+
+Issue: https://github.com/oops11111/clash5/issues/68.
+`tsc --noEmit`, Vite production build, and offline Rust library `cargo check`
+passed. The standalone backup path test binary passed all three Windows tests;
+the Unix symlink-escape test is included for CI and has not run locally.
+The WebView guard passed on current configuration and rejected isolated fixtures
+with null CSP and unrestricted filesystem scope. Registry validation passed;
+`--release` failed as intended because acceptance is incomplete.
+
+The Windows native save dialog, out-of-scope IPC rejection, icon loading and
+Monaco workers still require desktop acceptance. WebDAV now uses the default
+certificate verifier, but invalid-certificate server acceptance has not run.
+Restore staging, archive limits, optional encryption, core-upgrade removal and
+updater shutdown are not implemented in this tranche. No installer was built,
+no system security settings changed, and no release was published.

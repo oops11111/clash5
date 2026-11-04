@@ -356,11 +356,11 @@ pub async fn list_local_backup() -> Result<Vec<LocalBackupFile>> {
 
 pub async fn delete_local_backup(filename: String) -> Result<()> {
     let backup_dir = local_backup_dir()?;
-    let target_path = backup_dir.join(filename.as_str());
-    if !target_path.exists() {
-        logging!(debug, Type::Backup, "Local backup file not found: {}", filename);
-        return Ok(());
-    }
+    let target_path = match super::backup_path::backup_source(&backup_dir, filename.as_str()) {
+        Ok(path) => path,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
     target_path.remove_if_exists().await?;
     Ok(())
 }
@@ -368,10 +368,7 @@ pub async fn delete_local_backup(filename: String) -> Result<()> {
 #[tracing::instrument(skip_all, level = "info", fields(filename = %filename))]
 pub async fn restore_local_backup(filename: String) -> Result<()> {
     let backup_dir = local_backup_dir()?;
-    let target_path = backup_dir.join(filename.as_str());
-    if !target_path.exists() {
-        return Err(anyhow!("Backup file not found: {}", filename));
-    }
+    let target_path = super::backup_path::backup_source(&backup_dir, filename.as_str())?;
 
     let (webdav_url, webdav_username, webdav_password) = {
         let verge = Config::verge().await;
@@ -393,15 +390,21 @@ pub async fn restore_local_backup(filename: String) -> Result<()> {
 
 #[tracing::instrument(skip_all, level = "info", fields(filename = %filename, destination = %destination))]
 pub async fn export_local_backup(filename: String, destination: String) -> Result<()> {
+    use tauri_plugin_fs::FsExt as _;
+
     let backup_dir = local_backup_dir()?;
-    let source_path = backup_dir.join(filename.as_str());
-    if !source_path.exists() {
-        return Err(anyhow!("Backup file not found: {}", filename));
-    }
+    let source_path = super::backup_path::backup_source(&backup_dir, filename.as_str())?;
 
     let dest_path = PathBuf::from(destination.as_str());
-    if let Some(parent) = dest_path.parent() {
-        fs::create_dir_all(parent).await?;
+    if !dest_path.is_absolute()
+        || dest_path
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
+        || !crate::core::handle::Handle::app_handle()
+            .fs_scope()
+            .is_allowed(&dest_path)
+    {
+        return Err(anyhow!("Export destination must be selected through the save dialog"));
     }
 
     fs::copy(&source_path, &dest_path)

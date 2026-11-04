@@ -1,4 +1,5 @@
 mod backup;
+mod backup_path;
 mod clash;
 mod config;
 mod core_upgrade;

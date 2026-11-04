@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/clash5-release-candidate.yml'
       - 'scripts/release-gate/**'
+      - 'scripts/check-release-gates.mjs'
+      - 'RELEASE-GATES.md'
   workflow_dispatch:
     inputs:
       tag:
@@ -55,6 +57,9 @@ jobs:
           if [[ "$TAG" == *-* ]]; then branch=dev; else branch=main; fi
           git fetch origin "$branch"
           git merge-base --is-ancestor HEAD "origin/$branch"
+      - name: Enforce reviewed release gates
+        run: node scripts/check-release-gates.mjs --release
+
       - name: Download draft metadata and assets
         env:
           GH_TOKEN: ${{ github.token }}

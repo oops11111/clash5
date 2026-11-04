@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "src-tauri/**"
+      - "src/services/monaco.ts"
+      - "scripts/check-webview-security.mjs"
+      - "scripts/check-release-gates.mjs"
+      - "RELEASE-GATES.md"
       - ".github/workflows/backend-guardrails.yml"
   workflow_dispatch:
 
@@ -15,6 +19,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: WebView security boundaries
+        run: node scripts/check-webview-security.mjs
+
+      - name: Release registry integrity
+        run: node scripts/check-release-gates.mjs
+
+      - name: Backup path regression tests
+        run: |
+          rustc --edition 2024 --test src-tauri/src/feat/backup_path.rs -o /tmp/clash5-backup-path-tests
+          /tmp/clash5-backup-path-tests
 
       - name: No Handle::refresh calls in feat
         run: '! grep -rn "Handle::refresh" src-tauri/src/feat'
