@@ -1645,7 +1645,7 @@ mod tests {
 
     #[test]
     fn performance_presets_stay_within_probe_limit() {
-        assert_eq!(PerformancePreset::Balanced.probe_concurrency(), 12);
+        assert_eq!(PerformancePreset::Balanced.probe_concurrency(), 10);
         assert_eq!(PerformancePreset::Performance.probe_concurrency(), PROBE_CONCURRENCY);
         assert_eq!(PerformancePreset::PowerSaving.probe_concurrency(), 4);
         assert_eq!(

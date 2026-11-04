@@ -7,7 +7,11 @@ vi.mock('tauri-plugin-mihomo-api', () => ({
 
 import type { ResolvedProxyMember } from '@/types/proxy-view'
 
-import delayManager from './delay'
+import delayManager, {
+  clampDelayConcurrency,
+  DEFAULT_DELAY_CONCURRENCY,
+  MAX_DELAY_CONCURRENCY,
+} from './delay'
 
 const node = (name: string) =>
   ({
@@ -58,6 +62,15 @@ describe('group delay completion', () => {
     expect(other).toBe(0)
     stop()
   })
+})
+
+test('keeps the reviewed default and explicit sixteen-worker ceiling', () => {
+  expect(DEFAULT_DELAY_CONCURRENCY).toBe(10)
+  expect(MAX_DELAY_CONCURRENCY).toBe(16)
+  expect(clampDelayConcurrency(36, 40)).toBe(16)
+  expect(clampDelayConcurrency(10, 40)).toBe(10)
+  expect(clampDelayConcurrency(0, 40)).toBe(1)
+  expect(clampDelayConcurrency(Number.NaN, 40)).toBe(10)
 })
 
 test('uses newer core history after a tray test without hiding an active page test', () => {

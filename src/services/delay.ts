@@ -18,6 +18,21 @@ export type DelaySnapshot = {
   of: (member: ResolvedProxyMember) => number
 }
 
+export const DEFAULT_DELAY_CONCURRENCY = 10
+export const MAX_DELAY_CONCURRENCY = 16
+
+export const clampDelayConcurrency = (requested: number, count: number) =>
+  Math.min(
+    Math.max(
+      1,
+      Number.isFinite(requested)
+        ? Math.floor(requested)
+        : DEFAULT_DELAY_CONCURRENCY,
+    ),
+    count,
+    MAX_DELAY_CONCURRENCY,
+  )
+
 const hashKey = (member: ResolvedProxyMember, group: string) => {
   if (member.kind !== 'node')
     return JSON.stringify([group, member.kind, member.ref.name])
@@ -360,7 +375,7 @@ class DelayManager {
     proxies: InteractableProxyMember[],
     group: string,
     timeout: number,
-    concurrency = 36,
+    concurrency = DEFAULT_DELAY_CONCURRENCY,
   ) {
     debugLog(
       `[DelayManager] 批量测试延迟开始，组: ${group}, 数量: ${proxies.length}, 并发数: ${concurrency}`,
@@ -401,7 +416,7 @@ class DelayManager {
       return help()
     }
 
-    const actualConcurrency = Math.min(concurrency, proxies.length, 10)
+    const actualConcurrency = clampDelayConcurrency(concurrency, proxies.length)
     debugLog(`[DelayManager] 实际并发数: ${actualConcurrency}`)
 
     const promiseList: Promise<void>[] = []

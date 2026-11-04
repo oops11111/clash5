@@ -109,3 +109,8 @@ P1-11 issue #73 now maps system Chinese variants to `zh` and all other system
 locales to `en`, while manual language choices remain authoritative. The
 `i18n:missing-keys` check reports existing non-English pack gaps as CI warnings;
 runtime fallback is English and the translation gaps remain follow-up work.
+
+P1-12 issue #74 aligns latency probing at a default concurrency of 10 with an
+explicit ceiling of 16 in both the frontend and backend. The cross-layer
+`check:probe-concurrency` guard and unit tests cover the default, ceiling, and
+legacy-36 regression.

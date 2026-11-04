@@ -22,7 +22,7 @@ pub enum PerformancePreset {
 impl PerformancePreset {
     pub const fn probe_concurrency(self) -> usize {
         match self {
-            Self::Balanced => 12,
+            Self::Balanced => 10,
             Self::Performance => 16,
             Self::PowerSaving => 4,
         }
