@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   FormControl,
   InputAdornment,
@@ -453,11 +454,28 @@ export function ProfileViewer({ onChange, ref }: ProfileViewerProps) {
             name="option.danger_accept_invalid_certs"
             control={control}
             render={({ field }) => (
-              <StyledBox>
-                <InputLabel>
-                  {t('profiles.modals.profileForm.fields.acceptInvalidCerts')}
-                </InputLabel>
-                <Switch checked={field.value} {...field} color="primary" />
+              <StyledBox
+                sx={{ flexDirection: 'column', alignItems: 'stretch' }}
+              >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <InputLabel>
+                    {t('profiles.modals.profileForm.fields.acceptInvalidCerts')}
+                  </InputLabel>
+                  <Switch checked={field.value} {...field} color="primary" />
+                </Box>
+                {field.value && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    {t(
+                      'profiles.modals.profileForm.fields.acceptInvalidCertsWarning',
+                    )}
+                  </Alert>
+                )}
               </StyledBox>
             )}
           />

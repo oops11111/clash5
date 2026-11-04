@@ -133,6 +133,7 @@
         "useSystemProxy": "Use System Proxy",
         "useClashProxy": "Use Clash Proxy",
         "acceptInvalidCerts": "Allows Invalid Certificates (Danger)",
+        "acceptInvalidCertsWarning": "Certificate validation is disabled for this subscription only. Prefer a trusted CA or certificate fingerprint when available.",
         "allowAutoUpdate": "Allow Auto Update",
         "decoupleRules": "Send all subscription policies to the default exit"
       },

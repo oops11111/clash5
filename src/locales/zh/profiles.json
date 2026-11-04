@@ -133,6 +133,7 @@
         "useSystemProxy": "使用系统代理更新",
         "useClashProxy": "使用内核代理更新",
         "acceptInvalidCerts": "允许无效证书（危险）",
+        "acceptInvalidCertsWarning": "仅此订阅会关闭证书校验；如条件允许，请优先使用受信 CA 或证书指纹。",
         "allowAutoUpdate": "允许自动更新",
         "decoupleRules": "订阅规则全部改走默认出口"
       },

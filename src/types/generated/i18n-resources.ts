@@ -745,6 +745,7 @@ export interface TranslationResources {
           }
           fields: {
             acceptInvalidCerts: string
+            acceptInvalidCertsWarning: string
             allowAutoUpdate: string
             decoupleRules: string
             description: string
