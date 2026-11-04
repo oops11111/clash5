@@ -78,6 +78,7 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
     };
     let inline_snapshot = item.file_data.as_ref().map(std::string::ToString::to_string);
 
+    let _profile_write_guard = PROFILE_WRITE_LOCK.lock().await;
     if let Err(e) = profiles_append_item_safe(item).await {
         logging!(error, Type::Cmd, "[导入订阅] 保存配置失败: {e:#}");
         return Err(coded_error("PROFILE_IMPORT_FAILED", e));
@@ -109,6 +110,7 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
 pub async fn reorder_profile(active_id: std::string::String, over_id: std::string::String) -> CmdResult {
     let active_id: String = active_id.into();
     let over_id: String = over_id.into();
+    let _profile_write_guard = PROFILE_WRITE_LOCK.lock().await;
     match profiles_reorder_safe(&active_id, &over_id).await {
         Ok(_) => {
             logging!(info, Type::Cmd, "重新排序配置文件: {} -> {}", active_id, over_id);
@@ -131,6 +133,7 @@ pub async fn reorder_profile(active_id: std::string::String, over_id: std::strin
 #[specta::specta]
 pub async fn create_profile(item: PrfItem, file_data: Option<std::string::String>) -> CmdResult {
     let file_data = file_data.map(Into::into);
+    let _profile_write_guard = PROFILE_WRITE_LOCK.lock().await;
     match profiles_append_item_with_filedata_safe(&item, file_data).await {
         Ok(_) => {
             profiles_save_file_safe()
@@ -387,6 +390,7 @@ pub async fn patch_profiles_config_by_profile_index(profile_index: String) -> Cm
 #[specta::specta]
 pub async fn patch_profile(index: std::string::String, profile: PrfItem) -> CmdResult {
     let index: String = index.into();
+    let _profile_write_guard = PROFILE_WRITE_LOCK.lock().await;
     let profiles = Config::profiles().await;
     let should_refresh_timer = if let Ok(old_profile) = profiles.latest_arc().get_item(&index)
         && let Some(new_option) = profile.option.as_ref()

@@ -208,6 +208,7 @@ async fn perform_profile_update(
 
 #[tracing::instrument(skip_all, level = "info", fields(uid = %uid, manual = is_mannual_trigger))]
 pub async fn update_profile(uid: &String, option: Option<&PrfOption>, is_mannual_trigger: bool) -> Result<()> {
+    let _profile_write_guard = crate::config::profiles::PROFILE_WRITE_LOCK.lock().await;
     let url_opt = should_update_profile(uid, is_mannual_trigger).await?;
 
     let profile_persisted = match url_opt {
