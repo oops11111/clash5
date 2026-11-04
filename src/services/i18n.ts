@@ -1,6 +1,8 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
+import { appStorage } from '@/services/storage'
+
 export const supportedLanguages = [
   'en',
   'ru',
@@ -63,32 +65,17 @@ export const resolvePreferredLanguage = (
   return resolveLanguage(preference)
 }
 
-const getLanguageStorage = () => {
-  if (typeof window === 'undefined') return null
-  try {
-    return window.localStorage
-  } catch {
-    return null
-  }
-}
-
 export const cacheLanguage = (language: string) => {
-  const storage = getLanguageStorage()
-  if (!storage) return
-
   try {
-    storage.setItem(LANGUAGE_STORAGE_KEY, resolveLanguage(language))
+    appStorage.setItem(LANGUAGE_STORAGE_KEY, resolveLanguage(language))
   } catch (error) {
     console.warn('[i18n] Failed to cache language:', error)
   }
 }
 
 export const getCachedLanguage = () => {
-  const storage = getLanguageStorage()
-  if (!storage) return undefined
-
   try {
-    const cached = storage.getItem(LANGUAGE_STORAGE_KEY)
+    const cached = appStorage.getItem(LANGUAGE_STORAGE_KEY)
     return cached ? resolveLanguage(cached) : undefined
   } catch (error) {
     console.warn('[i18n] Failed to read cached language:', error)

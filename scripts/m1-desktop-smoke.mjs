@@ -112,11 +112,10 @@ async function startM4SingboxFixture() {
       `Pinned sing-box fixture is missing at ${singboxBinary}; run prebuild first`,
     )
   }
-  const child = spawn(
-    singboxBinary,
-    ['run', '-c', 'stdin'],
-    { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true },
-  )
+  const child = spawn(singboxBinary, ['run', '-c', 'stdin'], {
+    stdio: ['pipe', 'ignore', 'ignore'],
+    windowsHide: true,
+  })
   let startupError
   child.once('error', (error) => {
     startupError = error
@@ -1881,7 +1880,10 @@ async function verifyM2Chains() {
       `M2 front node was absent from workspace: ${backendWorkspace.nodes.map((node) => node.display_name).join(', ')}`,
     )
   await browser.execute(() => {
-    localStorage.setItem('clash5-exit-ip-url', 'http://127.0.0.1:18090/ip')
+    localStorage.setItem(
+      'clash5:v1:clash5-exit-ip-url',
+      'http://127.0.0.1:18090/ip',
+    )
     window.history.pushState({}, '', '/chains')
     window.dispatchEvent(new PopStateEvent('popstate'))
   })

@@ -4,10 +4,11 @@ import {
   syncTrayProxySelection,
 } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
+import { appStorage } from '@/services/storage'
 
 function readLegacyTestUrls(uid: string): Record<string, string> {
   try {
-    const states = JSON.parse(localStorage.getItem('proxy-head-state') || '{}')[
+    const states = JSON.parse(appStorage.getItem('proxy-head-state') || '{}')[
       uid
     ]
     return Object.fromEntries(

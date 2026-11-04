@@ -42,6 +42,7 @@
     "check:script-safety": "node scripts/check-script-safety.mjs",
     "check:local-diagnostics": "node scripts/check-local-diagnostics.mjs",
     "check:perf-redline": "node scripts/check-perf-redline.mjs",
+    "check:storage-namespace": "node scripts/check-storage-namespace.mjs",
     "plugin:package": "node scripts/plugin-package.mjs",
     "arch:check": "node scripts/check-architecture.mjs listen emit invoke",
     "typecheck": "tsc --noEmit",

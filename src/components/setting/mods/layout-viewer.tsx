@@ -24,6 +24,7 @@ import { useWindowDecorations } from '@/hooks/use-window'
 import { copyIconFile, getAppDir } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
+import { appStorage } from '@/services/storage'
 import getSystem from '@/utils/get-system'
 
 import { GuardState } from './guard-state'
@@ -38,7 +39,7 @@ const clampHoverDelay = (value: number) => {
 }
 
 const getIcons = async (icon_dir: string, name: string) => {
-  const updateTime = localStorage.getItem(`icon_${name}_update_time`) || ''
+  const updateTime = appStorage.getItem(`icon_${name}_update_time`) || ''
 
   const icon_png = await join(icon_dir, `${name}-${updateTime}.png`)
   const icon_ico = await join(icon_dir, `${name}-${updateTime}.ico`)

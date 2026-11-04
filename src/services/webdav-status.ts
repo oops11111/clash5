@@ -1,3 +1,5 @@
+import { appStorage, canUseAppStorage } from '@/services/storage'
+
 export type WebdavStatus = 'unknown' | 'ready' | 'failed'
 
 interface WebdavStatusCache {
@@ -23,12 +25,10 @@ export const buildWebdavSignature = (
   return JSON.stringify([url, username, password])
 }
 
-const canUseStorage = () => typeof localStorage !== 'undefined'
-
 export const getWebdavStatus = (signature: string): WebdavStatus => {
-  if (!signature || !canUseStorage()) return 'unknown'
+  if (!signature || !canUseAppStorage()) return 'unknown'
 
-  const raw = localStorage.getItem(WEBDAV_STATUS_KEY)
+  const raw = appStorage.getItem(WEBDAV_STATUS_KEY)
   if (!raw) return 'unknown'
 
   try {
@@ -43,7 +43,7 @@ export const getWebdavStatus = (signature: string): WebdavStatus => {
 }
 
 export const setWebdavStatus = (signature: string, status: WebdavStatus) => {
-  if (!signature || !canUseStorage()) return
+  if (!signature || !canUseAppStorage()) return
 
   const payload: WebdavStatusCache = {
     signature,
@@ -51,5 +51,5 @@ export const setWebdavStatus = (signature: string, status: WebdavStatus) => {
     updatedAt: Date.now(),
   }
 
-  localStorage.setItem(WEBDAV_STATUS_KEY, JSON.stringify(payload))
+  appStorage.setItem(WEBDAV_STATUS_KEY, JSON.stringify(payload))
 }

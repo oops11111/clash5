@@ -11,6 +11,7 @@ import {
 } from '@/services/command-wire'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
+import { appStorage } from '@/services/storage'
 import type {
   AppRoute as GeneratedAppRoute,
   Binding as GeneratedBinding,
@@ -732,10 +733,10 @@ export async function copyIconFile(
   name: 'common' | 'sysproxy' | 'tun',
 ) {
   const key = `icon_${name}_update_time`
-  const previousTime = localStorage.getItem(key) || ''
+  const previousTime = appStorage.getItem(key) || ''
 
   const currentTime = String(Date.now())
-  localStorage.setItem(key, currentTime)
+  appStorage.setItem(key, currentTime)
 
   const iconInfo = {
     name,

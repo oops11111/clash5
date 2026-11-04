@@ -42,6 +42,7 @@ import {
   testClash5Chain,
 } from '@/services/cmds'
 import type { SwitchEvent } from '@/services/tauri-commands.generated'
+import { appStorage } from '@/services/storage'
 import type {
   AppMatcherRef,
   AppRouteDef,
@@ -186,11 +187,10 @@ const ChainsPage = () => {
   const [switchEvents, setSwitchEvents] = useState<SwitchEvent[]>([])
   const [poolMemberKeys, setPoolMemberKeys] = useState<string[]>([])
   const [exitEnabled, setExitEnabled] = useState(
-    () => localStorage.getItem('clash5-exit-ip-enabled') !== 'false',
+    () => appStorage.getItem('clash5-exit-ip-enabled') !== 'false',
   )
   const [serviceUrl, setServiceUrl] = useState(
-    () =>
-      localStorage.getItem('clash5-exit-ip-url') ?? 'https://api64.ipify.org',
+    () => appStorage.getItem('clash5-exit-ip-url') ?? 'https://api64.ipify.org',
   )
 
   const load = useCallback(async (selectedId?: string) => {
@@ -938,7 +938,7 @@ const ChainsPage = () => {
                       disabled={busy}
                       onChange={(_, enabled) => {
                         setExitEnabled(enabled)
-                        localStorage.setItem(
+                        appStorage.setItem(
                           'clash5-exit-ip-enabled',
                           String(enabled),
                         )
@@ -953,10 +953,7 @@ const ChainsPage = () => {
                   disabled={!exitEnabled || busy}
                   onChange={(event) => {
                     setServiceUrl(event.target.value)
-                    localStorage.setItem(
-                      'clash5-exit-ip-url',
-                      event.target.value,
-                    )
+                    appStorage.setItem('clash5-exit-ip-url', event.target.value)
                   }}
                 />
                 <Typography variant="caption" color="text.secondary">

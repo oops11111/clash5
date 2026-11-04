@@ -26,6 +26,7 @@ import { useProxiesData, useSystemData } from '@/providers/app-data-context'
 import { syncTrayProxySelection } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { mutate } from '@/services/mutate'
+import { appStorage } from '@/services/storage'
 import {
   isInteractableMember,
   resolveMember,
@@ -147,12 +148,12 @@ function useProxyRenderState(
 
   const saveScrollPosition = useCallback(
     (scrollTop: number) => {
-      const scrollPositions = localStorage.getItem('proxy-scroll-positions')
-        ? JSON.parse(localStorage.getItem('proxy-scroll-positions') ?? '{}')
+      const scrollPositions = appStorage.getItem('proxy-scroll-positions')
+        ? JSON.parse(appStorage.getItem('proxy-scroll-positions') ?? '{}')
         : {}
       scrollPositions[scrollPositionKey] = scrollTop
       try {
-        localStorage.setItem(
+        appStorage.setItem(
           'proxy-scroll-positions',
           JSON.stringify(scrollPositions),
         )
@@ -165,7 +166,7 @@ function useProxyRenderState(
 
   const getScrollPosition = useCallback(() => {
     try {
-      const savedPositions = localStorage.getItem('proxy-scroll-positions')
+      const savedPositions = appStorage.getItem('proxy-scroll-positions')
       if (savedPositions) {
         const positions = JSON.parse(savedPositions)
         const savedPosition = positions[scrollPositionKey]

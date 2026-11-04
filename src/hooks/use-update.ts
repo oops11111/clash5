@@ -1,4 +1,5 @@
 import { fetchCacheData, setCacheData, useQuery } from '@/services/query-client'
+import { appStorage } from '@/services/storage'
 import { checkUpdateSafe, UPDATER_AVAILABLE } from '@/services/update'
 
 import { useVerge } from './use-verge'
@@ -6,7 +7,7 @@ import { useVerge } from './use-verge'
 const LAST_CHECK_KEY = 'last_check_update'
 
 export const readLastCheckTime = (): number | null => {
-  const stored = localStorage.getItem(LAST_CHECK_KEY)
+  const stored = appStorage.getItem(LAST_CHECK_KEY)
   if (!stored) return null
   const ts = parseInt(stored, 10)
   return isNaN(ts) ? null : ts
@@ -14,7 +15,7 @@ export const readLastCheckTime = (): number | null => {
 
 export const updateLastCheckTime = (timestamp?: number): number => {
   const now = timestamp ?? Date.now()
-  localStorage.setItem(LAST_CHECK_KEY, now.toString())
+  appStorage.setItem(LAST_CHECK_KEY, now.toString())
   setCacheData([LAST_CHECK_KEY], now)
   return now
 }

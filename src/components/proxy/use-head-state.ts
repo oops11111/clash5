@@ -5,6 +5,7 @@ import {
   profileTestUrls,
   commitProfileTestUrl,
 } from '@/services/proxy-test-url'
+import { appStorage } from '@/services/storage'
 
 import { ProxySortType } from './use-filter-sort'
 
@@ -98,7 +99,7 @@ export function useHeadStateNew() {
     }
     try {
       const data = JSON.parse(
-        localStorage.getItem(HEAD_STATE_KEY) || '{}',
+        appStorage.getItem(HEAD_STATE_KEY) || '{}',
       ) as HeadStateStorage
 
       const value = data?.[current] || {}
@@ -120,7 +121,7 @@ export function useHeadStateNew() {
     if (loadedProfile !== current) return
     const timer = setTimeout(() => {
       try {
-        const item = localStorage.getItem(HEAD_STATE_KEY)
+        const item = appStorage.getItem(HEAD_STATE_KEY)
 
         let data = (item ? JSON.parse(item) : {}) as HeadStateStorage
 
@@ -128,7 +129,7 @@ export function useHeadStateNew() {
 
         data[current] = state
 
-        localStorage.setItem(HEAD_STATE_KEY, JSON.stringify(data))
+        appStorage.setItem(HEAD_STATE_KEY, JSON.stringify(data))
       } catch {}
     })
 

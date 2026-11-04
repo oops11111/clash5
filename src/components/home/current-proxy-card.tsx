@@ -52,6 +52,7 @@ import { syncTrayProxySelection } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { mutate } from '@/services/mutate'
 import { profileTestUrls } from '@/services/proxy-test-url'
+import { appStorage } from '@/services/storage'
 import {
   findCurrentGroupMember,
   getRecord,
@@ -574,16 +575,16 @@ export const CurrentProxyCard = () => {
     (baseKey: string) => {
       if (typeof window === 'undefined') return null
       const profileKey = getProfileStorageKey(baseKey)
-      const profileValue = localStorage.getItem(profileKey)
+      const profileValue = appStorage.getItem(profileKey)
       if (profileValue != null) {
         return profileValue
       }
 
       if (profileKey !== baseKey) {
-        const legacyValue = localStorage.getItem(baseKey)
+        const legacyValue = appStorage.getItem(baseKey)
         if (legacyValue != null) {
-          localStorage.removeItem(baseKey)
-          localStorage.setItem(profileKey, legacyValue)
+          appStorage.removeItem(baseKey)
+          appStorage.setItem(profileKey, legacyValue)
           return legacyValue
         }
       }
@@ -597,9 +598,9 @@ export const CurrentProxyCard = () => {
     (baseKey: string, value: string) => {
       if (typeof window === 'undefined') return
       const profileKey = getProfileStorageKey(baseKey)
-      localStorage.setItem(profileKey, value)
+      appStorage.setItem(profileKey, value)
       if (profileKey !== baseKey) {
-        localStorage.removeItem(baseKey)
+        appStorage.removeItem(baseKey)
       }
     },
     [getProfileStorageKey],
@@ -620,7 +621,7 @@ export const CurrentProxyCard = () => {
   const isDirectMode = mode === 'direct'
 
   const [sortType, setSortType] = useState<ProxySortType>(() => {
-    const savedSortType = localStorage.getItem(STORAGE_KEY_SORT_TYPE)
+    const savedSortType = appStorage.getItem(STORAGE_KEY_SORT_TYPE)
     return savedSortType ? (Number(savedSortType) as ProxySortType) : 0
   })
 
@@ -904,7 +905,7 @@ export const CurrentProxyCard = () => {
   const handleSortTypeChange = useCallback(() => {
     const newSortType = ((sortType + 1) % 3) as ProxySortType
     setSortType(newSortType)
-    localStorage.setItem(STORAGE_KEY_SORT_TYPE, newSortType.toString())
+    appStorage.setItem(STORAGE_KEY_SORT_TYPE, newSortType.toString())
   }, [sortType])
 
   const handleCheckDelay = useLockFn(async () => {

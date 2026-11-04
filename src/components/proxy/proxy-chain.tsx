@@ -46,6 +46,7 @@ import { useRecordSelection } from '@/hooks/use-record-selection'
 import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
 import { updateProxyChainConfigInRuntime } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
+import { appStorage } from '@/services/storage'
 import {
   selectGlobalChainNodes,
   selectRuleChainMembers,
@@ -376,7 +377,7 @@ export const ProxyChain = ({
     }
 
     const lastNode = currentProxyChain[currentProxyChain.length - 1]
-    if (localStorage.getItem('proxy-chain-exit-node') === lastNode.name) {
+    if (appStorage.getItem('proxy-chain-exit-node') === lastNode.name) {
       return true
     }
     if (currentProxyChain.length < 2) return false
@@ -453,7 +454,7 @@ export const ProxyChain = ({
         const targetGroup =
           mode === 'global'
             ? 'GLOBAL'
-            : selectedGroup || localStorage.getItem('proxy-chain-group')
+            : selectedGroup || appStorage.getItem('proxy-chain-group')
 
         if (targetGroup) {
           try {
@@ -481,9 +482,9 @@ export const ProxyChain = ({
           }
         }
 
-        localStorage.removeItem('proxy-chain-group')
-        localStorage.removeItem('proxy-chain-exit-node')
-        localStorage.removeItem('proxy-chain-items')
+        appStorage.removeItem('proxy-chain-group')
+        appStorage.removeItem('proxy-chain-exit-node')
+        appStorage.removeItem('proxy-chain-items')
 
         await mutate(() => closeAllConnections(), {
           id: 'close-all-connections',
@@ -546,8 +547,8 @@ export const ProxyChain = ({
       // The chain moves the group like any other selection, so the profile has to learn about
       // it: what the profile holds is what gets re-applied the next time the core starts.
       recordSelection(targetGroup || 'GLOBAL', lastNode.name)
-      localStorage.setItem('proxy-chain-group', targetGroup || 'GLOBAL')
-      localStorage.setItem('proxy-chain-exit-node', lastNode.name)
+      appStorage.setItem('proxy-chain-group', targetGroup || 'GLOBAL')
+      appStorage.setItem('proxy-chain-exit-node', lastNode.name)
 
       // 刷新代理信息以更新连接状态
       refreshProxy()
@@ -623,9 +624,9 @@ export const ProxyChain = ({
                   id: 'update-proxy-chain-runtime',
                   errorNotice: false,
                 })
-                localStorage.removeItem('proxy-chain-group')
-                localStorage.removeItem('proxy-chain-exit-node')
-                localStorage.removeItem('proxy-chain-items')
+                appStorage.removeItem('proxy-chain-group')
+                appStorage.removeItem('proxy-chain-exit-node')
+                appStorage.removeItem('proxy-chain-items')
                 onUpdateChain([])
               }}
               sx={{

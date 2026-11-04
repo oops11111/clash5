@@ -32,6 +32,7 @@ import {
   type UnlockItem,
 } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
+import { appStorage } from '@/services/storage'
 
 const UNLOCK_RESULTS_STORAGE_KEY = 'clash_verge_unlock_results'
 
@@ -99,7 +100,7 @@ const UnlockPage = () => {
 
   const saveResultsToStorage = (items: UnlockItem[]) => {
     try {
-      localStorage.setItem(UNLOCK_RESULTS_STORAGE_KEY, JSON.stringify(items))
+      appStorage.setItem(UNLOCK_RESULTS_STORAGE_KEY, JSON.stringify(items))
     } catch (err) {
       console.error('Failed to save results to storage:', err)
     }
@@ -108,7 +109,7 @@ const UnlockPage = () => {
   useEffect(() => {
     let storedItems: UnlockItem[] = []
     try {
-      const itemsJson = localStorage.getItem(UNLOCK_RESULTS_STORAGE_KEY)
+      const itemsJson = appStorage.getItem(UNLOCK_RESULTS_STORAGE_KEY)
       if (itemsJson) {
         storedItems = dedupeUnlockItems(JSON.parse(itemsJson) as UnlockItem[])
       }

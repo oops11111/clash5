@@ -80,7 +80,7 @@ pub const WINDOW_INITIAL_SCRIPT: &str = r##"
             paintBody();
         }
         try {
-            localStorage.setItem("verge-theme-mode-cache", theme);
+            localStorage.setItem("clash5:v1:verge-theme-mode-cache", theme);
         } catch (error) {
             console.warn("[Tauri] 缓存主题模式失败:", error);
         }

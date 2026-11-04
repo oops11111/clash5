@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next'
 import { useProxiesData } from '@/providers/app-data-context'
 import { updateProxyChainConfigInRuntime } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
+import { appStorage } from '@/services/storage'
 import {
   isInteractableMember,
   type ProxyGroupView,
@@ -326,7 +327,7 @@ export function ProxyGroupsChain(props: ProxyGroupsChainProps) {
   // Chain-specific state
   const [proxyChain, setProxyChain] = useState<ProxyChainItem[]>(() => {
     try {
-      const saved = localStorage.getItem('proxy-chain-items')
+      const saved = appStorage.getItem('proxy-chain-items')
       if (saved) {
         return JSON.parse(saved)
       }
@@ -369,9 +370,9 @@ export function ProxyGroupsChain(props: ProxyGroupsChainProps) {
           delay,
         }),
       )
-      localStorage.setItem('proxy-chain-items', JSON.stringify(persistedChain))
+      appStorage.setItem('proxy-chain-items', JSON.stringify(persistedChain))
     } else {
-      localStorage.removeItem('proxy-chain-items')
+      appStorage.removeItem('proxy-chain-items')
     }
   }, [currentProxyChain])
 
@@ -409,9 +410,9 @@ export function ProxyGroupsChain(props: ProxyGroupsChainProps) {
         id: 'update-proxy-chain-runtime',
         errorNotice: false,
       })
-      localStorage.removeItem('proxy-chain-group')
-      localStorage.removeItem('proxy-chain-exit-node')
-      localStorage.removeItem('proxy-chain-items')
+      appStorage.removeItem('proxy-chain-group')
+      appStorage.removeItem('proxy-chain-exit-node')
+      appStorage.removeItem('proxy-chain-items')
       setProxyChain([])
     }
   }
