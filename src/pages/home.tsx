@@ -4,18 +4,14 @@ import {
   HistoryEduOutlined,
   RouterOutlined,
   SettingsOutlined,
-  SpeedOutlined,
 } from '@mui/icons-material'
 import {
   Box,
   Button,
-  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
-  FormGroup,
   Grid,
   IconButton,
   MenuItem,
@@ -28,14 +24,13 @@ import {
   Typography,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import { Suspense, lazy, useCallback, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BasePage } from '@/components/base'
 import { ClashModeCard } from '@/components/home/clash-mode-card'
 import { CurrentProxyCard } from '@/components/home/current-proxy-card'
 import { EnhancedCard } from '@/components/home/enhanced-card'
-import { EnhancedTrafficStats } from '@/components/home/enhanced-traffic-stats'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
 import { ThemeModeSwitch } from '@/components/setting/mods/theme-mode-switch'
@@ -48,27 +43,6 @@ import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
 import { openExternalUrl } from '@/utils/open-external-url'
 
-const preloadTestCard = () =>
-  import('@/components/home/test-card').then((module) => ({
-    default: module.TestCard,
-  }))
-const preloadIpInfoCard = () =>
-  import('@/components/home/ip-info-card').then((module) => ({
-    default: module.IpInfoCard,
-  }))
-const preloadClashInfoCard = () =>
-  import('@/components/home/clash-info-card').then((module) => ({
-    default: module.ClashInfoCard,
-  }))
-const preloadSystemInfoCard = () =>
-  import('@/components/home/system-info-card').then((module) => ({
-    default: module.SystemInfoCard,
-  }))
-
-const LazyTestCard = lazy(preloadTestCard)
-const LazyIpInfoCard = lazy(preloadIpInfoCard)
-const LazyClashInfoCard = lazy(preloadClashInfoCard)
-const LazySystemInfoCard = lazy(preloadSystemInfoCard)
 const LazyDnsCheckCard = lazy(() =>
   import('@/components/home/dns-check-card').then((module) => ({
     default: module.DnsCheckCard,
@@ -78,53 +52,11 @@ const LazyDnsCheckCard = lazy(() =>
 // Used by bootstrap to initiate optional card imports without blocking render.
 // eslint-disable-next-line react-refresh/only-export-components
 export const preloadHomePageCards = () =>
-  Promise.all([
-    preloadTestCard().catch(() => {}),
-    preloadIpInfoCard().catch(() => {}),
-    preloadClashInfoCard().catch(() => {}),
-    preloadSystemInfoCard().catch(() => {}),
-  ])
-
-// 定义首页卡片设置接口
-interface HomeCardsSettings {
-  profile: boolean
-  proxy: boolean
-  network: boolean
-  mode: boolean
-  traffic: boolean
-  info: boolean
-  clashinfo: boolean
-  systeminfo: boolean
-  dns: boolean
-  test: boolean
-  ip: boolean
-  [key: string]: boolean
-}
-
-const DEFAULT_HOME_CARDS: HomeCardsSettings = {
-  info: false,
-  profile: true,
-  proxy: true,
-  network: true,
-  mode: true,
-  traffic: true,
-  clashinfo: true,
-  systeminfo: true,
-  dns: true,
-  test: true,
-  ip: false,
-}
-
-const serializeCardFlags = (cards: HomeCardsSettings) =>
-  Object.keys(cards)
-    .sort()
-    .map((key) => `${key}:${cards[key] ? 1 : 0}`)
-    .join('|')
+  import('@/components/home/dns-check-card').catch(() => {})
 
 // 首页设置对话框组件接口
 interface HomeSettingsDialogProps {
   onClose: () => void
-  homeCards: HomeCardsSettings
 }
 
 // 首页设置对话框组件
@@ -133,24 +65,10 @@ const ACCENT_COLORS = ['#2F6BFF', '#8B5CF6', '#22C55E', '#F59E0B']
 
 const HomeSettingsDialog = ({
   onClose,
-  homeCards,
 }: HomeSettingsDialogProps) => {
   const { t } = useTranslation()
-  const [cards, setCards] = useState<HomeCardsSettings>(homeCards)
   const { verge, patchVerge } = useVerge()
   const accent = verge?.theme_setting?.primary_color
-
-  const handleToggle = (key: string) => {
-    setCards((prev: HomeCardsSettings) => ({
-      ...prev,
-      [key]: !(prev[key] ?? DEFAULT_HOME_CARDS[key]),
-    }))
-  }
-
-  const handleSave = async () => {
-    await patchVerge({ home_cards: cards })
-    onClose()
-  }
 
   return (
     <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
@@ -193,101 +111,6 @@ const HomeSettingsDialog = ({
             ))}
           </Stack>
         </Stack>
-        <Typography variant="overline" color="text.secondary">
-          {t('home.page.settings.cardsTitle')}
-        </Typography>
-        <FormGroup>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.profile || false}
-                onChange={() => handleToggle('profile')}
-              />
-            }
-            label={t('home.page.settings.cards.profile')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.proxy || false}
-                onChange={() => handleToggle('proxy')}
-              />
-            }
-            label={t('home.page.settings.cards.currentProxy')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.network || false}
-                onChange={() => handleToggle('network')}
-              />
-            }
-            label={t('home.page.settings.cards.network')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.mode || false}
-                onChange={() => handleToggle('mode')}
-              />
-            }
-            label={t('home.page.settings.cards.proxyMode')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.traffic || false}
-                onChange={() => handleToggle('traffic')}
-              />
-            }
-            label={t('home.page.settings.cards.traffic')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.test || false}
-                onChange={() => handleToggle('test')}
-              />
-            }
-            label={t('home.page.settings.cards.tests')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.ip || false}
-                onChange={() => handleToggle('ip')}
-              />
-            }
-            label={t('home.page.settings.cards.ip')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.clashinfo || false}
-                onChange={() => handleToggle('clashinfo')}
-              />
-            }
-            label={t('home.page.settings.cards.clashInfo')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.systeminfo || false}
-                onChange={() => handleToggle('systeminfo')}
-              />
-            }
-            label={t('home.page.settings.cards.systemInfo')}
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cards.dns ?? DEFAULT_HOME_CARDS.dns}
-                onChange={() => handleToggle('dns')}
-              />
-            }
-            label={t('home.page.settings.cards.dns')}
-          />
-        </FormGroup>
         <Typography variant="overline" color="text.secondary">
           {t('home.page.settings.refresh.title')}
         </Typography>
@@ -388,9 +211,6 @@ const HomeSettingsDialog = ({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t('shared.actions.cancel')}</Button>
-        <Button onClick={handleSave} color="primary">
-          {t('shared.actions.save')}
-        </Button>
       </DialogActions>
     </Dialog>
   )
@@ -398,15 +218,10 @@ const HomeSettingsDialog = ({
 
 const HomePage = () => {
   const { t } = useTranslation()
-  const { verge } = useVerge()
   const { current, mutateProfiles } = useProfiles()
 
   // 设置弹窗的状态
   const [settingsOpen, setSettingsOpen] = useState(false)
-
-  // 卡片显示状态
-  const homeCards =
-    (verge?.home_cards as HomeCardsSettings | undefined) ?? DEFAULT_HOME_CARDS
 
   // 文档链接函数
   const toGithubDoc = useLockFn(() =>
@@ -420,91 +235,38 @@ const HomePage = () => {
     setSettingsOpen(true)
   }, [])
 
-  const renderCard = useCallback(
-    (cardKey: string, component: React.ReactNode, size: number = 6) => {
-      if (!(homeCards[cardKey] ?? DEFAULT_HOME_CARDS[cardKey])) return null
-
-      return (
-        <Grid size={size} key={cardKey}>
-          {component}
-        </Grid>
-      )
-    },
-    [homeCards],
-  )
-
-  const criticalCards = useMemo(
-    () => [
-      renderCard(
-        'profile',
-        <HomeProfileCard current={current} onProfileUpdated={mutateProfiles} />,
-      ),
-      renderCard('proxy', <CurrentProxyCard />),
-      renderCard('network', <NetworkSettingsCard />),
-      renderCard('mode', <ClashModeEnhancedCard />),
-    ],
-    [current, mutateProfiles, renderCard],
-  )
-
-  const nonCriticalCards = useMemo(
-    () => [
-      renderCard(
-        'traffic',
-        <EnhancedCard
-          title={t('home.page.cards.trafficStats')}
-          icon={<SpeedOutlined />}
-          iconColor="secondary"
-        >
-          <EnhancedTrafficStats />
-        </EnhancedCard>,
-        12,
-      ),
-      renderCard(
-        'test',
-        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
-          <LazyTestCard />
-        </Suspense>,
-      ),
-      renderCard(
-        'ip',
-        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
-          <LazyIpInfoCard />
-        </Suspense>,
-      ),
-      renderCard(
-        'clashinfo',
-        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
-          <LazyClashInfoCard />
-        </Suspense>,
-      ),
-      renderCard(
-        'systeminfo',
-        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
-          <LazySystemInfoCard />
-        </Suspense>,
-      ),
-      renderCard(
-        'dns',
-        <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
-          <LazyDnsCheckCard />
-        </Suspense>,
-      ),
-    ],
-    [t, renderCard],
-  )
+  const fixedCards = [
+    ...(!current
+      ? [
+          <Grid size={12} key="first-run">
+            <HomeProfileCard
+              current={current}
+              onProfileUpdated={mutateProfiles}
+            />
+          </Grid>,
+        ]
+      : []),
+    <Grid size={{ xs: 6, md: 3 }} key="network">
+      <NetworkSettingsCard />
+    </Grid>,
+    <Grid size={{ xs: 6, md: 3 }} key="mode">
+      <ClashModeEnhancedCard />
+    </Grid>,
+    <Grid size={{ xs: 6, md: 3 }} key="proxy">
+      <CurrentProxyCard />
+    </Grid>,
+    <Grid size={{ xs: 6, md: 3 }} key="dns">
+      <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
+        <LazyDnsCheckCard />
+      </Suspense>
+    </Grid>,
+  ]
   return (
     <BasePage
       title={t('home.page.title')}
       contentStyle={{ padding: 2 }}
       header={
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Box sx={{ minWidth: 200, mr: 1 }}>
-            <ProxyControlSwitches
-              label={t('settings.sections.system.toggles.systemProxy')}
-              onError={(err) => showNotice.error(err)}
-              noRightPadding
-            />
-          </Box>
           <Tooltip title={t('home.page.tooltips.lightweightMode')} arrow>
             <IconButton
               onClick={async () =>
@@ -532,21 +294,11 @@ const HomePage = () => {
         </Box>
       }
     >
-      {homeSection(t('home.page.sections.status'), criticalCards)}
-      {/* nonCriticalCards starts with the traffic card, the rest are tools. */}
-      {homeSection(
-        t('home.page.sections.traffic'),
-        nonCriticalCards.slice(0, 1),
-      )}
-      {homeSection(t('home.page.sections.tools'), nonCriticalCards.slice(1))}
+      {homeSection(t('home.page.sections.status'), fixedCards)}
 
       {/* 首页设置弹窗 */}
       {settingsOpen && (
-        <HomeSettingsDialog
-          key={serializeCardFlags(homeCards)}
-          onClose={() => setSettingsOpen(false)}
-          homeCards={homeCards}
-        />
+        <HomeSettingsDialog onClose={() => setSettingsOpen(false)} />
       )}
     </BasePage>
   )
@@ -575,7 +327,14 @@ const NetworkSettingsCard = () => {
       iconColor="primary"
       action={null}
     >
-      <ProxyTunCard />
+      <Stack spacing={1.5}>
+        <ProxyControlSwitches
+          label={t('settings.sections.system.toggles.systemProxy')}
+          onError={(err) => showNotice.error(err)}
+          noRightPadding
+        />
+        <ProxyTunCard />
+      </Stack>
     </EnhancedCard>
   )
 }

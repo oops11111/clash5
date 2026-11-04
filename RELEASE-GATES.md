@@ -133,3 +133,12 @@ reaches all three entry points.
 P1-16 reports migration skip reasons in a persistent warning notice after a
 successful Verge import, while retaining the aggregate success report. Reasons
 come directly from the backend import report and are not inferred from counts.
+
+## P1-17 home dashboard evidence (issue #79)
+
+The home dashboard no longer exposes user-facing card visibility toggles. After
+the first-run profile entry point, it presents four fixed cards: system proxy and
+TUN controls, proxy mode/group switching, current-node quality, and DNS leak
+checking. The old traffic and diagnostic cards remain available from their
+dedicated pages. Frontend type checking, formatting, and the full frontend test
+suite are the executable local checks; desktop visual acceptance remains open.
