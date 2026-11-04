@@ -11,10 +11,9 @@ import { useClashLog } from '@/hooks/use-clash-log'
 import { useDisplayedMixedPort } from '@/hooks/use-displayed-mixed-port'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
-import { invoke_uwp_tool, setDnsOverride } from '@/services/cmds'
+import { setDnsOverride } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
-import getSystem from '@/utils/get-system'
 
 import { ClashCoreViewer } from './mods/clash-core-viewer'
 import { ClashPortViewer } from './mods/clash-port-viewer'
@@ -27,7 +26,6 @@ import { SettingItem, SettingSection } from './mods/setting-comp'
 import { TunnelsViewer } from './mods/tunnels-viewer'
 import { WebUIViewer } from './mods/web-ui-viewer'
 
-const isWIN = getSystem() === 'windows'
 
 interface Props {
   section: SettingSection
@@ -351,19 +349,6 @@ const SettingClash = ({ section, onError }: Props) => {
         >
           <Typography sx={{ py: '7px', pr: 1 }}>{version}</Typography>
         </SettingItem>
-      )}
-
-      {section === 'clash' && isWIN && (
-        <SettingItem
-          onClick={invoke_uwp_tool}
-          label={t('settings.sections.clash.form.fields.openUwpTool')}
-          extra={
-            <TooltipIcon
-              title={t('settings.sections.clash.form.tooltips.openUwpTool')}
-              sx={{ opacity: '0.7' }}
-            />
-          }
-        />
       )}
 
       {section === 'clash' && (

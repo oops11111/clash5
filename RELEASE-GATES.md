@@ -179,3 +179,11 @@ against the same pins; a mismatch triggers a fresh download, and a mismatched
 download is deleted before the build can continue. The static guard
 `node scripts/check-geodata-pins.mjs` passes locally. Updating the upstream tag
 requires an intentional digest review and a matching source change.
+
+## P1-26 Windows loopback helper evidence
+
+The prebuild task, Tauri resources, Rust command registry and Settings UI no
+longer download, bundle or invoke `enableLoopback.exe`. The helper was an
+external elevation surface; Windows users can use the built-in
+`CheckNetIsolation.exe LoopbackExempt` commands or TUN mode instead. The static
+guard `node scripts/check-no-loopback-helper.mjs` passes locally.

@@ -112,7 +112,6 @@ pub mod runtime;
 pub mod save_profile;
 pub mod service;
 pub mod system;
-pub mod uwp;
 pub mod validate;
 pub mod verge;
 pub mod webdav;
@@ -139,7 +138,6 @@ pub use runtime::*;
 pub use save_profile::*;
 pub use service::*;
 pub use system::*;
-pub use uwp::*;
 pub use verge::*;
 pub use webdav::*;
 

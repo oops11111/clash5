@@ -34,6 +34,7 @@
     "check:probe-concurrency": "node scripts/check-probe-concurrency.mjs",
     "check:stable-core": "node scripts/check-stable-core.mjs",
     "check:geodata-pins": "node scripts/check-geodata-pins.mjs",
+    "check:no-loopback-helper": "node scripts/check-no-loopback-helper.mjs",
     "plugin:package": "node scripts/plugin-package.mjs",
     "arch:check": "node scripts/check-architecture.mjs listen emit invoke",
     "typecheck": "tsc --noEmit",

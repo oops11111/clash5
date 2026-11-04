@@ -136,10 +136,6 @@ export const commands = {
         proxyChainConfig,
       }),
     ),
-  invokeUwpTool: () =>
-    typedError<null, CommandFailure_Serialize>(
-      __TAURI_INVOKE('invoke_uwp_tool'),
-    ),
   copyClashEnv: () =>
     typedError<null, CommandFailure_Serialize>(
       __TAURI_INVOKE('copy_clash_env'),

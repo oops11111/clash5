@@ -23,6 +23,7 @@
 - 相同内容的普通通知在 60 秒内合并并显示重复次数，避免连续操作堆叠提醒
 - 发布资源仅包含 stable Mihomo，移除 alpha sidecar、下载任务与服务哈希入口
 - geodata 构建资源固定 release tag，并在下载后校验官方 SHA-256；校验失败时拒绝继续打包
+- Windows 安装包不再携带第三方 UWP loopback helper，避免发布外部提权工具
 
 </details>
 

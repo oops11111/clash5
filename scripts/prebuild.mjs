@@ -645,12 +645,6 @@ const resolveGeoIP = () =>
     downloadURL: `${GEODATA_RELEASE_BASE}/geoip.dat`,
     sha256: GEODATA_SHA256['geoip.dat'],
   })
-const resolveEnableLoopback = () =>
-  resolveResource({
-    file: 'enableLoopback.exe',
-    downloadURL: `https://github.com/Kuingsmile/uwp-tool/releases/download/latest/enableLoopback.exe`,
-  })
-
 const resolveSetDnsScript = () =>
   resolveResource({
     file: 'set_dns.sh',
@@ -677,12 +671,6 @@ const tasks = [
   { name: 'asn_mmdb', func: resolveASNMmdb, retry: 5 },
   { name: 'geosite', func: resolveGeosite, retry: 5 },
   { name: 'geoip', func: resolveGeoIP, retry: 5 },
-  {
-    name: 'enableLoopback',
-    func: resolveEnableLoopback,
-    retry: 5,
-    winOnly: true,
-  },
   {
     name: 'service_chmod',
     func: resolveServicePermission,

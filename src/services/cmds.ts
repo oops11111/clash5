@@ -701,12 +701,6 @@ export async function cmdTestDelay(url: string) {
   return invoke<number>('test_delay', { url })
 }
 
-export async function invoke_uwp_tool() {
-  return invoke<null>('invoke_uwp_tool').catch((err) =>
-    showNotice.error(err, 1500),
-  )
-}
-
 export async function openDevTools() {
   return invoke<void>('open_devtools')
 }
