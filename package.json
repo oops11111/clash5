@@ -24,6 +24,7 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "i18n:check": "node scripts/cleanup-unused-i18n.mjs",
+    "i18n:missing-keys": "node scripts/check-i18n-locales.mjs",
     "i18n:format": "node scripts/cleanup-unused-i18n.mjs --align --apply",
     "i18n:types": "node scripts/generate-i18n-keys.mjs",
     "gen:contract": "node scripts/gen-contract.mjs",

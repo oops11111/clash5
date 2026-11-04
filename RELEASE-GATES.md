@@ -104,3 +104,8 @@ Service-backed generation restores the saved preference. The projection test,
 the 16 Run State/TUN capability tests, formatting, and Windows library compile
 check passed locally. Live service handoff and real TUN re-enable remain desktop
 acceptance work.
+
+P1-11 issue #73 now maps system Chinese variants to `zh` and all other system
+locales to `en`, while manual language choices remain authoritative. The
+`i18n:missing-keys` check reports existing non-English pack gaps as CI warnings;
+runtime fallback is English and the translation gaps remain follow-up work.

@@ -18,7 +18,7 @@ export const supportedLanguages = [
   'pt',
 ]
 
-export const FALLBACK_LANGUAGE = 'zh'
+export const FALLBACK_LANGUAGE = 'en'
 const LANGUAGE_STORAGE_KEY = 'verge-language'
 
 const normalizeLanguage = (language?: string) =>
@@ -45,16 +45,23 @@ const resolveLanguage = (language?: string) => {
   return FALLBACK_LANGUAGE
 }
 
+const resolveSystemLanguage = (language?: string) =>
+  normalizeLanguage(language)?.startsWith('zh') ? 'zh' : 'en'
+
 export const resolvePreferredLanguage = (
   preference?: string | null,
   systemLanguage?: string,
-) =>
-  resolveLanguage(
-    !preference || preference === 'system'
-      ? (systemLanguage ??
-          (typeof navigator !== 'undefined' ? navigator.language : undefined))
-      : preference,
-  )
+) => {
+  if (!preference || preference === 'system') {
+    return resolveSystemLanguage(
+      systemLanguage ??
+        (typeof navigator !== 'undefined' ? navigator.language : undefined),
+    )
+  }
+
+  // A manually selected supported language remains authoritative.
+  return resolveLanguage(preference)
+}
 
 const getLanguageStorage = () => {
   if (typeof window === 'undefined') return null
