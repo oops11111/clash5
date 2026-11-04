@@ -359,6 +359,7 @@ impl CoreManager {
         defer! {
             self.finish_config_update();
         }
+        self.cancel_sidecar_recovery();
         self.start_core_during_config_update().await
     }
 
@@ -607,7 +608,7 @@ impl CoreManager {
     }
 
     #[tracing::instrument(skip_all, level = "info", fields(decision = tracing::field::Empty))]
-    async fn start_core_inner(&self) -> Result<()> {
+    pub(super) async fn start_core_inner(&self) -> Result<()> {
         if Handle::global().is_exiting() {
             return Ok(());
         }
@@ -727,6 +728,7 @@ impl CoreManager {
 
     #[tracing::instrument(skip_all, level = "info", fields(mode = ?*self.get_running_mode()))]
     pub async fn stop_core(&self) -> Result<()> {
+        self.cancel_sidecar_recovery();
         let _life = self.lifecycle_lock.lock().await;
         self.controlled_stop_core_inner().await
     }
@@ -737,6 +739,9 @@ impl CoreManager {
 
     async fn controlled_stop_core_with_intent(&self, proxy_intent: ProxyStopIntent) -> Result<()> {
         let running_mode = *self.get_running_mode();
+        if matches!(running_mode, RunningMode::NotRunning) {
+            proxy_control::clear_after_unexpected_exit().await?;
+        }
         run_controlled_stop_transition(
             cfg!(target_os = "macos"),
             running_mode,
@@ -780,6 +785,7 @@ impl CoreManager {
         defer! {
             self.finish_config_update();
         }
+        self.cancel_sidecar_recovery();
         self.restart_core_during_config_update().await
     }
 

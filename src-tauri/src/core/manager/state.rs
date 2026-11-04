@@ -264,7 +264,7 @@ impl CoreManager {
                     tauri_plugin_shell::process::CommandEvent::Terminated(term) => {
                         let _ = terminated.send(());
                         let manager = Self::global();
-                        let _ = manager.invalidate_core_readiness_if(core_readiness_generation);
+                        let claimed_exit = manager.invalidate_core_readiness_if(core_readiness_generation);
                         let message = if let Some(code) = term.code {
                             format!("Process terminated with code: {}", code)
                         } else if let Some(signal) = term.signal {
@@ -274,7 +274,9 @@ impl CoreManager {
                         };
                         Logger::global().writer_sidecar_log(Level::Info, &message);
                         CLASH_LOGGER.clear_logs();
-                        manager.clear_terminated_sidecar(pid).await;
+                        if claimed_exit {
+                            manager.clear_terminated_sidecar(pid, core_readiness_generation).await;
+                        }
                         break;
                     }
                     _ => {}
@@ -392,9 +394,16 @@ impl CoreManager {
         Ok(())
     }
 
-    async fn clear_terminated_sidecar(&self, terminated_pid: u32) {
+    async fn clear_terminated_sidecar(&self, terminated_pid: u32, generation: u64) {
         let _life = self.lifecycle_lock.lock().await;
-        if !should_clear_terminated_sidecar(&self.get_running_mode(), self.get_running_sidecar_pid(), terminated_pid) {
+        if self.core_readiness_state.load(std::sync::atomic::Ordering::Acquire)
+            != super::inactive_core_readiness_state(generation)
+            || !should_clear_terminated_sidecar(
+                &self.get_running_mode(),
+                self.get_running_sidecar_pid(),
+                terminated_pid,
+            )
+        {
             return;
         }
 
@@ -402,9 +411,43 @@ impl CoreManager {
         #[cfg(target_os = "windows")]
         self.set_job_handle(None);
         proxy_control::stop_guard().await;
+        let cleanup = proxy_control::clear_after_unexpected_exit().await;
         self.core_stopped();
+        let resources = {
+            let mut active = self.singbox_route.lock().await;
+            let result = if let Some(route) = active.as_mut() {
+                route.stop_resources().await
+            } else {
+                Ok(())
+            };
+            if active.as_ref().is_some_and(|route| route.is_stopped()) {
+                *active = None;
+            }
+            drop(active);
+            self.singbox_degraded
+                .store(result.is_err(), std::sync::atomic::Ordering::Release);
+            result
+        };
+        let cleanup = match (cleanup, resources) {
+            (Err(error), Err(resources)) => Err(error.context(format!("Sing-box cleanup also failed: {resources:#}"))),
+            (Err(error), _) | (_, Err(error)) => Err(error),
+            _ => Ok(()),
+        };
+        if let Err(error) = cleanup {
+            logging!(
+                error,
+                Type::Core,
+                "Failed to clear the system proxy after core exit: {error:#}"
+            );
+            self.record_startup_error(super::CoreFailure::StartFailed(format!(
+                "Core exited; system proxy cleanup failed: {error:#}"
+            )));
+            handle::Handle::notice(crate::core::notify::NoticeStatus::CoreStartError, "");
+            return;
+        }
         #[cfg(target_os = "macos")]
         crate::utils::resolve::dns::sync_public_dns().await;
+        self.request_sidecar_recovery();
     }
 }
 

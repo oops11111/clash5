@@ -1,8 +1,7 @@
 use crate::{
-    config::{Config, MixedPort},
+    config::{Config, IVerge},
     core::proxy_control::{self, SystemProxyStateUnknown},
     singleton,
-    utils::server,
 };
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
@@ -413,13 +412,8 @@ impl Sysopt {
     }
 
     /// init the sysproxy
-    pub(super) async fn update_sysproxy(&self) -> Result<()> {
+    pub(super) async fn update_sysproxy(&self, verge: &IVerge, port: u16, pac_port: u16) -> Result<()> {
         let _lock = self.update_lock.lock().await;
-        let verge = Config::verge().await.latest_arc();
-        // Configured, not live: this runs while the Core is being started or restarted, and
-        // asking a Core that is not up yet would only fall back here anyway.
-        let port = MixedPort::desired().await;
-        let pac_port = server::embedded_server_port()?;
         // 先 await, 避免持有锁导致的 Send 问题
         let bypass = get_bypass().await;
 
