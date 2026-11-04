@@ -77,14 +77,15 @@ fn member_key(member: &NodeRef) -> String {
     serde_json::to_string(member).unwrap_or_default()
 }
 
+fn schedulable(pool: &NodePool) -> bool {
+    pool.mode == PoolMode::Quality && !pool.user_locked
+}
+
 async fn run_once() {
     let Ok(pools) = with_clash5_binding_store(|store| store.node_pools()).await else {
         return;
     };
-    let pools: Vec<NodePool> = pools
-        .into_iter()
-        .filter(|pool| pool.mode == PoolMode::Quality)
-        .collect();
+    let pools: Vec<NodePool> = pools.into_iter().filter(schedulable).collect();
     let members: Vec<NodeRef> = pools.iter().flat_map(|pool| pool.members.clone()).collect();
     if members.is_empty() {
         return;
@@ -154,6 +155,7 @@ async fn apply(pool: &NodePool, switch: &Switch, records: &[NodeRecord]) {
     let Ok(definitions) = chains::definitions().await else {
         return;
     };
+    let mut selected_any = false;
     for chain in definitions
         .iter()
         .filter(|chain| chain.enabled && chain.profile_id == profile_id)
@@ -167,10 +169,20 @@ async fn apply(pool: &NodePool, switch: &Switch, records: &[NodeRecord]) {
             }
             let group = format!("{}-h{hop_index}", chain.group_name());
             let proxy = format!("{group}-m{index}");
-            if let Err(error) = Handle::mihomo().select_node_for_group(&group, &proxy).await {
-                logging!(warn, Type::Config, "pool switch to {proxy} was not applied: {error:#}");
+            match Handle::mihomo().select_node_for_group(&group, &proxy).await {
+                Ok(()) => selected_any = true,
+                Err(error) => {
+                    logging!(warn, Type::Config, "pool switch to {proxy} was not applied: {error:#}");
+                    return;
+                }
             }
         }
+    }
+
+    // Persist the selected member only after every affected runtime group accepted it. This
+    // prevents a failed select from making the next scheduler round start from a false state.
+    if !selected_any {
+        return;
     }
 
     let mut updated = pool.clone();
@@ -192,5 +204,34 @@ async fn apply(pool: &NodePool, switch: &Switch, records: &[NodeRecord]) {
         with_clash5_binding_store(move |store| store.record_pool_switch(&pool_id, &member_name, reason, at_ms)).await;
     if recorded.is_err() {
         logging!(warn, Type::Config, "pool switch was not recorded");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clash5_data::Source;
+
+    fn pool(mode: PoolMode, user_locked: bool) -> NodePool {
+        NodePool {
+            schema_version: 1,
+            id: "00000000-0000-4000-8000-000000000001".into(),
+            name: "test".into(),
+            members: vec![NodeRef {
+                source: Source::Manual,
+                stable_id: "v2:test".into(),
+            }],
+            mode,
+            pinned: None,
+            user_locked,
+        }
+    }
+
+    #[test]
+    fn quality_scheduler_skips_user_locked_pools() {
+        assert!(schedulable(&pool(PoolMode::Quality, false)));
+        assert!(!schedulable(&pool(PoolMode::Quality, true)));
+        assert!(!schedulable(&pool(PoolMode::Pinned, false)));
+        assert!(!schedulable(&pool(PoolMode::Delay, false)));
     }
 }

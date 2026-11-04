@@ -515,8 +515,8 @@
 |---|---|
 | **来源** | R10 **Q8 A**；R20 **Q2 A**（落实） |
 | **拍板** | `user_locked`；Quality/Pinned 手动选择置锁；调度遇锁跳过；仅 select 成功后再写 pinned |
-| **文件:行** | 全仓 `rg user_locked` **无匹配**；`PoolMode` 在 `chain.rs:49-56` |
-| **现状** | **未落地** |
+| **文件:行** | `chain.rs` `NodePool.user_locked`；`pool_scheduler.rs` 调度过滤；`pool-policy.tsx` 手动选择 |
+| **现状** | **已落地** — Quality/Pinned 手动选成员置锁，Quality 调度跳过锁定池，运行时 select 全部成功后才更新 pinned |
 | **取代** | R20 Q2 A 为 Q8 A 的实现规格 |
 
 ### P1-36 · 深链接只用 clash5://（R11 Q4 A / Q5 A / Q8 A；R13 Q7 A）

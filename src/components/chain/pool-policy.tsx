@@ -73,7 +73,11 @@ export const PoolPolicy = ({
           disabled={busy || saving}
           sx={{ minWidth: 180 }}
           onChange={(event) =>
-            void save({ mode: event.target.value as PoolMode })
+            void save({
+              mode: event.target.value as PoolMode,
+              user_locked:
+                event.target.value === 'delay' ? false : pool.user_locked,
+            })
           }
         >
           {MODES.map((value) => (
@@ -97,7 +101,11 @@ export const PoolPolicy = ({
               const member = pool.members.find(
                 (reference) => JSON.stringify(reference) === event.target.value,
               )
-              if (member) void save({ pinned: member })
+              if (member)
+                void save({
+                  pinned: member,
+                  user_locked: true,
+                })
             }}
           >
             {pool.members.map((member) => (

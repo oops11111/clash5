@@ -1236,6 +1236,8 @@ export type NodePool = {
   members: NodeRef[]
   mode?: PoolMode
   pinned?: NodeRef | null
+  /**  A manual member choice prevents the quality scheduler from changing this pool. */
+  user_locked?: boolean
 }
 
 export type NodeQuality = {

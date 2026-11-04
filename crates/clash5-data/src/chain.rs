@@ -68,6 +68,9 @@ pub struct NodePool {
     pub mode: PoolMode,
     #[serde(default)]
     pub pinned: Option<NodeRef>,
+    /// A manual member choice prevents the quality scheduler from changing this pool.
+    #[serde(default)]
+    pub user_locked: bool,
 }
 
 /// Deserialized by hand so the schema 1 front and landing pair can be read.

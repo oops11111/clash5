@@ -56,6 +56,7 @@ fn pool() -> NodePool {
         members: vec![node("p1"), node("p2")],
         mode: PoolMode::Delay,
         pinned: None,
+        user_locked: false,
     }
 }
 
@@ -112,6 +113,26 @@ fn three_hops_with_a_pool_in_the_middle_dial_through_the_previous_hop() {
         .unwrap();
     assert_eq!(pool_group["type"], "url-test");
     assert_eq!(pool_group["proxies"].as_sequence().unwrap().len(), 2);
+}
+
+#[test]
+fn pool_user_lock_defaults_for_older_definitions_and_round_trips() {
+    let old = serde_json::json!({
+        "schema_version": 1,
+        "id": POOL_ID,
+        "name": "Pool",
+        "members": [node("p1")],
+        "mode": "quality"
+    });
+    let decoded: NodePool = serde_json::from_value(old).unwrap();
+    assert!(!decoded.user_locked);
+
+    let mut locked = pool();
+    locked.mode = PoolMode::Quality;
+    locked.user_locked = true;
+    let encoded = serde_json::to_value(&locked).unwrap();
+    assert_eq!(encoded["user_locked"], true);
+    assert!(serde_json::from_value::<NodePool>(encoded).unwrap().user_locked);
 }
 
 #[test]
