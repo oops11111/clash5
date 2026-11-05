@@ -330,6 +330,11 @@ export interface TranslationResources {
       }
       page: {
         cards: {
+          chainEmpty: string
+          chainLoading: string
+          chains: string
+          chainUnavailable: string
+          manageChains: string
           networkSettings: string
           proxyMode: string
           trafficStats: string

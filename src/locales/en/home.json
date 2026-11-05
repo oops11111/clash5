@@ -8,7 +8,12 @@
     "cards": {
       "trafficStats": "Traffic Stats",
       "networkSettings": "Network Settings",
-      "proxyMode": "Proxy Mode"
+      "proxyMode": "Proxy Mode",
+      "chains": "Chains",
+      "manageChains": "Manage",
+      "chainLoading": "Loading chains…",
+      "chainEmpty": "No chains configured yet.",
+      "chainUnavailable": "Chain data is unavailable right now."
     },
     "settings": {
       "cards": {

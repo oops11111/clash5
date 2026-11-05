@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router'
 
 import { BasePage } from '@/components/base'
+import { HomeChainCard } from '@/components/home/chain-card'
 import { ClashModeCard } from '@/components/home/clash-mode-card'
 import { CurrentProxyCard } from '@/components/home/current-proxy-card'
 import { EnhancedCard } from '@/components/home/enhanced-card'
@@ -258,6 +259,9 @@ const HomePage = () => {
     </Grid>,
     <Grid size={{ xs: 6, md: 3 }} key="proxy">
       <CurrentProxyCard />
+    </Grid>,
+    <Grid size={{ xs: 6, md: 3 }} key="chains">
+      <HomeChainCard profileId={current?.uid ?? null} />
     </Grid>,
     <Grid size={{ xs: 6, md: 3 }} key="dns">
       <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>

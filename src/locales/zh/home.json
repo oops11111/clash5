@@ -8,7 +8,12 @@
     "cards": {
       "trafficStats": "流量统计",
       "networkSettings": "网络设置",
-      "proxyMode": "代理模式"
+      "proxyMode": "代理模式",
+      "chains": "链路",
+      "manageChains": "管理",
+      "chainLoading": "正在加载链路…",
+      "chainEmpty": "尚未配置链路。",
+      "chainUnavailable": "当前无法读取链路数据。"
     },
     "settings": {
       "cards": {
