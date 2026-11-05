@@ -37,7 +37,7 @@ import { ThemeModeSwitch } from '@/components/setting/mods/theme-mode-switch'
 import ProxyControlSwitches from '@/components/shared/proxy-control-switches'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
-import { navigationItems } from '@/pages/_navigation-meta'
+import { primaryNavigationItems } from '@/pages/_navigation-meta'
 import { entry_lightweight_mode } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
@@ -201,7 +201,7 @@ const HomeSettingsDialog = ({
             onChange={(e) => void patchVerge({ start_page: e.target.value })}
             sx={{ minWidth: 140, '> div': { py: '7.5px' } }}
           >
-            {Object.values(navigationItems).map((page) => (
+            {Object.values(primaryNavigationItems).map((page) => (
               <MenuItem key={page.path} value={page.path}>
                 {t(page.label)}
               </MenuItem>

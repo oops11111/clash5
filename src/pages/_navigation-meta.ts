@@ -35,3 +35,12 @@ export const navigationItems = {
     path: '/settings',
   },
 } as const
+
+/** R14 primary tabs. Legacy pages remain routable for saved links and deep links. */
+export const primaryNavigationItems = {
+  home: navigationItems.home,
+  proxies: navigationItems.proxies,
+  profiles: navigationItems.profiles,
+  plugins: navigationItems.plugins,
+  settings: navigationItems.settings,
+} as const
