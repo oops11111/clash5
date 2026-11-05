@@ -1,0 +1,46 @@
+// Static release gate for the persisted proxy lease and abnormal-exit path.
+// OS-level kill/restart acceptance remains a desktop artifact.
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const read = (file) => readFile(path.join(root, file), 'utf8')
+const [proxy, state, budget, tests, docs] = await Promise.all([
+  read('src-tauri/src/core/proxy_control.rs'),
+  read('src-tauri/src/core/manager/state.rs'),
+  read('src-tauri/src/core/restart_budget.rs'),
+  read('src-tauri/tests/proxy_recovery.rs'),
+  read('docs/clash5/CLASH5-BACKLOG-ALL-ROUNDS-2026-11-04.md'),
+])
+
+const checks = [
+  ['proxy writes use a persisted lease',
+    proxy.includes('LeaseStore::new') &&
+      proxy.includes('store.begin(lease_owner(), target)') &&
+      proxy.includes('store.settle(lease_owner(), target)')],
+  ['unexpected exits clear only owned state and preserve foreign markers',
+    proxy.includes('clear_after_unexpected_exit') &&
+      proxy.includes('ForeignProxyPolicy::PreserveMarker') &&
+      proxy.includes('clear_and_retire_lease')],
+  ['sidecar cleanup is generation- and PID-scoped',
+    state.includes('invalidate_core_readiness_if(core_readiness_generation)') &&
+      state.includes('should_clear_terminated_sidecar') &&
+      state.includes('request_sidecar_recovery')],
+  ['recovery is bounded by the rolling restart budget',
+    budget.includes('MAX_RESTARTS') && budget.includes('RESTART_WINDOW') &&
+      budget.includes('try_start')],
+  ['isolated ownership, failure and budget tests exist',
+    tests.includes('abnormal_exit_clears_own_proxy') &&
+      tests.includes('mixed_protocol_proxy_does_not_clear_another_application') &&
+      tests.includes('persistent_budget_allows_only_three_attempts')],
+  ['backlog records the remaining desktop evidence',
+    docs.includes('真机杀进程恢复') && docs.includes('Service watchdog')],
+]
+
+for (const [name, ok] of checks) {
+  assert.ok(ok, `proxy recovery policy failed: ${name}`)
+  console.log(`ok   ${name}`)
+}
+console.log(`Validated ${checks.length} proxy recovery policy checks.`)

@@ -17,7 +17,7 @@ the original review records before release; the present registry is a skeleton.
 | G-06 | P0-06 | partial | - | Backup path tests pass locally; native save dialog and denied destination runtime checks remain |
 | G-07 | P0-18 | blocked | - | First release excludes browser companion resources |
 | G-08 | P0-18 | blocked | - | Frozen driver artifacts and accurate product claims |
-| G-09 | P0-07 | partial | - | Sidecar exit cleanup, persisted proxy lease and bounded recovery implemented; OS acceptance and service policy alignment remain |
+| G-09 | P0-07 | partial | scripts/check-proxy-recovery.mjs | Sidecar exit cleanup, persisted proxy lease and bounded recovery checks pass; OS acceptance and service policy alignment remain |
 | G-10 | P0-08 | blocked | - | IPv6 off and respect-rules on; preserve explicit settings |
 | G-11 | P0-09 | blocked | - | Uninstall proxy ownership and scheduled-task cleanup |
 | G-12 | P0-10 | blocked | - | Token-safe subscription naming and migration |
