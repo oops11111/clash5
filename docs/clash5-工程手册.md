@@ -122,9 +122,9 @@ M0 的原验收已完成并合并至 `dev`。以下是本草案新增或收紧�
 | 安全与契约 | M0 IPC 返回结构化错误；PR #31、#32 已依次合入 dev，完成稳定 SQLite 错误码和节点数据命令 `C5-*` 统一；当前契约生成器由 CI 校验 | `dev` 注册 108 个 Tauri 命令；事件契约覆盖 11 个事件 payload 与 34 个通知状态。PR #34 已实现全部命令的参数、成功返回与错误类型快照，并通过完整六项 CI（含 Windows 桌面 smoke）后合入 dev。PR #38 已接入统一日志/诊断脱敏与回归测试，待远程 CI 验收后关闭 R-20 |
 | 上游同步 | M0 文档及仓库基线来自上游 `dev` | 本草案将后续同步改为 release tag 的独立 PR；首次采用前核对目标 tag 与当前基线关系 |
 | M1 节点池 | PR #4 已实现库存、导入、手动节点运行时映射、受限探测与连续失败退避；[Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38647386824)通过页面交互、外部 provider 健康检查、筛选、搜索、质量排序与重启身份检查，附桌面截图 | M1 已达到退出标准并合并至 `dev`。截图覆盖默认 940 × 700 窗口，未单独截图验证 1600 × 900 布局；完整合并配置/插件来源属于后续里程碑。Mihomo 接口未暴露上游 HTTP 状态及 `Retry-After`，当前为连续失败通用退避（R-11/R-26） |
-| M2 链路编排 | PR #18 实现稳定两跳生成、来源隔离、保存和回滚、出口 IP 检测与 L2 策略；[Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38701837292)通过默认窗口无横向溢出检查、桌面交互和重启恢复 | 退出标准已达到，待 PR #18 合并。当前 UI 页面、provider 缓存路径限制与 Mihomo 官方行为见 [`M2 链路说明`](clash5/m2-chains.md) |
+| M2 链路编排 | PR #18 实现稳定两跳生成、来源隔离、保存和回滚、出口 IP 检测与 L2 策略；[Server 2022 原生验收](https://github.com/oops11111/clash5/actions/runs/38701837292)通过默认窗口无横向溢出检查、桌面交互和重启恢复 | 退出标准已达到，并由 PR #36 同步进 `dev`。当前 UI 页面、provider 缓存路径限制与 Mihomo 官方行为见 [`M2 链路说明`](clash5/m2-chains.md) |
 
-M0 原始实现说明见 [`clash5/implementation.md`](clash5/implementation.md)；M1 已合入 `dev`；M2 链路变更及限制见[PR #18](https://github.com/oops11111/clash5/pull/18)。
+M0 原始实现说明见 [`clash5/implementation.md`](clash5/implementation.md)；M1 已合入 `dev`；M2 链路变更及限制见[PR #18](https://github.com/oops11111/clash5/pull/18)及同步 PR #36。
 
 ---
 

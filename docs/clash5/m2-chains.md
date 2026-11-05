@@ -1,6 +1,6 @@
 # M2 chain orchestration
 
-Implementation for [Issue #17](https://github.com/oops11111/clash5/issues/17). The implementation and desktop acceptance passed on commit `ee6922c`; [Windows Server 2022 native run 38701837292](https://github.com/oops11111/clash5/actions/runs/38701837292) verified the desktop bridge, default-window layout, chain operations and restart persistence. PR #18 remains open for review and merge.
+Implementation for [Issue #17](https://github.com/oops11111/clash5/issues/17). The implementation and desktop acceptance passed on commit `ee6922c`; [Windows Server 2022 native run 38701837292](https://github.com/oops11111/clash5/actions/runs/38701837292) verified the desktop bridge, default-window layout, chain operations and restart persistence. The implementation was synchronized into `dev` through PR #36.
 
 Each chain has a UUID v4, a profile scope, two source-scoped stable node references, an enabled flag and an exit-IP failure policy. SQLite stores these references without proxy credentials. The existing opaque M0 chain records remain readable through their original API.
 
