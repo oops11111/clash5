@@ -13,7 +13,7 @@ the original review records before release; the present registry is a skeleton.
 | G-02 | P0-03 | partial | - | RC workflow now owns draft publication behind release-approval; real draft run and environment audit remain |
 | G-03 | P0-02 | blocked | - | Profile isolation and retained materialized nodes |
 | G-04 | P0-04 | partial | scripts/check-webview-security.mjs | Desktop IPC, Monaco, dialog import, icons and denied out-of-scope reads |
-| G-05 | P0-05 | partial | scripts/check-plugin-trust.mjs | Static signer lifecycle and catalog rollback checks pass; four package-rejection cases and desktop evidence remain |
+| G-05 | P0-05 | partial | scripts/check-plugin-trust.mjs | Static signer lifecycle, catalog rollback and four package-rejection tests pass; desktop evidence remains |
 | G-06 | P0-06 | partial | scripts/check-backup-path.mjs | Backup path tests pass locally; native save dialog and denied destination runtime checks remain |
 | G-07 | P0-18 | blocked | - | First release excludes browser companion resources |
 | G-08 | P0-18 | blocked | - | Frozen driver artifacts and accurate product claims |
@@ -42,7 +42,7 @@ the original review records before release; the present registry is a skeleton.
 
 - P0-04：生产/开发 CSP、Monaco schema 请求关闭及 `$APPDATA/icons/**` asset scope 通过静态门禁；迁移 capability 不再预置递归 `$APPDATA/**` 文件系统 scope，本地 YAML 导入继续由系统文件选择器/拖放路径触发。仍需在桌面壳中验证选择器授予范围、图标回退及越界读写拒绝。
 
-- G-05：`scripts/check-plugin-trust.mjs` 校验受信 signer 持久化边界、内置 signer 不可撤销、加载/启用前信任检查、独立列表/添加/撤销命令、指纹确认 UI 以及目录 freshness/sequence 保护；换 signer、无签名、篡改、升级换 signer 四拒和目录实测仍需验收。
+- G-05：`scripts/check-plugin-trust.mjs` 校验受信 signer 持久化边界、内置 signer 不可撤销、加载/启用前信任检查、独立列表/添加/撤销命令、指纹确认 UI、目录 freshness/sequence 保护，以及换 signer、无签名、篡改、升级换 signer 四类 Rust 拒绝测试；桌面实测仍需验收。
 
 Issue: https://github.com/oops11111/clash5/issues/68.
 `tsc --noEmit`, Vite production build, and offline Rust library `cargo check`

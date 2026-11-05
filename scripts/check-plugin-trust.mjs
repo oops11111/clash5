@@ -1,5 +1,4 @@
-// Static release gate for the plugin signer lifecycle. Runtime desktop and
-// four-case package rejection evidence remain separate acceptance artifacts.
+// Static release gate for the plugin signer lifecycle. Desktop acceptance remains a separate artifact.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -54,6 +53,13 @@ const checks = [
   [
     'catalog freshness and sequence rollback protections remain enabled',
     catalog.includes('ensure_fresh') && catalog.includes('ensure_sequence_not_older'),
+  ],
+  [
+    'four package rejection cases are covered by Rust tests',
+    plugins.includes('fn package_rejects_missing_signature') &&
+      plugins.includes('fn package_rejects_manifest_tampering') &&
+      plugins.includes('fn package_rejects_a_changed_signer') &&
+      plugins.includes('fn upgrade_rejects_a_signer_change_without_trusting_the_incoming_signer'),
   ],
   [
     'plugin documentation describes independent signer management',

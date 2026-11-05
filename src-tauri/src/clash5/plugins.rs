@@ -648,7 +648,6 @@ pub(crate) fn upgrade_package(
     if is_bundled(plugin_root, &package.manifest.id) {
         return Err(PluginFailure::PermissionDenied);
     }
-    trust_signer(plugin_root, &package.signer)?;
     let id = package.manifest.id.clone();
     let destination = plugin_root.join(&id);
     let installed_metadata = fs::symlink_metadata(&destination).map_err(|_| PluginFailure::InvalidPackage)?;
@@ -666,6 +665,8 @@ pub(crate) fn upgrade_package(
     {
         return Err(PluginFailure::PermissionDenied);
     }
+    // Do not persist a signer until the package is proven to belong to the installed plugin.
+    trust_signer(plugin_root, &package.signer)?;
     let current = version_parts(&installed_manifest.version).ok_or(PluginFailure::InvalidPackage)?;
     let incoming = version_parts(&package.manifest.version).ok_or(PluginFailure::InvalidPackage)?;
     match incoming.cmp(&current) {
@@ -1075,9 +1076,39 @@ fn classify_execution_error(error: &wasmtime::Error) -> PluginFailure {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write as _;
+    use zip::write::SimpleFileOptions;
 
     const TEST_SIGNER: &str = "untrusted comment: minisign public key E7620F1842B4E81F\nRWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3";
     const TEST_SIGNATURE: &str = "untrusted comment: signature from minisign secret key\nRUQf6LRCGA9i559r3g7V1qNyJDApGip8MfqcadIgT9CuhV3EMhHoN1mGTkUidF/z7SrlQgXdy8ofjb7bNJJylDOocrCo8KLzZwo=\ntrusted comment: timestamp:1556193335\tfile:test\ny/rUw2y8/hOUYjZU71eHp/Wo1KZ40fGy2VJEDl34XMJM+TX48Ss/17u3IvIfbVR1FkZZSNCisQbuQY+bHwhEBg==";
+    const ALTERNATE_SIGNER: &str = include_str!("../../../scripts/fixtures/catalog/signer.pub");
+
+    fn rewrite_package(package: &[u8], removed: Option<&str>, replacement: Option<(&str, &[u8])>) -> Vec<u8> {
+        let mut archive = ZipArchive::new(std::io::Cursor::new(package)).expect("fixture archive");
+        let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for index in 0..archive.len() {
+            let mut entry = archive.by_index(index).expect("fixture entry");
+            let name = entry.name().expect("fixture entry name").to_string();
+            if removed == Some(name.as_str()) {
+                continue;
+            }
+            let mut contents = Vec::new();
+            entry.read_to_end(&mut contents).expect("fixture contents");
+            if let Some((target, bytes)) = replacement
+                && target == name
+            {
+                contents = bytes.to_vec();
+            }
+            writer
+                .start_file(
+                    name,
+                    SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored),
+                )
+                .expect("write fixture entry");
+            writer.write_all(&contents).expect("write fixture contents");
+        }
+        writer.finish().expect("finish fixture archive").into_inner()
+    }
 
     #[test]
     fn minisign_verifies_the_exact_manifest_bytes() {
@@ -1115,6 +1146,41 @@ mod tests {
         };
         let patch = execute_blocking(inspected.module, input, inspected.manifest.writable_paths);
         assert_eq!(patch, Ok(serde_json::json!({"tun":{"mtu":1360}})));
+    }
+
+    #[test]
+    fn package_rejects_missing_signature() {
+        let package = include_bytes!("../../../scripts/fixtures/m3-acceptance-plugin.c5p");
+        let missing_signature = rewrite_package(package, Some("manifest.minisig"), None);
+        assert_eq!(
+            inspect_package(&missing_signature).err(),
+            Some(PluginFailure::InvalidPackage)
+        );
+    }
+
+    #[test]
+    fn package_rejects_manifest_tampering() -> Result<(), PluginFailure> {
+        let package = include_bytes!("../../../scripts/fixtures/m3-acceptance-plugin.c5p");
+        let inspected = inspect_package(package)?;
+        let mut tampered_manifest = inspected.manifest_bytes;
+        let marker = tampered_manifest
+            .iter()
+            .position(|byte| *byte == b'M')
+            .ok_or(PluginFailure::InvalidPackage)?;
+        tampered_manifest[marker] = b'N';
+        let tampered = rewrite_package(package, None, Some(("manifest.json", &tampered_manifest)));
+        assert_eq!(inspect_package(&tampered).err(), Some(PluginFailure::InvalidPackage));
+        Ok(())
+    }
+
+    #[test]
+    fn package_rejects_a_changed_signer() {
+        let package = include_bytes!("../../../scripts/fixtures/m3-acceptance-plugin.c5p");
+        let changed_signer = rewrite_package(package, None, Some(("signer.pub", ALTERNATE_SIGNER.as_bytes())));
+        assert_eq!(
+            inspect_package(&changed_signer).err(),
+            Some(PluginFailure::InvalidPackage)
+        );
     }
 
     #[test]
@@ -1307,6 +1373,26 @@ mod tests {
             upgrade_package(again, &root, true).err(),
             Some(PluginFailure::InvalidPackage)
         );
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn upgrade_rejects_a_signer_change_without_trusting_the_incoming_signer() -> Result<(), PluginFailure> {
+        let package = include_bytes!("../../../scripts/fixtures/m3-acceptance-plugin.c5p");
+        let inspected = inspect_package(package)?;
+        let root = std::env::temp_dir().join(format!("clash5-plugin-upgrade-signer-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        install_package(verify_package(package, std::slice::from_ref(&inspected.signer))?, &root)?;
+
+        let mut incoming = inspect_package(package)?;
+        incoming.manifest.version = "2.0.0".into();
+        incoming.signer = ALTERNATE_SIGNER.trim().to_owned();
+        assert_eq!(
+            upgrade_package(incoming, &root, false).err(),
+            Some(PluginFailure::PermissionDenied)
+        );
+        assert!(!signer_is_trusted(&root, ALTERNATE_SIGNER)?);
         let _ = fs::remove_dir_all(&root);
         Ok(())
     }
