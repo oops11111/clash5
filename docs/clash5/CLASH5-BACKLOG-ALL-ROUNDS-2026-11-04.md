@@ -301,7 +301,7 @@
 |---|---|
 | **来源** | R4 **D1 A** |
 | **拍板** | 钉 40 位 commit 并逐次审差异（含 tauri-plugin-mihomo） |
-| **现状** | **推断** — 需查 `Cargo.toml`/lock；未在本轮逐一核对 hash |
+| **现状** | **已落地** — `sysproxy`、`tauri-plugin-mihomo`、`clash_verge_service_ipc` 已钉到 Cargo.lock 对应的 40 位提交 |
 
 ### P1-08 · open_devtools 仅 debug
 

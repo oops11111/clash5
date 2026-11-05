@@ -80,7 +80,7 @@ boa_engine = "0.22.0"
 percent-encoding = "2.3.2"
 reqwest = { workspace = true }
 regex = { workspace = true }
-sysproxy = { git = "https://github.com/clash-verge-rev/sysproxy-rs.git", branch = "main", features = [
+sysproxy = { git = "https://github.com/clash-verge-rev/sysproxy-rs.git", rev = "89ad876a0942c049ae72e1472f9fc3ed62023c5e", features = [
   "guard",
 ] }
 network-interface = { version = "2.0.5", features = ["serde"] }
@@ -109,9 +109,9 @@ backon = { version = "1.6.0", features = ["tokio-sleep"] }
 tauri-plugin-http = "2.8.0"
 tracing = { workspace = true }
 tauri-plugin-devtools = { version = "2.2.2", optional = true }
-tauri-plugin-mihomo = { git = "https://github.com/clash-verge-rev/tauri-plugin-mihomo", branch = "main" }
+tauri-plugin-mihomo = { git = "https://github.com/clash-verge-rev/tauri-plugin-mihomo", rev = "7a03d16f4d39b1bb885b7babe66b9e153e34b615" }
 async-trait = "0.1.92"
-clash_verge_service_ipc = { git = "https://github.com/clash-verge-rev/clash-verge-service-ipc.git", tag = "v2.7.6", version = "2.7.6", features = [
+clash_verge_service_ipc = { git = "https://github.com/clash-verge-rev/clash-verge-service-ipc.git", rev = "b2a7427d6681c8d3780ab83a73f4dc21da2f22d6", version = "2.7.6", features = [
   "client",
   "development-channel",
 ] }
