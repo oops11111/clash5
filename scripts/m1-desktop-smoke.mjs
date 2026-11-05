@@ -5,7 +5,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import http from 'node:http'
 import net from 'node:net'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 import {
@@ -35,6 +35,21 @@ const capabilities = createTauriCapabilities(resolve(binary), {
   startTimeout: 120_000,
   commandTimeout: 60_000,
 })
+// Windows CI machines may have a matching driver cached outside PATH. Allow
+// the operator to pin that binary for a deterministic local acceptance run.
+// The service checks PATH during preflight, while tauri-driver accepts the
+// explicit native-driver path below.
+const pinnedEdgeDriver = process.env.CLASH5_MSEDGEDRIVER?.trim()
+if (pinnedEdgeDriver) {
+  const driverPath = resolve(pinnedEdgeDriver)
+  const pathValue = `${dirname(driverPath)}${process.platform === 'win32' ? ';' : ':'}${process.env.Path ?? process.env.PATH ?? ''}`
+  // Node preserves the original Windows environment-key casing, while
+  // `where.exe` may resolve either spelling. Set both for old shells.
+  process.env.Path = pathValue
+  process.env.PATH = pathValue
+  const serviceOptions = capabilities['wdio:tauriServiceOptions']
+  serviceOptions.nativeDriverPath = driverPath
+}
 let browser
 let originalClipboard
 let testError
@@ -2297,7 +2312,10 @@ try {
     await startFixtures()
     chainFixture = await startChainFixture(true)
   }
-  browser = await startWdioSession(capabilities)
+  browser = await startWdioSession(
+    capabilities,
+    capabilities['wdio:tauriServiceOptions'],
+  )
   phase = 'Tauri bridge'
   let inventory
   let lastError
