@@ -1,4 +1,5 @@
 use super::manual;
+use super::materialized;
 use crate::{config::profiles::with_clash5_binding_store, utils::dirs};
 use anyhow::{Result, anyhow};
 use clash5_data::{
@@ -128,34 +129,47 @@ pub(crate) async fn catalog(config: &Mapping, profile_id: Option<&str>) -> Resul
     let Some(profile_id) = profile_id else {
         return Ok(catalog);
     };
-    let Some(providers) = config.get("proxy-providers").and_then(Value::as_mapping) else {
-        return Ok(catalog);
-    };
-    let root = tokio::fs::canonicalize(dirs::app_home_dir()?).await?;
-    for (name, provider) in providers {
-        let Some(name) = name.as_str() else { continue };
-        let payload = match provider.get("type").and_then(Value::as_str) {
-            Some("inline") => provider.get("payload").and_then(Value::as_sequence).cloned(),
-            Some("http" | "file") => {
-                let Some(path) = provider.get("path").and_then(Value::as_str) else {
-                    continue;
-                };
-                read_provider_payload(&root, path).await
+    if let Some(providers) = config.get("proxy-providers").and_then(Value::as_mapping) {
+        let root = tokio::fs::canonicalize(dirs::app_home_dir()?).await?;
+        for (name, provider) in providers {
+            let Some(name) = name.as_str() else { continue };
+            let payload = match provider.get("type").and_then(Value::as_str) {
+                Some("inline") => provider.get("payload").and_then(Value::as_sequence).cloned(),
+                Some("http" | "file") => {
+                    let Some(path) = provider.get("path").and_then(Value::as_str) else {
+                        continue;
+                    };
+                    read_provider_payload(&root, path).await
+                }
+                _ => None,
+            };
+            let source = Source::Subscription {
+                provider_id: format!("proxy-provider:{profile_id}:{name}"),
+            };
+            for proxy in payload.unwrap_or_default() {
+                add_proxy(
+                    &mut catalog,
+                    source.clone(),
+                    &proxy,
+                    provider.get("override").and_then(Value::as_mapping),
+                    runtime_identity_key
+                        .as_ref()
+                        .and_then(|key| node_stable_id(&proxy, key)),
+                );
             }
-            _ => None,
-        };
-        let source = Source::Subscription {
-            provider_id: format!("proxy-provider:{profile_id}:{name}"),
-        };
-        for proxy in payload.unwrap_or_default() {
+        }
+    }
+    if let Some(key) = runtime_identity_key.as_ref() {
+        for (reference, proxy) in materialized::load_for_profile(profile_id, key).await? {
+            if catalog.iter().any(|entry| entry.reference == reference) {
+                continue;
+            }
             add_proxy(
                 &mut catalog,
-                source.clone(),
-                &proxy,
-                provider.get("override").and_then(Value::as_mapping),
-                runtime_identity_key
-                    .as_ref()
-                    .and_then(|key| node_stable_id(&proxy, key)),
+                reference.source.clone(),
+                &Value::Mapping(proxy),
+                None,
+                Some(reference.stable_id),
             );
         }
     }

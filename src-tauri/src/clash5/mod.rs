@@ -4,6 +4,7 @@ pub(crate) mod dns_check;
 pub(crate) mod exit_ip;
 pub(crate) mod import;
 pub(crate) mod manual;
+pub(crate) mod materialized;
 pub(crate) mod plugins;
 pub(crate) mod pool_scheduler;
 pub(crate) mod pool_score;

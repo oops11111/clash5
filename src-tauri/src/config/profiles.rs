@@ -2,6 +2,7 @@ use super::{
     PrfOption,
     prfitem::{PrfItem, PrfSelected, normalize_profile_home_url},
 };
+use crate::clash5::materialized;
 use crate::core::notify::{Refresh, announce};
 use crate::utils::retry::{RetryError, RetryPolicy, retry, retry_with_state};
 use crate::{
@@ -649,6 +650,13 @@ pub(crate) async fn reconcile_clash5_snapshot(
     provider_id: std::string::String,
     yaml: std::string::String,
 ) -> BindingSync {
+    if let Err(error) = materialized::snapshot_profile_yaml(provider_id.clone(), yaml.clone()).await {
+        logging!(
+            warn,
+            Type::Config,
+            "failed to materialize subscription proxy snapshot: {error:#}"
+        );
+    }
     let Some(nodes) = (match clash5_data::parse_inline_nodes(&yaml) {
         Ok(nodes) => nodes,
         Err(error) => return BindingSync::Failed(error),
@@ -660,6 +668,21 @@ pub(crate) async fn reconcile_clash5_snapshot(
         Ok(_) => BindingSync::Applied,
         Err(error) => BindingSync::Failed(error),
     }
+}
+
+pub(crate) async fn snapshot_materialized_profile(index: &str) -> Result<()> {
+    let profiles = Config::profiles().await;
+    let latest = profiles.latest_arc();
+    let item = latest.get_item(index)?;
+    if item.itype.as_deref() != Some("remote") {
+        return Ok(());
+    }
+    let Some(file) = item.file.as_ref() else {
+        return Ok(());
+    };
+    let path = dirs::app_profiles_dir()?.join(file.as_str());
+    let yaml = fs::read_to_string(path).await?;
+    materialized::snapshot_profile_yaml(index.to_owned(), yaml).await
 }
 
 pub(crate) enum BindingSync {

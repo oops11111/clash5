@@ -189,6 +189,14 @@ pub async fn delete_profile(index: std::string::String) -> CmdResult {
     let index: String = index.into();
     let profile_write_guard = PROFILE_WRITE_LOCK.lock().await;
 
+    if let Err(error) = profiles::snapshot_materialized_profile(&index).await {
+        logging!(
+            warn,
+            Type::Config,
+            "failed to preserve deleted subscription nodes: {error:#}"
+        );
+    }
+
     let profiles = Config::profiles().await;
     let deleted_was_remote = profiles
         .latest_arc()
