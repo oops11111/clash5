@@ -657,15 +657,28 @@ pub async fn clash5_delete_node_pool(id: String) -> CmdResult {
 #[tauri::command]
 #[specta::specta]
 pub async fn clash5_list_app_routes() -> CmdResult<Vec<clash5_data::AppRoute>> {
-    with_clash5_binding_store(|store| store.app_routes())
-        .await
-        .map_err(|_| storage_failure())
+    let profile_id = Config::profiles().await.latest_arc().current.clone();
+    with_clash5_binding_store(move |store| match profile_id {
+        Some(profile_id) => {
+            store.claim_legacy_app_routes(&profile_id)?;
+            store.app_routes_for_profile(&profile_id)
+        }
+        None => store.app_routes(),
+    })
+    .await
+    .map_err(|_| storage_failure())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn clash5_save_app_route(route: clash5_data::AppRoute) -> CmdResult {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
+    let profile_id = Config::profiles()
+        .await
+        .latest_arc()
+        .current
+        .clone()
+        .ok_or_else(|| coded_error("C5-ROUTE-003", "a current profile is required for app routes"))?;
     route
         .validate()
         .map_err(|_| coded_error("C5-ROUTE-002", "app route definition is invalid"))?;
@@ -687,14 +700,11 @@ pub async fn clash5_save_app_route(route: clash5_data::AppRoute) -> CmdResult {
                         .iter()
                         .any(|group| group.get("name").and_then(Value::as_str) == Some(name.as_str()))
                 }),
-            clash5_data::RouteTarget::Node { node } => {
-                let profiles = Config::profiles().await.latest_arc();
-                chains::catalog(config, profiles.current.as_deref())
-                    .await
-                    .map_err(|_| storage_failure())?
-                    .iter()
-                    .any(|entry| entry.reference == *node)
-            }
+            clash5_data::RouteTarget::Node { node } => chains::catalog(config, Some(profile_id.as_str()))
+                .await
+                .map_err(|_| storage_failure())?
+                .iter()
+                .any(|entry| entry.reference == *node),
             _ => false,
         };
         if !known {
@@ -706,31 +716,38 @@ pub async fn clash5_save_app_route(route: clash5_data::AppRoute) -> CmdResult {
             .await
             .map_err(|_| storage_failure())?
             .iter()
-            .any(|chain| chain.id == *chain_id && chain.enabled);
+            .any(|chain| {
+                chain.id == *chain_id && chain.enabled && chain.profile_id.as_deref() == Some(profile_id.as_str())
+            });
         if !known {
             return Err(coded_error("C5-ROUTE-003", "the route's chain is not an enabled chain"));
         }
     }
     let id = route.id.clone();
-    let previous = with_clash5_binding_store(|store| store.app_routes())
-        .await
-        .map_err(|_| storage_failure())?
-        .into_iter()
-        .find(|saved| saved.id == id);
-    with_clash5_binding_store(move |store| store.save_app_route(&route))
+    let previous_profile = profile_id.clone();
+    let previous = with_clash5_binding_store(move |store| {
+        store.claim_legacy_app_routes(&previous_profile)?;
+        store.app_routes_for_profile(&previous_profile)
+    })
+    .await
+    .map_err(|_| storage_failure())?
+    .into_iter()
+    .find(|saved| saved.id == id);
+    let save_profile_id = profile_id.clone();
+    with_clash5_binding_store(move |store| store.save_app_route_for_profile(&save_profile_id, &route))
         .await
         .map_err(|_| storage_failure())?;
     if let Err(failure) = apply_saved_chains().await {
-        restore_app_route(id, previous).await?;
+        restore_app_route(profile_id.to_string(), id, previous).await?;
         return Err(failure);
     }
     Ok(())
 }
 
-async fn restore_app_route(id: String, previous: Option<clash5_data::AppRoute>) -> CmdResult {
+async fn restore_app_route(profile_id: String, id: String, previous: Option<clash5_data::AppRoute>) -> CmdResult {
     with_clash5_binding_store(move |store| match previous {
-        Some(route) => store.save_app_route(&route),
-        None => store.delete_app_route(&id),
+        Some(route) => store.save_app_route_for_profile(&profile_id, &route),
+        None => store.delete_app_route_for_profile(&profile_id, &id),
     })
     .await
     .map_err(|_| storage_failure())?;
@@ -741,17 +758,30 @@ async fn restore_app_route(id: String, previous: Option<clash5_data::AppRoute>) 
 #[specta::specta]
 pub async fn clash5_delete_app_route(id: String) -> CmdResult {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
-    let previous = with_clash5_binding_store(|store| store.app_routes())
+    let profile_id = Config::profiles()
         .await
-        .map_err(|_| storage_failure())?
-        .into_iter()
-        .find(|route| route.id == id);
+        .latest_arc()
+        .current
+        .clone()
+        .ok_or_else(|| coded_error("C5-ROUTE-003", "a current profile is required for app routes"))?;
+    let previous_profile = profile_id.clone();
+    let previous = with_clash5_binding_store(move |store| {
+        store.claim_legacy_app_routes(&previous_profile)?;
+        store.app_routes_for_profile(&previous_profile)
+    })
+    .await
+    .map_err(|_| storage_failure())?
+    .into_iter()
+    .find(|route| route.id == id);
     let deleted_id = id.clone();
-    with_clash5_binding_store(move |store| store.delete_app_route(&id))
-        .await
-        .map_err(|_| storage_failure())?;
+    with_clash5_binding_store({
+        let profile_id = profile_id.clone();
+        move |store| store.delete_app_route_for_profile(&profile_id, &id)
+    })
+    .await
+    .map_err(|_| storage_failure())?;
     if let Err(failure) = apply_saved_chains().await {
-        restore_app_route(deleted_id, previous).await?;
+        restore_app_route(profile_id.to_string(), deleted_id, previous).await?;
         return Err(failure);
     }
     Ok(())

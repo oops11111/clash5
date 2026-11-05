@@ -24,6 +24,16 @@ pub enum RouteTarget {
     Reject,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteHealth {
+    Healthy,
+    MissingGroup,
+    MissingNode,
+    MissingChain,
+    InvalidDefinition,
+}
+
 /// An application or subsystem route. Routes are independent objects; each one lists what it covers
 /// and where that traffic goes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
@@ -132,6 +142,58 @@ impl AppRoute {
     }
 }
 
+fn route_target(config: &Mapping, route: &AppRoute, chains: &[ProxyChain]) -> Result<String, RouteHealth> {
+    match &route.target {
+        RouteTarget::Direct => Ok("DIRECT".to_owned()),
+        RouteTarget::Reject => Ok("REJECT".to_owned()),
+        RouteTarget::Group { name } => {
+            if config
+                .get("proxy-groups")
+                .and_then(Value::as_sequence)
+                .is_some_and(|groups| {
+                    groups
+                        .iter()
+                        .any(|group| group.get("name").and_then(Value::as_str) == Some(name.as_str()))
+                })
+            {
+                Ok(name.clone())
+            } else {
+                Err(RouteHealth::MissingGroup)
+            }
+        }
+        RouteTarget::Node { .. } => {
+            let name = format!("clash5-app-node-{}", route.id);
+            if config
+                .get("proxies")
+                .and_then(Value::as_sequence)
+                .is_some_and(|proxies| {
+                    proxies
+                        .iter()
+                        .any(|proxy| proxy.get("name").and_then(Value::as_str) == Some(name.as_str()))
+                })
+            {
+                Ok(name)
+            } else {
+                Err(RouteHealth::MissingNode)
+            }
+        }
+        RouteTarget::Chain { chain_id } => chains
+            .iter()
+            .find(|chain| chain.id == *chain_id && chain.enabled)
+            .map(ProxyChain::group_name)
+            .ok_or(RouteHealth::MissingChain),
+    }
+}
+
+/// Reports whether a saved route can currently resolve its target in one profile.
+/// Missing runtime targets are intentionally distinct from malformed saved definitions.
+pub fn route_health(config: &Mapping, route: &AppRoute, chains: &[ProxyChain]) -> RouteHealth {
+    if route.validate().is_err() {
+        return RouteHealth::InvalidDefinition;
+    }
+    route_target(config, route, chains).map_or_else(|health| health, |_| RouteHealth::Healthy)
+}
+
 /// Adds one rule per matcher ahead of the profile's rules. Process matchers need `find-process-mode`,
 /// which is set only when a route uses them. A route's nameserver becomes a `nameserver-policy` entry
 /// for each of its domain suffixes. Nothing is written unless every route validates first.
@@ -149,44 +211,12 @@ pub fn compile_app_routes(
     let mut process_matchers = false;
     for route in &active {
         route.validate().map_err(|_| ChainError::InvalidDefinition)?;
-        let target = match &route.target {
-            RouteTarget::Direct => "DIRECT".to_owned(),
-            RouteTarget::Reject => "REJECT".to_owned(),
-            RouteTarget::Group { name } => {
-                if !config
-                    .get("proxy-groups")
-                    .and_then(Value::as_sequence)
-                    .is_some_and(|groups| {
-                        groups
-                            .iter()
-                            .any(|group| group.get("name").and_then(Value::as_str) == Some(name.as_str()))
-                    })
-                {
-                    return Err(ChainError::InvalidDefinition);
-                }
-                name.clone()
-            }
-            RouteTarget::Node { .. } => {
-                let name = format!("clash5-app-node-{}", route.id);
-                if !config
-                    .get("proxies")
-                    .and_then(Value::as_sequence)
-                    .is_some_and(|proxies| {
-                        proxies
-                            .iter()
-                            .any(|proxy| proxy.get("name").and_then(Value::as_str) == Some(name.as_str()))
-                    })
-                {
-                    return Err(ChainError::InvalidDefinition);
-                }
-                name
-            }
-            RouteTarget::Chain { chain_id } => {
-                let chain = chains
-                    .iter()
-                    .find(|chain| chain.id == *chain_id && chain.enabled)
-                    .ok_or(ChainError::InvalidDefinition)?;
-                chain.group_name()
+        let target = match route_target(config, route, chains) {
+            Ok(target) => target,
+            Err(RouteHealth::Healthy) => return Err(ChainError::InvalidDefinition),
+            Err(RouteHealth::InvalidDefinition) => return Err(ChainError::InvalidDefinition),
+            Err(RouteHealth::MissingGroup | RouteHealth::MissingNode | RouteHealth::MissingChain) => {
+                "REJECT".to_owned()
             }
         };
         for matcher in &route.matchers {

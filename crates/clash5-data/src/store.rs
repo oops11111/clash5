@@ -1069,6 +1069,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations(
  version INTEGER PRIMARY KEY,
  applied_at TEXT NOT NULL DEFAULT(strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 ) STRICT;
+CREATE TABLE IF NOT EXISTS app_routes(id TEXT PRIMARY KEY, definition TEXT NOT NULL CHECK(json_valid(definition))) STRICT;
+ALTER TABLE app_routes ADD COLUMN profile_id TEXT;
+ALTER TABLE app_routes ADD COLUMN migration_owner TEXT;
 INSERT OR IGNORE INTO schema_migrations(version) VALUES(11);
 PRAGMA user_version=11;
 "#,
@@ -1863,12 +1866,51 @@ PRAGMA user_version=11;
         let definition = serde_json::to_value(route).map_err(|_| DataError::InvalidInput)?;
         let tx = self.db.transaction()?;
         tx.execute(
-            "INSERT INTO app_routes VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET definition=excluded.definition",
+            "INSERT INTO app_routes(id,definition) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET definition=excluded.definition",
             params![route.id, definition.to_string()],
         )?;
         audit(&tx, "route.upsert", serde_json::json!({"routes":1}))?;
         tx.commit()?;
         Ok(())
+    }
+    pub fn claim_legacy_app_routes(&mut self, profile_id: &str) -> Result<usize, DataError> {
+        text(profile_id)?;
+        let tx = self.db.transaction()?;
+        let claimed = tx.execute(
+            "UPDATE app_routes SET profile_id=?1,migration_owner='legacy-v11' WHERE profile_id IS NULL",
+            [profile_id],
+        )?;
+        if claimed > 0 {
+            audit(&tx, "route.migrate", serde_json::json!({"routes":claimed}))?;
+        }
+        tx.commit()?;
+        Ok(claimed)
+    }
+    pub fn save_app_route_for_profile(&mut self, profile_id: &str, route: &AppRoute) -> Result<(), DataError> {
+        text(profile_id)?;
+        route.validate()?;
+        let definition = serde_json::to_value(route).map_err(|_| DataError::InvalidInput)?;
+        let tx = self.db.transaction()?;
+        tx.execute(
+            "INSERT INTO app_routes(id,definition,profile_id,migration_owner) VALUES(?1,?2,?3,'profile') ON CONFLICT(id) DO UPDATE SET definition=excluded.definition,profile_id=excluded.profile_id,migration_owner=excluded.migration_owner",
+            params![route.id, definition.to_string(), profile_id],
+        )?;
+        audit(&tx, "route.upsert", serde_json::json!({"routes":1}))?;
+        tx.commit()?;
+        Ok(())
+    }
+    pub fn app_routes_for_profile(&self, profile_id: &str) -> Result<Vec<AppRoute>, DataError> {
+        text(profile_id)?;
+        let mut statement = self
+            .db
+            .prepare("SELECT definition FROM app_routes WHERE profile_id=?1 ORDER BY id")?;
+        let raw = statement.query_map([profile_id], |row| row.get::<_, String>(0))?;
+        raw.map(|raw| {
+            let route: AppRoute = serde_json::from_str(&raw?).map_err(|_| DataError::Database)?;
+            route.validate()?;
+            Ok(route)
+        })
+        .collect()
     }
     pub fn app_routes(&self) -> Result<Vec<AppRoute>, DataError> {
         let mut statement = self.db.prepare("SELECT definition FROM app_routes ORDER BY id")?;
@@ -1884,6 +1926,21 @@ PRAGMA user_version=11;
         text(id)?;
         let tx = self.db.transaction()?;
         let deleted = tx.execute("DELETE FROM app_routes WHERE id=?1", [id])?;
+        if deleted == 0 {
+            return Err(DataError::NotFound);
+        }
+        audit(&tx, "route.delete", serde_json::json!({"routes":deleted}))?;
+        tx.commit()?;
+        Ok(())
+    }
+    pub fn delete_app_route_for_profile(&mut self, profile_id: &str, id: &str) -> Result<(), DataError> {
+        text(profile_id)?;
+        text(id)?;
+        let tx = self.db.transaction()?;
+        let deleted = tx.execute(
+            "DELETE FROM app_routes WHERE id=?1 AND profile_id=?2",
+            params![id, profile_id],
+        )?;
         if deleted == 0 {
             return Err(DataError::NotFound);
         }

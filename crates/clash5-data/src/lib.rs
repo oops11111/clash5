@@ -6,7 +6,9 @@ mod profile;
 mod quality;
 mod store;
 
-pub use app_route::{AppMatcher, AppRoute, MAX_APP_MATCHERS, RouteTarget, compile_app_routes};
+pub use app_route::{
+    AppMatcher, AppRoute, MAX_APP_MATCHERS, RouteHealth, RouteTarget, compile_app_routes, route_health,
+};
 pub use chain::{
     ChainError, ChainSample, CompiledChain, ExitPolicy, Hop, MAX_HOPS, MAX_POOL_MEMBERS, NodePool, NodeRef, PoolMode,
     ProxyChain, ScopedProxy, compile_chains,

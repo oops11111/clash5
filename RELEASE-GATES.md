@@ -9,7 +9,7 @@ the original review records before release; the present registry is a skeleton.
 
 | Gate | Backlog | Status | Check | Remaining evidence |
 | --- | --- | --- | --- | --- |
-| G-01 | P0-01 | blocked | - | Missing targets reject only their application; route health and UI |
+| G-01 | P0-01 | partial | - | Data-layer REJECT/RouteHealth and profile ownership pass; desktop red notification and disabled-chain acceptance remain |
 | G-02 | P0-03 | blocked | - | RC-only publication and environment approval |
 | G-03 | P0-02 | blocked | - | Profile isolation and retained materialized nodes |
 | G-04 | P0-04 | partial | scripts/check-webview-security.mjs | Desktop IPC, Monaco, dialog import, icons and denied out-of-scope reads |
@@ -22,7 +22,7 @@ the original review records before release; the present registry is a skeleton.
 | G-11 | P0-09 | blocked | - | Uninstall proxy ownership and scheduled-task cleanup |
 | G-12 | P0-10 | blocked | - | Token-safe subscription naming and migration |
 | G-13 | P0-11 | partial | - | Desktop transport/UA evidence, direct-connection UX, and certificate-exception acceptance |
-| G-14 | P0-14 | partial | - | Data-layer snapshot, atomic v11 and newer-schema rejection pass; desktop recovery evidence and route ownership migration remain |
+| G-14 | P0-14 | partial | - | Data-layer snapshot, atomic v11, newer-schema rejection and legacy route ownership pass; desktop recovery evidence remains |
 | G-15 | P0-15 | blocked | - | Corrupt config preservation and write protection |
 | G-16 | P0-16 | partial | scripts/check-privacy-defaults.mjs | Updater disabled in config, frontend and backend; signing and RC artifact policy still unverified |
 | P0-12 | P0-12 | partial | scripts/check-privacy-defaults.mjs | Upgrade UI, command and downloader removed; packaged-core service hash acceptance remains |

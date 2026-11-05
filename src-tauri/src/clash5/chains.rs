@@ -173,17 +173,20 @@ pub(crate) async fn generate(config: &mut Mapping, profile_id: Option<&str>) -> 
         .into_iter()
         .filter(|chain| chain.profile_id.as_deref() == profile_id && chain.enabled)
         .collect();
-    // A route can name a chain from another profile. That route is inactive here, not an error,
-    // so switching profiles never fails the configuration.
-    let routes: Vec<_> = with_clash5_binding_store(|store| store.app_routes())
-        .await
-        .map_err(|_| anyhow!("C5-ROUTE-001"))?
-        .into_iter()
-        .filter(|route| match &route.target {
-            RouteTarget::Chain { chain_id } => chains.iter().any(|chain| chain.id == *chain_id),
-            RouteTarget::Direct | RouteTarget::Reject | RouteTarget::Group { .. } | RouteTarget::Node { .. } => true,
-        })
-        .collect();
+    let routes = match profile_id {
+        Some(profile_id) => {
+            let profile_id = profile_id.to_owned();
+            with_clash5_binding_store(move |store| {
+                store.claim_legacy_app_routes(&profile_id)?;
+                store.app_routes_for_profile(&profile_id)
+            })
+            .await
+            .map_err(|_| anyhow!("C5-ROUTE-001"))?
+        }
+        None => with_clash5_binding_store(|store| store.app_routes())
+            .await
+            .map_err(|_| anyhow!("C5-ROUTE-001"))?,
+    };
     if routes
         .iter()
         .any(|route| route.enabled && matches!(route.target, RouteTarget::Node { .. }))
@@ -191,12 +194,13 @@ pub(crate) async fn generate(config: &mut Mapping, profile_id: Option<&str>) -> 
         let nodes = catalog(config, profile_id).await?;
         for route in routes.iter().filter(|route| route.enabled) {
             if let RouteTarget::Node { node } = &route.target {
-                let mut proxy = nodes
+                let Some(mut proxy) = nodes
                     .iter()
                     .find(|entry| entry.reference == *node)
-                    .ok_or_else(|| anyhow!("C5-ROUTE-003"))?
-                    .proxy
-                    .clone();
+                    .map(|entry| entry.proxy.clone())
+                else {
+                    continue;
+                };
                 let name = format!("clash5-app-node-{}", route.id);
                 proxy.insert("name".into(), name.clone().into());
                 let proxies = config

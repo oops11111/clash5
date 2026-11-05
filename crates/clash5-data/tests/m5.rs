@@ -1,5 +1,6 @@
 use clash5_data::{
-    AppMatcher, AppRoute, BindingStore, ExitPolicy, Hop, NodeRef, ProxyChain, RouteTarget, Source, compile_app_routes,
+    AppMatcher, AppRoute, BindingStore, ExitPolicy, Hop, NodeRef, ProxyChain, RouteHealth, RouteTarget, Source,
+    compile_app_routes, route_health,
 };
 use serde_yaml_ng::Mapping;
 
@@ -27,7 +28,9 @@ fn process_routes_select_groups_and_materialized_nodes() {
         );
         compile_app_routes(&mut config, std::slice::from_ref(&definition), &[]).unwrap();
         assert_eq!(rules(&config), vec![format!("PROCESS-NAME,browser.exe,{destination}")]);
-        assert!(compile_app_routes(&mut Mapping::new(), &[definition], &[]).is_err());
+        let mut missing_target_config = Mapping::new();
+        compile_app_routes(&mut missing_target_config, &[definition], &[]).unwrap();
+        assert_eq!(rules(&missing_target_config)[0], "PROCESS-NAME,browser.exe,REJECT");
     }
 }
 
@@ -133,8 +136,8 @@ fn no_active_routes_leaves_the_configuration_untouched() {
 }
 
 #[test]
-fn a_route_to_a_missing_or_disabled_chain_is_rejected() {
-    let mut config = config();
+fn a_route_to_a_missing_or_disabled_chain_degrades_to_reject() {
+    let mut route_config = config();
     let target = RouteTarget::Chain {
         chain_id: CHAIN_ID.into(),
     };
@@ -143,8 +146,41 @@ fn a_route_to_a_missing_or_disabled_chain_is_rejected() {
         target.clone(),
         true,
     )];
-    assert!(compile_app_routes(&mut config, &routes, &[]).is_err());
-    assert!(compile_app_routes(&mut config, &routes, &[chain(false)]).is_err());
+    assert_eq!(compile_app_routes(&mut route_config, &routes, &[]).unwrap(), 1);
+    assert_eq!(rules(&route_config)[0], "PROCESS-NAME,x,REJECT");
+    assert_eq!(route_health(&route_config, &routes[0], &[]), RouteHealth::MissingChain);
+    let mut disabled_config = config();
+    assert_eq!(
+        compile_app_routes(&mut disabled_config, &routes, &[chain(false)]).unwrap(),
+        1
+    );
+    assert_eq!(rules(&disabled_config)[0], "PROCESS-NAME,x,REJECT");
+}
+
+#[test]
+fn missing_group_and_node_targets_degrade_only_their_routes_to_reject() {
+    let mut config = config();
+    let group = route(
+        vec![AppMatcher::ProcessName { name: "grouped".into() }],
+        RouteTarget::Group {
+            name: "missing-group".into(),
+        },
+        true,
+    );
+    let node = route(
+        vec![AppMatcher::ProcessName { name: "noded".into() }],
+        RouteTarget::Node { node: node("missing") },
+        true,
+    );
+    assert_eq!(compile_app_routes(&mut config, &[group, node], &[]).unwrap(), 2);
+    assert_eq!(
+        rules(&config),
+        vec![
+            "PROCESS-NAME,grouped,REJECT",
+            "PROCESS-NAME,noded,REJECT",
+            "MATCH,DIRECT",
+        ]
+    );
 }
 
 #[test]
@@ -212,6 +248,31 @@ fn routes_round_trip_through_the_store() {
     assert_eq!(store.app_routes().unwrap(), vec![saved]);
     store.delete_app_route(ROUTE_ID).unwrap();
     assert!(store.app_routes().unwrap().is_empty());
+}
+
+#[test]
+fn legacy_routes_are_claimed_once_and_new_routes_stay_profile_scoped() {
+    let mut store = BindingStore::memory().unwrap();
+    let legacy = route(
+        vec![AppMatcher::ProcessName { name: "legacy".into() }],
+        RouteTarget::Direct,
+        true,
+    );
+    store.save_app_route(&legacy).unwrap();
+    assert_eq!(store.claim_legacy_app_routes("profile-a").unwrap(), 1);
+    assert_eq!(store.claim_legacy_app_routes("profile-b").unwrap(), 0);
+    assert_eq!(store.app_routes_for_profile("profile-a").unwrap(), vec![legacy.clone()]);
+    assert!(store.app_routes_for_profile("profile-b").unwrap().is_empty());
+
+    let mut profile_route = route(
+        vec![AppMatcher::ProcessName { name: "profile".into() }],
+        RouteTarget::Direct,
+        true,
+    );
+    profile_route.id = "5b7e4d3c-2a1f-4e8d-9c7b-6a5f4e3d2c1b".into();
+    store.save_app_route_for_profile("profile-b", &profile_route).unwrap();
+    assert_eq!(store.app_routes_for_profile("profile-a").unwrap(), vec![legacy]);
+    assert_eq!(store.app_routes_for_profile("profile-b").unwrap(), vec![profile_route]);
 }
 
 fn domain_route(suffix: &str, nameserver: Option<&str>) -> AppRoute {
