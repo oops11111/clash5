@@ -40,9 +40,10 @@ const checks = [
     ok: (text) => text.includes('auto_check_update: Some(false)'),
   },
   {
-    name: 'Home IP card is off by default',
+    name: 'Home IP card is not rendered by default',
     file: 'src/pages/home.tsx',
-    ok: (text) => /DEFAULT_HOME_CARDS[\s\S]*?\bip: false,/.test(text),
+    ok: (text) =>
+      !text.includes('IPInfoCard') && !text.includes('DEFAULT_HOME_CARDS'),
   },
   {
     name: 'Miscellaneous update check defaults to off in the UI',
