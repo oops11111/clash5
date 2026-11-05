@@ -112,6 +112,55 @@ fn duplicate_fingerprint_has_deterministic_name_and_preserves_scope() {
 }
 
 #[test]
+fn removing_a_subscription_keeps_referenced_node_and_binding_as_recoverable_records() {
+    let mut db = BindingStore::memory().unwrap();
+    let source = Source::Subscription {
+        provider_id: "referenced-provider".into(),
+    };
+    let referenced = node("Referenced");
+    let stable_id = db
+        .refresh_provider("referenced-provider", std::slice::from_ref(&referenced))
+        .unwrap()
+        .added
+        .remove(0);
+
+    db.upsert_binding(&Binding {
+        id: "chain-reference".into(),
+        plugin_id: "fixture-chain".into(),
+        target_id: stable_id.clone(),
+        source: source.clone(),
+        priority: 0,
+        enabled: true,
+        config: serde_json::json!({"role": "chain-hop"}),
+        orphan: false,
+        disappeared_at: None,
+    })
+    .unwrap();
+
+    let diff = db.refresh_provider("referenced-provider", &[]).unwrap();
+    assert_eq!(diff.removed, vec![stable_id.clone()]);
+
+    let retained = db
+        .node_records(true)
+        .unwrap()
+        .into_iter()
+        .find(|record| record.stable_id == stable_id)
+        .expect("removed subscription node remains materialized for recovery");
+    assert!(!retained.active);
+    assert_eq!(retained.display_name, "Referenced");
+
+    let binding = db
+        .bindings(Some(&source))
+        .unwrap()
+        .into_iter()
+        .find(|binding| binding.id == "chain-reference")
+        .expect("binding remains readable after its source disappears");
+    assert_eq!(binding.target_id, stable_id);
+    assert!(binding.orphan);
+    assert!(db.effective_bindings(&source, &binding.target_id).unwrap().is_empty());
+}
+
+#[test]
 fn v1_database_migrates_without_discarding_nodes() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
     std::fs::create_dir_all(&root).unwrap();

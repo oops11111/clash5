@@ -600,6 +600,8 @@ export interface TranslationResources {
       manualImportSuccess: string
       milliseconds: string
       nodeCount: string
+      notEffective: string
+      notEffectiveHint: string
       notTested: string
       oneSelected: string
       port: string

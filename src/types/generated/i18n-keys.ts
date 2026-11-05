@@ -456,6 +456,8 @@ export const translationKeys = [
   'nodePool.duplicates',
   'nodePool.highQuality',
   'nodePool.inactive',
+  'nodePool.notEffective',
+  'nodePool.notEffectiveHint',
   'nodePool.refresh',
   'nodePool.importClipboard',
   'nodePool.importInvalid',

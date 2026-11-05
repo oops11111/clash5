@@ -14,6 +14,8 @@
   "duplicates": "重复",
   "highQuality": "高质量",
   "inactive": "已移除",
+  "notEffective": "未生效",
+  "notEffectiveHint": "该节点已保留用于恢复，但当前订阅快照中不可用。",
   "refresh": "刷新列表",
   "importClipboard": "从剪贴板导入",
   "importInvalid": "剪贴板中没有可识别的订阅地址或节点链接",

@@ -11,7 +11,7 @@ the original review records before release; the present registry is a skeleton.
 | --- | --- | --- | --- | --- |
 | G-01 | P0-01 | partial | - | Data-layer REJECT/RouteHealth, profile ownership and UI alert pass; runtime desktop restart and disabled-chain acceptance remain |
 | G-02 | P0-03 | partial | - | RC workflow now owns draft publication behind release-approval; real draft run and environment audit remain |
-| G-03 | P0-02 | blocked | - | Profile isolation and retained materialized nodes |
+| G-03 | P0-02 | partial | scripts/check-node-retention.mjs | Retained node/orphan-binding regression and inactive-node UI are covered; runtime materialization after source deletion and cross-profile desktop evidence remain |
 | G-04 | P0-04 | partial | scripts/check-webview-security.mjs | Desktop IPC, Monaco, dialog import, icons and denied out-of-scope reads |
 | G-05 | P0-05 | partial | scripts/check-plugin-trust.mjs | Static signer lifecycle, catalog rollback and four package-rejection tests pass; desktop evidence remains |
 | G-06 | P0-06 | partial | scripts/check-backup-path.mjs | Backup path tests pass locally; native save dialog and denied destination runtime checks remain |

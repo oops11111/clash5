@@ -575,7 +575,7 @@ const NodePoolPage = () => {
                       <Chip
                         size="small"
                         color="warning"
-                        label={t('nodePool.inactive')}
+                        label={t('nodePool.notEffective')}
                       />
                     )}
                     {(record.duplicate_count > 1 ||
@@ -651,6 +651,11 @@ const NodePoolPage = () => {
               </Stack>
               {selected ? (
                 <>
+                  {!selected.active && (
+                    <Alert severity="warning" variant="outlined" sx={{ mb: 1.5 }}>
+                      {t('nodePool.notEffectiveHint')}
+                    </Alert>
+                  )}
                   <TableContainer>
                     <Table
                       size="small"

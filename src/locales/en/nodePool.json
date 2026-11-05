@@ -14,6 +14,8 @@
   "duplicates": "Duplicates",
   "highQuality": "Healthy",
   "inactive": "Removed",
+  "notEffective": "Not effective",
+  "notEffectiveHint": "This node is retained for recovery, but it is not available in the current subscription snapshot.",
   "refresh": "Refresh list",
   "importClipboard": "Import from clipboard",
   "importInvalid": "Clipboard does not contain a supported subscription URL or proxy link",
