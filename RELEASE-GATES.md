@@ -14,7 +14,7 @@ the original review records before release; the present registry is a skeleton.
 | G-03 | P0-02 | blocked | - | Profile isolation and retained materialized nodes |
 | G-04 | P0-04 | partial | scripts/check-webview-security.mjs | Desktop IPC, Monaco, dialog import, icons and denied out-of-scope reads |
 | G-05 | P0-05 | blocked | - | Trusted signer lifecycle and catalog rollback protection |
-| G-06 | P0-06 | partial | - | Backup path tests pass locally; native save dialog and denied destination runtime checks remain |
+| G-06 | P0-06 | partial | scripts/check-backup-path.mjs | Backup path tests pass locally; native save dialog and denied destination runtime checks remain |
 | G-07 | P0-18 | blocked | - | First release excludes browser companion resources |
 | G-08 | P0-18 | blocked | - | Frozen driver artifacts and accurate product claims |
 | G-09 | P0-07 | partial | - | Sidecar exit cleanup, persisted proxy lease and bounded recovery implemented; OS acceptance and service policy alignment remain |
@@ -61,7 +61,9 @@ per file, with rollback on publication/database errors; this is not a crash-atom
 transaction across all config files and OS effects. Failed database restoration
 retains recovery snapshots. Eleven Windows archive/database regression tests passed;
 the Unix destination-link test is wired into CI but has not run locally.
-All 75 data-layer tests passed. Clippy passed for the backend library and the
+The registered `scripts/check-backup-path.mjs` compiles and runs the three
+Windows backup-path regression tests in the same way as CI. All 75 data-layer
+tests passed. Clippy passed for the backend library and the
 backup restore integration test with warnings denied.
 Optional encryption and custom CA/pin controls remain unimplemented.
 Backup creation shares the restore limits and excludes unexpected profile files;

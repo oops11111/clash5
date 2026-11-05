@@ -7,6 +7,7 @@ on:
       - "src/services/monaco.ts"
       - "scripts/check-webview-security.mjs"
       - "scripts/check-release-gates.mjs"
+      - "scripts/check-backup-path.mjs"
       - "scripts/check-privacy-defaults.mjs"
       - "RELEASE-GATES.md"
       - ".github/workflows/backend-guardrails.yml"
@@ -35,9 +36,7 @@ jobs:
         run: node scripts/check-privacy-defaults.mjs
 
       - name: Backup path regression tests
-        run: |
-          rustc --edition 2024 --test src-tauri/src/feat/backup_path.rs -o /tmp/clash5-backup-path-tests
-          /tmp/clash5-backup-path-tests
+        run: node scripts/check-backup-path.mjs
 
       - name: No Handle::refresh calls in feat
         run: '! grep -rn "Handle::refresh" src-tauri/src/feat'
