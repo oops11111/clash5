@@ -46,9 +46,9 @@
         "settings": "设置"
       },
       "pluginInstall": "从文件安装",
-      "browserPrivacyTitle": "浏览器指纹切换组件",
-      "browserPrivacyDescription": "在 Chrome/Edge 的扩展页开启开发者模式，选择“加载已解压的扩展程序”并选中下方目录。到扩展中设置网站配置，再刷新页面。",
-      "browserPrivacyLimit": "此浏览器扩展与内置 IPv6/DNS 插件分别生效。它只修改部分区域指纹，不改变 IP、DNS 路由、WebRTC、硬件或全部指纹信号。",
+      "browserPrivacyTitle": "站点区域环境",
+      "browserPrivacyDescription": "在 Chrome/Edge 的扩展页开启开发者模式，选择“加载已解压的扩展程序”并选中下方目录。在扩展中设置网站区域配置，再刷新页面。",
+      "browserPrivacyLimit": "此可选扩展与内置 IPv6/DNS 插件分别生效。它只修改选定的站点区域信息，不改变 IP、DNS 路由、WebRTC、硬件或全部浏览器信号。",
       "pluginInstallTitle": "确认安装插件",
       "pluginSigner": "签名者指纹：{{fingerprint}}",
       "pluginProvenanceTitle": "当前配置来源",
@@ -162,7 +162,7 @@
       "restarting": "服务已安装，正在通过服务重启内核……",
       "applying": "正在重新应用系统代理……",
       "tunTitle": "TUN 模式需要系统服务",
-      "tunMessage": "TUN 模式需要 Clash Verge 系统服务才能接管网络流量。安装完成后会自动为你开启 TUN 模式。"
+      "tunMessage": "TUN 模式需要 clash5 系统服务来路由网络流量。安装完成后会自动为你开启 TUN 模式。"
     }
   },
   "feedback": {

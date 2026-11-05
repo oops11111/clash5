@@ -54,6 +54,12 @@
         "detectionFailedWithName": "Detection failed for {{name}}",
         "detectionTimeout": "Detection timeout or failed"
       },
+      "externalNotice": {
+        "title": "Allow external unlock checks?",
+        "message": "{{name}} will send requests through clash5 to the third-party hosts listed below. They may receive your IP address, region and request metadata.",
+        "confirm": "Continue",
+        "cancel": "Cancel"
+      },
       "title": "Unlock Test"
     }
   },

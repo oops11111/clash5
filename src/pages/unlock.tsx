@@ -24,7 +24,7 @@ import { useLockFn } from 'ahooks'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { BaseEmpty, BasePage } from '@/components/base'
+import { BaseEmpty, BasePage, ConfirmDialog } from '@/components/base'
 import {
   checkMediaUnlock,
   checkMediaUnlockItem,
@@ -34,7 +34,25 @@ import {
 import { showNotice } from '@/services/notice-service'
 import { appStorage } from '@/services/storage'
 
-const UNLOCK_RESULTS_STORAGE_KEY = 'clash_verge_unlock_results'
+const UNLOCK_RESULTS_STORAGE_KEY = 'clash5_unlock_results'
+const LEGACY_UNLOCK_RESULTS_STORAGE_KEY = 'clash_verge_unlock_results'
+const UNLOCK_CHECK_HOSTS = [
+  'ani.gamer.com.tw',
+  'api.bilibili.com',
+  'api.fast.com',
+  'api.openai.com',
+  'chat.openai.com',
+  'claude.ai',
+  'disney.api.edge.bamgrid.com',
+  'disneyplus.com',
+  'gemini.google.com',
+  'www.netflix.com',
+  'www.disneyplus.com',
+  'www.primevideo.com',
+  'www.spotify.com',
+  'www.tiktok.com',
+  'www.youtube.com',
+] as const
 
 const STATUS_LABEL_KEYS: Record<string, string> = {
   Pending: 'tests.statuses.test.pending',
@@ -97,6 +115,10 @@ const UnlockPage = () => {
   const unlockItemsRef = useRef<UnlockItem[]>([])
   const [isCheckingAll, setIsCheckingAll] = useState(false)
   const [loadingItems, setLoadingItems] = useState<string[]>([])
+  const [externalNoticeOpen, setExternalNoticeOpen] = useState(false)
+  const [pendingSingleName, setPendingSingleName] = useState<string | null>(
+    null,
+  )
 
   const saveResultsToStorage = (items: UnlockItem[]) => {
     try {
@@ -109,7 +131,9 @@ const UnlockPage = () => {
   useEffect(() => {
     let storedItems: UnlockItem[] = []
     try {
-      const itemsJson = appStorage.getItem(UNLOCK_RESULTS_STORAGE_KEY)
+      const itemsJson =
+        appStorage.getItem(UNLOCK_RESULTS_STORAGE_KEY) ??
+        appStorage.getItem(LEGACY_UNLOCK_RESULTS_STORAGE_KEY)
       if (itemsJson) {
         storedItems = dedupeUnlockItems(JSON.parse(itemsJson) as UnlockItem[])
       }
@@ -192,6 +216,22 @@ const UnlockPage = () => {
     }
   }
 
+  const requestExternalCheck = (name?: string) => {
+    setPendingSingleName(name ?? null)
+    setExternalNoticeOpen(true)
+  }
+
+  const confirmExternalCheck = () => {
+    setExternalNoticeOpen(false)
+    const name = pendingSingleName
+    setPendingSingleName(null)
+    if (name) {
+      void checkSingleMedia(name)
+    } else {
+      void checkAllMedia()
+    }
+  }
+
   // 状态颜色
   const getStatusColor = (status: string) => {
     if (status === 'Pending') return 'default'
@@ -244,7 +284,7 @@ const UnlockPage = () => {
               isCheckingAll ||
               loadingItems.length > 0
             }
-            onClick={checkAllMedia}
+            onClick={() => requestExternalCheck()}
             startIcon={
               isCheckingAll ? (
                 <CircularProgress size={16} color="inherit" />
@@ -326,7 +366,7 @@ const UnlockPage = () => {
                             height: '32px',
                             borderRadius: '50%',
                           }}
-                          onClick={() => checkSingleMedia(item.name)}
+                          onClick={() => requestExternalCheck(item.name)}
                         >
                           <RefreshRounded
                             sx={{
@@ -400,6 +440,33 @@ const UnlockPage = () => {
           ))}
         </Grid>
       )}
+      <ConfirmDialog
+        open={externalNoticeOpen}
+        title={t('tests.unlock.page.externalNotice.title')}
+        message={
+          <Box>
+            <Typography variant="body2">
+              {t('tests.unlock.page.externalNotice.message', {
+                name: pendingSingleName ?? t('tests.unlock.page.title'),
+              })}
+            </Typography>
+            <Typography
+              variant="body2"
+              component="code"
+              sx={{ display: 'block', mt: 1, whiteSpace: 'pre-wrap' }}
+            >
+              {UNLOCK_CHECK_HOSTS.join('\n')}
+            </Typography>
+          </Box>
+        }
+        confirmLabel={t('tests.unlock.page.externalNotice.confirm')}
+        cancelLabel={t('tests.unlock.page.externalNotice.cancel')}
+        onConfirm={confirmExternalCheck}
+        onCancel={() => {
+          setExternalNoticeOpen(false)
+          setPendingSingleName(null)
+        }}
+      />
     </BasePage>
   )
 }

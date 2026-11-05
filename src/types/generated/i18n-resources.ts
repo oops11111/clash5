@@ -2080,6 +2080,12 @@ export interface TranslationResources {
             testing: string
           }
           empty: string
+          externalNotice: {
+            cancel: string
+            confirm: string
+            message: string
+            title: string
+          }
           messages: {
             detectionFailedWithName: string
             detectionTimeout: string

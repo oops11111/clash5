@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "clash5 Browser Privacy",
+  "name": "clash5 Site Locale Environment",
   "version": "0.1.0",
   "minimum_chrome_version": "111",
-  "description": "Opt-in site profiles for browser language and time zone, paired with clash5 network privacy settings.",
+  "description": "Opt-in site locale profiles, paired with clash5 network privacy settings.",
   "permissions": ["storage", "scripting", "declarativeNetRequest"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "worker.mjs", "type": "module" },

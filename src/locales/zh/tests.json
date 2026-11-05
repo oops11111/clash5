@@ -54,6 +54,12 @@
         "detectionFailedWithName": "{{name}} 检测失败",
         "detectionTimeout": "检测超时或失败"
       },
+      "externalNotice": {
+        "title": "允许外连进行解锁检测？",
+        "message": "{{name}} 将通过 clash5 向下列第三方主机发起请求；对方可能获得你的 IP、区域和请求元数据。",
+        "confirm": "继续",
+        "cancel": "取消"
+      },
       "title": "解锁测试"
     }
   },

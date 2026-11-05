@@ -46,9 +46,9 @@
         "settings": "Settings"
       },
       "pluginInstall": "Install from file",
-      "browserPrivacyTitle": "Browser fingerprint companion",
+      "browserPrivacyTitle": "Site Locale Environment",
       "browserPrivacyDescription": "Chrome/Edge: open Extensions, enable Developer mode, then Load unpacked and select this folder. Set site profiles in the extension and reload pages.",
-      "browserPrivacyLimit": "The browser extension is separate from the built-in IPv6/DNS guard. It changes regional browser values, not IP, DNS routing, WebRTC, hardware, or every fingerprint signal.",
+      "browserPrivacyLimit": "This optional extension is separate from the built-in IPv6/DNS guard. It changes selected site locale values, not IP, DNS routing, WebRTC, hardware, or all browser signals.",
       "pluginInstallTitle": "Review plugin installation",
       "pluginSigner": "Signer fingerprint: {{fingerprint}}",
       "pluginProvenanceTitle": "Effective configuration sources",
@@ -162,7 +162,7 @@
       "restarting": "Service installed. Restarting the core through it…",
       "applying": "Applying your system proxy change…",
       "tunTitle": "TUN mode needs the system service",
-      "tunMessage": "TUN mode needs the Clash Verge system service to take over network traffic. Once it is installed, TUN mode will be turned on for you."
+      "tunMessage": "TUN mode uses the clash5 system service to route network traffic. Once it is installed, TUN mode will be turned on for you."
     }
   },
   "feedback": {

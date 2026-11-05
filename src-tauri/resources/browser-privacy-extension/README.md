@@ -1,4 +1,4 @@
-# clash5 Browser Privacy companion
+# clash5 Site Locale Environment
 
 This Chromium extension pairs with clash5's bundled IPv6/DNS guard. The `.c5p` plugin controls Mihomo configuration; this extension controls browser-visible regional values. They are separate trust boundaries. Neither component changes the other's settings.
 
@@ -19,7 +19,7 @@ The separate [Who Are You](https://github.com/yt1988/who-are-you) site can give 
 
 ## Limits
 
-The profiles change `navigator.language(s)`, default `Intl.DateTimeFormat` language/time zone, local Date getters, Date locale formatting, and `Accept-Language` for requests associated with a matching site. Other signals can disagree: `Date.toString()`, explicit locale choices, Worker contexts, WebRTC, UA/Client Hints, screen, fonts, Canvas, WebGL, and audio are untouched. IP, DNS, TUN routing, cookies, and account identity are not changed. This is a regional fingerprint switch, not a complete browser persona or a guarantee against tracking.
+The profiles change `navigator.language(s)`, default `Intl.DateTimeFormat` language/time zone, local Date getters, Date locale formatting, and `Accept-Language` for requests associated with a matching site. Other signals can disagree: `Date.toString()`, explicit locale choices, Worker contexts, WebRTC, UA/Client Hints, screen, fonts, Canvas, WebGL, and audio are untouched. IP, DNS, TUN routing, cookies, and account identity are not changed. This is a site locale environment, not a complete browser persona or a guarantee against tracking.
 
 Only HTTP/HTTPS documents are covered. Existing pages need a reload. The two Chrome APIs that apply scripts and headers cannot update atomically; wait for the save confirmation before opening a new page. For network privacy, separately enable and verify clash5's IPv6/DNS guard and route configuration.
 

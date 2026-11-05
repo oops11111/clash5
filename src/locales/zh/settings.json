@@ -41,7 +41,7 @@
     "proxyControl": {
       "tooltips": {
         "systemProxy": "修改操作系统的代理设置，如果开启失败，可手动修改操作系统的代理设置",
-        "tunMode": "TUN（虚拟网卡）模式接管系统所有流量，启用时无须打开系统代理",
+        "tunMode": "TUN（虚拟网卡）模式通过虚拟网卡路由系统流量，启用时无须打开系统代理",
         "tunUnavailable": "TUN 模式需要安装服务模式或管理员模式"
       },
       "actions": {
