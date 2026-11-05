@@ -11,6 +11,7 @@ import {
   ClearRounded,
   ContentPasteRounded,
   DeleteRounded,
+  FileOpenOutlined,
   FolderOpenOutlined,
   IndeterminateCheckBoxRounded,
   LocalFireDepartmentRounded,
@@ -128,16 +129,14 @@ const ProfilePage = () => {
     currentProfileRef.current = profiles.current
   }, [profiles])
 
-  useEffect(() => {
-    const unlisten = getCurrentWindow().onDragDropEvent(async (event) => {
-      if (event.payload.type !== 'drop') return
-      const paths = event.payload.paths
+  const importLocalProfiles = useCallback(async (paths: string[]) => {
+    for (const file of paths) {
+      if (!file.endsWith('.yaml') && !file.endsWith('.yml')) {
+        showNotice.error('profiles.page.feedback.errors.onlyYaml')
+        continue
+      }
 
-      for (const file of paths) {
-        if (!file.endsWith('.yaml') && !file.endsWith('.yml')) {
-          showNotice.error('profiles.page.feedback.errors.onlyYaml')
-          continue
-        }
+      try {
         const item = {
           type: 'local',
           name: file.split(/\/|\\/).pop() ?? 'New Profile',
@@ -154,17 +153,27 @@ const ProfilePage = () => {
           errorNotice: false,
           revalidate: [['getProfiles']],
         })
+      } catch (error) {
+        showNotice.error(error)
       }
-      await mutate(() => enhanceProfiles(), {
-        id: 'enhance-profiles',
-        errorNotice: false,
-      })
+    }
+
+    await mutate(() => enhanceProfiles(), {
+      id: 'enhance-profiles',
+      errorNotice: false,
+    })
+  }, [])
+
+  useEffect(() => {
+    const unlisten = getCurrentWindow().onDragDropEvent(async (event) => {
+      if (event.payload.type !== 'drop') return
+      await importLocalProfiles(event.payload.paths)
     })
 
     return () => {
       void unlisten.then((cleanup) => cleanup())
     }
-  }, [])
+  }, [importLocalProfiles])
 
   const onEmergencyRefresh = useLockFn(async () => {
     debugLog('[紧急刷新] 开始强制刷新所有数据')
@@ -279,6 +288,24 @@ const ProfilePage = () => {
       })
       if (typeof selected !== 'string') return
       setVergeImportSource(selected)
+    } catch (error) {
+      showNotice.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const onImportLocalProfile = async () => {
+    try {
+      const selected = await openDialog({
+        multiple: true,
+        filters: [{ name: 'YAML Profile', extensions: ['yaml', 'yml'] }],
+      })
+      if (!selected) return
+      setLoading(true)
+      await importLocalProfiles(
+        Array.isArray(selected) ? selected : [selected],
+      )
     } catch (error) {
       showNotice.error(error)
     } finally {
@@ -927,6 +954,17 @@ const ProfilePage = () => {
           onClick={() => void onImportVergeData()}
         >
           <FolderOpenOutlined fontSize="small" />
+        </Button>
+        <Button
+          disabled={loading || disabled}
+          variant="outlined"
+          size="small"
+          sx={{ borderRadius: '6px', minWidth: 36, px: 1 }}
+          title={t('profiles.page.actions.import')}
+          aria-label={t('profiles.page.actions.import')}
+          onClick={() => void onImportLocalProfile()}
+        >
+          <FileOpenOutlined fontSize="small" />
         </Button>
         <Button
           variant="contained"

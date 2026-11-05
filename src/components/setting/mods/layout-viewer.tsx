@@ -13,8 +13,13 @@ import {
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { join } from '@tauri-apps/api/path'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { exists } from '@tauri-apps/plugin-fs'
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseDialog, DialogRef, Switch, TooltipIcon } from '@/components/base'
@@ -58,6 +63,11 @@ export const LayoutViewer = forwardRef<DialogRef>((_, ref) => {
   const [commonIcon, setCommonIcon] = useState('')
   const [sysproxyIcon, setSysproxyIcon] = useState('')
   const [tunIcon, setTunIcon] = useState('')
+  const iconFallbacksRef = useRef<Record<'common' | 'sysproxy' | 'tun', string>>({
+    common: '',
+    sysproxy: '',
+    tun: '',
+  })
 
   const { decorated, toggleDecorations } = useWindowDecorations()
 
@@ -81,20 +91,16 @@ export const LayoutViewer = forwardRef<DialogRef>((_, ref) => {
       'tun',
     )
 
-    if (await exists(common_icon_ico)) {
-      setCommonIcon(common_icon_ico)
-    } else {
-      setCommonIcon(common_icon_png)
-    }
-    if (await exists(sysproxy_icon_ico)) {
-      setSysproxyIcon(sysproxy_icon_ico)
-    } else {
-      setSysproxyIcon(sysproxy_icon_png)
-    }
-    if (await exists(tun_icon_ico)) {
-      setTunIcon(tun_icon_ico)
-    } else {
-      setTunIcon(tun_icon_png)
+    setCommonIcon(common_icon_png)
+    setSysproxyIcon(sysproxy_icon_png)
+    setTunIcon(tun_icon_png)
+
+    // The selected icon may be ICO-only. Keep its path ready for the image
+    // fallback without granting the WebView a directory metadata scope.
+    iconFallbacksRef.current = {
+      common: common_icon_ico,
+      sysproxy: sysproxy_icon_ico,
+      tun: tun_icon_ico,
     }
   }
 
@@ -518,7 +524,16 @@ export const LayoutViewer = forwardRef<DialogRef>((_, ref) => {
               startIcon={
                 verge?.common_tray_icon &&
                 commonIcon && (
-                  <img height="20px" src={convertFileSrc(commonIcon)} />
+                  <img
+                    height="20px"
+                    src={convertFileSrc(commonIcon)}
+                    onError={() => {
+                      const fallback = iconFallbacksRef.current.common
+                      if (fallback && commonIcon !== fallback) {
+                        setCommonIcon(fallback)
+                      }
+                    }}
+                  />
                 )
               }
               onClick={async () => {
@@ -573,7 +588,16 @@ export const LayoutViewer = forwardRef<DialogRef>((_, ref) => {
               startIcon={
                 verge?.sysproxy_tray_icon &&
                 sysproxyIcon && (
-                  <img height="20px" src={convertFileSrc(sysproxyIcon)} />
+                  <img
+                    height="20px"
+                    src={convertFileSrc(sysproxyIcon)}
+                    onError={() => {
+                      const fallback = iconFallbacksRef.current.sysproxy
+                      if (fallback && sysproxyIcon !== fallback) {
+                        setSysproxyIcon(fallback)
+                      }
+                    }}
+                  />
                 )
               }
               onClick={async () => {
@@ -625,7 +649,18 @@ export const LayoutViewer = forwardRef<DialogRef>((_, ref) => {
               size="small"
               startIcon={
                 verge?.tun_tray_icon &&
-                tunIcon && <img height="20px" src={convertFileSrc(tunIcon)} />
+                tunIcon && (
+                  <img
+                    height="20px"
+                    src={convertFileSrc(tunIcon)}
+                    onError={() => {
+                      const fallback = iconFallbacksRef.current.tun
+                      if (fallback && tunIcon !== fallback) {
+                        setTunIcon(fallback)
+                      }
+                    }}
+                  />
+                )
               }
               onClick={async () => {
                 if (verge?.tun_tray_icon) {

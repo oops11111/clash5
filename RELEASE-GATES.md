@@ -40,6 +40,8 @@ the original review records before release; the present registry is a skeleton.
 - P1-34：新增 `appStorage`，所有应用端浏览器存储键统一写入 `clash5:v1:`，首次读取旧键时迁移并删除旧键；窗口初始化脚本和桌面 smoke fixture 使用同一命名空间。静态门禁：`npm run check:storage-namespace`；Vitest 覆盖迁移、读写删除和无窗口执行。
 - P1-36：Windows 仅注册 `Clash5`，Linux 仅维护 `clash5` MIME handler，解析器拒绝旧 `clash://` / `clash-verge://`；已有且明确指向当前可执行文件的旧 Windows 注册项会被清理。静态门禁：`npm run check:deep-link-scheme`；运行时仍需补“显示订阅主机名并由用户确认后导入”的桌面验收。
 
+- P0-04：生产/开发 CSP、Monaco schema 请求关闭及 `$APPDATA/icons/**` asset scope 通过静态门禁；迁移 capability 不再预置递归 `$APPDATA/**` 文件系统 scope，本地 YAML 导入继续由系统文件选择器/拖放路径触发。仍需在桌面壳中验证选择器授予范围、图标回退及越界读写拒绝。
+
 Issue: https://github.com/oops11111/clash5/issues/68.
 `tsc --noEmit`, Vite production build, and offline Rust library `cargo check`
 passed. The standalone backup path test binary passed all three Windows tests;

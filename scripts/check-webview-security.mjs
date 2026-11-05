@@ -46,9 +46,18 @@ for (const file of ['migrated.json', 'desktop.json', 'desktop-windows.json']) {
         `${file}: unexpected permission ${permission}`,
       )
     } else if (permission.identifier === 'fs:scope') {
-      assert.deepEqual(permission.allow, ['$APPDATA/**'])
+      assert.fail(`${file}: broad fs scope must be granted by a native picker`)
     }
   }
+  assert.ok(
+    !capability.permissions.some(
+      (permission) =>
+        typeof permission === 'string' &&
+        permission.startsWith('fs:allow-app') &&
+        permission.includes('recursive'),
+    ),
+    `${file}: recursive app fs permissions must not be enabled`,
+  )
 }
 const monaco = await read('src/services/monaco.ts')
 assert.match(monaco, /enableSchemaRequest: false/)

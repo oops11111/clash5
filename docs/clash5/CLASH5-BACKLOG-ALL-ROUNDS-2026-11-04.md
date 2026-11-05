@@ -79,9 +79,9 @@
 | **来源** | R3 **D6 A**；R8 **H1/K8**；R9 G-04；R18 **Q2 A**（最小 CSP 并入 D6 验收） |
 | **拍板** | 只开放应用目录；导入导出走系统文件对话框；补 CSP；`enableSchemaRequest: false` |
 | **要做什么** | `csp` 非 null；去掉 scope `**`；CI jq 守卫 |
-| **文件:行** | `src-tauri/tauri.conf.json:49-75`（显式 production/dev CSP 与 `$APPDATA/icons/**` asset scope）；`capabilities/migrated.json:11-18`（仍有 `$APPDATA/**` 读 scope） |
+| **文件:行** | `src-tauri/tauri.conf.json:49-75`（显式 production/dev CSP 与 `$APPDATA/icons/**` asset scope）；`capabilities/migrated.json`（仅保留由系统选择器授予的文件读取命令） |
 | **验收** | CI：csp 非 null、scope 无 `**`；越界读写被拒 |
-| **现状** | **部分落地** — 生产/开发 CSP 已显式收窄，asset scope 仅允许 `$APPDATA/icons/**`，静态 WebView 门禁已存在；迁移 capability 仍保留 `$APPDATA/**` 读范围，桌面 IPC/Monaco/图标运行时验收未完成 |
+| **现状** | **部分落地** — 生产/开发 CSP 已显式收窄，asset scope 仅允许 `$APPDATA/icons/**`，迁移 capability 不再预置递归 `$APPDATA/**` scope，本地 YAML 导入走系统文件选择器；桌面 IPC/Monaco/图标及越界读取运行时验收未完成 |
 | **被并入** | R18 Q2 A 最小 CSP 细节并入本项验收，不另立 P0 |
 
 ### P0-05 · K4：插件受信公钥列表（G-05）

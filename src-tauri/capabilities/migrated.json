@@ -5,18 +5,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "fs:allow-read-file",
-    "fs:allow-exists",
-    {
-      "identifier": "fs:scope",
-      "allow": ["$APPDATA/**"]
-    },
-    "fs:allow-app-read",
-    "fs:allow-app-read-recursive",
-    "fs:allow-appcache-read",
-    "fs:allow-appcache-read-recursive",
-    "fs:allow-appconfig-read",
-    "fs:allow-appconfig-read-recursive",
+    "fs:allow-read-text-file",
     "core:window:allow-center",
     "core:window:allow-request-user-attention",
     "core:window:allow-set-resizable",
