@@ -301,7 +301,7 @@
 |---|---|
 | **来源** | R4 **D1 A** |
 | **拍板** | 钉 40 位 commit 并逐次审差异（含 tauri-plugin-mihomo） |
-| **现状** | **已落地** — `sysproxy`、`tauri-plugin-mihomo`、`clash_verge_service_ipc` 已钉到 Cargo.lock 对应的 40 位提交 |
+| **现状** | **部分落地** — `tauri-plugin-mihomo`、`clash_verge_service_ipc` 已钉到 Cargo.lock 对应的 40 位提交；`sysproxy` 仍跟随上游分支，待处理传递依赖的统一钉版本 |
 
 ### P1-08 · open_devtools 仅 debug
 
