@@ -45,6 +45,7 @@
     "check:storage-namespace": "node scripts/check-storage-namespace.mjs",
     "check:deep-link-scheme": "node scripts/check-deep-link-scheme.mjs",
     "check:plugin-trust": "node scripts/check-plugin-trust.mjs",
+    "check:proxy-recovery": "node scripts/check-proxy-recovery.mjs",
     "plugin:package": "node scripts/plugin-package.mjs",
     "arch:check": "node scripts/check-architecture.mjs listen emit invoke",
     "typecheck": "tsc --noEmit",
