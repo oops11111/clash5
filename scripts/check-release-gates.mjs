@@ -34,6 +34,16 @@ for (const row of rows) {
 for (let n = 1; n <= 16; n++)
   assert.ok(gates.has(`G-${String(n).padStart(2, '0')}`))
 for (const id of ['P0-12', 'P0-13', 'P0-17']) assert.ok(gates.has(id))
+const runChecks = () => {
+  for (const check of new Set([...gates.values()].map((gate) => gate.check))) {
+    if (check === '-' || check === 'scripts/check-release-gates.mjs') continue
+    execFileSync(process.execPath, [path.join(root, check)], {
+      cwd: root,
+      stdio: 'inherit',
+    })
+  }
+}
+
 if (process.argv.includes('--release')) {
   const incomplete = [...gates]
     .filter(([, gate]) => gate.status !== 'passed')
@@ -43,13 +53,8 @@ if (process.argv.includes('--release')) {
     0,
     `Release blocked: ${incomplete.join(', ')}`,
   )
-  for (const check of new Set([...gates.values()].map((gate) => gate.check))) {
-    execFileSync(process.execPath, [path.join(root, check)], {
-      cwd: root,
-      stdio: 'inherit',
-    })
-  }
 }
+runChecks()
 console.log(
   `Validated ${gates.size} gate records. Release approval remains blocked.`,
 )
