@@ -2,7 +2,7 @@ use crate::utils::{dirs, help};
 use anyhow::{Result, anyhow};
 use clash5_data::{IdentityKey, NodeRef, Source, parse_proxy_node};
 use serde::{Deserialize, Serialize};
-use serde_yaml_ng::{Mapping, Value};
+use serde_yaml_ng::{Mapping, Sequence, Value};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -44,16 +44,12 @@ fn entry_key(entry: &MaterializedProxyEntry, key: &IdentityKey) -> Result<String
     Ok(format!("{}:{}", source_key(&entry.source), node.stable_id_v2(key)?))
 }
 
-fn merge_yaml(file: &mut MaterializedProxyFile, source: Source, yaml: &str, key: &IdentityKey) -> Result<()> {
-    let root: Value = serde_yaml_ng::from_str(yaml).map_err(|_| anyhow!("subscription YAML is invalid"))?;
-    let Some(proxies) = root
-        .as_mapping()
-        .and_then(|mapping| mapping.get("proxies"))
-        .and_then(Value::as_sequence)
-    else {
-        return Ok(());
-    };
-
+fn merge_proxies(
+    file: &mut MaterializedProxyFile,
+    source: Source,
+    proxies: &Sequence,
+    key: &IdentityKey,
+) -> Result<()> {
     let mut positions = BTreeMap::new();
     for (index, entry) in file.entries.iter().enumerate() {
         if let Ok(id) = entry_key(entry, key) {
@@ -86,6 +82,78 @@ fn merge_yaml(file: &mut MaterializedProxyFile, source: Source, yaml: &str, key:
     Ok(())
 }
 
+fn merge_yaml(file: &mut MaterializedProxyFile, source: Source, yaml: &str, key: &IdentityKey) -> Result<()> {
+    let root: Value = serde_yaml_ng::from_str(yaml).map_err(|_| anyhow!("subscription YAML is invalid"))?;
+    let Some(proxies) = root
+        .as_mapping()
+        .and_then(|mapping| mapping.get("proxies"))
+        .and_then(Value::as_sequence)
+    else {
+        return Ok(());
+    };
+
+    merge_proxies(file, source, proxies, key)
+}
+
+fn provider_payload(value: &Value) -> Option<Sequence> {
+    value
+        .as_mapping()
+        .and_then(|mapping| mapping.get("proxies"))
+        .and_then(Value::as_sequence)
+        .cloned()
+}
+
+async fn read_provider_payload(root: &std::path::Path, raw: &str) -> Option<Sequence> {
+    let path = tokio::fs::canonicalize(root.join(raw)).await.ok()?;
+    if !path.starts_with(root) {
+        return None;
+    }
+    let yaml = tokio::fs::read_to_string(path).await.ok()?;
+    let value: Value = serde_yaml_ng::from_str(&yaml).ok()?;
+    provider_payload(&value)
+}
+
+async fn merge_provider_snapshots(
+    file: &mut MaterializedProxyFile,
+    profile_id: &str,
+    root: &std::path::Path,
+    yaml: &Value,
+    key: &IdentityKey,
+) -> Result<()> {
+    let Some(providers) = yaml
+        .as_mapping()
+        .and_then(|mapping| mapping.get("proxy-providers"))
+        .and_then(Value::as_mapping)
+    else {
+        return Ok(());
+    };
+    for (name, provider) in providers {
+        let Some(name) = name.as_str() else {
+            continue;
+        };
+        let payload = match provider.get("type").and_then(Value::as_str) {
+            Some("inline") => provider_payload(provider),
+            Some("http" | "file") => match provider.get("path").and_then(Value::as_str) {
+                Some(path) => read_provider_payload(root, path).await,
+                None => None,
+            },
+            _ => None,
+        };
+        let Some(payload) = payload else {
+            continue;
+        };
+        merge_proxies(
+            file,
+            Source::Subscription {
+                provider_id: format!("proxy-provider:{profile_id}:{name}"),
+            },
+            &payload,
+            key,
+        )?;
+    }
+    Ok(())
+}
+
 pub(crate) async fn snapshot_profile_yaml(provider_id: String, yaml: String) -> Result<()> {
     if provider_id.trim().is_empty() {
         return Ok(());
@@ -99,7 +167,17 @@ pub(crate) async fn snapshot_profile_yaml(provider_id: String, yaml: String) -> 
     } else {
         MaterializedProxyFile::default()
     };
-    merge_yaml(&mut file, Source::Subscription { provider_id }, &yaml, &key)?;
+    let root = tokio::fs::canonicalize(dirs::app_home_dir()?).await?;
+    let parsed: Value = serde_yaml_ng::from_str(&yaml).map_err(|_| anyhow!("subscription YAML is invalid"))?;
+    merge_yaml(
+        &mut file,
+        Source::Subscription {
+            provider_id: provider_id.clone(),
+        },
+        &yaml,
+        &key,
+    )?;
+    merge_provider_snapshots(&mut file, &provider_id, &root, &parsed, &key).await?;
     help::save_yaml(&file_path, &file, None).await
 }
 
@@ -111,12 +189,14 @@ pub(crate) async fn load_for_profile(profile_id: &str, key: &IdentityKey) -> Res
         return Ok(vec![]);
     }
     let file: MaterializedProxyFile = help::read_yaml(&file_path).await?;
-    let source = Source::Subscription {
+    let profile_source = Source::Subscription {
         provider_id: profile_id.to_owned(),
     };
     let mut loaded = Vec::new();
     for entry in file.entries {
-        if entry.source != source {
+        let include = entry.source == profile_source
+            || matches!(&entry.source, Source::Subscription { provider_id } if provider_id.starts_with(&format!("proxy-provider:{profile_id}:")));
+        if !include {
             continue;
         }
         let Ok(node) = parse_proxy_node(&Value::Mapping(entry.proxy.clone())) else {
@@ -127,7 +207,7 @@ pub(crate) async fn load_for_profile(profile_id: &str, key: &IdentityKey) -> Res
         };
         loaded.push((
             NodeRef {
-                source: source.clone(),
+                source: entry.source,
                 stable_id,
             },
             entry.proxy,
@@ -185,6 +265,30 @@ mod tests {
             &key,
         )?;
         assert_eq!(file.entries.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn provider_snapshots_use_a_distinct_source_namespace() -> Result<()> {
+        let key = IdentityKey::from_bytes(&[5; 32])?;
+        let value: Value = serde_yaml_ng::from_str(&yaml("provider-node", "one"))?;
+        let payload = provider_payload(&value).ok_or_else(|| anyhow!("provider fixture has no proxies"))?;
+        let mut file = MaterializedProxyFile::default();
+        merge_proxies(
+            &mut file,
+            Source::Subscription {
+                provider_id: "proxy-provider:profile:remote".into(),
+            },
+            &payload,
+            &key,
+        )?;
+        assert_eq!(file.entries.len(), 1);
+        assert_eq!(
+            file.entries[0].source,
+            Source::Subscription {
+                provider_id: "proxy-provider:profile:remote".into()
+            }
+        );
         Ok(())
     }
 }

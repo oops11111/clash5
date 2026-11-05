@@ -42,6 +42,8 @@ const checks = [
     materialized.includes('serialize_encrypted') &&
       materialized.includes('snapshot_profile_yaml') &&
       materialized.includes('load_for_profile') &&
+      materialized.includes('proxy-provider:{profile_id}:{name}') &&
+      materialized.includes('read_provider_payload') &&
       profiles.includes('materialized::snapshot_profile_yaml') &&
       deleteProfile.includes('snapshot_materialized_profile'),
   ],
