@@ -188,6 +188,12 @@ fn filename_from_disposition(disposition: &str) -> Option<String> {
     }
 }
 
+fn default_remote_profile_name(url: &Url, filename: Option<String>) -> String {
+    filename
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| url.host_str().map_or_else(|| "Remote File".into(), Into::into))
+}
+
 impl PrfItem {
     /// Builds an item from a partial value that must include `itype`.
     pub(super) async fn from(item: &Self, file_data: Option<String>) -> Result<Self> {
@@ -359,11 +365,7 @@ impl PrfItem {
 
         let filename = match header.get("Content-Disposition") {
             Some(value) => value.to_str().ok().and_then(filename_from_disposition),
-            None => Some(
-                crate::utils::help::get_last_part_and_decode(url.as_str())
-                    .unwrap_or_else(|| "Remote File".into())
-                    .into(),
-            ),
+            None => None,
         };
         let update_interval = match update_interval {
             Some(val) => Some(val),
@@ -383,9 +385,9 @@ impl PrfItem {
 
         let uid = help::get_uid("R").into();
         let file = format!("{uid}.yaml").into();
-        let name = name.map(|s| s.to_owned()).unwrap_or_else(|| {
-            filename.unwrap_or_else(|| url.host_str().map_or_else(|| "Remote File".into(), Into::into))
-        });
+        let name = name
+            .map(|s| s.to_owned())
+            .unwrap_or_else(|| default_remote_profile_name(&url, filename));
         let data = resp.text();
 
         let data = data.trim_start_matches('\u{feff}');
@@ -595,7 +597,8 @@ fn fix_dirty_url(input: &str) -> Result<Url> {
 
 #[cfg(test)]
 mod filename_tests {
-    use super::filename_from_disposition;
+    use super::{default_remote_profile_name, filename_from_disposition};
+    use tauri::Url;
 
     #[test]
     fn quoted_and_encoded_file_names_come_out_without_quotes() {
@@ -608,5 +611,17 @@ mod filename_tests {
             Some("名.yaml")
         );
         assert_eq!(filename_from_disposition("attachment").as_deref(), None);
+    }
+
+    #[test]
+    fn default_name_uses_host_instead_of_a_tokenized_path() {
+        let url = Url::parse("https://sub.example.test/subscribe/secret-token?user=alice").unwrap();
+        assert_eq!(default_remote_profile_name(&url, None), "sub.example.test");
+    }
+
+    #[test]
+    fn content_disposition_name_still_wins_over_host() {
+        let url = Url::parse("https://sub.example.test/subscribe/secret-token").unwrap();
+        assert_eq!(default_remote_profile_name(&url, Some("team.yaml".into())), "team.yaml");
     }
 }

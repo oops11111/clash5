@@ -348,6 +348,13 @@ impl IProfiles {
                     each.extra = item.extra;
                     each.updated = item.updated;
                     each.home = item.home.to_owned();
+                    let legacy_name = each
+                        .url
+                        .as_deref()
+                        .and_then(crate::utils::help::get_last_part_and_decode);
+                    if each.name.as_deref() == legacy_name.as_deref() {
+                        each.name = item.name.clone();
+                    }
                     each.option = PrfOption::merge(each.option.as_ref(), item.option.as_ref());
                     if let Some(file_data) = item.file_data.take() {
                         let file = each.file.take();

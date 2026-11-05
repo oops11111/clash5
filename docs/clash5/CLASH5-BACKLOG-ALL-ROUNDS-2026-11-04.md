@@ -149,7 +149,7 @@
 | **要做什么** | 改 `from_url` 命名；托盘/通知/tooltip 脱敏；迁移改名 |
 | **文件:行** | `config/prfitem.rs:360-366,386-387`（无 Disposition 时仍 `get_last_part_and_decode`）；`utils/help.rs`；`cmd/profile.rs`；`core/tray` |
 | **验收** | 合成令牌 URL：名称/tooltip/通知不含令牌段 |
-| **现状** | **未落地** — 仍走 URL 末段回退 |
+| **现状** | **部分落地** — 新订阅无 `Content-Disposition` 时回退到主机名；更新旧订阅时仅迁移等于旧 URL 末段的自动名称，保留用户自定义名称；外部桌面验收与全量托盘/通知脱敏证据仍待补齐 |
 
 ### P0-11 · 订阅更新通道与 UA（G-13）
 
