@@ -291,4 +291,16 @@ mod tests {
         );
         Ok(())
     }
+
+    #[test]
+    fn inline_provider_payload_is_read_from_the_payload_field() -> Result<()> {
+        let value: Value = serde_yaml_ng::from_str(&format!(
+            "type: inline\npayload:\n{}",
+            yaml("inline", "one").replace("proxies:\n", "")
+        ))?;
+        let payload = provider_payload(&value).ok_or_else(|| anyhow!("inline provider payload missing"))?;
+        assert_eq!(payload.len(), 1);
+        assert_eq!(payload[0]["name"], "inline");
+        Ok(())
+    }
 }
