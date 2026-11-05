@@ -22,7 +22,7 @@ the original review records before release; the present registry is a skeleton.
 | G-11 | P0-09 | blocked | - | Uninstall proxy ownership and scheduled-task cleanup |
 | G-12 | P0-10 | blocked | - | Token-safe subscription naming and migration |
 | G-13 | P0-11 | partial | - | Desktop transport/UA evidence, direct-connection UX, and certificate-exception acceptance |
-| G-14 | P0-14 | blocked | - | Pre-migration snapshot, atomic v11 and downgrade rejection |
+| G-14 | P0-14 | partial | - | Data-layer snapshot, atomic v11 and newer-schema rejection pass; desktop recovery evidence and route ownership migration remain |
 | G-15 | P0-15 | blocked | - | Corrupt config preservation and write protection |
 | G-16 | P0-16 | partial | scripts/check-privacy-defaults.mjs | Updater disabled in config, frontend and backend; signing and RC artifact policy still unverified |
 | P0-12 | P0-12 | partial | scripts/check-privacy-defaults.mjs | Upgrade UI, command and downloader removed; packaged-core service hash acceptance remains |
@@ -62,7 +62,7 @@ transaction across all config files and OS effects. Failed database restoration
 retains recovery snapshots. Eleven Windows archive/database regression tests passed;
 the Unix destination-link test is wired into CI but has not run locally.
 The registered `scripts/check-backup-path.mjs` compiles and runs the three
-Windows backup-path regression tests in the same way as CI. All 75 data-layer
+Windows backup-path regression tests in the same way as CI. All 71 data-layer
 tests passed. Clippy passed for the backend library and the
 backup restore integration test with warnings denied.
 Optional encryption and custom CA/pin controls remain unimplemented.

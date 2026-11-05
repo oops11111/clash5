@@ -1,5 +1,5 @@
 use clash5_data::{
-    BindingStore, ExitPolicy, Node, PluginBinding, PluginBindingTarget, ProxyChain, Source, parse_proxy_node,
+    BindingStore, DataError, ExitPolicy, Node, PluginBinding, PluginBindingTarget, ProxyChain, Source, parse_proxy_node,
 };
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -216,7 +216,7 @@ fn schema_v2_migrates_transactionally_to_current_schema() {
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(version, 10);
+    assert_eq!(version, 11);
     assert!(table_exists);
 
     let rollback_directory = tempfile::tempdir_in(&root).unwrap();
@@ -239,6 +239,58 @@ fn schema_v2_migrates_transactionally_to_current_schema() {
         .unwrap();
     assert_eq!(version, 2);
     assert!(!table_exists);
+}
+
+#[test]
+fn migration_snapshots_before_upgrading_and_records_schema_version() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
+    std::fs::create_dir_all(&root).unwrap();
+    let directory = tempfile::tempdir_in(&root).unwrap();
+    let path = directory.path().join("v10.sqlite");
+    {
+        let db = rusqlite::Connection::open(&path).unwrap();
+        db.execute_batch(
+            "CREATE TABLE nodes(stable_id_version INTEGER); INSERT INTO nodes VALUES(1); PRAGMA user_version=10;",
+        )
+        .unwrap();
+    }
+
+    let store = BindingStore::open(&path).unwrap();
+    store.integrity_check().unwrap();
+    drop(store);
+
+    let snapshot = path.with_file_name("v10.sqlite.pre-migration-v10.sqlite");
+    assert!(snapshot.is_file());
+    let snapshot_db = rusqlite::Connection::open(snapshot).unwrap();
+    let snapshot_version: i64 = snapshot_db
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap();
+    assert_eq!(snapshot_version, 10);
+    let migrated_db = rusqlite::Connection::open(&path).unwrap();
+    let migrated_version: i64 = migrated_db
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap();
+    assert_eq!(migrated_version, 11);
+    let migration_record: i64 = migrated_db
+        .query_row("SELECT version FROM schema_migrations WHERE version=11", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(migration_record, 11);
+}
+
+#[test]
+fn newer_schema_is_rejected_without_mutating_the_database() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("future.sqlite");
+    {
+        let db = rusqlite::Connection::open(&path).unwrap();
+        db.pragma_update(None, "user_version", 12).unwrap();
+    }
+    assert!(matches!(BindingStore::open(&path), Err(DataError::SchemaVersion)));
+    let db = rusqlite::Connection::open(&path).unwrap();
+    let version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
+    assert_eq!(version, 12);
 }
 
 #[test]
@@ -281,7 +333,7 @@ fn prior_m3_and_m2_schemas_upgrade_to_current_schema() {
         drop(store);
         let db = rusqlite::Connection::open(&path).unwrap();
         let migrated_version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
-        assert_eq!(migrated_version, 10);
+        assert_eq!(migrated_version, 11);
         let plugin_table_exists: bool = db
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='plugin_bindings')",

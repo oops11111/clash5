@@ -7,9 +7,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::Path,
+    fs,
+    path::{Path, PathBuf},
     time::Duration,
 };
+
+const CURRENT_SCHEMA_VERSION: i64 = 11;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -437,18 +440,20 @@ impl BindingStore {
     pub const MAX_ORPHAN_RETENTION_DAYS: u16 = 365;
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self, DataError> {
-        Self::initialize(Connection::open(path)?)
+        let path = path.as_ref();
+        Self::initialize(Connection::open(path)?, Some(path))
     }
     pub fn open_with_identity(path: impl AsRef<Path>, key: IdentityKey) -> Result<Self, DataError> {
-        let mut store = Self::initialize(Connection::open(path)?)?;
+        let path = path.as_ref();
+        let mut store = Self::initialize(Connection::open(path)?, Some(path))?;
         store.install_identity_key(key)?;
         Ok(store)
     }
     pub fn memory() -> Result<Self, DataError> {
-        Self::initialize(Connection::open_in_memory()?)
+        Self::initialize(Connection::open_in_memory()?, None)
     }
     pub fn memory_with_identity(key: IdentityKey) -> Result<Self, DataError> {
-        let mut store = Self::initialize(Connection::open_in_memory()?)?;
+        let mut store = Self::initialize(Connection::open_in_memory()?, None)?;
         store.install_identity_key(key)?;
         Ok(store)
     }
@@ -459,11 +464,7 @@ impl BindingStore {
     }
 
     pub fn integrity_check(&self) -> Result<(), DataError> {
-        let result: String = self.db.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
-        if result != "ok" {
-            return Err(DataError::InvalidInput);
-        }
-        Ok(())
+        integrity_check(&self.db)
     }
 
     pub fn restore_from(&mut self, path: impl AsRef<Path>) -> Result<(), DataError> {
@@ -826,13 +827,18 @@ impl BindingStore {
     pub fn identity_key(&self) -> Result<&IdentityKey, DataError> {
         self.identity_key.as_ref().ok_or(DataError::IdentityRecovery)
     }
-    fn initialize(mut db: Connection) -> Result<Self, DataError> {
+    fn initialize(mut db: Connection, database_path: Option<&Path>) -> Result<Self, DataError> {
         db.pragma_update(None, "journal_mode", "WAL")?;
         db.pragma_update(None, "foreign_keys", true)?;
         db.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if !(0..=10).contains(&version) {
+        if !(0..=CURRENT_SCHEMA_VERSION).contains(&version) {
             return Err(DataError::SchemaVersion);
+        }
+        if version > 0 && version < CURRENT_SCHEMA_VERSION {
+            if let Some(path) = database_path {
+                create_migration_snapshot(&db, path, version)?;
+            }
         }
         let mut version = version;
         if version == 0 {
@@ -1055,6 +1061,21 @@ PRAGMA user_version=10;
             )?;
             tx.commit()?;
         }
+        if version < 11 {
+            let tx = db.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS schema_migrations(
+ version INTEGER PRIMARY KEY,
+ applied_at TEXT NOT NULL DEFAULT(strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+) STRICT;
+INSERT OR IGNORE INTO schema_migrations(version) VALUES(11);
+PRAGMA user_version=11;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        integrity_check(&db)?;
         let hmac_nodes: i64 = db.query_row("SELECT count(*) FROM nodes WHERE stable_id_version=2", [], |row| {
             row.get(0)
         })?;
@@ -1934,6 +1955,37 @@ PRAGMA user_version=10;
         tx.commit()?;
         Ok(())
     }
+}
+
+fn integrity_check(db: &Connection) -> Result<(), DataError> {
+    let result: String = db.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+    if result == "ok" {
+        Ok(())
+    } else {
+        Err(DataError::Database)
+    }
+}
+
+fn create_migration_snapshot(db: &Connection, database_path: &Path, version: i64) -> Result<PathBuf, DataError> {
+    let file_name = database_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or(DataError::Database)?;
+    let parent = database_path.parent().unwrap_or_else(|| Path::new("."));
+    let base = format!("{file_name}.pre-migration-v{version}");
+    let mut candidate = parent.join(format!("{base}.sqlite"));
+    let mut suffix = 1_u32;
+    while candidate.exists() {
+        candidate = parent.join(format!("{base}-{suffix}.sqlite"));
+        suffix = suffix.checked_add(1).ok_or(DataError::Database)?;
+    }
+    db.backup(DatabaseName::Main, &candidate, None)?;
+    if !candidate.is_file() {
+        return Err(DataError::Database);
+    }
+    // A snapshot is a recovery artifact; make failures visible before migration starts.
+    fs::metadata(&candidate).map_err(|_| DataError::Database)?;
+    Ok(candidate)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

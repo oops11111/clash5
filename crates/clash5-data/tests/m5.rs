@@ -25,7 +25,7 @@ fn process_routes_select_groups_and_materialized_nodes() {
             target,
             true,
         );
-        compile_app_routes(&mut config, &[definition.clone()], &[]).unwrap();
+        compile_app_routes(&mut config, std::slice::from_ref(&definition), &[]).unwrap();
         assert_eq!(rules(&config), vec![format!("PROCESS-NAME,browser.exe,{destination}")]);
         assert!(compile_app_routes(&mut Mapping::new(), &[definition], &[]).is_err());
     }

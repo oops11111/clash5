@@ -191,9 +191,9 @@
 |---|---|
 | **来源** | R8 **D2 A**；R9 G-14 |
 | **拍板** | 迁移前 `snapshot_to`；v10→v11 单 IMMEDIATE 事务；integrity_check；旧版本明确拒绝并提示从快照恢复 |
-| **文件:行** | `crates/clash5-data/src/store.rs` 迁移段（R9:786-1013）；`snapshot_to` 未被调用（R9:421） |
+| **文件:行** | `crates/clash5-data/src/store.rs` 迁移段与 `create_migration_snapshot`；测试 `crates/clash5-data/tests/m3.rs` |
 | **验收** | `migration_snapshots_before_upgrading` 等；旧二进制拒开新 `user_version` |
-| **现状** | **未落地**（R9 未达） |
+| **现状** | **部分落地** — 文件库在迁移前生成带版本的恢复快照，v10→v11 使用单个 IMMEDIATE 事务并在打开后执行 `integrity_check`；更高 `user_version` 会明确拒绝。旧路由归属标记与桌面恢复证据仍待补齐 |
 
 ### P0-15 · 配置损坏保留（G-15）
 
@@ -696,7 +696,7 @@
 | G-11 | P0-09 | 未达 | 未落地 |
 | G-12 | P0-10 | 未达 | 未落地 |
 | G-13 | P0-11 | 部分 | 已落地策略与 UA；桌面抓包、直连 UX 和验收证据待补 |
-| G-14 | P0-14 | 未达 | 未落地 |
+| G-14 | P0-14 | 部分 | 数据层迁移检查已落地；桌面恢复证据与路由归属迁移待补 |
 | G-15 | P0-15 | 未达 | 未落地 |
 | G-16 | P0-16 | 未达 | 部分/未达 |
 | G-17…G-22 | R11（WebDAV/深链/UA 等） | — | 见 P0-13、P1-36 |
