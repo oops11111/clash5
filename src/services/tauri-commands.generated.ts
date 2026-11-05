@@ -236,6 +236,14 @@ export const commands = {
     typedError<IProfiles_Serialize, CommandFailure_Serialize>(
       __TAURI_INVOKE('get_profiles'),
     ),
+  getProfileRecoveryStatus: () =>
+    typedError<ProfileRecoveryStatus, CommandFailure_Serialize>(
+      __TAURI_INVOKE('get_profile_recovery_status'),
+    ),
+  confirmProfileRecovery: () =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('confirm_profile_recovery'),
+    ),
   clash5ListBindings: (
     source:
       | { kind: 'manual' }
@@ -919,6 +927,11 @@ export type Hop =
 
 /**  Define the `profiles.yaml` schema */
 export type IProfiles = IProfiles_Serialize | IProfiles_Deserialize
+
+export type ProfileRecoveryStatus = {
+  active: boolean
+  corrupt_file: string | null
+}
 
 /**  Define the `profiles.yaml` schema */
 export type IProfiles_Deserialize = {

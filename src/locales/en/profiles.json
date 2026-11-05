@@ -67,7 +67,12 @@
         "forceRefreshStaleData": "Profile data is unavailable; click to force a refresh"
       }
     },
-    "title": "Profiles"
+    "title": "Profiles",
+    "recovery": {
+      "description": "The previous profiles file was invalid and was preserved as {{file}}. No changes will be written until you confirm recovery.",
+      "confirm": "Start with a clean profiles file",
+      "confirmed": "Recovery confirmed; the preserved file remains available for inspection."
+    }
   },
   "components": {
     "card": {

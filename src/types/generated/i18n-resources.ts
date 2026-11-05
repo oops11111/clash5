@@ -858,6 +858,11 @@ export interface TranslationResources {
           }
           placeholder: string
         }
+        recovery: {
+          confirm: string
+          confirmed: string
+          description: string
+        }
         title: string
         vergeImport: {
           action: string

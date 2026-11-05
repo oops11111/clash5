@@ -7,8 +7,8 @@ use crate::{
     config::{
         Config, IProfiles, PrfItem, PrfOption,
         profiles::{
-            PROFILE_WRITE_LOCK, profiles_append_item_with_filedata_safe, profiles_patch_item_safe,
-            profiles_reorder_safe, profiles_save_file_safe,
+            PROFILE_WRITE_LOCK, profile_recovery_status, profiles_append_item_with_filedata_safe,
+            profiles_patch_item_safe, profiles_reorder_safe, profiles_save_file_safe,
         },
         profiles_append_item_safe,
     },
@@ -38,6 +38,27 @@ pub async fn get_profiles() -> CmdResult<SharedDraft<IProfiles>> {
     let draft = Config::profiles().await;
     let data = draft.data_arc();
     Ok(data)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_profile_recovery_status() -> CmdResult<profiles::ProfileRecoveryStatus> {
+    Ok(profile_recovery_status())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn confirm_profile_recovery() -> CmdResult {
+    let _profile_write_guard = PROFILE_WRITE_LOCK.lock().await;
+    let profiles = Config::profiles().await;
+    let candidate = (**profiles.latest_arc()).clone();
+    candidate
+        .confirm_recovery()
+        .await
+        .with_error_code("PROFILE_RECOVERY_CONFIRM_FAILED")?;
+    profiles.edit_draft(|draft| *draft = candidate);
+    profiles.apply();
+    Ok(())
 }
 
 #[tauri::command]

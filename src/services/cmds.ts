@@ -78,6 +78,17 @@ export async function getProfiles() {
   return profilesFromWire(await invoke<IProfiles_Serialize>('get_profiles'))
 }
 
+export interface ProfileRecoveryStatus {
+  active: boolean
+  corrupt_file: string | null
+}
+
+export const getProfileRecoveryStatus = () =>
+  invoke<ProfileRecoveryStatus>('get_profile_recovery_status')
+
+export const confirmProfileRecovery = () =>
+  invoke<null>('confirm_profile_recovery')
+
 export const getClash5ChainWorkspace = () =>
   invoke<GeneratedChainWorkspace>(
     'clash5_chain_workspace',

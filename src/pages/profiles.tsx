@@ -18,7 +18,16 @@ import {
   RefreshRounded,
   TextSnippetOutlined,
 } from '@mui/icons-material'
-import { Box, Button, Divider, Grid, IconButton, Stack } from '@mui/material'
+import {
+  Alert,
+  Box,
+  Button,
+  Divider,
+  Grid,
+  IconButton,
+  Stack,
+  Typography,
+} from '@mui/material'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
@@ -47,14 +56,17 @@ import { ConfigViewer } from '@/components/setting/mods/config-viewer'
 import { fetchProfilesIntoCache, useProfiles } from '@/hooks/use-profiles'
 import {
   createProfile,
+  confirmProfileRecovery,
   deleteProfile,
   enhanceProfiles,
   getRuntimeLogs,
+  getProfileRecoveryStatus,
   importProfile,
   importClash5VergeData,
   reorderProfile,
   updateProfile,
 } from '@/services/cmds'
+import type { ProfileRecoveryStatus } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { errorDetail, showNotice } from '@/services/notice-service'
 import { revalidateQuery, useQuery } from '@/services/query-client'
@@ -103,6 +115,8 @@ const ProfilePage = () => {
   const [vergeImportSource, setVergeImportSource] = useState<string | null>(
     null,
   )
+  const [profileRecovery, setProfileRecovery] =
+    useState<ProfileRecoveryStatus | null>(null)
 
   const [batchMode, setBatchMode] = useState(false)
   const [selectedProfiles, setSelectedProfiles] = useState<Set<string>>(
@@ -127,6 +141,36 @@ const ProfilePage = () => {
     error,
     isStale,
   } = useProfiles()
+
+  useEffect(() => {
+    let mounted = true
+    void getProfileRecoveryStatus()
+      .then((status) => {
+        if (mounted) setProfileRecovery(status)
+      })
+      .catch(() => {
+        if (mounted) setProfileRecovery(null)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const confirmCorruptProfileRecovery = useLockFn(async () => {
+    try {
+      await mutate(() => confirmProfileRecovery(), {
+        id: 'confirm-profile-recovery',
+        errorNotice: false,
+      })
+      setProfileRecovery({ active: false, corrupt_file: null })
+      await mutateProfiles()
+      showNotice.success('profiles.page.recovery.confirmed')
+    } catch (error) {
+      showNotice.error(error)
+    }
+  })
+
+  const recoveryBlocked = profileRecovery?.active === true
 
   useEffect(() => {
     currentProfileRef.current = profiles.current
@@ -889,6 +933,27 @@ const ProfilePage = () => {
         </Box>
       }
     >
+      {profileRecovery?.active && (
+        <Alert
+          severity="warning"
+          sx={{ mx: '10px', mt: 1, alignItems: 'center' }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={() => void confirmCorruptProfileRecovery()}
+            >
+              {t('profiles.page.recovery.confirm')}
+            </Button>
+          }
+        >
+          <Typography variant="body2">
+            {t('profiles.page.recovery.description', {
+              file: profileRecovery.corrupt_file ?? 'profiles.yaml',
+            })}
+          </Typography>
+        </Alert>
+      )}
       <Stack
         direction="row"
         spacing={1}
@@ -903,6 +968,7 @@ const ProfilePage = () => {
       >
         <BaseStyledTextField
           value={url}
+          disabled={recoveryBlocked}
           variant="outlined"
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(event) => {
@@ -942,7 +1008,7 @@ const ProfilePage = () => {
           }}
         />
         <Button
-          disabled={!url || disabled}
+          disabled={!url || disabled || recoveryBlocked}
           loading={loading}
           variant="contained"
           size="small"
@@ -952,7 +1018,7 @@ const ProfilePage = () => {
           {t('profiles.page.actions.import')}
         </Button>
         <Button
-          disabled={loading || disabled}
+          disabled={loading || disabled || recoveryBlocked}
           variant="outlined"
           size="small"
           sx={{ borderRadius: '6px', minWidth: 36, px: 1 }}
@@ -963,7 +1029,7 @@ const ProfilePage = () => {
           <FolderOpenOutlined fontSize="small" />
         </Button>
         <Button
-          disabled={loading || disabled}
+          disabled={loading || disabled || recoveryBlocked}
           variant="outlined"
           size="small"
           sx={{ borderRadius: '6px', minWidth: 36, px: 1 }}
@@ -978,6 +1044,7 @@ const ProfilePage = () => {
           size="small"
           sx={{ borderRadius: '6px' }}
           onClick={() => viewerRef.current?.create()}
+          disabled={recoveryBlocked}
         >
           {t('shared.actions.new')}
         </Button>

@@ -21,12 +21,12 @@ use smartstring::alias::String;
 use std::num::NonZeroUsize;
 use std::{
     collections::{HashMap, HashSet},
-    path::{Component, Path},
+    path::{Component, Path, PathBuf},
     sync::{
         LazyLock,
         atomic::{AtomicU64, Ordering},
     },
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri_plugin_mihomo::models::{Proxies, ProxyType};
 use tokio::{fs, task::JoinHandle};
@@ -36,6 +36,7 @@ pub(crate) static PROFILE_WRITE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mute
 static ACTIVATE_SELECTED_TASK: LazyLock<Mutex<Option<JoinHandle<()>>>> = LazyLock::new(|| Mutex::new(None));
 static ACTIVATE_SELECTED_GENERATION: AtomicU64 = AtomicU64::new(0);
 static CLASH5_IDENTITY_INIT_LOCK: Mutex<()> = Mutex::new(());
+static PROFILE_RECOVERY_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 // The plugin already limits the request/response phase to 5 seconds. This outer timeout also covers
 // lock acquisition, connection-pool waiting, and local-socket connection establishment.
@@ -66,6 +67,12 @@ pub struct IProfiles {
     pub current: Option<String>,
 
     pub items: Option<Vec<PrfItem>>,
+}
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct ProfileRecoveryStatus {
+    pub active: bool,
+    pub corrupt_file: Option<std::string::String>,
 }
 
 impl Default for IProfiles {
@@ -113,6 +120,40 @@ macro_rules! patch {
             $lv.$key = $rv.$key.to_owned();
         }
     };
+}
+
+fn is_profile_parse_error(error: &anyhow::Error) -> bool {
+    error
+        .chain()
+        .any(|cause| cause.to_string().starts_with("failed to parse YAML file "))
+}
+
+async fn quarantine_corrupt_profile(path: &Path) -> Result<PathBuf> {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .context("profiles.yaml has no file name")?;
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let preserved = path.with_file_name(format!("{file_name}.corrupt-{timestamp}"));
+    fs::rename(path, &preserved)
+        .await
+        .with_context(|| format!("failed to preserve corrupt profiles.yaml as {}", preserved.display()))?;
+    Ok(preserved)
+}
+
+pub(crate) fn profile_recovery_status() -> ProfileRecoveryStatus {
+    let path = PROFILE_RECOVERY_PATH.lock().clone();
+    ProfileRecoveryStatus {
+        active: path.is_some(),
+        corrupt_file: path.and_then(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.to_owned())
+        }),
+    }
 }
 
 impl IProfiles {
@@ -170,6 +211,20 @@ impl IProfiles {
                 }
                 profiles
             }
+            Err(err) if is_profile_parse_error(&err) => {
+                let preserved = quarantine_corrupt_profile(&path).await.unwrap_or(path.clone());
+                *PROFILE_RECOVERY_PATH.lock() = Some(preserved.clone());
+                logging!(
+                    error,
+                    Type::Config,
+                    "failed to parse profiles.yaml; preserved recovery copy at {}: {err:#}",
+                    preserved.display()
+                );
+                Self {
+                    items: Some(Vec::new()),
+                    ..Self::default()
+                }
+            }
             Err(err) => {
                 logging!(error, Type::Config, "failed to read profiles.yaml: {err:#}");
                 Self::default()
@@ -178,6 +233,25 @@ impl IProfiles {
     }
 
     pub async fn save_file(&self) -> Result<()> {
+        if let Some(path) = PROFILE_RECOVERY_PATH.lock().clone() {
+            anyhow::bail!(
+                "profiles.yaml is in recovery mode; confirm recovery before saving (preserved at {})",
+                path.display()
+            );
+        }
+        self.save_file_unchecked().await
+    }
+
+    pub async fn confirm_recovery(&self) -> Result<()> {
+        if PROFILE_RECOVERY_PATH.lock().is_none() {
+            return Ok(());
+        }
+        self.save_file_unchecked().await?;
+        PROFILE_RECOVERY_PATH.lock().take();
+        Ok(())
+    }
+
+    async fn save_file_unchecked(&self) -> Result<()> {
         if self.schema_version > PROFILES_SCHEMA_VERSION {
             anyhow::bail!(
                 "profiles.yaml schema version {} is newer than the supported version {}",
@@ -187,7 +261,19 @@ impl IProfiles {
         }
         let mut profiles = self.clone();
         profiles.schema_version = PROFILES_SCHEMA_VERSION;
-        help::save_yaml(&dirs::profiles_path()?, &profiles, Some("# Profiles Config for clash5")).await
+        let path = dirs::profiles_path()?;
+        if fs::try_exists(&path).await.unwrap_or(false) {
+            let backup = path.with_file_name(format!(
+                "{}.bak",
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("profiles.yaml")
+            ));
+            fs::copy(&path, &backup)
+                .await
+                .with_context(|| format!("failed to create profiles backup {}", backup.display()))?;
+        }
+        help::save_yaml(&path, &profiles, Some("# Profiles Config for clash5")).await
     }
 
     /// 只修改current，valid和chain
@@ -2061,5 +2147,33 @@ mod tests {
                 ("first-group".into(), "replacement".into()),
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn corrupt_profiles_are_quarantined_with_a_timestamp() -> Result<()> {
+        let root = std::env::temp_dir().join(format!("clash5-profile-corrupt-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root).await;
+        fs::create_dir_all(&root).await?;
+        let path = root.join("profiles.yaml");
+        fs::write(&path, b"items: [").await?;
+
+        let preserved = quarantine_corrupt_profile(&path).await?;
+        assert!(!path.exists());
+        assert!(preserved.exists());
+        assert!(preserved.to_string_lossy().contains("profiles.yaml.corrupt-"));
+
+        let _ = fs::remove_dir_all(&root).await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn profile_saves_are_blocked_until_recovery_is_confirmed() {
+        *PROFILE_RECOVERY_PATH.lock() = Some(PathBuf::from("profiles.yaml.corrupt-test"));
+        let error = IProfiles::default()
+            .save_file()
+            .await
+            .expect_err("recovery must block writes");
+        assert!(error.to_string().contains("recovery mode"));
+        PROFILE_RECOVERY_PATH.lock().take();
     }
 }

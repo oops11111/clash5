@@ -67,7 +67,12 @@
         "forceRefreshStaleData": "订阅数据异常，点击强制刷新"
       }
     },
-    "title": "订阅"
+    "title": "订阅",
+    "recovery": {
+      "description": "上一次的订阅配置文件无法解析，已保留为 {{file}}。确认恢复前不会写入任何更改。",
+      "confirm": "使用干净配置继续",
+      "confirmed": "已确认恢复，原文件仍保留供检查。"
+    }
   },
   "components": {
     "card": {
