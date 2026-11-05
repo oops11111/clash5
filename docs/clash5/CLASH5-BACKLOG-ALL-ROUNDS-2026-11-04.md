@@ -21,7 +21,7 @@
 
 | 类别 | 要求 | 现状证据（HEAD） |
 |---|---|---|
-| 订阅 URL / 节点凭证 | 落盘加密；日志/诊断默认脱敏；不得提交样例真值 | 订阅 URL 仍明文 `PrfItem.url`（`config/prfitem.rs:53,431`）→ **未落地**（R4 D4 A） |
+| 订阅 URL / 节点凭证 | 落盘加密；日志/诊断默认脱敏；不得提交样例真值 | `PrfItem.url` 已接入 OS 凭据库/AES-GCM；节点凭证仍留在配置结构中，需继续核对日志/诊断脱敏（R4 D4 A） |
 | WebDAV 口令 | 不进备份明文；传输校验证书 | `core/backup.rs:109` `danger_accept_invalid_certs(true)` → **未落地**（R11 Q1 B） |
 | controller secret | 每进程随机，不入仓库 | 运行时生成（R3 议题事实）；勿把 secret 写入测试夹具真值 |
 | 签名私钥 / updater 私钥 / SignPath 凭据 | 仅 CI secrets / SignPath；`.gitignore` 拒私钥 | R8 D6 A；仓库内不得出现 `.pem`/`.p12`/私钥 |
@@ -319,7 +319,7 @@
 | **来源** | R4 **D4 A** |
 | **拍板** | 加密存储并迁移旧明文 |
 | **文件:行** | `config/prfitem.rs:53` `url: Option<String>` 明文 |
-| **现状** | **未落地** |
+| **现状** | **部分落地** — `PrfItem.url` 复用 OS 凭据库/AES-GCM 配置加密；旧版明文 URL 可兼容读取并在下一次保存时迁移；新安装/桌面迁移和密钥不可用提示仍待验收 |
 
 ### P1-10 · X2 TUN：服务不可用时暂停不改设置
 

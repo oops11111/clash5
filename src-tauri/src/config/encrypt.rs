@@ -83,6 +83,34 @@ where
     }
 }
 
+/// Reads an encrypted optional string while accepting the pre-encryption plaintext form.
+///
+/// This is intentionally narrower than `deserialize_encrypted`: subscription URLs were stored
+/// as ordinary YAML strings before encryption was introduced, so they need a one-time migration
+/// path. Other encrypted fields remain strict and reject an invalid ciphertext.
+pub fn deserialize_encrypted_string<'a, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'a>,
+    T: for<'de> Deserialize<'de> + Default + From<String>,
+{
+    if !is_encryption_active() {
+        return Option::<T>::deserialize(deserializer);
+    }
+
+    let value = Option::<String>::deserialize(deserializer)?;
+    match value {
+        Some(value) if !value.is_empty() => match decrypt_data(&value) {
+            Ok(decrypted) => {
+                let value = serde_json::from_str::<String>(&decrypted).map_err(serde::de::Error::custom)?;
+                Ok(Some(value.into()))
+            }
+            Err(_error) if value.starts_with("http://") || value.starts_with("https://") => Ok(Some(value.into())),
+            Err(error) => Err(serde::de::Error::custom(error)),
+        },
+        _ => Ok(None),
+    }
+}
+
 pub async fn with_encryption<F, Fut, R>(f: F) -> R
 where
     F: FnOnce() -> Fut,

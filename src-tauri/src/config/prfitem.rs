@@ -1,5 +1,5 @@
 use crate::{
-    config::profiles,
+    config::{deserialize_encrypted_string, profiles, serialize_encrypted},
     core::{CoreManager, manager::RunningMode},
     utils::{
         dirs, help,
@@ -50,6 +50,8 @@ pub struct PrfItem {
     pub desc: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "serialize_encrypted")]
+    #[serde(deserialize_with = "deserialize_encrypted_string")]
     #[specta(type = Option<std::string::String>)]
     pub url: Option<String>,
 
