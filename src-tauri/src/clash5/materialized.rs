@@ -98,7 +98,7 @@ fn merge_yaml(file: &mut MaterializedProxyFile, source: Source, yaml: &str, key:
 fn provider_payload(value: &Value) -> Option<Sequence> {
     value
         .as_mapping()
-        .and_then(|mapping| mapping.get("proxies"))
+        .and_then(|mapping| mapping.get("proxies").or_else(|| mapping.get("payload")))
         .and_then(Value::as_sequence)
         .cloned()
 }
