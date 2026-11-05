@@ -79,9 +79,9 @@
 | **来源** | R3 **D6 A**；R8 **H1/K8**；R9 G-04；R18 **Q2 A**（最小 CSP 并入 D6 验收） |
 | **拍板** | 只开放应用目录；导入导出走系统文件对话框；补 CSP；`enableSchemaRequest: false` |
 | **要做什么** | `csp` 非 null；去掉 scope `**`；CI jq 守卫 |
-| **文件:行** | `src-tauri/tauri.conf.json:49-56`（`csp: null`，`allow: ["**"]`）；`capabilities/migrated.json:12,17` |
+| **文件:行** | `src-tauri/tauri.conf.json:49-75`（显式 production/dev CSP 与 `$APPDATA/icons/**` asset scope）；`capabilities/migrated.json:11-18`（仍有 `$APPDATA/**` 读 scope） |
 | **验收** | CI：csp 非 null、scope 无 `**`；越界读写被拒 |
-| **现状** | **未落地** — `csp: null`；fs/asset `**` 仍在 |
+| **现状** | **部分落地** — 生产/开发 CSP 已显式收窄，asset scope 仅允许 `$APPDATA/icons/**`，静态 WebView 门禁已存在；迁移 capability 仍保留 `$APPDATA/**` 读范围，桌面 IPC/Monaco/图标运行时验收未完成 |
 | **被并入** | R18 Q2 A 最小 CSP 细节并入本项验收，不另立 P0 |
 
 ### P0-05 · K4：插件受信公钥列表（G-05）
@@ -103,9 +103,9 @@
 | **来源** | R4 **R1/P0**；R9 G-06 |
 | **拍板** | 拒绝 `..` 与绝对路径；destination 走系统对话框 |
 | **要做什么** | `filename`/`destination` 规范化 + 前缀校验；单测 |
-| **文件:行** | `src-tauri/src/feat/backup.rs:395-411`（`:397` join、`:402-407` 无校验 copy） |
+| **文件:行** | `src-tauri/src/feat/backup.rs:417-440`；`src-tauri/src/feat/backup_path.rs:6-87` |
 | **验收** | `export_rejects_traversal`、`export_rejects_absolute` |
-| **现状** | **未落地** — 仍直接 `backup_dir.join(filename)` + `fs::copy` |
+| **现状** | **部分落地** — `backup_path` 拒绝相对/绝对/设备名/符号链接逃逸，导出目标要求绝对路径且必须来自 Tauri 保存对话框；Windows 单测已通过，原生保存对话框和越界目标桌面验收仍待补齐 |
 
 ### P0-07 · S1 内核退出 / 崩溃残留系统代理（G-09）
 
@@ -125,9 +125,9 @@
 | **来源** | R3 **D4 A**；R6 **E1 B**；R9 G-10；R13 备注 |
 | **拍板** | IPv6 **默认关**；`respect-rules: true`；节点域名国内解析，其余经规则；三处默认统一，键缺失不写回 true |
 | **要做什么** | `clash.rs` / `init.rs` / `dns-viewer.tsx` 默认 `ipv6=false`，`respect-rules=true` |
-| **文件:行** | `config/clash.rs:93`（`ipv6: true`）；`utils/init.rs:340`（dns ipv6 true）、`:347`（respect-rules false）；`dns-viewer.tsx:152,155` |
+| **文件:行** | `config/clash.rs:99,466-473`；`utils/init.rs:339-347,699-700`；`scripts/check-privacy-defaults.mjs` |
 | **验收** | 新装快照 ipv6/dns.ipv6 false、respect-rules true；保存不写回 true；老用户显式开启保持 |
-| **现状** | **未落地** — 三处仍 true / respect-rules false |
+| **现状** | **部分落地** — 新配置 IPv6 默认关闭、DNS `respect-rules` 默认开启、回环监听和 DoH 默认值已有 Rust/静态门禁；新安装快照与真实 DNS 路由验收仍待补齐 |
 
 ### P0-09 · 卸载残留代理与计划任务（G-11）
 
@@ -211,9 +211,9 @@
 |---|---|
 | **来源** | R4 **D3 A**；R8 **D6 A**、**D7 A**；R18 **Q5 A**、**Q6 B**；R9 G-16 |
 | **拍板** | Windows SignPath 开源计划签名；首发关 updater；三处配置统一；RC 不要求 `.sig`；去 updater 权限；`unwrap_or`/FE 缺省关；endpoints 空可 init，文档写明无自动检查 |
-| **文件:行** | `tauri.conf.json` updater `endpoints: []`；`core/updater.rs:371,638,701`（`auto_check_update.unwrap_or(true)` ← 与 `verge.rs:485` 默认 `Some(false)` **矛盾**）；`release.yml` / RC workflow |
+| **文件:行** | `tauri.conf.json` updater `endpoints: []` 与 `createUpdaterArtifacts: false`；`core/updater.rs:385,656,719`；`config/verge.rs:508`；capability manifests |
 | **验收** | `signtool verify`；三处逻辑一致为关；无 updater 权限 |
-| **现状** | **部分落地** — endpoints 空、verge 默认 false；但 SilentUpdater `unwrap_or(true)` 仍偏开；签名/RC `.sig` 流程未证实完成 → 整体按门禁 **未达**，细项标部分 |
+| **现状** | **部分落地** — endpoints 为空、前后端更新检查缺省关闭、无 updater 权限且不生成 updater artifacts；Windows/Apple 签名、独立 updater 密钥与 RC `.sig` 流程仍未提供凭据或验收证据 |
 
 ### P0-17 · 门禁权威表 RELEASE-GATES.md（R9 Q1 C）
 
@@ -222,9 +222,9 @@
 | **来源** | R9 **Q1 C** |
 | **拍板** | 仓库放 `RELEASE-GATES.md` 为权威；CI 校验每行测试存在且通过；RC 引用 |
 | **要做什么** | 新增文件，迁入 G-01…及后续 G-17+；CI 钩子 |
-| **文件:行** | 仓库根目前 **无** `RELEASE-GATES.md`（`ls` 无） |
+| **文件:行** | `RELEASE-GATES.md`；`scripts/check-release-gates.mjs`；`.github/workflows/backend-guardrails.yml`、`clash5-release-candidate.yml` |
 | **验收** | 文件存在；故意缺测试 CI 红；RC 引用 |
-| **现状** | **未落地** |
+| **现状** | **部分落地** — 根目录 `RELEASE-GATES.md`、`scripts/check-release-gates.mjs` 和 CI 引用已存在；因多数门禁仍缺桌面/发布证据，`--release` 按预期阻断 |
 
 ### P0-18 · 条件 P0：指纹/扩展命名与「接管」文案（G-07 / G-08）
 
