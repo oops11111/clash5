@@ -13,6 +13,26 @@ use anyhow::{Result, bail};
 use clash_verge_logging::{Type, logging, logging_error};
 use smartstring::alias::String;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UpdateStrategy {
+    Direct,
+    Clash,
+    System,
+}
+
+fn select_update_strategy(option: Option<&PrfOption>, core_running: bool) -> UpdateStrategy {
+    match (
+        option.and_then(|option| option.self_proxy),
+        option.and_then(|option| option.with_proxy),
+    ) {
+        (Some(true), _) => UpdateStrategy::Clash,
+        (_, Some(true)) => UpdateStrategy::System,
+        (Some(false), _) | (_, Some(false)) => UpdateStrategy::Direct,
+        (None, None) if core_running => UpdateStrategy::Clash,
+        (None, None) => UpdateStrategy::Direct,
+    }
+}
+
 /// Toggle proxy profile
 pub async fn toggle_proxy_profile(profile_index: String) {
     if let Err(err) = cmd::patch_profiles_config_by_profile_index(profile_index.clone()).await {
@@ -122,64 +142,56 @@ async fn perform_profile_update(
         .and_then(|item| item.name.clone())
         .unwrap_or_else(|| String::from("UnKnown Profile"));
 
-    #[derive(Clone, Copy)]
-    enum Strategy {
-        Configured,
-        Clash,
-        System,
+    let strategy = select_update_strategy(
+        merged_opt.as_ref(),
+        !matches!(
+            *CoreManager::global().get_running_mode(),
+            crate::core::manager::RunningMode::NotRunning
+        ),
+    );
+    let strategy_name = match strategy {
+        UpdateStrategy::Direct => "direct",
+        UpdateStrategy::Clash => "clash",
+        UpdateStrategy::System => "system",
+    };
+    tracing::Span::current().record("strategy", strategy_name);
+    let started = std::time::Instant::now();
+    let mut options = merged_opt.unwrap_or_default();
+    match strategy {
+        UpdateStrategy::Direct => {
+            options.self_proxy = Some(false);
+            options.with_proxy = Some(false);
+        }
+        UpdateStrategy::Clash => {
+            options.self_proxy = Some(true);
+            options.with_proxy = Some(false);
+        }
+        UpdateStrategy::System => {
+            options.self_proxy = Some(false);
+            options.with_proxy = Some(true);
+        }
     }
-
-    let result =
-        crate::utils::retry::try_strategies(Strategy::Configured, [Strategy::Clash, Strategy::System], |strategy| {
-            let mut options = merged_opt.clone();
-            async move {
-                let (name, success, failure) = match strategy {
-                    Strategy::Configured => (
-                        "configured",
-                        "[订阅更新] 更新订阅配置成功",
-                        "[订阅更新] 直接更新失败: {}，尝试使用Clash代理更新",
-                    ),
-                    Strategy::Clash => (
-                        "clash",
-                        "[订阅更新] 使用 Clash代理 更新订阅配置成功",
-                        "[订阅更新] Clash代理更新失败: {}，尝试使用系统代理更新",
-                    ),
-                    Strategy::System => (
-                        "system",
-                        "[订阅更新] 使用 系统代理 更新订阅配置成功",
-                        "[订阅更新] 系统代理更新失败: {}，所有重试均已失败",
-                    ),
-                };
-                match strategy {
-                    Strategy::Configured => {}
-                    Strategy::Clash | Strategy::System => {
-                        let option = options.get_or_insert_with(PrfOption::default);
-                        option.self_proxy = Some(matches!(strategy, Strategy::Clash));
-                        option.with_proxy = Some(matches!(strategy, Strategy::System));
-                    }
-                }
-                tracing::Span::current().record("strategy", name);
-                let started = std::time::Instant::now();
-                let result = PrfItem::from_url(url, None, None, options.as_ref()).await;
-                let elapsed_field = match strategy {
-                    Strategy::Configured => "configured_elapsed",
-                    Strategy::Clash => "clash_elapsed",
-                    Strategy::System => "system_elapsed",
-                };
-                tracing::Span::current().record(elapsed_field, tracing::field::debug(started.elapsed()));
-                match &result {
-                    Ok(_) => logging!(info, Type::Config, "{success}"),
-                    Err(error) => logging!(
-                        warn,
-                        Type::Config,
-                        "{}",
-                        failure.replace("{}", &mask_err(&format!("{error:#}")))
-                    ),
-                }
-                result
-            }
-        })
-        .await;
+    let result = PrfItem::from_url(url, None, None, Some(&options)).await;
+    let elapsed_field = match strategy {
+        UpdateStrategy::Direct => "configured_elapsed",
+        UpdateStrategy::Clash => "clash_elapsed",
+        UpdateStrategy::System => "system_elapsed",
+    };
+    tracing::Span::current().record(elapsed_field, tracing::field::debug(started.elapsed()));
+    match &result {
+        Ok(_) => logging!(
+            info,
+            Type::Config,
+            "[订阅更新] 使用 {strategy_name} 通道更新订阅配置成功"
+        ),
+        Err(error) => logging!(
+            warn,
+            Type::Config,
+            "[订阅更新] 使用 {strategy_name} 通道更新失败: {}",
+            mask_err(&format!("{error:#}"))
+        ),
+    }
+    let result = result.map(|item| (strategy, item));
     let last_err = match result {
         Ok((strategy, mut item)) => {
             // A persistence error must not replay a successful download with another transport.
@@ -188,7 +200,7 @@ async fn perform_profile_update(
                 logging!(warn, Type::Config, "{message}");
                 handle::Handle::notice(NoticeStatus::UpdateFailed, message.as_str());
             }
-            if !matches!(strategy, Strategy::Configured) {
+            if matches!(strategy, UpdateStrategy::Clash | UpdateStrategy::System) {
                 handle::Handle::notice(NoticeStatus::UpdateWithClashProxy, profile_name.as_str());
             }
             return Ok(());
@@ -260,4 +272,50 @@ pub async fn enhance_profiles() -> Result<ValidationOutcome> {
         logging_error!(Type::Config, Config::sync_dns_override().await);
     }
     Ok(outcome)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{UpdateStrategy, select_update_strategy};
+    use crate::config::PrfOption;
+
+    #[test]
+    fn automatic_updates_use_clash_only_when_the_core_is_running() {
+        assert_eq!(select_update_strategy(None, true), UpdateStrategy::Clash);
+        assert_eq!(select_update_strategy(None, false), UpdateStrategy::Direct);
+    }
+
+    #[test]
+    fn explicit_transport_choices_never_fall_back_to_another_channel() {
+        assert_eq!(
+            select_update_strategy(
+                Some(&PrfOption {
+                    with_proxy: Some(true),
+                    ..Default::default()
+                }),
+                false,
+            ),
+            UpdateStrategy::System
+        );
+        assert_eq!(
+            select_update_strategy(
+                Some(&PrfOption {
+                    self_proxy: Some(true),
+                    ..Default::default()
+                }),
+                false,
+            ),
+            UpdateStrategy::Clash
+        );
+        assert_eq!(
+            select_update_strategy(
+                Some(&PrfOption {
+                    with_proxy: Some(false),
+                    ..Default::default()
+                }),
+                true,
+            ),
+            UpdateStrategy::Direct
+        );
+    }
 }

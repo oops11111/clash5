@@ -1,5 +1,6 @@
 use crate::{
     config::profiles,
+    core::{CoreManager, manager::RunningMode},
     utils::{
         dirs, help,
         network::{NetworkManager, ProxyType},
@@ -294,8 +295,8 @@ impl PrfItem {
         desc: Option<&String>,
         option: Option<&PrfOption>,
     ) -> Result<Self> {
-        let with_proxy = option.is_some_and(|o| o.with_proxy.unwrap_or(false));
-        let self_proxy = option.is_some_and(|o| o.self_proxy.unwrap_or(false));
+        let with_proxy = option.and_then(|o| o.with_proxy);
+        let self_proxy = option.and_then(|o| o.self_proxy);
         let accept_invalid_certs = option.is_some_and(|o| o.danger_accept_invalid_certs.unwrap_or(false));
         let allow_auto_update = Some(allow_auto_update_enabled(option));
         let user_agent = option.and_then(|o| o.user_agent.clone());
@@ -307,12 +308,14 @@ impl PrfItem {
         let mut proxies = option.and_then(|o| o.proxies.clone());
         let mut groups = option.and_then(|o| o.groups.clone());
 
-        let proxy_type = if self_proxy {
-            ProxyType::Localhost
-        } else if with_proxy {
-            ProxyType::System
-        } else {
-            ProxyType::None
+        let proxy_type = match (self_proxy, with_proxy) {
+            (Some(true), _) => ProxyType::Localhost,
+            (_, Some(true)) => ProxyType::System,
+            (Some(false), _) | (_, Some(false)) => ProxyType::None,
+            (None, None) if !matches!(*CoreManager::global().get_running_mode(), RunningMode::NotRunning) => {
+                ProxyType::Localhost
+            }
+            (None, None) => ProxyType::None,
         };
 
         let url = fix_dirty_url(url)?;

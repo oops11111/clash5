@@ -21,7 +21,7 @@ the original review records before release; the present registry is a skeleton.
 | G-10 | P0-08 | partial | scripts/check-privacy-defaults.mjs | Rust and frontend default tests pass; new-install snapshot and live DNS routing acceptance remain |
 | G-11 | P0-09 | blocked | - | Uninstall proxy ownership and scheduled-task cleanup |
 | G-12 | P0-10 | blocked | - | Token-safe subscription naming and migration |
-| G-13 | P0-11 | blocked | - | Explicit subscription transport policy and UA |
+| G-13 | P0-11 | partial | - | Desktop transport/UA evidence, direct-connection UX, and certificate-exception acceptance |
 | G-14 | P0-14 | blocked | - | Pre-migration snapshot, atomic v11 and downgrade rejection |
 | G-15 | P0-15 | blocked | - | Corrupt config preservation and write protection |
 | G-16 | P0-16 | partial | scripts/check-privacy-defaults.mjs | Updater disabled in config, frontend and backend; signing and RC artifact policy still unverified |

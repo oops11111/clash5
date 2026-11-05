@@ -125,9 +125,7 @@ impl NetworkManager {
 
         // SSL/TLS
         if accept_invalid_certs {
-            builder = builder
-                .danger_accept_invalid_certs(true)
-                .danger_accept_invalid_hostnames(true);
+            builder = builder.danger_accept_invalid_certs(true);
         }
 
         // 超时设置
@@ -270,11 +268,12 @@ impl NetworkManager {
                 Some(format!("http://127.0.0.1:{port}"))
             }
             ProxyType::System => {
-                if let Ok(p @ Sysproxy { enable: true, .. }) = Sysproxy::get_system_proxy() {
-                    Some(format!("http://{}:{}", p.host, p.port))
-                } else {
-                    None
+                let p = Sysproxy::get_system_proxy()
+                    .map_err(|error| anyhow::anyhow!("system proxy could not be read: {error}"))?;
+                if !p.enable {
+                    bail!("system proxy is not enabled");
                 }
+                Some(format!("http://{}:{}", p.host, p.port))
             }
         };
 
@@ -286,7 +285,7 @@ impl NetworkManager {
         } else {
             headers.insert(
                 USER_AGENT,
-                HeaderValue::from_str(&format!("clash-verge/v{}", env!("CARGO_PKG_VERSION")))?,
+                HeaderValue::from_str(&format!("clash5/v{}", env!("CARGO_PKG_VERSION")))?,
             );
         }
 
