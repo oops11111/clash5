@@ -19,4 +19,6 @@ Settings. Preserve existing capabilities and redirect legacy entry routes.
 references. `renders` and `src` at the reference root cover confirmation,
 error notices, empty states, skeletons, loading buttons and keyboard focus.
 The implementation must use actual application state and translated strings;
-sample names and green latency values in the images are illustrative only.
+sample names and green latency values in the images are illustrative only. The
+current shell exposes the five tabs horizontally; page-level island composition
+and legacy-route redirects remain tracked work under issue #69.

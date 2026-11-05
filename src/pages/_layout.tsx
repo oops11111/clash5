@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { Outlet, useNavigate } from 'react-router'
 
 import { BaseErrorBoundary } from '@/components/base'
-import { LayoutSidebar } from '@/components/layout/layout-sidebar'
+import { LayoutTopNav } from '@/components/layout/layout-top-nav'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { ServiceMigrationDialog } from '@/components/layout/service-migration-dialog'
 import { SysproxyPrivilegeDialog } from '@/components/layout/sysproxy-privilege-dialog'
@@ -168,7 +168,7 @@ const Layout = () => {
         {customTitlebar}
 
         <div className="layout-content">
-          <LayoutSidebar isDark={isDark} isCollapsed={navCollapsed} />
+          <LayoutTopNav isDark={isDark} />
 
           <div className="layout-content__right">
             <div className="the-bar"></div>

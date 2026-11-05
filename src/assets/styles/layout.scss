@@ -6,9 +6,106 @@
   overflow: hidden;
   background: var(--background-color);
 
+  .layout-top-nav {
+    flex: 0 0 56px;
+    min-height: 56px;
+    width: 100%;
+    display: flex;
+    align-items: stretch;
+    gap: 16px;
+    padding: 0 18px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--divider-color);
+    background: var(--sidebar-background);
+    backdrop-filter: var(--glass-filter);
+    user-select: none;
+    -webkit-user-select: none;
+
+    &__brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 132px;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+
+      img {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+        pointer-events: none;
+      }
+    }
+
+    &__tabs {
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+    }
+
+    &__tab {
+      position: relative;
+      min-width: max-content;
+      padding: 0 18px;
+      color: var(--text-primary);
+      opacity: 0.68;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+
+      &::after {
+        position: absolute;
+        right: 12px;
+        bottom: 0;
+        left: 12px;
+        height: 2px;
+        border-radius: 2px 2px 0 0;
+        background: transparent;
+        content: '';
+      }
+
+      &:hover {
+        color: var(--text-primary);
+        background: var(--background-color-alpha);
+        opacity: 1;
+      }
+
+      &.is-active {
+        color: var(--primary-main);
+        opacity: 1;
+
+        &::after {
+          background: var(--primary-main);
+        }
+      }
+    }
+
+    &__actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    &__update {
+      border-radius: 8px;
+      padding: 2px 4px;
+      transform: scale(0.8);
+    }
+  }
+
   .layout-content {
     /* New container for the flex layout */
     display: flex;
+    flex-direction: column;
     flex: 1; /* Take remaining height */
     overflow: hidden;
 
@@ -84,8 +181,10 @@
 
     &__right {
       position: relative;
-      flex: 1 1 100%;
-      height: 100%;
+      flex: 1 1 auto;
+      width: 100%;
+      height: auto;
+      min-height: 0;
       min-width: 0;
       background: var(--background-color);
 
