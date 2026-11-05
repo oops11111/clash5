@@ -1891,10 +1891,13 @@ PRAGMA user_version=11;
         route.validate()?;
         let definition = serde_json::to_value(route).map_err(|_| DataError::InvalidInput)?;
         let tx = self.db.transaction()?;
-        tx.execute(
-            "INSERT INTO app_routes(id,definition,profile_id,migration_owner) VALUES(?1,?2,?3,'profile') ON CONFLICT(id) DO UPDATE SET definition=excluded.definition,profile_id=excluded.profile_id,migration_owner=excluded.migration_owner",
+        let changed = tx.execute(
+            "INSERT INTO app_routes(id,definition,profile_id,migration_owner) VALUES(?1,?2,?3,'profile') ON CONFLICT(id) DO UPDATE SET definition=excluded.definition,profile_id=excluded.profile_id,migration_owner=excluded.migration_owner WHERE app_routes.profile_id=excluded.profile_id",
             params![route.id, definition.to_string(), profile_id],
         )?;
+        if changed == 0 {
+            return Err(DataError::InvalidInput);
+        }
         audit(&tx, "route.upsert", serde_json::json!({"routes":1}))?;
         tx.commit()?;
         Ok(())

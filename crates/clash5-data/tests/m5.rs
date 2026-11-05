@@ -273,6 +273,17 @@ fn legacy_routes_are_claimed_once_and_new_routes_stay_profile_scoped() {
     store.save_app_route_for_profile("profile-b", &profile_route).unwrap();
     assert_eq!(store.app_routes_for_profile("profile-a").unwrap(), vec![legacy]);
     assert_eq!(store.app_routes_for_profile("profile-b").unwrap(), vec![profile_route]);
+
+    let mut conflicting = route(
+        vec![AppMatcher::ProcessName {
+            name: "conflicting".into(),
+        }],
+        RouteTarget::Reject,
+        true,
+    );
+    conflicting.id = ROUTE_ID.into();
+    assert!(store.save_app_route_for_profile("profile-b", &conflicting).is_err());
+    assert_eq!(store.app_routes_for_profile("profile-a").unwrap().len(), 1);
 }
 
 fn domain_route(suffix: &str, nameserver: Option<&str>) -> AppRoute {
