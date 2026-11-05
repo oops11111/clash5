@@ -71,11 +71,16 @@ fn matching_manual_record<'a>(
 pub(crate) async fn catalog(config: &Mapping, profile_id: Option<&str>) -> Result<Vec<ScopedProxy>> {
     let mut catalog = vec![];
     let records = with_clash5_binding_store(|store| store.node_records(false)).await?;
-    let manual_identity_key = if records.iter().any(|record| record.source == Source::Manual) {
-        Some(crate::config::profiles::clash5_identity_key().await?)
+    let runtime_identity_key = if records.iter().any(|record| record.stable_id.starts_with("v2:")) {
+        Some(
+            with_clash5_binding_store(|store| store.identity_key().cloned())
+                .await
+                .map_err(|error| anyhow!("failed to load clash5 identity key: {error}"))?,
+        )
     } else {
         None
     };
+    let manual_identity_key = runtime_identity_key.as_ref();
     if let Some(proxies) = config.get("proxies").and_then(Value::as_sequence) {
         for proxy in proxies {
             if proxy
@@ -112,7 +117,11 @@ pub(crate) async fn catalog(config: &Mapping, profile_id: Option<&str>) -> Resul
                 source,
                 proxy,
                 None,
-                manual_record.map(|record| record.stable_id.clone()),
+                manual_record.map(|record| record.stable_id.clone()).or_else(|| {
+                    runtime_identity_key
+                        .as_ref()
+                        .and_then(|key| node.stable_id_v2(key).ok())
+                }),
             );
         }
     }
@@ -144,11 +153,17 @@ pub(crate) async fn catalog(config: &Mapping, profile_id: Option<&str>) -> Resul
                 source.clone(),
                 &proxy,
                 provider.get("override").and_then(Value::as_mapping),
-                None,
+                runtime_identity_key
+                    .as_ref()
+                    .and_then(|key| node_stable_id(&proxy, key)),
             );
         }
     }
     Ok(catalog)
+}
+
+fn node_stable_id(proxy: &Value, identity_key: &IdentityKey) -> Option<String> {
+    parse_proxy_node(proxy).ok()?.stable_id_v2(identity_key).ok()
 }
 
 async fn read_provider_payload(root: &Path, raw: &str) -> Option<Vec<Value>> {
@@ -256,6 +271,27 @@ mod tests {
         assert_eq!(catalog[0].proxy["dialer-proxy"], "user-front");
         assert_eq!(catalog[0].proxy["name"], "fixture");
         assert_eq!(catalog[0].proxy["server"], "127.0.0.1");
+        Ok(())
+    }
+
+    #[test]
+    fn subscription_catalog_identity_uses_the_installation_key() -> Result<()> {
+        let key = IdentityKey::from_bytes(&[11; 32])?;
+        let proxy: Value =
+            serde_yaml_ng::from_str("name: fixture\ntype: socks5\nserver: 127.0.0.1\nport: 18081\npassword: secret\n")?;
+        let node = parse_proxy_node(&proxy)?;
+        let mut catalog = vec![];
+        add_proxy(
+            &mut catalog,
+            Source::Subscription {
+                provider_id: "profile-a".into(),
+            },
+            &proxy,
+            None,
+            node.stable_id_v2(&key).ok(),
+        );
+        assert_eq!(catalog[0].reference.stable_id, node.stable_id_v2(&key)?);
+        assert_ne!(catalog[0].reference.stable_id, node.stable_id()?);
         Ok(())
     }
 

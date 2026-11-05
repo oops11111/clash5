@@ -7,12 +7,13 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (file) => readFile(path.join(root, file), 'utf8')
 
-const [test, page, en, zh, docs] = await Promise.all([
+const [test, page, en, zh, docs, chains] = await Promise.all([
   read('crates/clash5-data/tests/m1.rs'),
   read('src/pages/node-pool.tsx'),
   read('src/locales/en/nodePool.json'),
   read('src/locales/zh/nodePool.json'),
   read('docs/clash5/CLASH5-BACKLOG-ALL-ROUNDS-2026-11-04.md'),
+  read('src-tauri/src/clash5/chains.rs'),
 ])
 
 const checks = [
@@ -26,6 +27,12 @@ const checks = [
     'node pool marks inactive records as not effective',
     page.includes("t('nodePool.notEffective')") &&
       page.includes("t('nodePool.notEffectiveHint')"),
+  ],
+  [
+    'runtime catalog uses the installation identity for subscription nodes',
+    chains.includes('runtime_identity_key') &&
+      chains.includes('store.identity_key().cloned()') &&
+      chains.includes('subscription_catalog_identity_uses_the_installation_key'),
   ],
   [
     'English and Chinese inactive-node copy is present',
