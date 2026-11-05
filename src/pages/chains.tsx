@@ -27,16 +27,13 @@ import { PoolPolicy } from '@/components/chain/pool-policy'
 import { PoolScoreList } from '@/components/chain/pool-scores'
 import {
   activateClash5Chain,
-  deleteClash5AppRoute,
   getClash5ChainSamples,
   deleteClash5Chain,
   deleteClash5NodePool,
   detectClash5ExitIp,
   getClash5ChainWorkspace,
   getClash5PoolSwitchEvents,
-  listClash5AppRoutes,
   runClash5QualityTest,
-  saveClash5AppRoute,
   saveClash5Chain,
   saveClash5NodePool,
   testClash5Chain,
@@ -44,8 +41,6 @@ import {
 import { appStorage } from '@/services/storage'
 import type { SwitchEvent } from '@/services/tauri-commands.generated'
 import type {
-  AppMatcherRef,
-  AppRouteDef,
   ChainHopRef,
   ChainSample,
   ChainNodeRef,
@@ -53,7 +48,6 @@ import type {
   ChainWorkspace,
   Clash5Chain,
   ExitIpResult,
-  RouteTargetRef,
 } from '@/types/clash5-chain'
 
 // Matches the backend default for the long-lived connection quality test.
@@ -92,68 +86,6 @@ const newChain = (workspace: ChainWorkspace): Clash5Chain => ({
   pinned_exit_ip: null,
 })
 
-const newRoute = (): AppRouteDef => ({
-  schema_version: 1,
-  id: crypto.randomUUID(),
-  name: '',
-  matchers: [{ kind: 'process_name', name: '' }],
-  target: { kind: 'direct' },
-  enabled: true,
-  nameserver: null,
-})
-const matcherValue = (matcher: AppMatcherRef) =>
-  matcher.kind === 'process_name'
-    ? matcher.name
-    : matcher.kind === 'process_path'
-      ? matcher.path
-      : matcher.suffix
-const matcherWith = (
-  kind: AppMatcherRef['kind'],
-  value: string,
-): AppMatcherRef =>
-  kind === 'process_name'
-    ? { kind, name: value }
-    : kind === 'process_path'
-      ? { kind, path: value }
-      : { kind, suffix: value }
-const targetValue = (target: RouteTargetRef) =>
-  target.kind === 'chain'
-    ? `chain:${target.chain_id}`
-    : target.kind === 'group'
-      ? `group:${target.name}`
-      : target.kind === 'node'
-        ? `node:${nodeKey(target.node)}`
-        : target.kind
-const targetFromValue = (value: string): RouteTargetRef =>
-  value.startsWith('group:')
-    ? { kind: 'group', name: value.slice(6) }
-    : value.startsWith('node:')
-      ? { kind: 'node', node: JSON.parse(value.slice(5)) as ChainNodeRef }
-      : value.startsWith('chain:')
-        ? { kind: 'chain', chain_id: value.slice(6) }
-        : value === 'reject'
-          ? { kind: 'reject' }
-          : { kind: 'direct' }
-const targetLabel = (
-  target: RouteTargetRef,
-  chains: readonly { id: string; name: string }[],
-  labels: { missing: string; direct: string; reject: string },
-  nodes: ChainWorkspace['nodes'],
-) => {
-  if (target.kind === 'group') return target.name
-  if (target.kind === 'node')
-    return (
-      nodes.find((entry) => sameNode(entry.reference, target.node))
-        ?.display_name ?? labels.missing
-    )
-  if (target.kind !== 'chain') {
-    return target.kind === 'direct' ? labels.direct : labels.reject
-  }
-  const chainId = target.chain_id
-  return chains.find((chain) => chain.id === chainId)?.name ?? labels.missing
-}
-const MAX_MATCHERS = 32
-
 const failureCode = (error: unknown) => {
   if (
     typeof error === 'object' &&
@@ -181,9 +113,7 @@ const ChainsPage = () => {
   const [exitResult, setExitResult] = useState<ExitIpResult | null>(null)
   const [quality, setQuality] = useState<ChainQualityReport | null>(null)
   const [qualityConfirmOpen, setQualityConfirmOpen] = useState(false)
-  const [appRoutes, setAppRoutes] = useState<AppRouteDef[]>([])
   const [samples, setSamples] = useState<ChainSample[]>([])
-  const [routeDraft, setRouteDraft] = useState<AppRouteDef | null>(null)
   const [poolName, setPoolName] = useState('')
   const [switchEvents, setSwitchEvents] = useState<SwitchEvent[]>([])
   const [poolMemberKeys, setPoolMemberKeys] = useState<string[]>([])
@@ -195,12 +125,8 @@ const ChainsPage = () => {
   )
 
   const load = useCallback(async (selectedId?: string) => {
-    const [next, routes] = await Promise.all([
-      getClash5ChainWorkspace(),
-      listClash5AppRoutes(),
-    ])
+    const next = await getClash5ChainWorkspace()
     setWorkspace(next)
-    setAppRoutes(routes)
     const selected =
       next.chains.find((chain) => chain.id === selectedId) ?? next.chains[0]
     setDraft(selected ? structuredClone(selected) : newChain(next))
@@ -236,10 +162,6 @@ const ChainsPage = () => {
     } catch {
       setSamples([])
     }
-  }, [])
-
-  const refreshRoutes = useCallback(async () => {
-    setAppRoutes(await listClash5AppRoutes())
   }, [])
 
   useEffect(() => {
@@ -969,315 +891,21 @@ const ChainsPage = () => {
           </Box>
         )}
         {workspace && tab === 'apps' && (
-          <Stack spacing={2}>
-            <Stack direction="row">
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+            <Stack spacing={2}>
+              <Typography variant="h6">{t('chains.apps')}</Typography>
+              <Typography color="text.secondary" variant="body2">
+                {t('chains.appRouteHint')}
+              </Typography>
               <Button
-                variant="outlined"
-                disabled={busy}
-                onClick={() => setRouteDraft(newRoute())}
+                variant="contained"
+                sx={{ alignSelf: 'flex-start' }}
+                onClick={() => navigate('/proxies')}
               >
-                {t('chains.appNewRoute')}
+                {t('proxies.apps.title')}
               </Button>
             </Stack>
-            <Typography color="text.secondary" variant="body2">
-              {t('chains.appRouteHint')}
-            </Typography>
-            {routeDraft && (
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
-                <Stack spacing={2}>
-                  <TextField
-                    size="small"
-                    label={t('chains.appRouteName')}
-                    value={routeDraft.name}
-                    disabled={busy}
-                    onChange={(event) =>
-                      setRouteDraft({ ...routeDraft, name: event.target.value })
-                    }
-                  />
-                  {routeDraft.matchers.map((matcher, index) => (
-                    <Stack
-                      key={index}
-                      direction="row"
-                      sx={{ gap: 1, alignItems: 'center', flexWrap: 'wrap' }}
-                    >
-                      <TextField
-                        select
-                        size="small"
-                        sx={{ minWidth: 180 }}
-                        label={t('chains.appMatcherKind')}
-                        value={matcher.kind}
-                        disabled={busy}
-                        onChange={(event) => {
-                          const kind = event.target
-                            .value as AppMatcherRef['kind']
-                          setRouteDraft({
-                            ...routeDraft,
-                            matchers: routeDraft.matchers.map(
-                              (entry, position) =>
-                                position === index
-                                  ? matcherWith(kind, matcherValue(entry))
-                                  : entry,
-                            ),
-                          })
-                        }}
-                      >
-                        <MenuItem value="process_name">
-                          {t('chains.appProcessName')}
-                        </MenuItem>
-                        <MenuItem value="process_path">
-                          {t('chains.appProcessPath')}
-                        </MenuItem>
-                        <MenuItem value="domain_suffix">
-                          {t('chains.appDomainSuffix')}
-                        </MenuItem>
-                      </TextField>
-                      <TextField
-                        size="small"
-                        sx={{ flex: 1, minWidth: 160 }}
-                        label={t('chains.appMatcherValue')}
-                        value={matcherValue(matcher)}
-                        disabled={busy}
-                        onChange={(event) =>
-                          setRouteDraft({
-                            ...routeDraft,
-                            matchers: routeDraft.matchers.map(
-                              (entry, position) =>
-                                position === index
-                                  ? matcherWith(entry.kind, event.target.value)
-                                  : entry,
-                            ),
-                          })
-                        }
-                      />
-                      <Button
-                        size="small"
-                        color="error"
-                        disabled={busy || routeDraft.matchers.length <= 1}
-                        onClick={() =>
-                          setRouteDraft({
-                            ...routeDraft,
-                            matchers: routeDraft.matchers.filter(
-                              (_, position) => position !== index,
-                            ),
-                          })
-                        }
-                      >
-                        {t('chains.appRemoveMatcher')}
-                      </Button>
-                    </Stack>
-                  ))}
-                  {routeDraft.matchers.some(
-                    (matcher) => matcher.kind === 'domain_suffix',
-                  ) && (
-                    <>
-                      <TextField
-                        size="small"
-                        label={t('chains.appNameserver')}
-                        helperText={t('chains.appNameserverHint')}
-                        value={routeDraft.nameserver ?? ''}
-                        disabled={busy}
-                        onChange={(event) =>
-                          setRouteDraft({
-                            ...routeDraft,
-                            nameserver: event.target.value,
-                          })
-                        }
-                      />
-                      <Alert severity="info">
-                        {t('chains.appDomainScope')}
-                      </Alert>
-                    </>
-                  )}
-                  <Button
-                    size="small"
-                    sx={{ alignSelf: 'flex-start' }}
-                    disabled={
-                      busy || routeDraft.matchers.length >= MAX_MATCHERS
-                    }
-                    onClick={() =>
-                      setRouteDraft({
-                        ...routeDraft,
-                        matchers: [
-                          ...routeDraft.matchers,
-                          { kind: 'process_name', name: '' },
-                        ],
-                      })
-                    }
-                  >
-                    {t('chains.appAddMatcher')}
-                  </Button>
-                  <TextField
-                    select
-                    size="small"
-                    label={t('chains.appTarget')}
-                    value={targetValue(routeDraft.target)}
-                    disabled={busy}
-                    onChange={(event) =>
-                      setRouteDraft({
-                        ...routeDraft,
-                        target: targetFromValue(event.target.value),
-                      })
-                    }
-                  >
-                    <MenuItem value="direct">{t('chains.appDirect')}</MenuItem>
-                    <MenuItem value="reject">{t('chains.appReject')}</MenuItem>
-                    {((routeDraft.target.kind === 'chain' &&
-                      !workspace.chains.some(
-                        (chain) =>
-                          chain.enabled &&
-                          chain.id ===
-                            (routeDraft.target as { chain_id: string })
-                              .chain_id,
-                      )) ||
-                      (routeDraft.target.kind === 'group' &&
-                        !workspace.route_groups.includes(
-                          routeDraft.target.name,
-                        )) ||
-                      (routeDraft.target.kind === 'node' &&
-                        !workspace.nodes.some((entry) =>
-                          sameNode(
-                            entry.reference,
-                            (routeDraft.target as { node: ChainNodeRef }).node,
-                          ),
-                        ))) && (
-                      <MenuItem value={targetValue(routeDraft.target)} disabled>
-                        {t('chains.appMissingTarget')}
-                      </MenuItem>
-                    )}
-                    {workspace.route_groups.map((name) => (
-                      <MenuItem key={`group:${name}`} value={`group:${name}`}>
-                        {t('chains.appPolicyGroup')}: {name}
-                      </MenuItem>
-                    ))}
-                    {workspace.nodes.map((entry) => (
-                      <MenuItem
-                        key={`node:${nodeKey(entry.reference)}`}
-                        value={`node:${nodeKey(entry.reference)}`}
-                      >
-                        {t('chains.appSingleNode')}: {entry.display_name}
-                      </MenuItem>
-                    ))}
-                    {workspace.chains
-                      .filter((chain) => chain.enabled)
-                      .map((chain) => (
-                        <MenuItem key={chain.id} value={`chain:${chain.id}`}>
-                          {t('chains.appMultiHop')}: {chain.name}
-                        </MenuItem>
-                      ))}
-                  </TextField>
-                  <FormControlLabel
-                    label={t('chains.enabled')}
-                    control={
-                      <Switch
-                        checked={routeDraft.enabled}
-                        disabled={busy}
-                        onChange={(_, enabled) =>
-                          setRouteDraft({ ...routeDraft, enabled })
-                        }
-                      />
-                    }
-                  />
-                  <Stack direction="row" sx={{ gap: 1 }}>
-                    <Button
-                      variant="contained"
-                      disabled={
-                        busy ||
-                        !routeDraft.name.trim() ||
-                        routeDraft.matchers.some(
-                          (matcher) => !matcherValue(matcher).trim(),
-                        )
-                      }
-                      onClick={() =>
-                        void perform(async () => {
-                          await saveClash5AppRoute({
-                            ...routeDraft,
-                            nameserver: routeDraft.nameserver?.trim() || null,
-                          })
-                          setRouteDraft(null)
-                          await refreshRoutes()
-                          report(t('chains.appSaved'))
-                        })
-                      }
-                    >
-                      {t('chains.appSaveRoute')}
-                    </Button>
-                    <Button disabled={busy} onClick={() => setRouteDraft(null)}>
-                      {t('shared.actions.cancel')}
-                    </Button>
-                  </Stack>
-                </Stack>
-              </Paper>
-            )}
-            {appRoutes.length === 0 && (
-              <Alert severity="info">{t('chains.appEmpty')}</Alert>
-            )}
-            {appRoutes.map((route) => (
-              <Paper
-                key={route.id}
-                variant="outlined"
-                sx={{ p: 2, borderRadius: 3 }}
-              >
-                <Stack
-                  direction="row"
-                  sx={{
-                    gap: 1,
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Stack>
-                    <Typography sx={{ fontWeight: 600 }}>
-                      {route.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {route.matchers.map(matcherValue).join(', ')}
-                      {' → '}
-                      {targetLabel(
-                        route.target,
-                        workspace.chains,
-                        {
-                          missing: t('chains.missingChain'),
-                          direct: t('chains.appDirect'),
-                          reject: t('chains.appReject'),
-                        },
-                        workspace.nodes,
-                      )}
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" sx={{ gap: 1, alignItems: 'center' }}>
-                    <Chip
-                      size="small"
-                      label={t(
-                        route.enabled ? 'chains.enabled' : 'chains.disabled',
-                      )}
-                    />
-                    <Button
-                      size="small"
-                      disabled={busy}
-                      onClick={() => setRouteDraft(structuredClone(route))}
-                    >
-                      {t('chains.appEditRoute')}
-                    </Button>
-                    <Button
-                      size="small"
-                      color="error"
-                      disabled={busy}
-                      onClick={() =>
-                        void perform(async () => {
-                          await deleteClash5AppRoute(route.id)
-                          await refreshRoutes()
-                          report(t('chains.appDeleted'))
-                        })
-                      }
-                    >
-                      {t('chains.appDeleteRoute')}
-                    </Button>
-                  </Stack>
-                </Stack>
-              </Paper>
-            ))}
-          </Stack>
+          </Paper>
         )}
         {workspace && tab === 'pools' && (
           <Stack spacing={2}>
