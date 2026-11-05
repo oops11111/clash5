@@ -164,11 +164,19 @@ pub(crate) async fn catalog(config: &Mapping, profile_id: Option<&str>) -> Resul
             if catalog.iter().any(|entry| entry.reference == reference) {
                 continue;
             }
+            let overrides = match &reference.source {
+                Source::Subscription { provider_id } => provider_id
+                    .strip_prefix(&format!("proxy-provider:{profile_id}:"))
+                    .and_then(|name| config.get("proxy-providers").and_then(Value::as_mapping)?.get(name))
+                    .and_then(Value::as_mapping)
+                    .and_then(|provider| provider.get("override").and_then(Value::as_mapping)),
+                Source::Manual => None,
+            };
             add_proxy(
                 &mut catalog,
                 reference.source.clone(),
                 &Value::Mapping(proxy),
-                None,
+                overrides,
                 Some(reference.stable_id),
             );
         }

@@ -44,6 +44,8 @@ const checks = [
       materialized.includes('load_for_profile') &&
       materialized.includes('proxy-provider:{profile_id}:{name}') &&
       materialized.includes('read_provider_payload') &&
+      chains.includes('strip_prefix(&format!("proxy-provider:{profile_id}:"))') &&
+      chains.includes('provider.get("override")') &&
       profiles.includes('materialized::snapshot_profile_yaml') &&
       deleteProfile.includes('snapshot_materialized_profile'),
   ],
