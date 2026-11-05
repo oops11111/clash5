@@ -1,4 +1,5 @@
 import {
+  Alert,
   Autocomplete,
   Button,
   FormControlLabel,
@@ -10,7 +11,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -92,6 +93,17 @@ const targetFromValue = (value: string): RouteTargetRef | null => {
   return null
 }
 
+const targetAvailable = (target: RouteTargetRef, workspace: ChainWorkspace) => {
+  if (target.kind === 'direct' || target.kind === 'reject') return true
+  if (target.kind === 'group') return workspace.route_groups.includes(target.name)
+  if (target.kind === 'chain') {
+    return workspace.chains.some(
+      (chain) => chain.id === target.chain_id && chain.enabled,
+    )
+  }
+  return workspace.nodes.some((node) => sameNode(node.reference, target.node))
+}
+
 const AppRoutesPanel = () => {
   const { t } = useTranslation()
   const [routes, setRoutes] = useState<AppRouteDef[]>([])
@@ -101,6 +113,7 @@ const AppRoutesPanel = () => {
   const [quickName, setQuickName] = useState('')
   const [quickTarget, setQuickTarget] = useState('direct')
   const [busy, setBusy] = useState(false)
+  const reportedMissingRoutesRef = useRef(new Set<string>())
 
   const loadProcesses = useLockFn(async () => {
     try {
@@ -119,6 +132,15 @@ const AppRoutesPanel = () => {
       ])
       setRoutes(nextRoutes)
       setWorkspace(nextWorkspace)
+      for (const route of nextRoutes) {
+        const missing = !targetAvailable(route.target, nextWorkspace)
+        if (missing && !reportedMissingRoutesRef.current.has(route.id)) {
+          reportedMissingRoutesRef.current.add(route.id)
+          showNotice.error('chains.appMissingTarget')
+        } else if (!missing) {
+          reportedMissingRoutesRef.current.delete(route.id)
+        }
+      }
     } catch (error) {
       showNotice.error(error)
     }
@@ -217,36 +239,42 @@ const AppRoutesPanel = () => {
         )}
 
         {routes.map((route) => (
-          <Stack
-            key={route.id}
-            direction="row"
-            spacing={1}
-            sx={{ alignItems: 'center', flexWrap: 'wrap' }}
-          >
-            <Stack sx={{ minWidth: 180, flex: 1 }}>
-              <Typography sx={{ fontWeight: 600 }}>{route.name}</Typography>
+          <Stack key={route.id} spacing={0.75}>
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+            >
+              <Stack sx={{ minWidth: 180, flex: 1 }}>
+                <Typography sx={{ fontWeight: 600 }}>{route.name}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {route.matchers.map(matcherValue).join(', ')} → {targetLabel(route.target)}
+                </Typography>
+              </Stack>
               <Typography variant="caption" color="text.secondary">
-                {route.matchers.map(matcherValue).join(', ')} → {targetLabel(route.target)}
+                {t(route.enabled ? 'chains.enabled' : 'chains.disabled')}
               </Typography>
+              <Button
+                size="small"
+                disabled={busy}
+                onClick={() => setDraft(structuredClone(route))}
+              >
+                {t('chains.appEditRoute')}
+              </Button>
+              <Button
+                size="small"
+                color="error"
+                disabled={busy}
+                onClick={() => void remove(route)}
+              >
+                {t('proxies.apps.remove')}
+              </Button>
             </Stack>
-            <Typography variant="caption" color="text.secondary">
-              {t(route.enabled ? 'chains.enabled' : 'chains.disabled')}
-            </Typography>
-            <Button
-              size="small"
-              disabled={busy}
-              onClick={() => setDraft(structuredClone(route))}
-            >
-              {t('chains.appEditRoute')}
-            </Button>
-            <Button
-              size="small"
-              color="error"
-              disabled={busy}
-              onClick={() => void remove(route)}
-            >
-              {t('proxies.apps.remove')}
-            </Button>
+            {workspace && !targetAvailable(route.target, workspace) && (
+              <Alert severity="error" variant="outlined">
+                {t('chains.appMissingTarget')}
+              </Alert>
+            )}
           </Stack>
         ))}
 
