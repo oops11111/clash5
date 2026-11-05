@@ -70,7 +70,7 @@
 | **要做什么** | 收紧 `release.yml` / `clash5-release-candidate.yml`；禁止绕过 RC 直接 publish |
 | **文件:行** | `.github/workflows/clash5-release-candidate.yml:3-13`；`release.yml` |
 | **验收** | 绕过 RC 直接 publish 失败；RC 对真实 draft 跑通 |
-| **现状** | **未落地**（R9：**未达**；本轮未重跑 CI，流程结论沿用） |
+| **现状** | **部分落地** — RC workflow 已将草稿转正步骤限定在 `workflow_dispatch`、`verify-draft` 通过且 `release-approval` environment 审批之后；真实草稿运行与环境审计证据仍待补齐 |
 
 ### P0-04 · K8：CSP + fs/assetProtocol 收窄（G-04）
 
@@ -684,7 +684,7 @@
 | 门禁 | 对应本清单 | R9 状态（当时） | HEAD 复核 |
 |---|---|---|---|
 | G-01 | P0-01 | 未达 | 部分落地；数据层 REJECT/RouteHealth、profile 归属和 UI 红色告警已实现，运行时桌面重启与真机证据待补 |
-| G-02 | P0-03 | 未达 | 未落地 |
+| G-02 | P0-03 | 未达 | 部分落地；RC-only 转正与 environment 审批已接入，真实草稿运行待补 |
 | G-03 | P0-02 | 部分 | 部分落地 |
 | G-04 | P0-04 | 未达 | 未落地 |
 | G-05 | P0-05 | 未达 | 未落地 |

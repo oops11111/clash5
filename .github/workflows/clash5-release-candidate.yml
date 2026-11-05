@@ -76,3 +76,26 @@ jobs:
             "$RUNNER_TEMP/clash5-release.json" \
             "$RUNNER_TEMP/clash5-release-assets" \
             package.json src-tauri/tauri.conf.json
+
+  publish-draft:
+    name: Publish reviewed draft
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify-draft
+    runs-on: ubuntu-latest
+    environment: release-approval
+    permissions:
+      contents: write
+    steps:
+      - name: Confirm the release is still a draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          draft=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/$TAG" --jq .draft)
+          test "$draft" = true
+      - name: Publish the reviewed draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: gh release edit "$TAG" --draft=false
