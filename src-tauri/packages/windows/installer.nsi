@@ -616,6 +616,15 @@ FunctionEnd
   ${EndIf}
 !macroend
 
+!macro RemoveClash5AutoLaunchTasks
+  ; Auto-launch tasks are app-owned and must not survive a normal uninstall.
+  ; schtasks returns an error when a task does not exist; that is intentionally
+  ; ignored so uninstall remains idempotent for per-user and per-machine modes.
+  DetailPrint "Removing ${PRODUCTNAME} auto-launch tasks..."
+  nsExec::ExecToLog 'schtasks.exe /Delete /TN "clash5" /F'
+  nsExec::ExecToLog 'schtasks.exe /Delete /TN "clash5 (Admin)" /F'
+!macroend
+
 Section EarlyChecks
   ; Abort silent installer if downgrades is disabled
   !if "${ALLOWDOWNGRADES}" == "false"
@@ -986,6 +995,7 @@ Section Uninstall
 
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
     !insertmacro RemoveVergeService
+    !insertmacro RemoveClash5AutoLaunchTasks
 
   ; Delete the app directory and its content from disk
   ; Copy main executable
