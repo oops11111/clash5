@@ -297,7 +297,12 @@ impl IClashTemp {
                         false => Cow::Borrowed(val_str),
                     };
 
-                    SocketAddr::from_str(&val).ok().map(|s| s.to_string())
+                    SocketAddr::from_str(&val).ok().map(|mut socket| {
+                        if socket.ip().is_unspecified() {
+                            socket.set_ip(IpAddr::V4(Ipv4Addr::LOCALHOST));
+                        }
+                        socket.to_string()
+                    })
                 }
                 None => None,
             })
