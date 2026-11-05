@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import { DialogRef, Switch, TooltipIcon } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
-import { navigationItems } from '@/pages/_navigation-meta'
+import { primaryNavigationItems } from '@/pages/_navigation-meta'
 import { copyClashEnv } from '@/services/cmds'
 import { resolvePreferredLanguage, supportedLanguages } from '@/services/i18n'
 import { showNotice } from '@/services/notice-service'
@@ -240,18 +240,13 @@ const SettingVergeBasic = ({ section, onError }: Props) => {
             onGuard={(e) => patchVerge({ start_page: e })}
           >
             <Select size="small" sx={{ width: 140, '> div': { py: '7.5px' } }}>
-              {Object.values(navigationItems).map((page) => {
+              {Object.values(primaryNavigationItems).map((page) => {
                 return (
                   <MenuItem key={page.path} value={page.path}>
                     {t(page.label)}
                   </MenuItem>
                 )
               })}
-              {start_page === '/unlock' && (
-                <MenuItem value="/unlock">
-                  {t('layout.components.navigation.tabs.unlock')}
-                </MenuItem>
-              )}
             </Select>
           </GuardState>
         </SettingItem>

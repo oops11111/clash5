@@ -3,7 +3,7 @@ import { Box, Button, ButtonGroup } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 
 import { BasePage } from '@/components/base'
 import { AppRoutesPanel } from '@/components/proxy/app-routes-panel'
@@ -18,6 +18,8 @@ import { patchClashMode } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
 
+import RulesPage from './rules'
+
 const MODES = ['rule', 'global', 'direct'] as const
 type Mode = (typeof MODES)[number]
 const MODE_SET = new Set<string>(MODES)
@@ -27,6 +29,7 @@ const isMode = (value: unknown): value is Mode =>
 const ProxyPage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
   const normalizedMode = clashConfig?.mode?.toLowerCase()
@@ -47,6 +50,10 @@ const ProxyPage = () => {
   useEffect(() => {
     if (normalizedMode && !isMode(normalizedMode)) onChangeMode('rule')
   }, [normalizedMode, onChangeMode])
+
+  if (searchParams.get('view') === 'rules') {
+    return <RulesPage />
+  }
 
   return (
     <BasePage
@@ -78,7 +85,7 @@ const ProxyPage = () => {
           <Button
             size="small"
             variant="outlined"
-            onClick={() => navigate('/chains')}
+            onClick={() => navigate('/?view=chains')}
             sx={{ ml: 1 }}
             startIcon={<LanOutlined fontSize="small" />}
           >

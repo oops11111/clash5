@@ -297,9 +297,9 @@ const EmptyProfile = ({
           size="small"
           variant="outlined"
           startIcon={<DnsOutlined fontSize="small" />}
-          onClick={() => onNavigate('/nodes')}
+          onClick={() => onNavigate('/profile')}
         >
-          {t('layout.components.navigation.tabs.nodePool')}
+          {t('layout.components.navigation.tabs.profiles')}
         </Button>
         <Button
           size="small"

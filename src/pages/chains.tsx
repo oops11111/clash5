@@ -584,7 +584,7 @@ const ChainsPage = () => {
                   >
                     {t('chains.addHop')}
                   </Button>
-                  <Button size="small" onClick={() => navigate('/nodes')}>
+                  <Button size="small" onClick={() => navigate('/profile')}>
                     {t('chains.manageNodes')}
                   </Button>
                 </Stack>

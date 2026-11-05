@@ -101,7 +101,7 @@ const LogPage = () => {
       }}
       header={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button size="small" onClick={() => navigate('/unlock')}>
+          <Button size="small" onClick={() => navigate('/settings?view=unlock')}>
             {t('layout.components.navigation.diagnostics')}
           </Button>
           <IconButton

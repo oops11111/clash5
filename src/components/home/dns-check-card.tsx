@@ -77,7 +77,7 @@ export const DnsCheckCard = () => {
           variant="caption"
           color="primary"
           sx={{ cursor: 'pointer', alignSelf: 'flex-start' }}
-          onClick={() => navigate('/diagnostics')}
+          onClick={() => navigate('/settings?view=dns')}
         >
           {t('home.components.dnsCheck.actions.details')}
         </Typography>

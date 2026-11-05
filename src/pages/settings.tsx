@@ -10,6 +10,7 @@ import {
 import { useLockFn } from 'ahooks'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router'
 
 import { BasePage } from '@/components/base'
 import {
@@ -23,6 +24,8 @@ import SettingVergeAdvanced from '@/components/setting/setting-verge-advanced'
 import SettingVergeBasic from '@/components/setting/setting-verge-basic'
 import { showNotice } from '@/services/notice-service'
 import { openExternalUrl } from '@/utils/open-external-url'
+
+import DiagnosticsPage from './diagnostics'
 
 const settingCardSx = {
   borderRadius: '14px',
@@ -43,6 +46,7 @@ const groups: SettingSection[] = [
 
 const SettingPage = () => {
   const { t } = useTranslation()
+  const [searchParams] = useSearchParams()
   const [active, setActive] = useState<SettingSection>('appearance')
 
   const onError = (err: any) => {
@@ -84,6 +88,23 @@ const SettingPage = () => {
       case 'advanced':
         return <SettingVergeAdvanced section={active} />
     }
+  }
+
+  const diagnosticsView = searchParams.get('view')
+  if (
+    diagnosticsView === 'diagnostics' ||
+    diagnosticsView === 'connections' ||
+    diagnosticsView === 'logs' ||
+    diagnosticsView === 'unlock' ||
+    diagnosticsView === 'dns'
+  ) {
+    return (
+      <DiagnosticsPage
+        initialView={
+          diagnosticsView === 'diagnostics' ? undefined : diagnosticsView
+        }
+      />
+    )
   }
 
   return (

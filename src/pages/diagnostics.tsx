@@ -10,10 +10,16 @@ import UnlockPage from './unlock'
 
 type View = 'connections' | 'logs' | 'unlock' | 'dns'
 
+interface DiagnosticsPageProps {
+  initialView?: View
+}
+
 // Runtime diagnostics in one place: live connections, logs, unlock and DNS checks.
-const DiagnosticsPage = () => {
+const DiagnosticsPage = ({
+  initialView = 'connections',
+}: DiagnosticsPageProps) => {
   const { t } = useTranslation()
-  const [view, setView] = useState<View>('connections')
+  const [view, setView] = useState<View>(initialView)
 
   return (
     <>

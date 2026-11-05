@@ -26,6 +26,7 @@ import {
 import { useLockFn } from 'ahooks'
 import { Suspense, lazy, useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router'
 
 import { BasePage } from '@/components/base'
 import { ClashModeCard } from '@/components/home/clash-mode-card'
@@ -42,6 +43,8 @@ import { entry_lightweight_mode } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
 import { openExternalUrl } from '@/utils/open-external-url'
+
+import ChainsPage from './chains'
 
 const LazyDnsCheckCard = lazy(() =>
   import('@/components/home/dns-check-card').then((module) => ({
@@ -218,6 +221,7 @@ const HomeSettingsDialog = ({
 
 const HomePage = () => {
   const { t } = useTranslation()
+  const [searchParams] = useSearchParams()
   const { current, mutateProfiles } = useProfiles()
 
   // 设置弹窗的状态
@@ -261,6 +265,11 @@ const HomePage = () => {
       </Suspense>
     </Grid>,
   ]
+
+  if (searchParams.get('view') === 'chains') {
+    return <ChainsPage />
+  }
+
   return (
     <BasePage
       title={t('home.page.title')}
