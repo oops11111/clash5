@@ -734,6 +734,69 @@ async function verifySubscriptionRefresh() {
   )
 }
 
+async function verifyRemovedSubscriptionMaterialization() {
+  const profiles = await invoke('get_profiles')
+  const profile = profiles.items?.find(
+    (item) => item.url === 'http://127.0.0.1:18080/subscription.yaml',
+  )
+  if (!profile?.uid) throw new Error('Materialization fixture profile is missing')
+  const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
+  const removed = nodes.find(
+    (node) =>
+      node.source.provider_id === profile.uid &&
+      node.display_name === 'M1-inline' &&
+      node.port === 18080 &&
+      !node.active,
+  )
+  const active = nodes.find(
+    (node) =>
+      node.source.provider_id === profile.uid &&
+      node.display_name === 'M1-inline' &&
+      node.port === 18081 &&
+      node.active,
+  )
+  if (!removed || !active)
+    throw new Error('Materialization fixture does not have removed and active nodes')
+
+  const id = randomUUID()
+  const chain = {
+    schema_version: 2,
+    id,
+    name: 'M1 removed-node materialization',
+    profile_id: profile.uid,
+    hops: [
+      { kind: 'node', node: removed.reference },
+      { kind: 'node', node: active.reference },
+    ],
+    enabled: true,
+    exit_policy: { mode: 'warn' },
+    pinned_exit_ip: null,
+  }
+  await invoke('clash5_save_chain', { chain })
+  try {
+    const runtime = await invoke('get_runtime_config')
+    const first = runtime.proxies?.find(
+      (proxy) => proxy.name === `clash5-chain-${id}-h0`,
+    )
+    const second = runtime.proxies?.find(
+      (proxy) => proxy.name === `clash5-chain-${id}-h1`,
+    )
+    if (
+      first?.server !== '127.0.0.1' ||
+      first?.port !== 18080 ||
+      second?.server !== '127.0.0.1' ||
+      second?.port !== 18081 ||
+      second?.['dialer-proxy'] !== `clash5-chain-${id}-h0`
+    ) {
+      throw new Error(
+        `Removed subscription node was not materialized in runtime: ${JSON.stringify({ first, second })}`,
+      )
+    }
+  } finally {
+    await invoke('clash5_delete_chain', { id }).catch(() => {})
+  }
+}
+
 async function verifyWorkspaceControls() {
   phase = 'source filters'
   const nodes = await invoke('clash5_list_nodes', { includeInactive: true })
@@ -2347,6 +2410,8 @@ try {
     await verifyImportAndProbe()
     phase = 'subscription refresh and provider probe'
     await verifySubscriptionRefresh()
+    phase = 'removed subscription node materialization'
+    await verifyRemovedSubscriptionMaterialization()
     await verifyWorkspaceControls()
   } else if (recoveryCancel) {
     await verifyNavigation({ includePluginFixture: false })

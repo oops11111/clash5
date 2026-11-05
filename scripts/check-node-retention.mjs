@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (file) => readFile(path.join(root, file), 'utf8')
 
-const [test, page, en, zh, docs, chains, materialized, profiles, deleteProfile] = await Promise.all([
+const [test, page, en, zh, docs, chains, materialized, profiles, deleteProfile, desktopSmoke] = await Promise.all([
   read('crates/clash5-data/tests/m1.rs'),
   read('src/pages/node-pool.tsx'),
   read('src/locales/en/nodePool.json'),
@@ -17,6 +17,7 @@ const [test, page, en, zh, docs, chains, materialized, profiles, deleteProfile] 
   read('src-tauri/src/clash5/materialized.rs'),
   read('src-tauri/src/config/profiles.rs'),
   read('src-tauri/src/cmd/profile.rs'),
+  read('scripts/m1-desktop-smoke.mjs'),
 ])
 
 const checks = [
@@ -58,7 +59,11 @@ const checks = [
   ],
   [
     'backlog records the remaining runtime materialization evidence',
-    docs.includes('P0-02') && docs.includes('未生效') && docs.includes('订阅删除被引用节点后仍可用'),
+    docs.includes('P0-02') &&
+      docs.includes('未生效') &&
+      docs.includes('订阅删除被引用节点后仍可用') &&
+      desktopSmoke.includes('verifyRemovedSubscriptionMaterialization') &&
+      desktopSmoke.includes('Removed subscription node was not materialized in runtime'),
   ],
 ]
 
