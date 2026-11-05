@@ -48,6 +48,7 @@
     "check:proxy-recovery": "node scripts/check-proxy-recovery.mjs",
     "check:profile-recovery": "node scripts/check-profile-recovery.mjs",
     "check:node-retention": "node scripts/check-node-retention.mjs",
+    "check:subscription-naming": "node scripts/check-subscription-naming.mjs",
     "plugin:package": "node scripts/plugin-package.mjs",
     "arch:check": "node scripts/check-architecture.mjs listen emit invoke",
     "typecheck": "tsc --noEmit",

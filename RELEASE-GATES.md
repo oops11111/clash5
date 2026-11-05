@@ -20,7 +20,7 @@ the original review records before release; the present registry is a skeleton.
 | G-09 | P0-07 | partial | scripts/check-proxy-recovery.mjs | Sidecar exit cleanup, persisted proxy lease and bounded recovery checks pass; OS acceptance and service policy alignment remain |
 | G-10 | P0-08 | partial | scripts/check-privacy-defaults.mjs | Rust and frontend default tests pass; new-install snapshot and live DNS routing acceptance remain |
 | G-11 | P0-09 | blocked | - | Uninstall proxy ownership and scheduled-task cleanup |
-| G-12 | P0-10 | blocked | - | Token-safe subscription naming and migration |
+| G-12 | P0-10 | partial | scripts/check-subscription-naming.mjs | Host-safe defaults, legacy-name migration and masked update logs are covered; full tray/notification desktop redaction remains |
 | G-13 | P0-11 | partial | - | Desktop transport/UA evidence, direct-connection UX, and certificate-exception acceptance |
 | G-14 | P0-14 | partial | - | Data-layer snapshot, atomic v11, newer-schema rejection and legacy route ownership pass; desktop recovery evidence remains |
 | G-15 | P0-15 | partial | scripts/check-profile-recovery.mjs | Corrupt config quarantine, explicit recovery confirmation and .bak preservation checks pass; desktop restore evidence remains |
