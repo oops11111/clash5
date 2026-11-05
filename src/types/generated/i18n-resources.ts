@@ -467,8 +467,18 @@ export interface TranslationResources {
           pluginSelect: string
           pluginSettingsHint: string
           pluginSigner: string
+          pluginSignerAdd: string
+          pluginSignerAddConfirm: string
+          pluginSignerAddDescription: string
+          pluginSignerAddTitle: string
+          pluginSignerBundled: string
+          pluginSignerEmpty: string
+          pluginSignerError: string
+          pluginSignerInstalledCount: string
           pluginSignerKnown: string
           pluginSignerNew: string
+          pluginSignerPreview: string
+          pluginSignerPublicKey: string
           pluginSignerRevoke: string
           pluginSignerRevokeConfirm: string
           pluginSignerRevokeDescription: string

@@ -62,6 +62,7 @@ import type {
   Clash5CatalogView,
   Clash5PluginPackagePreview,
   Clash5PluginSummary,
+  Clash5PluginTrustedSigner,
 } from '@/types/clash5-plugin'
 import type { ProxyViewV1 } from '@/types/proxy-view'
 import { debugLog } from '@/utils/debug'
@@ -213,6 +214,16 @@ export const revokeClash5PluginSigner = (signerFingerprint: string) =>
   mutate(
     () => invoke<number>('clash5_revoke_plugin_signer', { signerFingerprint }),
     { id: `clash5.plugin.signer.revoke.${signerFingerprint}` },
+  )
+export const listClash5TrustedPluginSigners = () =>
+  invoke<Clash5PluginTrustedSigner[]>('clash5_list_trusted_plugin_signers')
+export const trustClash5PluginSigner = (signer: string) =>
+  mutate(
+    () =>
+      invoke<Clash5PluginTrustedSigner>('clash5_trust_plugin_signer', {
+        signer,
+      }),
+    { id: 'clash5.plugin.signer.trust' },
   )
 export const uninstallClash5Plugin = (pluginId: string) =>
   mutate(() => invoke<null>('clash5_uninstall_plugin', { pluginId }), {

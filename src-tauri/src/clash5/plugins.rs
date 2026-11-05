@@ -80,6 +80,12 @@ pub(crate) struct PluginSummary {
     pub bundled: bool,
 }
 
+#[derive(Serialize, specta::Type)]
+pub(crate) struct PluginTrustedSigner {
+    pub fingerprint: String,
+    pub bundled: bool,
+}
+
 #[derive(Serialize)]
 pub(crate) struct PluginInvocation<'a> {
     pub configuration: &'a JsonValue,
@@ -306,6 +312,27 @@ pub(crate) fn trust_signer(plugin_root: &Path, signer: &str) -> Result<(), Plugi
         save_trusted_signers(plugin_root, &signers)?;
     }
     Ok(())
+}
+
+pub(crate) fn trusted_signers(plugin_root: &Path) -> Result<Vec<PluginTrustedSigner>, PluginFailure> {
+    let mut signers = Vec::new();
+    if let Some(bundled) = BUNDLED_SIGNER {
+        signers.push(PluginTrustedSigner {
+            fingerprint: hex_digest(bundled.trim().as_bytes()),
+            bundled: true,
+        });
+    }
+    for signer in load_trusted_signers(plugin_root)? {
+        let fingerprint = hex_digest(signer.trim().as_bytes());
+        if !signers.iter().any(|item| item.fingerprint == fingerprint) {
+            signers.push(PluginTrustedSigner {
+                fingerprint,
+                bundled: false,
+            });
+        }
+    }
+    signers.sort_by(|left, right| left.fingerprint.cmp(&right.fingerprint));
+    Ok(signers)
 }
 
 pub(crate) fn revoke_signer(plugin_root: &Path, fingerprint: &str) -> Result<bool, PluginFailure> {
@@ -896,7 +923,7 @@ fn summary(manifest: &PluginManifest, signer: &str) -> PluginSummary {
     }
 }
 
-fn hex_digest(input: &[u8]) -> String {
+pub(crate) fn hex_digest(input: &[u8]) -> String {
     Sha256::digest(input).iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
@@ -1102,8 +1129,18 @@ mod tests {
         install_package(verify_package(package, std::slice::from_ref(&signer))?, &root)?;
         assert!(signer_is_trusted(&root, &signer)?);
         let fingerprint = hex_digest(signer.as_bytes());
+        assert!(
+            trusted_signers(&root)?
+                .iter()
+                .any(|item| item.fingerprint == fingerprint && !item.bundled)
+        );
         assert!(revoke_signer(&root, &fingerprint)?);
         assert!(!signer_is_trusted(&root, &signer)?);
+        assert!(
+            !trusted_signers(&root)?
+                .iter()
+                .any(|item| item.fingerprint == fingerprint)
+        );
         set_plugin_enabled(&root, &id, false)?;
         assert_eq!(
             set_plugin_enabled(&root, &id, true),

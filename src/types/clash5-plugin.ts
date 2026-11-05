@@ -69,6 +69,11 @@ export interface Clash5PluginSummary {
   bundled: boolean
 }
 
+export interface Clash5PluginTrustedSigner {
+  fingerprint: string
+  bundled: boolean
+}
+
 export interface Clash5PluginAuditEvent {
   id: number
   event: string

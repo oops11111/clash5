@@ -38,12 +38,14 @@ import {
   previewClash5PluginCatalog,
   refreshClash5PluginCatalog,
   removeClash5PluginCatalog,
+  listClash5TrustedPluginSigners,
   revokeClash5PluginSigner,
   saveClash5PluginCatalog,
   rollbackClash5Plugin,
   upgradeClash5Plugin,
   uninstallClash5Plugin,
   setClash5PluginEnabled,
+  trustClash5PluginSigner,
   stageClash5PluginPackage,
   saveClash5PluginBindings,
   deleteClash5PluginBinding,
@@ -57,6 +59,7 @@ import type {
   Clash5PluginEffectiveConfig,
   Clash5PluginPackagePreview,
   Clash5PluginSummary,
+  Clash5PluginTrustedSigner,
 } from '@/types/clash5-plugin'
 import type {
   Clash5CatalogPreview,
@@ -129,6 +132,14 @@ const PluginsPage = () => {
     useState<Clash5PluginPackagePreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [signerToRevoke, setSignerToRevoke] = useState<string | null>(null)
+  const [trustedSigners, setTrustedSigners] = useState<
+    Clash5PluginTrustedSigner[] | null
+  >(null)
+  const [trustedSignerKey, setTrustedSignerKey] = useState('')
+  const [trustedSignerPreviewFingerprint, setTrustedSignerPreviewFingerprint] =
+    useState<string | null>(null)
+  const [trustedSignerDialogOpen, setTrustedSignerDialogOpen] = useState(false)
+  const [trustedSignerError, setTrustedSignerError] = useState(false)
   const [catalogs, setCatalogs] = useState<Clash5CatalogView[] | null>(null)
   const [catalogUrl, setCatalogUrl] = useState('')
   const [catalogPreview, setCatalogPreview] =
@@ -248,6 +259,13 @@ const PluginsPage = () => {
         if (!cancelled) setPluginError(true)
       })
     if (tab === 'settings') {
+      listClash5TrustedPluginSigners()
+        .then((items) => {
+          if (!cancelled) setTrustedSigners(items)
+        })
+        .catch(() => {
+          if (!cancelled) setTrustedSignerError(true)
+        })
       listClash5PluginAuditEvents()
         .then((items) => {
           if (!cancelled) setAuditEvents(items)
@@ -427,11 +445,52 @@ const PluginsPage = () => {
       await revokeClash5PluginSigner(signerToRevoke)
       setSignerToRevoke(null)
       setPlugins(await listClash5Plugins())
+      setTrustedSigners(await listClash5TrustedPluginSigners())
     } catch {
       setPluginError(true)
     } finally {
       setBusy(false)
     }
+  }
+
+  const addTrustedSigner = async () => {
+    const signer = trustedSignerKey.trim()
+    if (!signer) {
+      setTrustedSignerError(true)
+      return
+    }
+    setBusy(true)
+    setTrustedSignerError(false)
+    try {
+      await trustClash5PluginSigner(signer)
+      setTrustedSigners(await listClash5TrustedPluginSigners())
+      setTrustedSignerKey('')
+      setTrustedSignerPreviewFingerprint(null)
+      setTrustedSignerDialogOpen(false)
+    } catch {
+      setTrustedSignerError(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const updateTrustedSignerKey = (value: string) => {
+    setTrustedSignerKey(value)
+    const normalized = value.trim()
+    if (!normalized) {
+      setTrustedSignerPreviewFingerprint(null)
+      return
+    }
+    void globalThis.crypto.subtle
+      .digest('SHA-256', new TextEncoder().encode(normalized))
+      .then((digest) => {
+        setTrustedSignerPreviewFingerprint(
+          Array.from(new Uint8Array(digest), (byte) =>
+            byte.toString(16).padStart(2, '0'),
+          ).join(''),
+        )
+      })
+      .catch(() => setTrustedSignerPreviewFingerprint(null))
   }
 
   const saveBinding = async () => {
@@ -914,83 +973,96 @@ const PluginsPage = () => {
         </Stack>
       </Paper>
     )
-    if (pluginError) {
-      return (
-        <Stack spacing={2}>
-          <Alert severity="error">
-            {t('layout.components.navigation.empty.pluginError')}
-          </Alert>
-          {auditPanel}
-        </Stack>
-      )
-    }
-    if (plugins === null) {
-      return (
-        <Stack spacing={2}>
-          <Typography color="text.secondary">
-            {t('layout.components.navigation.empty.pluginLoading')}
-          </Typography>
-          {auditPanel}
-        </Stack>
-      )
-    }
-    if (plugins.length === 0) {
-      return (
-        <Stack spacing={2}>
-          <Paper variant="outlined" sx={{ p: 4, borderRadius: 3 }}>
-            <Stack
-              spacing={1}
-              sx={{ alignItems: 'center', textAlign: 'center' }}
-            >
-              <ExtensionOutlinedIcon color="primary" fontSize="large" />
-              <Typography variant="h6">
-                {t('layout.components.navigation.empty.settingsTitle')}
-              </Typography>
-              <Typography color="text.secondary">
-                {t('layout.components.navigation.empty.settingsDescription')}
-              </Typography>
-            </Stack>
-          </Paper>
-          {auditPanel}
-        </Stack>
-      )
-    }
-    return (
-      <Stack spacing={2}>
-        <Typography color="text.secondary">
-          {t('layout.components.navigation.pluginSettingsHint')}
-        </Typography>
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-          <Stack spacing={1}>
+    const trustedSignerPanel = (
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+        <Stack spacing={1}>
+          <Stack
+            direction="row"
+            sx={{ justifyContent: 'space-between', alignItems: 'center' }}
+          >
             <Typography sx={{ fontWeight: 600 }}>
               {t('layout.components.navigation.pluginSignersTitle')}
             </Typography>
-            {Array.from(
-              new Set(plugins.map((plugin) => plugin.signer_fingerprint)),
-            ).map((fingerprint) => (
-              <Stack
-                key={fingerprint}
-                direction="row"
-                sx={{ justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-                  {t('layout.components.navigation.pluginSigner', {
-                    fingerprint,
-                  })}
-                  {` (${plugins.filter((plugin) => plugin.signer_fingerprint === fingerprint).length})`}
-                </Typography>
-                <Button
-                  size="small"
-                  color="error"
-                  disabled={busy}
-                  onClick={() => setSignerToRevoke(fingerprint)}
-                >
-                  {t('layout.components.navigation.pluginSignerRevoke')}
-                </Button>
-              </Stack>
-            ))}
+            <Button
+              size="small"
+              disabled={busy}
+              onClick={() => {
+                setTrustedSignerError(false)
+                setTrustedSignerKey('')
+                setTrustedSignerPreviewFingerprint(null)
+                setTrustedSignerDialogOpen(true)
+              }}
+            >
+              {t('layout.components.navigation.pluginSignerAdd')}
+            </Button>
           </Stack>
-        </Paper>
+          {trustedSignerError && (
+            <Alert severity="error">
+              {t('layout.components.navigation.pluginSignerError')}
+            </Alert>
+          )}
+          {trustedSigners === null ? (
+            <Typography color="text.secondary">
+              {t('layout.components.navigation.empty.pluginLoading')}
+            </Typography>
+          ) : trustedSigners.length === 0 ? (
+            <Typography color="text.secondary">
+              {t('layout.components.navigation.pluginSignerEmpty')}
+            </Typography>
+          ) : (
+            trustedSigners.map((signer) => {
+              const installedCount = (plugins ?? []).filter(
+                (plugin) => plugin.signer_fingerprint === signer.fingerprint,
+              ).length
+              return (
+                <Stack
+                  key={signer.fingerprint}
+                  direction="row"
+                  spacing={1}
+                  sx={{ justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <Stack spacing={0.25} sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                      {t('layout.components.navigation.pluginSigner', {
+                        fingerprint: signer.fingerprint,
+                      })}
+                    </Typography>
+                    <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                      {signer.bundled && (
+                        <Chip
+                          size="small"
+                          color="primary"
+                          label={t('layout.components.navigation.pluginSignerBundled')}
+                        />
+                      )}
+                      {installedCount > 0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          {t('layout.components.navigation.pluginSignerInstalledCount', {
+                            count: installedCount,
+                          })}
+                        </Typography>
+                      )}
+                    </Stack>
+                  </Stack>
+                  {!signer.bundled && (
+                    <Button
+                      size="small"
+                      color="error"
+                      disabled={busy}
+                      onClick={() => setSignerToRevoke(signer.fingerprint)}
+                    >
+                      {t('layout.components.navigation.pluginSignerRevoke')}
+                    </Button>
+                  )}
+                </Stack>
+              )
+            })
+          )}
+        </Stack>
+      </Paper>
+    )
+    const dialogs = (
+      <>
         <Dialog
           open={signerToRevoke !== null}
           onClose={() => !busy && setSignerToRevoke(null)}
@@ -1006,7 +1078,7 @@ const PluginsPage = () => {
                 )}
               </Typography>
               {plugins
-                .filter(
+                ?.filter(
                   (plugin) => plugin.signer_fingerprint === signerToRevoke,
                 )
                 .map((plugin) => (
@@ -1029,6 +1101,115 @@ const PluginsPage = () => {
             </Button>
           </DialogActions>
         </Dialog>
+        <Dialog
+          open={trustedSignerDialogOpen}
+          onClose={() => !busy && setTrustedSignerDialogOpen(false)}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle>
+            {t('layout.components.navigation.pluginSignerAddTitle')}
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={1.5} sx={{ pt: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                {t('layout.components.navigation.pluginSignerAddDescription')}
+              </Typography>
+              <TextField
+                autoFocus
+                multiline
+                minRows={4}
+                fullWidth
+                label={t('layout.components.navigation.pluginSignerPublicKey')}
+                value={trustedSignerKey}
+                onChange={(event) => updateTrustedSignerKey(event.target.value)}
+                disabled={busy}
+              />
+              {trustedSignerPreviewFingerprint && (
+                <Typography variant="caption" sx={{ wordBreak: 'break-all' }}>
+                  {t('layout.components.navigation.pluginSignerPreview', {
+                    fingerprint: trustedSignerPreviewFingerprint,
+                  })}
+                </Typography>
+              )}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                setTrustedSignerKey('')
+                setTrustedSignerPreviewFingerprint(null)
+                setTrustedSignerDialogOpen(false)
+              }}
+              disabled={busy}
+            >
+              {t('shared.actions.cancel')}
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => void addTrustedSigner()}
+              disabled={busy || !trustedSignerKey.trim()}
+            >
+              {t('layout.components.navigation.pluginSignerAddConfirm')}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </>
+    )
+    if (pluginError) {
+      return (
+        <Stack spacing={2}>
+          <Alert severity="error">
+            {t('layout.components.navigation.empty.pluginError')}
+          </Alert>
+          {trustedSignerPanel}
+          {dialogs}
+          {auditPanel}
+        </Stack>
+      )
+    }
+    if (plugins === null) {
+      return (
+        <Stack spacing={2}>
+          <Typography color="text.secondary">
+            {t('layout.components.navigation.empty.pluginLoading')}
+          </Typography>
+          {trustedSignerPanel}
+          {dialogs}
+          {auditPanel}
+        </Stack>
+      )
+    }
+    if (plugins.length === 0) {
+      return (
+        <Stack spacing={2}>
+          <Paper variant="outlined" sx={{ p: 4, borderRadius: 3 }}>
+            <Stack
+              spacing={1}
+              sx={{ alignItems: 'center', textAlign: 'center' }}
+            >
+              <ExtensionOutlinedIcon color="primary" fontSize="large" />
+              <Typography variant="h6">
+                {t('layout.components.navigation.empty.settingsTitle')}
+              </Typography>
+              <Typography color="text.secondary">
+                {t('layout.components.navigation.empty.settingsDescription')}
+              </Typography>
+            </Stack>
+          </Paper>
+          {trustedSignerPanel}
+          {dialogs}
+          {auditPanel}
+        </Stack>
+      )
+    }
+    return (
+      <Stack spacing={2}>
+        <Typography color="text.secondary">
+          {t('layout.components.navigation.pluginSettingsHint')}
+        </Typography>
+        {trustedSignerPanel}
+        {dialogs}
         {plugins.map((plugin) => (
           <Paper
             key={plugin.id}

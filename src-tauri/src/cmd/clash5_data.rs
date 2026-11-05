@@ -840,6 +840,13 @@ pub async fn clash5_revoke_plugin_signer(signer_fingerprint: String) -> CmdResul
     let root = dirs::app_home_dir()
         .map_err(super::CommandFailure::plain)?
         .join("plugins");
+    let trusted = plugins::trusted_signers(&root).map_err(plugin_failure)?;
+    if trusted
+        .iter()
+        .any(|signer| signer.fingerprint == signer_fingerprint && signer.bundled)
+    {
+        return Err(coded_error("C5-PLUGIN-002", "the bundled signer cannot be revoked"));
+    }
     let previous: Vec<(String, bool)> = plugins::installed_plugins(&root)
         .map_err(plugin_failure)?
         .into_iter()
@@ -847,7 +854,19 @@ pub async fn clash5_revoke_plugin_signer(signer_fingerprint: String) -> CmdResul
         .map(|plugin| (plugin.id, plugin.enabled))
         .collect();
     if previous.is_empty() {
-        return Err(coded_error("C5-PLUGIN-001", "no installed plugin uses this signer"));
+        if !trusted.iter().any(|signer| signer.fingerprint == signer_fingerprint) {
+            return Err(coded_error("C5-PLUGIN-001", "no trusted signer uses this fingerprint"));
+        }
+        plugins::revoke_signer(&root, &signer_fingerprint).map_err(plugin_failure)?;
+        let details = serde_json::json!({ "signer_fingerprint": signer_fingerprint });
+        let audit_result = crate::config::profiles::with_clash5_binding_store(move |store| {
+            store.record_plugin_audit("plugin.signer.revoke", &details)
+        })
+        .await;
+        if audit_result.is_err() {
+            tracing::warn!("plugin signer revocation audit event could not be persisted");
+        }
+        return Ok(0);
     }
     let disabled: Vec<(String, bool)> = previous.iter().map(|(id, _)| (id.clone(), false)).collect();
     if let Err(error) = set_plugin_states(&root, &disabled) {
@@ -872,6 +891,51 @@ pub async fn clash5_revoke_plugin_signer(signer_fingerprint: String) -> CmdResul
         tracing::warn!("plugin signer revocation audit event could not be persisted");
     }
     Ok(previous.len() as u32)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_list_trusted_plugin_signers() -> CmdResult<Vec<plugins::PluginTrustedSigner>> {
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    tokio::task::spawn_blocking(move || plugins::trusted_signers(&root))
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "trusted signers could not be listed"))?
+        .map_err(plugin_failure)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_trust_plugin_signer(signer: String) -> CmdResult<plugins::PluginTrustedSigner> {
+    let _profile_guard = PROFILE_WRITE_LOCK.lock().await;
+    let signer = signer.trim().to_owned();
+    if signer.is_empty() || signer.len() > 1_024 {
+        return Err(coded_error("C5-PLUGIN-001", "signer public key is invalid"));
+    }
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    let trust_root = root.clone();
+    let signer_for_storage = signer.clone();
+    tokio::task::spawn_blocking(move || plugins::trust_signer(&trust_root, &signer_for_storage))
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "trusted signer could not be saved"))?
+        .map_err(plugin_failure)?;
+    let fingerprint = plugins::hex_digest(signer.as_bytes());
+    let details = serde_json::json!({ "signer_fingerprint": fingerprint });
+    let audit_result = crate::config::profiles::with_clash5_binding_store(move |store| {
+        store.record_plugin_audit("plugin.signer.trust", &details)
+    })
+    .await;
+    if audit_result.is_err() {
+        tracing::warn!("plugin signer trust audit event could not be persisted");
+    }
+    plugins::trusted_signers(&root)
+        .map_err(plugin_failure)?
+        .into_iter()
+        .find(|trusted| trusted.fingerprint == fingerprint)
+        .ok_or_else(|| coded_error("C5-PLUGIN-004", "trusted signer could not be loaded"))
 }
 
 #[tauri::command]

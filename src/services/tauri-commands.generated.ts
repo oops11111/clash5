@@ -292,6 +292,14 @@ export const commands = {
     typedError<number, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_revoke_plugin_signer', { signerFingerprint }),
     ),
+  clash5ListTrustedPluginSigners: () =>
+    typedError<PluginTrustedSigner[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_trusted_plugin_signers'),
+    ),
+  clash5TrustPluginSigner: (signer: string) =>
+    typedError<PluginTrustedSigner, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_trust_plugin_signer', { signer }),
+    ),
   clash5UninstallPlugin: (pluginId: string) =>
     typedError<null, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_uninstall_plugin', { pluginId }),
@@ -1388,6 +1396,11 @@ export type PluginSummary = {
   signer_fingerprint: string
   enabled: boolean
   has_previous: boolean
+  bundled: boolean
+}
+
+export type PluginTrustedSigner = {
+  fingerprint: string
   bundled: boolean
 }
 
