@@ -27,7 +27,7 @@ import { useLockFn } from 'ahooks'
 import { throttle } from 'lodash-es'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation } from 'react-router'
+import { useLocation, useSearchParams } from 'react-router'
 import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
 import {
@@ -67,6 +67,8 @@ import {
 import { debugLog } from '@/utils/debug'
 import { isValidUrl } from '@/utils/network'
 
+import NodePoolPage from './node-pool'
+
 // 与 src-tauri/src/main.rs 的 worker_limit 上限(8)保持一致，避免前后端更新风暴不对齐
 const PROFILE_UPDATE_WORKER_LIMIT = 8
 const PROFILE_SWITCH_LOADING_DELAY = 400
@@ -88,6 +90,7 @@ const debugProfileSwitch = (action: string, profile: string, extra?: any) => {
 const ProfilePage = () => {
   const { t } = useTranslation()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const [url, setUrl] = useState('')
   const [disabled, setDisabled] = useState(false)
   const [profileDndRevision, setProfileDndRevision] = useState(0)
@@ -768,6 +771,10 @@ const ProfilePage = () => {
       }
     }
   }, [])
+
+  if (searchParams.get('view') === 'nodes') {
+    return <NodePoolPage />
+  }
 
   return (
     <BasePage

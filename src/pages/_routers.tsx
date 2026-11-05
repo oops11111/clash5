@@ -17,7 +17,10 @@ export const router = createBrowserRouter([
       )
       .concat([
         // Keep saved links working while R14 exposes only the five primary tabs.
-        { path: '/nodes', element: <Navigate to="/profile" replace /> },
+        {
+          path: '/nodes',
+          element: <Navigate to="/profile?view=nodes" replace />,
+        },
         { path: '/chains', element: <Navigate to="/?view=chains" replace /> },
         {
           path: '/rules',
