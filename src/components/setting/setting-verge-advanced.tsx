@@ -20,7 +20,6 @@ import {
   exportDiagnosticInfo,
   openAppDir,
   openCoreDir,
-  openDevTools,
   openLogsDir,
 } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
@@ -183,18 +182,6 @@ const SettingVergeAdvanced = ({ section }: Props) => {
         <SettingItem
           onClick={onCheckUpdate}
           label={t('settings.components.verge.advanced.fields.checkUpdates')}
-        />
-      )}
-
-      {section === 'advanced' && advancedExpanded && (
-        <SettingItem
-          onClick={() => {
-            void mutate(() => openDevTools(), {
-              id: 'open-devtools',
-              errorNotice: false,
-            }).catch(() => {})
-          }}
-          label={t('settings.components.verge.advanced.fields.openDevTools')}
         />
       )}
 

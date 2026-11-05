@@ -702,10 +702,6 @@ export async function cmdTestDelay(url: string) {
   return invoke<number>('test_delay', { url })
 }
 
-export async function openDevTools() {
-  return invoke<void>('open_devtools')
-}
-
 export async function exitApp() {
   return invoke<void>('exit_app')
 }
