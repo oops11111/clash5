@@ -9,7 +9,7 @@ the original review records before release; the present registry is a skeleton.
 
 | Gate | Backlog | Status | Check | Remaining evidence |
 | --- | --- | --- | --- | --- |
-| G-01 | P0-01 | partial | - | Data-layer REJECT/RouteHealth and profile ownership pass; desktop red notification and disabled-chain acceptance remain |
+| G-01 | P0-01 | partial | - | Data-layer REJECT/RouteHealth, profile ownership and UI alert pass; runtime desktop restart and disabled-chain acceptance remain |
 | G-02 | P0-03 | blocked | - | RC-only publication and environment approval |
 | G-03 | P0-02 | blocked | - | Profile isolation and retained materialized nodes |
 | G-04 | P0-04 | partial | scripts/check-webview-security.mjs | Desktop IPC, Monaco, dialog import, icons and denied out-of-scope reads |

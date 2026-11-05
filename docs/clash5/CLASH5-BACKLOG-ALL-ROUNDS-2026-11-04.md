@@ -46,7 +46,7 @@
 | **要做什么** | `compile_app_routes` 对 Group/Node/Chain 缺失改为逐条 REJECT + degraded 列表，勿整份 `InvalidDefinition` 失败；改锁定相反行为的测试；UI 标红 |
 | **文件:行** | `crates/clash5-data/src/app_route.rs:151-188`；`src-tauri/src/clash5/chains.rs:178-226`；测试 `m5.rs`（R9 记 `:136`） |
 | **验收** | 单测：组/节点/链路缺失 → 该条 REJECT；删节点后订阅仍可生成；真机：停用链路后应用被拒并标红 |
-| **现状** | **部分落地** — `compile_app_routes` 已将缺失组/节点/链路逐条降级为 `REJECT`，并提供 `RouteHealth`；保存期仍拒绝坏定义。profile 归属与旧路由一次性认领已接入 v11。桌面红标通知和停用链路的真机证据仍待补齐 |
+| **现状** | **部分落地** — `compile_app_routes` 已将缺失组/节点/链路逐条降级为 `REJECT`，并提供 `RouteHealth`；保存期仍拒绝坏定义。profile 归属与旧路由一次性认领已接入 v11；应用路由面板已对失效目标显示红色告警并发出错误通知。运行时桌面重启与停用链路真机证据仍待补齐 |
 | **依赖** | schema v11（与 P0-14 迁移事务一并） |
 
 ### P0-02 · 跨配置隔离 + 物化节点（G-03 部分 / U3）
@@ -683,7 +683,7 @@
 
 | 门禁 | 对应本清单 | R9 状态（当时） | HEAD 复核 |
 |---|---|---|---|
-| G-01 | P0-01 | 未达 | 部分落地；数据层 REJECT/RouteHealth 与 profile 归属已实现，桌面红标通知和真机证据待补 |
+| G-01 | P0-01 | 未达 | 部分落地；数据层 REJECT/RouteHealth、profile 归属和 UI 红色告警已实现，运行时桌面重启与真机证据待补 |
 | G-02 | P0-03 | 未达 | 未落地 |
 | G-03 | P0-02 | 部分 | 部分落地 |
 | G-04 | P0-04 | 未达 | 未落地 |
