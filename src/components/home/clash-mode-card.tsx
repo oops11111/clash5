@@ -170,6 +170,7 @@ export const ClashModeCard = () => {
           py: 1,
           position: 'relative',
           zIndex: 2,
+          flexWrap: 'wrap',
         }}
       >
         {CLASH_MODES.map((mode) => (

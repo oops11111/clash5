@@ -5,23 +5,7 @@
       "manual": "Kılavuz",
       "settings": "Ana Sayfa Ayarları"
     },
-    "cards": {
-      "trafficStats": "Trafik İstatistikleri",
-      "networkSettings": "Ağ Ayarları",
-      "proxyMode": "Vekil Modu"
-    },
     "settings": {
-      "cards": {
-        "profile": "Profil Kartı",
-        "currentProxy": "Geçerli Vekil Kartı",
-        "network": "Ağ Ayarları Kartı",
-        "proxyMode": "Vekil Modu Kartı",
-        "traffic": "Trafik İstatistikleri Kartı",
-        "tests": "Web Sitesi Testleri Kartı",
-        "ip": "IP Bilgi Kartı",
-        "clashInfo": "Clash Bilgi Kartları",
-        "systemInfo": "Sistem Bilgi Kartları"
-      },
       "title": "Ana Sayfa Ayarları"
     },
     "title": "Ana Sayfa"

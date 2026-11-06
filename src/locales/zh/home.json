@@ -6,9 +6,11 @@
       "settings": "首页设置"
     },
     "cards": {
-      "trafficStats": "流量统计",
-      "networkSettings": "网络设置",
-      "proxyMode": "代理模式",
+      "systemProxy": "系统代理",
+      "proxyGroups": "代理组",
+      "qualityNodes": "优质节点",
+      "qualityGroup": "当前分组：{{group}}",
+      "qualityEmpty": "此分组暂无可测试节点。",
       "chains": "链路",
       "manageChains": "管理",
       "chainLoading": "正在加载链路…",
@@ -23,18 +25,6 @@
       "openPlugins": "打开插件"
     },
     "settings": {
-      "cards": {
-        "profile": "订阅卡",
-        "currentProxy": "当前代理卡",
-        "network": "网络设置卡",
-        "proxyMode": "代理模式卡",
-        "traffic": "流量统计卡",
-        "tests": "网站测试卡",
-        "ip": "IP 信息卡",
-        "clashInfo": "Clash 信息卡",
-        "systemInfo": "系统信息卡",
-        "dns": "DNS 检测卡"
-      },
       "title": "首页设置",
       "appearance": "外观",
       "accent": "强调色",
@@ -52,8 +42,7 @@
         "title": "启动",
         "startPage": "启动后打开",
         "startPageHint": "应用启动时默认显示的页面"
-      },
-      "cardsTitle": "显示的卡片"
+      }
     },
     "title": "首页",
     "sections": {

@@ -5,23 +5,7 @@
       "manual": "Bedienungsanleitung",
       "settings": "Startseite-Einstellungen"
     },
-    "cards": {
-      "trafficStats": "Verkehrsstatistik",
-      "networkSettings": "Netzwerkeinstellungen",
-      "proxyMode": "Proxy-Modus"
-    },
     "settings": {
-      "cards": {
-        "profile": "Abonnement-Karte",
-        "currentProxy": "Aktueller Proxy-Karte",
-        "network": "Netzwerkeinstellungen-Karte",
-        "proxyMode": "Proxy-Modus-Karte",
-        "traffic": "Verkehrsstatistik-Karte",
-        "tests": "Website-Tests-Karte",
-        "ip": "IP-Informationen-Karte",
-        "clashInfo": "Clash-Informationen-Karten",
-        "systemInfo": "Systeminformationen-Karten"
-      },
       "title": "Startseite-Einstellungen"
     },
     "title": "Startseite"

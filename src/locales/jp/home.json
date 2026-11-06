@@ -5,23 +5,7 @@
       "manual": "マニュアル",
       "settings": "ホーム設定"
     },
-    "cards": {
-      "trafficStats": "トラフィック統計",
-      "networkSettings": "ネットワーク設定",
-      "proxyMode": "プロキシモード"
-    },
     "settings": {
-      "cards": {
-        "profile": "プロファイルカード",
-        "currentProxy": "現在のプロキシカード",
-        "network": "ネットワーク設定カード",
-        "proxyMode": "プロキシモードカード",
-        "traffic": "トラフィック統計カード",
-        "tests": "ウェブサイトテストカード",
-        "ip": "IP情報カード",
-        "clashInfo": "Clash情報カード",
-        "systemInfo": "システム情報カード"
-      },
       "title": "ホーム設定"
     },
     "title": "ホーム"

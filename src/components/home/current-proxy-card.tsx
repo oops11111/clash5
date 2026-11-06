@@ -19,12 +19,14 @@ import {
   ButtonBase,
   Chip,
   ClickAwayListener,
+  Grid,
   IconButton,
   MenuItem,
   MenuList,
   Paper,
   Popper,
   type PopperProps,
+  Stack,
   Tooltip,
   Typography,
   alpha,
@@ -35,6 +37,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 
+import { HomeChainSummary } from '@/components/home/chain-card'
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import type { ProxySortType } from '@/components/proxy/use-filter-sort'
 import { useGroupDelays } from '@/hooks/use-group-delays'
@@ -628,6 +631,8 @@ export const CurrentProxyCard = () => {
   const [selectedGroupName, setSelectedGroupName] = useState('')
   const [openSelect, setOpenSelect] = useState<OpenSelect>(null)
 
+  // Mode changes should close an open selector even though the effect only updates state.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mode intentionally triggers this reset.
   useEffect(() => {
     setOpenSelect(null)
   }, [mode])
@@ -727,8 +732,9 @@ export const CurrentProxyCard = () => {
       ({ name }) => name === selectedGroupName,
     )
       ? selectedGroupName
-      : selectableGroups.some(({ name }) => name === savedGroup)
-        ? savedGroup!
+      : savedGroup != null &&
+          selectableGroups.some(({ name }) => name === savedGroup)
+        ? savedGroup
         : (primaryGroup?.name ?? '')
     if (nextGroup !== selectedGroupName) {
       setSelectedGroupName(nextGroup)
@@ -965,6 +971,22 @@ export const CurrentProxyCard = () => {
     ],
   )
 
+  const qualityOptions = useMemo(() => {
+    const testableOptions = unsortedProxyOptions.filter(
+      ({ member }) =>
+        isInteractableMember(member) &&
+        member.ref.name !== 'DIRECT' &&
+        member.ref.name !== 'REJECT',
+    )
+
+    return sortProxyOptions(
+      testableOptions,
+      1,
+      delays.of,
+      defaultLatencyTimeout,
+    ).slice(0, 3)
+  }, [delays, defaultLatencyTimeout, unsortedProxyOptions])
+
   const getSortIcon = (): React.ReactElement => {
     switch (sortType) {
       case 1:
@@ -990,191 +1012,275 @@ export const CurrentProxyCard = () => {
   }
 
   return (
-    <EnhancedCard
-      title={t('home.components.currentProxy.title')}
-      icon={
-        <Tooltip
-          title={
-            currentProxy
-              ? `${signalInfo.text}: ${delayManager.formatDelay(currentDelay)}`
-              : t('home.components.currentProxy.status.noProxyNode')
-          }
-        >
-          <Box sx={{ color: signalInfo.color }}>
-            {currentProxy ? signalInfo.icon : <SignalNone color="disabled" />}
-          </Box>
-        </Tooltip>
-      }
-      iconColor={currentProxy ? 'primary' : undefined}
-      action={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Tooltip
-            title={t('home.components.currentProxy.actions.refreshDelay')}
-          >
-            <span>
-              <IconButton
-                ref={delayButtonRef}
-                size="small"
-                color="inherit"
-                onClick={handleCheckDelay}
-                disabled={isDirectMode || unsortedProxyOptions.length === 0}
-                aria-label={t(
-                  'home.components.currentProxy.actions.refreshDelay',
-                )}
-              >
-                <NetworkCheckRounded />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title={getSortTooltip()}>
-            <IconButton
-              size="small"
-              color="inherit"
-              onClick={handleSortTypeChange}
+    <>
+      <Grid size={{ xs: 6, md: 3 }}>
+        <EnhancedCard
+          title={t('home.page.cards.proxyGroups')}
+          icon={
+            <Tooltip
+              title={
+                currentProxy
+                  ? `${signalInfo.text}: ${delayManager.formatDelay(currentDelay)}`
+                  : t('home.components.currentProxy.status.noProxyNode')
+              }
             >
-              {getSortIcon()}
-            </IconButton>
-          </Tooltip>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={goToProxies}
-            sx={{ borderRadius: 1.5 }}
-            endIcon={<ChevronRight fontSize="small" />}
-          >
-            {t('layout.components.navigation.tabs.proxies')}
-          </Button>
-        </Box>
-      }
-    >
-      {isCoreDataPending ? (
-        <Box sx={{ py: 4, height: 24 }} />
-      ) : currentProxy || (!isDirectMode && selectedGroup) ? (
-        <Box>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              p: 1,
-              mb: 2,
-              borderRadius: 1,
-              bgcolor: alpha(theme.palette.primary.main, 0.05),
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-            }}
-          >
-            <Box>
-              <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                {currentProxy?.name ??
-                  t('home.components.currentProxy.labels.noActiveNode')}
-              </Typography>
-
-              <Box
-                sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}
-              >
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mr: 1 }}
-                >
-                  {currentProxy?.type}
-                </Typography>
-                {isGlobalMode && (
-                  <Chip
-                    size="small"
-                    label={t('home.components.currentProxy.labels.globalMode')}
-                    color="primary"
-                    sx={{ mr: 0.5 }}
-                  />
-                )}
-                {isDirectMode && (
-                  <Chip
-                    size="small"
-                    label={t('home.components.currentProxy.labels.directMode')}
-                    color="success"
-                    sx={{ mr: 0.5 }}
-                  />
-                )}
-                {currentProxy?.udp && (
-                  <Chip size="small" label="UDP" variant="outlined" />
-                )}
-                {currentProxy?.tfo && (
-                  <Chip size="small" label="TFO" variant="outlined" />
-                )}
-                {currentProxy?.xudp && (
-                  <Chip size="small" label="XUDP" variant="outlined" />
-                )}
-                {currentProxy?.mptcp && (
-                  <Chip size="small" label="MPTCP" variant="outlined" />
-                )}
-                {currentProxy?.smux && (
-                  <Chip size="small" label="SMUX" variant="outlined" />
+              <Box sx={{ color: signalInfo.color }}>
+                {currentProxy ? (
+                  signalInfo.icon
+                ) : (
+                  <SignalNone color="disabled" />
                 )}
               </Box>
-            </Box>
+            </Tooltip>
+          }
+          iconColor={currentProxy ? 'primary' : undefined}
+          action={
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={goToProxies}
+              sx={{ borderRadius: 1.5 }}
+              endIcon={<ChevronRight fontSize="small" />}
+            >
+              {t('layout.components.navigation.tabs.proxies')}
+            </Button>
+          }
+        >
+          {isCoreDataPending ? (
+            <Box sx={{ py: 4, height: 24 }} />
+          ) : currentProxy || (!isDirectMode && selectedGroup) ? (
+            <Box>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  p: 1,
+                  mb: 2,
+                  borderRadius: 1,
+                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                }}
+              >
+                <Box>
+                  <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                    {currentProxy?.name ??
+                      t('home.components.currentProxy.labels.noActiveNode')}
+                  </Typography>
 
-            {currentProxy && !isDirectMode && (
-              <Chip
-                size="small"
-                label={delayManager.formatDelay(currentDelay)}
-                color={convertDelayColor(currentDelay)}
-              />
-            )}
-          </Box>
-          <Box sx={{ mb: 1.5 }}>
-            <PersistentSelect
-              label={t('home.components.currentProxy.labels.group')}
-              displayValue={<Typography noWrap>{selectedGroupName}</Typography>}
-              open={openSelect === 'group'}
-              disabled={isGlobalMode || isDirectMode}
-              keepOpenRef={delayButtonRef}
-              onOpenChange={(open) => setOpenSelect(open ? 'group' : null)}
-              renderOptions={() =>
-                selectableGroups.map((group) => (
-                  <MenuItem
-                    key={group.name}
-                    role="option"
-                    aria-selected={group.name === selectedGroupName}
-                    selected={group.name === selectedGroupName}
-                    onClick={() => handleGroupChange(group.name)}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
                   >
-                    <Typography noWrap>{group.name}</Typography>
-                  </MenuItem>
-                ))
-              }
-            />
-          </Box>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ mr: 1 }}
+                    >
+                      {currentProxy?.type}
+                    </Typography>
+                    {isGlobalMode && (
+                      <Chip
+                        size="small"
+                        label={t(
+                          'home.components.currentProxy.labels.globalMode',
+                        )}
+                        color="primary"
+                        sx={{ mr: 0.5 }}
+                      />
+                    )}
+                    {isDirectMode && (
+                      <Chip
+                        size="small"
+                        label={t(
+                          'home.components.currentProxy.labels.directMode',
+                        )}
+                        color="success"
+                        sx={{ mr: 0.5 }}
+                      />
+                    )}
+                    {currentProxy?.udp && (
+                      <Chip size="small" label="UDP" variant="outlined" />
+                    )}
+                    {currentProxy?.tfo && (
+                      <Chip size="small" label="TFO" variant="outlined" />
+                    )}
+                    {currentProxy?.xudp && (
+                      <Chip size="small" label="XUDP" variant="outlined" />
+                    )}
+                    {currentProxy?.mptcp && (
+                      <Chip size="small" label="MPTCP" variant="outlined" />
+                    )}
+                    {currentProxy?.smux && (
+                      <Chip size="small" label="SMUX" variant="outlined" />
+                    )}
+                  </Box>
+                </Box>
 
-          <PersistentProxySelect
-            label={t('home.components.currentProxy.labels.proxy')}
-            groupName={selectedGroupName}
-            fixed={selectedGroup?.fixed}
-            value={
-              currentOption
-                ? optionValue(currentOption.memberIndex, currentOption.member)
-                : ''
-            }
-            selectedName={selectedProxyName}
-            selectedDelay={currentDelay}
-            options={proxyOptions}
-            open={openSelect === 'proxy'}
-            disabled={isDirectMode}
-            keepOpenRef={delayButtonRef}
-            onOpenChange={(open) => setOpenSelect(open ? 'proxy' : null)}
-            onChange={handleProxyChange}
-          />
-        </Box>
-      ) : (
-        <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography
-            sx={{ height: 24 }}
-            variant="body1"
-            color="text.secondary"
-          >
-            {t('home.components.currentProxy.labels.noActiveNode')}
-          </Typography>
-        </Box>
-      )}
-    </EnhancedCard>
+                {currentProxy && !isDirectMode && (
+                  <Chip
+                    size="small"
+                    label={delayManager.formatDelay(currentDelay)}
+                    color={convertDelayColor(currentDelay)}
+                  />
+                )}
+              </Box>
+              <Box sx={{ mb: 1.5 }}>
+                <PersistentSelect
+                  label={t('home.components.currentProxy.labels.group')}
+                  displayValue={
+                    <Typography noWrap>{selectedGroupName}</Typography>
+                  }
+                  open={openSelect === 'group'}
+                  disabled={isGlobalMode || isDirectMode}
+                  keepOpenRef={delayButtonRef}
+                  onOpenChange={(open) => setOpenSelect(open ? 'group' : null)}
+                  renderOptions={() =>
+                    selectableGroups.map((group) => (
+                      <MenuItem
+                        key={group.name}
+                        role="option"
+                        aria-selected={group.name === selectedGroupName}
+                        selected={group.name === selectedGroupName}
+                        onClick={() => handleGroupChange(group.name)}
+                      >
+                        <Typography noWrap>{group.name}</Typography>
+                      </MenuItem>
+                    ))
+                  }
+                />
+              </Box>
+
+              <PersistentProxySelect
+                label={t('home.components.currentProxy.labels.proxy')}
+                groupName={selectedGroupName}
+                fixed={selectedGroup?.fixed}
+                value={
+                  currentOption
+                    ? optionValue(
+                        currentOption.memberIndex,
+                        currentOption.member,
+                      )
+                    : ''
+                }
+                selectedName={selectedProxyName}
+                selectedDelay={currentDelay}
+                options={proxyOptions}
+                open={openSelect === 'proxy'}
+                disabled={isDirectMode}
+                keepOpenRef={delayButtonRef}
+                onOpenChange={(open) => setOpenSelect(open ? 'proxy' : null)}
+                onChange={handleProxyChange}
+              />
+            </Box>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography
+                sx={{ height: 24 }}
+                variant="body1"
+                color="text.secondary"
+              >
+                {t('home.components.currentProxy.labels.noActiveNode')}
+              </Typography>
+            </Box>
+          )}
+          <HomeChainSummary profileId={currentProfileId} />
+        </EnhancedCard>
+      </Grid>
+
+      <Grid size={{ xs: 6, md: 3 }}>
+        <EnhancedCard
+          title={t('home.page.cards.qualityNodes')}
+          icon={<NetworkCheckRounded />}
+          iconColor="success"
+          action={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Tooltip
+                title={t('home.components.currentProxy.actions.refreshDelay')}
+              >
+                <span>
+                  <IconButton
+                    ref={delayButtonRef}
+                    size="small"
+                    color="inherit"
+                    onClick={handleCheckDelay}
+                    disabled={isDirectMode || unsortedProxyOptions.length === 0}
+                    aria-label={t(
+                      'home.components.currentProxy.actions.refreshDelay',
+                    )}
+                  >
+                    <NetworkCheckRounded />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title={getSortTooltip()}>
+                <IconButton
+                  size="small"
+                  color="inherit"
+                  onClick={handleSortTypeChange}
+                  aria-label={getSortTooltip()}
+                >
+                  {getSortIcon()}
+                </IconButton>
+              </Tooltip>
+            </Box>
+          }
+        >
+          <Stack spacing={1}>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {t('home.page.cards.qualityGroup', {
+                group:
+                  selectedGroupName ||
+                  t('home.components.currentProxy.labels.noActiveNode'),
+              })}
+            </Typography>
+            {isCoreDataPending ? (
+              <Box sx={{ py: 4 }} />
+            ) : qualityOptions.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                {t('home.page.cards.qualityEmpty')}
+              </Typography>
+            ) : (
+              qualityOptions.map((option) => {
+                const delay = delays.of(option.member)
+                return (
+                  <Box
+                    key={option.value}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 1,
+                      minWidth: 0,
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      noWrap
+                      title={option.name}
+                      sx={{
+                        minWidth: 0,
+                        fontWeight:
+                          option.name === selectedProxyName ? 600 : undefined,
+                      }}
+                    >
+                      {option.name}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={delayManager.formatDelay(delay)}
+                      color={convertDelayColor(delay)}
+                    />
+                  </Box>
+                )
+              })
+            )}
+          </Stack>
+        </EnhancedCard>
+      </Grid>
+    </>
   )
 }

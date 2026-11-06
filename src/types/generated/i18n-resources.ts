@@ -335,9 +335,11 @@ export interface TranslationResources {
           chains: string
           chainUnavailable: string
           manageChains: string
-          networkSettings: string
-          proxyMode: string
-          trafficStats: string
+          proxyGroups: string
+          qualityEmpty: string
+          qualityGroup: string
+          qualityNodes: string
+          systemProxy: string
         }
         emptyState: {
           addNode: string
@@ -354,19 +356,6 @@ export interface TranslationResources {
         settings: {
           accent: string
           appearance: string
-          cards: {
-            clashInfo: string
-            currentProxy: string
-            dns: string
-            ip: string
-            network: string
-            profile: string
-            proxyMode: string
-            systemInfo: string
-            tests: string
-            traffic: string
-          }
-          cardsTitle: string
           refresh: {
             ipAuto: string
             ipAutoHint: string

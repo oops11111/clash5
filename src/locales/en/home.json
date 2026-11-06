@@ -6,9 +6,11 @@
       "settings": "Home Settings"
     },
     "cards": {
-      "trafficStats": "Traffic Stats",
-      "networkSettings": "Network Settings",
-      "proxyMode": "Proxy Mode",
+      "systemProxy": "System Proxy",
+      "proxyGroups": "Proxy Groups",
+      "qualityNodes": "Quality Nodes",
+      "qualityGroup": "Current group: {{group}}",
+      "qualityEmpty": "No testable nodes in this group.",
       "chains": "Chains",
       "manageChains": "Manage",
       "chainLoading": "Loading chains…",
@@ -23,18 +25,6 @@
       "openPlugins": "Open Plugins"
     },
     "settings": {
-      "cards": {
-        "profile": "Profile Card",
-        "currentProxy": "Current Proxy Card",
-        "network": "Network Settings Card",
-        "proxyMode": "Proxy Mode Card",
-        "traffic": "Traffic Stats Card",
-        "tests": "Website Tests Card",
-        "ip": "IP Information Card",
-        "clashInfo": "Clash Info Cards",
-        "systemInfo": "System Info Cards",
-        "dns": "DNS Check Card"
-      },
       "title": "Home Settings",
       "appearance": "Appearance",
       "accent": "Accent color",
@@ -52,8 +42,7 @@
         "title": "Startup",
         "startPage": "Open on launch",
         "startPageHint": "Page shown when the app starts"
-      },
-      "cardsTitle": "Cards"
+      }
     },
     "title": "Home",
     "sections": {

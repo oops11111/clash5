@@ -2,7 +2,6 @@ import {
   DnsOutlined,
   HelpOutlineRounded,
   HistoryEduOutlined,
-  RouterOutlined,
   SettingsOutlined,
 } from '@mui/icons-material'
 import {
@@ -12,6 +11,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   Grid,
   IconButton,
   MenuItem,
@@ -29,12 +29,10 @@ import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router'
 
 import { BasePage } from '@/components/base'
-import { HomeChainCard } from '@/components/home/chain-card'
 import { ClashModeCard } from '@/components/home/clash-mode-card'
 import { CurrentProxyCard } from '@/components/home/current-proxy-card'
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import { FirstRunEmptyState } from '@/components/home/first-run-empty-state'
-import { HomeProfileCard } from '@/components/home/home-profile-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
 import { ThemeModeSwitch } from '@/components/setting/mods/theme-mode-switch'
 import ProxyControlSwitches from '@/components/shared/proxy-control-switches'
@@ -68,9 +66,7 @@ interface HomeSettingsDialogProps {
 // Accent colors offered in the home settings; the choice is saved as the theme's primary color.
 const ACCENT_COLORS = ['#2F6BFF', '#8B5CF6', '#22C55E', '#F59E0B']
 
-const HomeSettingsDialog = ({
-  onClose,
-}: HomeSettingsDialogProps) => {
+const HomeSettingsDialog = ({ onClose }: HomeSettingsDialogProps) => {
   const { t } = useTranslation()
   const { verge, patchVerge } = useVerge()
   const accent = verge?.theme_setting?.primary_color
@@ -225,8 +221,6 @@ const HomePage = () => {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const {
-    current,
-    mutateProfiles,
     profiles,
     error: profilesError,
     isLoading: profilesLoading,
@@ -273,28 +267,10 @@ const HomePage = () => {
   }, [])
 
   const fixedCards = [
-    ...(!current
-      ? [
-          <Grid size={12} key="first-run">
-            <HomeProfileCard
-              current={current}
-              onProfileUpdated={mutateProfiles}
-            />
-          </Grid>,
-        ]
-      : []),
     <Grid size={{ xs: 6, md: 3 }} key="network">
       <NetworkSettingsCard />
     </Grid>,
-    <Grid size={{ xs: 6, md: 3 }} key="mode">
-      <ClashModeEnhancedCard />
-    </Grid>,
-    <Grid size={{ xs: 6, md: 3 }} key="proxy">
-      <CurrentProxyCard />
-    </Grid>,
-    <Grid size={{ xs: 6, md: 3 }} key="chains">
-      <HomeChainCard profileId={current?.uid ?? null} />
-    </Grid>,
+    <CurrentProxyCard key="proxy" />,
     <Grid size={{ xs: 6, md: 3 }} key="dns">
       <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>
         <LazyDnsCheckCard />
@@ -383,7 +359,7 @@ const NetworkSettingsCard = () => {
   const { t } = useTranslation()
   return (
     <EnhancedCard
-      title={t('home.page.cards.networkSettings')}
+      title={t('home.page.cards.systemProxy')}
       icon={<DnsOutlined />}
       iconColor="primary"
       action={null}
@@ -395,22 +371,9 @@ const NetworkSettingsCard = () => {
           noRightPadding
         />
         <ProxyTunCard />
+        <Divider />
+        <ClashModeCard />
       </Stack>
-    </EnhancedCard>
-  )
-}
-
-// 增强版 Clash 模式卡片组件
-const ClashModeEnhancedCard = () => {
-  const { t } = useTranslation()
-  return (
-    <EnhancedCard
-      title={t('home.page.cards.proxyMode')}
-      icon={<RouterOutlined />}
-      iconColor="info"
-      action={null}
-    >
-      <ClashModeCard />
     </EnhancedCard>
   )
 }
