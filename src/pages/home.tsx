@@ -24,7 +24,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import { Suspense, lazy, useCallback, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router'
 
@@ -33,6 +33,7 @@ import { HomeChainCard } from '@/components/home/chain-card'
 import { ClashModeCard } from '@/components/home/clash-mode-card'
 import { CurrentProxyCard } from '@/components/home/current-proxy-card'
 import { EnhancedCard } from '@/components/home/enhanced-card'
+import { FirstRunEmptyState } from '@/components/home/first-run-empty-state'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
 import { ThemeModeSwitch } from '@/components/setting/mods/theme-mode-switch'
@@ -40,7 +41,7 @@ import ProxyControlSwitches from '@/components/shared/proxy-control-switches'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
 import { primaryNavigationItems } from '@/pages/_navigation-meta'
-import { entry_lightweight_mode } from '@/services/cmds'
+import { entry_lightweight_mode, listClash5Nodes } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
 import { openExternalUrl } from '@/utils/open-external-url'
@@ -223,7 +224,38 @@ const HomeSettingsDialog = ({
 const HomePage = () => {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
-  const { current, mutateProfiles } = useProfiles()
+  const {
+    current,
+    mutateProfiles,
+    profiles,
+    error: profilesError,
+    isLoading: profilesLoading,
+  } = useProfiles()
+  const profileCount = profiles?.items?.length
+  const [nodeDataStatus, setNodeDataStatus] = useState<
+    'loading' | 'empty' | 'available' | 'error'
+  >('loading')
+
+  useEffect(() => {
+    if (profileCount !== 0) return
+
+    let active = true
+    void listClash5Nodes()
+      .then((nodes) => {
+        if (active) {
+          setNodeDataStatus(
+            nodes.some((node) => node.active) ? 'available' : 'empty',
+          )
+        }
+      })
+      .catch(() => {
+        if (active) setNodeDataStatus('error')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [profileCount])
 
   // 设置弹窗的状态
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -274,6 +306,14 @@ const HomePage = () => {
     return <ChainsPage />
   }
 
+  const checkingHomeData =
+    !profilesError &&
+    (profileCount === undefined
+      ? profilesLoading
+      : profileCount === 0 && nodeDataStatus === 'loading')
+  const showFirstRunEmptyState =
+    !profilesError && profileCount === 0 && nodeDataStatus === 'empty'
+
   return (
     <BasePage
       title={t('home.page.title')}
@@ -307,7 +347,15 @@ const HomePage = () => {
         </Box>
       }
     >
-      {homeSection(t('home.page.sections.status'), fixedCards)}
+      {checkingHomeData ? (
+        <Box sx={{ p: 2 }}>
+          <Skeleton variant="rounded" height={260} />
+        </Box>
+      ) : showFirstRunEmptyState ? (
+        <FirstRunEmptyState />
+      ) : (
+        homeSection(t('home.page.sections.status'), fixedCards)
+      )}
 
       {/* 首页设置弹窗 */}
       {settingsOpen && (

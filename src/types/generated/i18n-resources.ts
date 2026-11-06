@@ -339,6 +339,13 @@ export interface TranslationResources {
           proxyMode: string
           trafficStats: string
         }
+        emptyState: {
+          addNode: string
+          description: string
+          importSubscription: string
+          openPlugins: string
+          title: string
+        }
         sections: {
           status: string
           tools: string

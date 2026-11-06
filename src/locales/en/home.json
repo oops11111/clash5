@@ -15,6 +15,13 @@
       "chainEmpty": "No chains configured yet.",
       "chainUnavailable": "Chain data is unavailable right now."
     },
+    "emptyState": {
+      "title": "Get started with clash5",
+      "description": "Add a subscription or node, or open Plugins to continue setup.",
+      "importSubscription": "Import subscription",
+      "addNode": "Add a node",
+      "openPlugins": "Open Plugins"
+    },
     "settings": {
       "cards": {
         "profile": "Profile Card",

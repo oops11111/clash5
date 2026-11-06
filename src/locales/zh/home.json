@@ -15,6 +15,13 @@
       "chainEmpty": "尚未配置链路。",
       "chainUnavailable": "当前无法读取链路数据。"
     },
+    "emptyState": {
+      "title": "开始设置 clash5",
+      "description": "添加订阅或节点，或打开插件页继续配置。",
+      "importSubscription": "导入订阅",
+      "addNode": "添加节点",
+      "openPlugins": "打开插件"
+    },
     "settings": {
       "cards": {
         "profile": "订阅卡",
