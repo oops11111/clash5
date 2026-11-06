@@ -471,7 +471,12 @@ export const BackupHistoryViewer = ({
       <BaseDialog
         open={pendingConfirmation !== null}
         title={confirmTitle}
-        okBtn={t('shared.actions.confirm')}
+        okBtn={
+          pendingConfirmation?.action === 'delete'
+            ? t('shared.actions.delete')
+            : t('shared.actions.confirm')
+        }
+        okColor={pendingConfirmation?.action === 'delete' ? 'error' : 'primary'}
         cancelBtn={t('shared.actions.cancel')}
         contentSx={{ width: { xs: 320, sm: 420 } }}
         loading={isConfirming}

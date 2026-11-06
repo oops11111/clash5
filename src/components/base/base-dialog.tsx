@@ -1,5 +1,6 @@
 import {
   Button,
+  type ButtonProps,
   Dialog,
   DialogActions,
   DialogContent,
@@ -13,6 +14,7 @@ interface Props {
   title: ReactNode
   open: boolean
   okBtn?: ReactNode
+  okColor?: ButtonProps['color']
   cancelBtn?: ReactNode
   disableEnforceFocus?: boolean
   disableOk?: boolean
@@ -36,6 +38,7 @@ export const BaseDialog: React.FC<Props> = ({
   title,
   children,
   okBtn,
+  okColor = 'primary',
   cancelBtn,
   disableEnforceFocus,
   contentSx,
@@ -65,7 +68,12 @@ export const BaseDialog: React.FC<Props> = ({
             </Button>
           )}
           {!disableOk && (
-            <Button loading={loading} variant="contained" onClick={onOk}>
+            <Button
+              color={okColor}
+              loading={loading}
+              variant="contained"
+              onClick={onOk}
+            >
               {okBtn}
             </Button>
           )}

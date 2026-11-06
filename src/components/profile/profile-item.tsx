@@ -967,7 +967,8 @@ const ProfileItemBase = (props: ProfileItemProps) => {
       <BaseDialog
         title={t('profiles.modals.confirmDelete.title')}
         open={confirmOpen}
-        okBtn={t('shared.actions.confirm')}
+        okBtn={t('shared.actions.delete')}
+        okColor="error"
         cancelBtn={t('shared.actions.cancel')}
         contentSx={{ width: { xs: 320, sm: 420 }, userSelect: 'text' }}
         onCancel={() => setConfirmOpen(false)}
