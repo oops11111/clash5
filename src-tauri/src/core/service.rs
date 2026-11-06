@@ -1730,15 +1730,37 @@ fn log_core_restarts(seen: &mut Option<u32>, status: &ServiceStatusSnapshot) {
     *seen = Some(status.restart_count);
 }
 
-fn report_service_core_stopped(status: &ServiceStatusSnapshot) {
-    let detail = format!(
+fn service_core_stopped_detail(status: &ServiceStatusSnapshot) -> String {
+    format!(
         "service state {:?}, {} restarts, last exit: {}",
         status.service_state,
         status.restart_count,
         status.last_core_exit_reason.as_deref().unwrap_or("none reported")
-    );
-    logging!(error, Type::Service, "service core stopped: {detail}");
-    CoreManager::global().record_startup_error(CoreFailure::ServiceCoreStopped(detail));
+    )
+}
+
+fn owner_recovery_failure(service_detail: Option<String>, cleanup_detail: Option<String>) -> Option<CoreFailure> {
+    match (service_detail, cleanup_detail) {
+        (Some(mut service), Some(cleanup)) => {
+            service.push_str(&format!("; proxy cleanup failed: {cleanup}"));
+            Some(CoreFailure::ServiceCoreStopped(service))
+        }
+        (Some(service), None) => Some(CoreFailure::ServiceCoreStopped(service)),
+        (None, Some(cleanup)) => Some(CoreFailure::StartFailed(format!(
+            "Proxy cleanup after service owner loss failed: {cleanup}"
+        ))),
+        (None, None) => None,
+    }
+}
+
+fn report_owner_recovery_failure(status: Option<&ServiceStatusSnapshot>, cleanup_error: Option<anyhow::Error>) {
+    let service_detail = status.map(service_core_stopped_detail);
+    let cleanup_detail = cleanup_error.map(|error| format!("{error:#}"));
+    let Some(failure) = owner_recovery_failure(service_detail, cleanup_detail) else {
+        return;
+    };
+    logging!(error, Type::Service, "service owner recovery failed: {failure:?}");
+    CoreManager::global().record_startup_error(failure);
     Handle::notice(NoticeStatus::CoreStartError, "");
 }
 
@@ -1824,11 +1846,12 @@ async fn recover_after_owner_loss(
     {
         return;
     }
-    recover_after_owner_loss_while_locked(reason).await;
+    let cleanup_error = recover_after_owner_loss_while_locked(reason).await.err();
     // Still under the lifecycle lock, so a later start is the one that clears it.
-    if let (OwnerRecoveryReason::SameOwnerFailure, Some(status)) = (reason, status) {
-        report_service_core_stopped(status);
-    }
+    let status = matches!(reason, OwnerRecoveryReason::SameOwnerFailure)
+        .then_some(status)
+        .flatten();
+    report_owner_recovery_failure(status, cleanup_error);
 }
 
 fn claim_owner_recovery_generation(generation: &AtomicU64, captured_generation: u64) -> Option<u64> {
@@ -1845,7 +1868,7 @@ fn claim_owner_recovery_generation(generation: &AtomicU64, captured_generation: 
 }
 
 #[tracing::instrument(skip_all, level = "info", fields(reason = ?reason))]
-async fn recover_after_owner_loss_while_locked(reason: OwnerRecoveryReason) {
+async fn recover_after_owner_loss_while_locked(reason: OwnerRecoveryReason) -> Result<()> {
     logging!(
         warn,
         Type::Service,
@@ -1855,9 +1878,11 @@ async fn recover_after_owner_loss_while_locked(reason: OwnerRecoveryReason) {
     proxy_control::stop_guard().await;
     let policy = owner_recovery_policy(reason, cfg!(target_os = "macos"));
     // Clear while still in Service mode with the session: on macOS it routes through the helper.
-    if policy.reset_system_proxy {
-        clear_proxy_after_owner_loss().await;
-    }
+    let cleanup = if policy.reset_system_proxy {
+        clear_proxy_after_owner_loss().await
+    } else {
+        Ok(())
+    };
     clear_active_service_session();
     CoreManager::global().core_stopped();
     // A displaced Service may still run TUN for its new owner, and DNS settings are system-wide.
@@ -1865,9 +1890,10 @@ async fn recover_after_owner_loss_while_locked(reason: OwnerRecoveryReason) {
     if policy.reset_system_proxy {
         crate::utils::resolve::dns::sync_public_dns().await;
     }
+    cleanup
 }
 
-async fn clear_proxy_after_owner_loss() {
+async fn clear_proxy_after_owner_loss() -> Result<()> {
     use crate::utils::retry::{RetryError, RetryPolicy, retry};
     let result = retry(
         RetryPolicy::fixed(
@@ -1887,15 +1913,17 @@ async fn clear_proxy_after_owner_loss() {
         },
     )
     .await;
-    if let Err(error) = result {
-        // The existing recovery path also waits after its final failed clear.
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        logging!(
-            error,
-            Type::Service,
-            "failed to clear local proxy after owner loss: {error:#}"
-        );
-    }
+    let Err(error) = result else {
+        return Ok(());
+    };
+    // The existing recovery path also waits after its final failed clear.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    logging!(
+        error,
+        Type::Service,
+        "failed to clear local proxy after owner loss: {error:#}"
+    );
+    Err(error.context("failed to clear local proxy after service owner loss"))
 }
 
 /// Waits for a repaired service, preserving readable rejection details but classifying sustained
@@ -2125,8 +2153,8 @@ pub static SERVICE_MANAGER: ServiceManager = ServiceManager;
 mod tests {
     use super::{
         ServiceHealth, ServiceStatus, capture_generation_before, claim_owner_recovery_generation,
-        generate_service_session_token, mark_service_unavailable_after_owner_loss, owner_recovery_policy,
-        service_core_path_for, session_matches_status,
+        generate_service_session_token, mark_service_unavailable_after_owner_loss, owner_recovery_failure,
+        owner_recovery_policy, service_core_path_for, session_matches_status,
     };
     #[cfg(target_os = "linux")]
     use super::{StagedServiceTools, bundled_core_name};
@@ -2455,6 +2483,27 @@ mod tests {
         assert_eq!(claim_owner_recovery_generation(&generation, 7), Some(8));
         assert_eq!(generation.load(Ordering::Acquire), 8);
         assert_eq!(claim_owner_recovery_generation(&generation, 7), None);
+    }
+
+    #[test]
+    fn owner_recovery_keeps_proxy_cleanup_errors_in_the_unresolved_failure() {
+        use crate::core::manager::CoreFailure;
+
+        assert_eq!(
+            owner_recovery_failure(
+                Some("service core stopped after three restarts".into()),
+                Some("OS proxy write failed".into()),
+            ),
+            Some(CoreFailure::ServiceCoreStopped(
+                "service core stopped after three restarts; proxy cleanup failed: OS proxy write failed".into()
+            ))
+        );
+        assert_eq!(
+            owner_recovery_failure(None, Some("OS proxy write failed".into())),
+            Some(CoreFailure::StartFailed(
+                "Proxy cleanup after service owner loss failed: OS proxy write failed".into()
+            ))
+        );
     }
 
     #[test]
