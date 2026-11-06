@@ -1,6 +1,7 @@
 import { Typography } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import React, { ReactNode } from 'react'
+import type React from 'react'
+import type { ReactNode } from 'react'
 
 import { BaseErrorBoundary } from './base-error-boundary'
 
@@ -10,11 +11,25 @@ interface Props {
   contentStyle?: React.CSSProperties
   children?: ReactNode
   full?: boolean
+  embedded?: boolean
 }
 
 export const BasePage: React.FC<Props> = (props) => {
-  const { title, header, contentStyle, full, children } = props
+  const { title, header, contentStyle, full, embedded, children } = props
   const theme = useTheme()
+
+  if (embedded) {
+    return (
+      <BaseErrorBoundary>
+        <div className="base-embedded-page">
+          {header && <div className="base-embedded-header">{header}</div>}
+          <div className="base-embedded-content" style={contentStyle}>
+            {children}
+          </div>
+        </div>
+      </BaseErrorBoundary>
+    )
+  }
 
   return (
     <BaseErrorBoundary>

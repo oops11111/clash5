@@ -21,7 +21,7 @@ import LogItem from '@/components/log/log-item'
 import { useClashLog } from '@/hooks/use-clash-log'
 import { useLogData } from '@/hooks/use-log-data'
 
-const LogPage = () => {
+const LogPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [clashLog, setClashLog] = useClashLog()
@@ -52,7 +52,7 @@ const LogPage = () => {
       const matchesSearch = match(searchText)
 
       return (
-        (logState == 'all' ? true : data.type.includes(logState)) &&
+        (logState === 'all' ? true : data.type.includes(logState)) &&
         matchesSearch
       )
     })
@@ -92,6 +92,7 @@ const LogPage = () => {
   return (
     <BasePage
       full
+      embedded={embedded}
       title={t('logs.page.title')}
       contentStyle={{
         height: '100%',
@@ -101,9 +102,14 @@ const LogPage = () => {
       }}
       header={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button size="small" onClick={() => navigate('/settings?view=unlock')}>
-            {t('layout.components.navigation.diagnostics')}
-          </Button>
+          {!embedded && (
+            <Button
+              size="small"
+              onClick={() => navigate('/settings?view=unlock')}
+            >
+              {t('layout.components.navigation.diagnostics')}
+            </Button>
+          )}
           <IconButton
             title={t(
               enableLog ? 'shared.actions.pause' : 'shared.actions.resume',

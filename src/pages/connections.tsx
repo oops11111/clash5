@@ -80,7 +80,7 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFunc>>(
 )
 
 const EMPTY_CONNECTIONS: IConnectionsItem[] = []
-const ConnectionsPage = () => {
+const ConnectionsPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { t } = useTranslation()
   const pageVisible = useVisibility()
   const [match, setMatch] = useState<(input: string) => boolean>(
@@ -172,6 +172,7 @@ const ConnectionsPage = () => {
   return (
     <BasePage
       full
+      embedded={embedded}
       title={
         <span style={{ whiteSpace: 'nowrap' }}>
           {t('connections.page.title')}

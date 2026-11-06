@@ -6,8 +6,12 @@
       "system": "系统与代理",
       "clash": "Clash 设置",
       "basic": "基本设置",
-      "backup": "备份与诊断",
+      "diagnostics": "诊断",
+      "backup": "备份",
       "advanced": "高级"
+    },
+    "diagnostics": {
+      "description": "连接、日志、解锁检测与 DNS 工具"
     },
     "actions": {
       "manual": "使用手册",

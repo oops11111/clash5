@@ -6,8 +6,12 @@
       "system": "System & proxy",
       "clash": "Clash settings",
       "basic": "General",
-      "backup": "Backup & diagnostics",
+      "diagnostics": "Diagnostics",
+      "backup": "Backup",
       "advanced": "Advanced"
+    },
+    "diagnostics": {
+      "description": "Connections, logs, unlock checks, and DNS tools"
     },
     "actions": {
       "manual": "Manual",

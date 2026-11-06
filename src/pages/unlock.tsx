@@ -107,7 +107,7 @@ const dedupeUnlockItems = (items: UnlockItem[]) => {
   return Array.from(map.values())
 }
 
-const UnlockPage = () => {
+const UnlockPage = ({ embedded = false }: { embedded?: boolean }) => {
   const { t } = useTranslation()
   const theme = useTheme()
 
@@ -273,6 +273,7 @@ const UnlockPage = () => {
 
   return (
     <BasePage
+      embedded={embedded}
       title={t('tests.unlock.page.title')}
       header={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

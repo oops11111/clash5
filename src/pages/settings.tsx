@@ -15,7 +15,7 @@ import { useSearchParams } from 'react-router'
 import { BasePage } from '@/components/base'
 import {
   SettingList,
-  SettingSection,
+  type SettingSection,
 } from '@/components/setting/mods/setting-comp'
 import { PerformancePresetSettings } from '@/components/setting/performance-preset-settings'
 import SettingClash from '@/components/setting/setting-clash'
@@ -35,19 +35,68 @@ const settingCardSx = {
   boxShadow: '0 1px 3px rgba(26, 35, 50, 0.04)',
 }
 
-const groups: SettingSection[] = [
+type DiagnosticTab = 'connections' | 'logs' | 'unlock' | 'dns'
+type SettingsGroup = SettingSection | 'diagnostics'
+
+const groups: SettingsGroup[] = [
   'appearance',
   'system',
   'clash',
   'basic',
+  'diagnostics',
   'backup',
   'advanced',
 ]
 
+const isDiagnosticsView = (
+  view: string | null,
+): view is 'diagnostics' | DiagnosticTab =>
+  view === 'diagnostics' ||
+  view === 'connections' ||
+  view === 'logs' ||
+  view === 'unlock' ||
+  view === 'dns'
+
 const SettingPage = () => {
   const { t } = useTranslation()
-  const [searchParams] = useSearchParams()
-  const [active, setActive] = useState<SettingSection>('appearance')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedView = searchParams.get('view')
+  const diagnosticsView = isDiagnosticsView(requestedView)
+  const initialDiagnosticTab: DiagnosticTab | undefined =
+    requestedView === 'connections' ||
+    requestedView === 'logs' ||
+    requestedView === 'unlock' ||
+    requestedView === 'dns'
+      ? requestedView
+      : undefined
+  const [selectedGroup, setSelectedGroup] = useState<SettingsGroup>(() =>
+    diagnosticsView ? 'diagnostics' : 'appearance',
+  )
+  const active = diagnosticsView
+    ? 'diagnostics'
+    : selectedGroup === 'diagnostics'
+      ? 'appearance'
+      : selectedGroup
+
+  const selectGroup = (group: SettingsGroup) => {
+    setSelectedGroup(group)
+    setSearchParams(
+      (current) => {
+        const currentView = current.get('view')
+        if (group === 'diagnostics') {
+          if (isDiagnosticsView(currentView)) return current
+          const next = new URLSearchParams(current)
+          next.set('view', 'diagnostics')
+          return next
+        }
+        if (!isDiagnosticsView(currentView)) return current
+        const next = new URLSearchParams(current)
+        next.delete('view')
+        return next
+      },
+      { replace: true },
+    )
+  }
 
   const onError = (err: any) => {
     showNotice.error(err)
@@ -69,8 +118,8 @@ const SettingPage = () => {
     openExternalUrl('https://t.me/clash_verge_re').catch(onError),
   )
 
-  const renderGroup = () => {
-    switch (active) {
+  const renderGroup = (section: SettingSection) => {
+    switch (section) {
       case 'appearance':
         return <SettingVergeBasic section="appearance" onError={onError} />
       case 'system':
@@ -86,25 +135,8 @@ const SettingPage = () => {
         return <SettingVergeBasic section="basic" onError={onError} />
       case 'backup':
       case 'advanced':
-        return <SettingVergeAdvanced section={active} />
+        return <SettingVergeAdvanced section={section} />
     }
-  }
-
-  const diagnosticsView = searchParams.get('view')
-  if (
-    diagnosticsView === 'diagnostics' ||
-    diagnosticsView === 'connections' ||
-    diagnosticsView === 'logs' ||
-    diagnosticsView === 'unlock' ||
-    diagnosticsView === 'dns'
-  ) {
-    return (
-      <DiagnosticsPage
-        initialView={
-          diagnosticsView === 'diagnostics' ? undefined : diagnosticsView
-        }
-      />
-    )
   }
 
   return (
@@ -143,13 +175,19 @@ const SettingPage = () => {
         </ButtonGroup>
       }
     >
-      <PerformancePresetSettings />
+      {active !== 'diagnostics' && <PerformancePresetSettings />}
       <Box
         sx={{
           display: 'grid',
           gap: 1.5,
           gridTemplateColumns: { xs: '1fr', md: '200px minmax(0, 1fr)' },
-          alignItems: 'start',
+          alignItems: 'stretch',
+          ...(active === 'diagnostics'
+            ? {
+                height: 'min(700px, calc(100vh - 160px))',
+                minHeight: '420px',
+              }
+            : {}),
         }}
       >
         <Box
@@ -162,7 +200,7 @@ const SettingPage = () => {
               <ListItemButton
                 key={group}
                 selected={active === group}
-                onClick={() => setActive(group)}
+                onClick={() => selectGroup(group)}
                 sx={{ borderRadius: '10px' }}
               >
                 <ListItemText primary={t(`settings.page.groups.${group}`)} />
@@ -170,10 +208,25 @@ const SettingPage = () => {
             ))}
           </List>
         </Box>
-        <Box sx={{ ...settingCardSx, minWidth: 0 }}>
-          <SettingList title={t(`settings.page.groups.${active}`)}>
-            {renderGroup()}
-          </SettingList>
+        <Box
+          sx={{
+            ...settingCardSx,
+            minWidth: 0,
+            display: active === 'diagnostics' ? 'flex' : undefined,
+            flexDirection: active === 'diagnostics' ? 'column' : undefined,
+            overflow: active === 'diagnostics' ? 'hidden' : undefined,
+          }}
+        >
+          {active === 'diagnostics' ? (
+            <DiagnosticsPage
+              key={initialDiagnosticTab ?? 'connections'}
+              initialView={initialDiagnosticTab}
+            />
+          ) : (
+            <SettingList title={t(`settings.page.groups.${active}`)}>
+              {renderGroup(active)}
+            </SettingList>
+          )}
         </Box>
       </Box>
     </BasePage>

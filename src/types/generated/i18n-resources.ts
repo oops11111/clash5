@@ -1710,12 +1710,16 @@ export interface TranslationResources {
           telegram: string
         }
         actionsGroupLabel: string
+        diagnostics: {
+          description: string
+        }
         groups: {
           advanced: string
           appearance: string
           backup: string
           basic: string
           clash: string
+          diagnostics: string
           system: string
         }
         groupsLabel: string
