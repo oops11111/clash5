@@ -9,6 +9,8 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Duration,
 };
+#[cfg(test)]
+use tauri_plugin_updater::{ReleaseManifestPlatform, RemoteRelease, RemoteReleaseInner};
 use tauri_plugin_updater::{Update, UpdaterExt as _};
 use tokio_util::sync::CancellationToken;
 
@@ -749,7 +751,6 @@ impl SilentUpdater {
 #[cfg(test)]
 mod release_source_tests {
     use super::*;
-    use tauri_plugin_updater::{ReleaseManifestPlatform, RemoteRelease, RemoteReleaseInner};
 
     fn candidate(version: &str, url: &str) -> Result<RemoteRelease, Box<dyn std::error::Error>> {
         Ok(RemoteRelease {
