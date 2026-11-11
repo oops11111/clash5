@@ -2216,17 +2216,22 @@ try {
     fsScopeFixture,
     'This file must remain outside the WebView filesystem scope.',
   )
-  const fsScopeResult = await browser.execute(async (encodedPath) => {
-    const path = window.atob(encodedPath)
-    try {
-      await window.__TAURI_INTERNALS__.invoke('plugin:fs|read_text_file', {
-        path,
-      })
-      return { allowed: true }
-    } catch (error) {
-      return { allowed: false, error: String(error) }
-    }
-  }, Buffer.from(fsScopeFixture, 'utf8').toString('base64'))
+  let fsScopeResult
+  try {
+    fsScopeResult = await browser.execute(async (encodedPath) => {
+      const path = window.atob(encodedPath)
+      try {
+        await window.__TAURI_INTERNALS__.invoke('plugin:fs|read_text_file', {
+          path,
+        })
+        return { allowed: true }
+      } catch (error) {
+        return { allowed: false, error: String(error) }
+      }
+    }, Buffer.from(fsScopeFixture, 'utf8').toString('base64'))
+  } catch (error) {
+    fsScopeResult = { allowed: false, error: String(error) }
+  }
   if (
     fsScopeResult.allowed ||
     !/forbidden|scope|not allowed|not permitted/i.test(
@@ -2240,18 +2245,23 @@ try {
   }
   process.stdout.write('Out-of-scope WebView file read was rejected\n')
   phase = 'filesystem scope write denial'
-  const fsScopeWriteResult = await browser.execute(async (encodedPath) => {
-    const path = window.atob(encodedPath)
-    try {
-      await window.__TAURI_INTERNALS__.invoke('plugin:fs|write_text_file', {
-        path,
-        contents: 'This out-of-scope file must not be created.',
-      })
-      return { allowed: true }
-    } catch (error) {
-      return { allowed: false, error: String(error) }
-    }
-  }, Buffer.from(fsScopeWriteFixture, 'utf8').toString('base64'))
+  let fsScopeWriteResult
+  try {
+    fsScopeWriteResult = await browser.execute(async (encodedPath) => {
+      const path = window.atob(encodedPath)
+      try {
+        await window.__TAURI_INTERNALS__.invoke('plugin:fs|write_text_file', {
+          path,
+          contents: 'This out-of-scope file must not be created.',
+        })
+        return { allowed: true }
+      } catch (error) {
+        return { allowed: false, error: String(error) }
+      }
+    }, Buffer.from(fsScopeWriteFixture, 'utf8').toString('base64'))
+  } catch (error) {
+    fsScopeWriteResult = { allowed: false, error: String(error) }
+  }
   if (
     fsScopeWriteResult.allowed ||
     !/forbidden|scope|not allowed|not permitted/i.test(
