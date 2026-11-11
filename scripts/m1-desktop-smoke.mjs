@@ -1192,6 +1192,8 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
     const last = items.at(-1)?.getBoundingClientRect()
     const viewport = menu.getBoundingClientRect()
     const menuStyle = getComputedStyle(menu)
+    const nonce = document.querySelector('style[nonce]')?.nonce
+    const emotionStyles = [...document.querySelectorAll('style[data-emotion]')]
     return {
       labels: items.map((item) => item.textContent?.trim()),
       lastVisible: Boolean(
@@ -1206,6 +1208,10 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
         overflowY: menuStyle.overflowY,
         minHeight: menuStyle.minHeight,
       },
+      emotionStylesWithNonce: emotionStyles.filter(
+        (style) => nonce && style.nonce === nonce,
+      ).length,
+      emotionStyleCount: emotionStyles.length,
       lastItemBounds: last && { top: last.top, bottom: last.bottom },
       logoVisible: Boolean(
         document.querySelector('.the-logo img[alt="clash5"]'),
@@ -1230,6 +1236,8 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
   if (
     !sidebar.logoVisible ||
     !sidebar.lastVisible ||
+    !sidebar.emotionStyleCount ||
+    sidebar.emotionStylesWithNonce !== sidebar.emotionStyleCount ||
     !expected.some(
       (labels) => JSON.stringify(labels) === JSON.stringify(sidebar.labels),
     )
