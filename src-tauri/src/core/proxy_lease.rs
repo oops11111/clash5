@@ -30,6 +30,7 @@ impl ProxyTarget {
 }
 
 #[cfg(any(windows, test))]
+#[cfg_attr(test, allow(dead_code))]
 pub(crate) fn windows_targets(global_enabled: bool, server: &str, pac: &str) -> Result<Vec<ProxyTarget>> {
     let mut targets = Vec::new();
     if global_enabled {
