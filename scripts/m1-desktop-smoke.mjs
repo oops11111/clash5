@@ -1188,13 +1188,25 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
     const menu = document.querySelector('.the-menu')
     menu.scrollTop = menu.scrollHeight
     const items = [...menu.querySelectorAll('.MuiListItemButton-root')]
+    items.at(-1)?.scrollIntoView({ block: 'end' })
     const last = items.at(-1)?.getBoundingClientRect()
     const viewport = menu.getBoundingClientRect()
+    const menuStyle = getComputedStyle(menu)
     return {
       labels: items.map((item) => item.textContent?.trim()),
       lastVisible: Boolean(
         last && last.top >= viewport.top && last.bottom <= viewport.bottom + 1,
       ),
+      menuMetrics: {
+        top: viewport.top,
+        bottom: viewport.bottom,
+        scrollTop: menu.scrollTop,
+        scrollHeight: menu.scrollHeight,
+        clientHeight: menu.clientHeight,
+        overflowY: menuStyle.overflowY,
+        minHeight: menuStyle.minHeight,
+      },
+      lastItemBounds: last && { top: last.top, bottom: last.bottom },
       logoVisible: Boolean(
         document.querySelector('.the-logo img[alt="clash5"]'),
       ),
