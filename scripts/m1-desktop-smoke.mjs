@@ -2216,7 +2216,8 @@ try {
     fsScopeFixture,
     'This file must remain outside the WebView filesystem scope.',
   )
-  const fsScopeResult = await browser.execute(async (path) => {
+  const fsScopeResult = await browser.execute(async (encodedPath) => {
+    const path = window.atob(encodedPath)
     try {
       await window.__TAURI_INTERNALS__.invoke('plugin:fs|read_text_file', {
         path,
@@ -2225,7 +2226,7 @@ try {
     } catch (error) {
       return { allowed: false, error: String(error) }
     }
-  }, fsScopeFixture)
+  }, Buffer.from(fsScopeFixture, 'utf8').toString('base64'))
   if (
     fsScopeResult.allowed ||
     !/forbidden|scope|not allowed|not permitted/i.test(
@@ -2239,7 +2240,8 @@ try {
   }
   process.stdout.write('Out-of-scope WebView file read was rejected\n')
   phase = 'filesystem scope write denial'
-  const fsScopeWriteResult = await browser.execute(async (path) => {
+  const fsScopeWriteResult = await browser.execute(async (encodedPath) => {
+    const path = window.atob(encodedPath)
     try {
       await window.__TAURI_INTERNALS__.invoke('plugin:fs|write_text_file', {
         path,
@@ -2249,7 +2251,7 @@ try {
     } catch (error) {
       return { allowed: false, error: String(error) }
     }
-  }, fsScopeWriteFixture)
+  }, Buffer.from(fsScopeWriteFixture, 'utf8').toString('base64'))
   if (
     fsScopeWriteResult.allowed ||
     !/forbidden|scope|not allowed|not permitted/i.test(
