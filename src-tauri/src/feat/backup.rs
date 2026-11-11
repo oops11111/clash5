@@ -393,16 +393,25 @@ pub async fn restore_local_backup(filename: String) -> Result<()> {
 
 #[tracing::instrument(skip_all, level = "info", fields(filename = %filename, destination = %destination))]
 pub async fn export_local_backup(filename: String, destination: String) -> Result<()> {
+    use tauri_plugin_fs::FsExt as _;
+
     let backup_dir = local_backup_dir()?;
-    let source_path = backup_dir.join(filename.as_str());
-    if !source_path.exists() {
-        return Err(anyhow!("Backup file not found: {}", filename));
-    }
+    let source_path = super::backup_path::backup_source(&backup_dir, filename.as_str())?;
 
     let dest_path = PathBuf::from(destination.as_str());
-    if let Some(parent) = dest_path.parent() {
-        fs::create_dir_all(parent).await?;
+    if !crate::core::handle::Handle::app_handle()
+        .fs_scope()
+        .is_allowed(&dest_path)
+    {
+        return Err(anyhow!("Export destination must be selected through the save dialog"));
     }
+    let dest_path = super::backup_path::normalize_export_destination(&dest_path)?;
+    anyhow::ensure!(
+        crate::core::handle::Handle::app_handle()
+            .fs_scope()
+            .is_allowed(&dest_path),
+        "Export destination must be selected through the save dialog"
+    );
 
     fs::copy(&source_path, &dest_path)
         .await
