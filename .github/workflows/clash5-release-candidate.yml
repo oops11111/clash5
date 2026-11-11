@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/clash5-release-candidate.yml'
+      - 'RELEASE-GATES.md'
       - 'scripts/release-gate/**'
   workflow_dispatch:
     inputs:
@@ -25,7 +26,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: scripts/release-gate -> target
-      - run: cargo test --locked --manifest-path scripts/release-gate/Cargo.toml
+      - name: Validate release gate registry
+        run: node scripts/release-gate/check-registry.mjs
+      - name: Test release gate verifier
+        run: cargo test --locked --manifest-path scripts/release-gate/Cargo.toml
+      - name: Test release registry validation
+        run: node --test scripts/release-gate/check-registry.test.mjs
 
   verify-draft:
     name: Verify draft assets and updater signatures
