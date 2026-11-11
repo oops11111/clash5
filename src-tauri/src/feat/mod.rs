@@ -1,5 +1,5 @@
 mod backup;
-mod backup_archive;
+pub(crate) mod backup_archive;
 mod backup_path;
 mod clash;
 mod config;
