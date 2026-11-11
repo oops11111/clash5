@@ -18,7 +18,7 @@ the original review records before release; the present registry is a skeleton.
 | G-07 | P0-18 | blocked | - | First release excludes browser companion resources |
 | G-08 | P0-18 | blocked | - | Frozen driver artifacts and accurate product claims |
 | G-09 | P0-07 | partial | scripts/check-proxy-recovery.mjs | Sidecar exit cleanup, persisted proxy lease and bounded recovery checks pass; OS acceptance and service policy alignment remain |
-| G-10 | P0-08 | partial | scripts/check-privacy-defaults.mjs | Rust and frontend default tests pass; new-install snapshot and live DNS routing acceptance remain |
+| G-10 | P0-08 | partial | scripts/check-privacy-defaults.mjs | Rust tests cover first-run defaults and explicit DNS preservation; frontend tests cover missing-key defaults; live DNS routing acceptance remains |
 | G-11 | P0-09 | partial | scripts/check-uninstall-cleanup.mjs | Windows task cleanup is registered and name-aligned; ownership-safe proxy reset and VM/browser evidence remain |
 | G-12 | P0-10 | partial | scripts/check-subscription-naming.mjs | Host-safe defaults, legacy-name migration and masked update logs are covered; full tray/notification desktop redaction remains |
 | G-13 | P0-11 | partial | - | Desktop transport/UA evidence, direct-connection UX, and certificate-exception acceptance |
@@ -31,6 +31,7 @@ the original review records before release; the present registry is a skeleton.
 
 ## Local implementation evidence (2026-11-04)
 
+- P0-08：新安装的主配置和 DNS 文件默认关闭 IPv6、启用 DNS 规则路由；启动仅在 DNS 文件缺失时创建默认值，现有显式设置（包括上游列表）保持原样。Rust 首次运行快照/保留测试、前端缺失键默认测试与静态门禁覆盖此策略；真实 DNS 路由仍须桌面验收。
 - P1-28：`scripts/prebuild.mjs` 将 mihomo 实际字节写入 `resources/core-hashes.json`；服务安装前读取该清单并重新计算核心 SHA-256，清单缺失仅允许开发会话，清单存在但哈希不匹配时拒绝安装。Windows NSIS 仍使用同一构建摘要调用服务安装器。静态门禁：`npm run check:core-hash-gate`；Rust 单测覆盖精确字节接受、篡改拒绝及开发会话无清单。
 - P1-29：远程规则集在配置写入和运行时生成两处拒绝非 HTTPS/超长 URL；生成的 mihomo `rule-providers` 强制走 `clash5-default` 并设置 10 MiB `size-limit`。静态门禁：`npm run check:rule-provider-policy`；Rust 单测覆盖代理字段、大小限制和 HTTPS URL 策略。
 - P1-30：前端剪贴板读写统一使用 Tauri clipboard-manager 插件，能力文件保留最小读写权限；未声明 create-webview/window create 能力，源码无 `navigator.clipboard`。静态门禁：`npm run check:window-clipboard-policy`。

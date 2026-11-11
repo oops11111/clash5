@@ -12,9 +12,7 @@ use crate::{
 use anyhow::{Context as _, Result};
 use chrono::{Local, TimeZone as _};
 use clash_verge_logging::Type;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use std::path::Path;
-use std::{path::PathBuf, str::FromStr as _};
+use std::{path::Path, path::PathBuf, str::FromStr as _};
 use tauri_plugin_shell::ShellExt as _;
 use tokio::fs;
 use tokio::fs::DirEntry;
@@ -417,25 +415,25 @@ fn default_dns_section() -> serde_yaml_ng::Mapping {
     ])
 }
 
-pub(super) async fn init_dns_config() -> Result<()> {
+async fn write_default_dns_config_if_missing(dns_path: &Path) -> Result<()> {
     use serde_yaml_ng::Value;
-
-    let dns_config = default_dns_section();
-
-    let default_dns_config = serde_yaml_ng::Mapping::from_iter([
-        ("dns".into(), Value::Mapping(dns_config)),
-        ("hosts".into(), Value::Mapping(serde_yaml_ng::Mapping::new())),
-    ]);
-
-    let app_dir = dirs::app_home_dir()?;
-    let dns_path = app_dir.join(constants::files::DNS_CONFIG);
 
     if !dns_path.exists() {
         logging!(info, Type::Setup, "Creating default DNS config file");
+        let default_dns_config = serde_yaml_ng::Mapping::from_iter([
+            ("dns".into(), Value::Mapping(default_dns_section())),
+            ("hosts".into(), Value::Mapping(serde_yaml_ng::Mapping::new())),
+        ]);
         help::save_yaml(&dns_path, &default_dns_config, Some("# clash5 DNS Config")).await?;
     }
 
     Ok(())
+}
+
+pub(super) async fn init_dns_config() -> Result<()> {
+    let app_dir = dirs::app_home_dir()?;
+    let dns_path = app_dir.join(constants::files::DNS_CONFIG);
+    write_default_dns_config_if_missing(&dns_path).await
 }
 
 async fn ensure_directories() -> Result<()> {
@@ -676,6 +674,33 @@ async fn handle_copy(src: &PathBuf, dest: &PathBuf, file: &str) {
 mod tests {
     use super::*;
     use serde_yaml_ng::Value;
+
+    #[tokio::test]
+    async fn first_run_dns_snapshot_uses_privacy_defaults_and_preserves_existing_opt_ins() -> Result<()> {
+        let root = std::env::temp_dir().join(format!("clash5-dns-defaults-{}", nanoid::nanoid!()));
+        fs::create_dir(&root).await?;
+        let _cleanup = scopeguard::guard(root.clone(), |path| {
+            let _ = std::fs::remove_dir_all(path);
+        });
+
+        let fresh_path = root.join("fresh.yaml");
+        write_default_dns_config_if_missing(&fresh_path).await?;
+        let fresh: Value = serde_yaml_ng::from_str(&fs::read_to_string(&fresh_path).await?)?;
+        let dns = fresh
+            .get("dns")
+            .and_then(Value::as_mapping)
+            .context("first-run DNS snapshot has no dns mapping")?;
+        assert_eq!(dns.get("ipv6"), Some(&Value::Bool(false)));
+        assert_eq!(dns.get("respect-rules"), Some(&Value::Bool(true)));
+        assert_eq!(IClashTemp::template().0.get("ipv6"), Some(&Value::Bool(false)));
+
+        let existing_path = root.join("existing.yaml");
+        let existing = b"dns:\n  ipv6: true\n  respect-rules: false\n  nameserver:\n    - udp://203.0.113.53\n";
+        fs::write(&existing_path, existing).await?;
+        write_default_dns_config_if_missing(&existing_path).await?;
+        assert_eq!(fs::read(&existing_path).await?, existing);
+        Ok(())
+    }
 
     #[test]
     fn default_dns_uses_no_plaintext_upstream_no_system_bootstrap_and_loopback_listen() {
