@@ -190,18 +190,6 @@ mod app_init {
         let mut builder = builder
             .plugin(tauri_plugin_clash_verge_sysinfo::init())
             .plugin(tauri_plugin_notification::init())
-            .plugin(
-                tauri_plugin_updater::Builder::new()
-                    .default_version_comparator(|current, release| {
-                        core::updater::is_official_stable_release(&release)
-                            && (release.version > current
-                                || core::updater::is_build_to_stable(
-                                    &current.to_string(),
-                                    &release.version.to_string(),
-                                ))
-                    })
-                    .build(),
-            )
             .plugin(tauri_plugin_clipboard_manager::init())
             .plugin(tauri_plugin_process::init())
             .plugin(tauri_plugin_global_shortcut::Builder::new().build())

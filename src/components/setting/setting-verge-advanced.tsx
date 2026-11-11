@@ -4,7 +4,6 @@ import { useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { DialogRef, TooltipIcon } from '@/components/base'
-import { updateLastCheckTime } from '@/hooks/use-update'
 import {
   exitApp,
   exportDiagnosticInfo,
@@ -15,7 +14,6 @@ import {
 } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
-import { checkUpdateSafe as checkUpdate } from '@/services/update'
 import { version } from '@root/package.json'
 
 import { BackupViewer } from './mods/backup-viewer'
@@ -43,23 +41,6 @@ const SettingVergeAdvanced = ({ onError: _ }: Props) => {
   const updateRef = useRef<DialogRef>(null)
   const backupRef = useRef<DialogRef>(null)
   const liteModeRef = useRef<DialogRef>(null)
-
-  const onCheckUpdate = async () => {
-    try {
-      const info = await checkUpdate()
-      updateLastCheckTime()
-      if (!info?.available) {
-        showNotice.success(
-          'settings.components.verge.advanced.notifications.latestVersion',
-        )
-      } else {
-        updateRef.current?.open()
-      }
-    } catch (err) {
-      console.warn('update check failed:', err)
-      showNotice.warning(err)
-    }
-  }
 
   const onExportDiagnosticInfo = useCallback(async () => {
     await mutate(() => exportDiagnosticInfo(), {
@@ -124,11 +105,6 @@ const SettingVergeAdvanced = ({ onError: _ }: Props) => {
       <SettingItem
         onClick={openLogsDir}
         label={t('settings.components.verge.advanced.fields.openLogsDir')}
-      />
-
-      <SettingItem
-        onClick={onCheckUpdate}
-        label={t('settings.components.verge.advanced.fields.checkUpdates')}
       />
 
       <SettingItem
