@@ -61,8 +61,12 @@ pub async fn install_update(
     version: std::string::String,
     on_event: Channel<DownloadEvent>,
 ) -> CmdResult<bool> {
-    let _ = (app_handle, version, on_event);
-    Err("in-app updates are disabled for the first release".into())
+    SilentUpdater::global()
+        .install_update(&app_handle, &version, |event| {
+            let _ = on_event.send(event);
+        })
+        .await
+        .stringify_err()
 }
 
 #[tauri::command]

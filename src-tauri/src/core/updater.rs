@@ -9,7 +9,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Duration,
 };
-use tauri_plugin_updater::{RemoteRelease, RemoteReleaseInner, Update, UpdaterExt as _};
+use tauri_plugin_updater::{Update, UpdaterExt as _};
 use tokio_util::sync::CancellationToken;
 
 /// The first clash5 release is updated only through its installer.
@@ -178,6 +178,7 @@ pub fn is_build_to_stable(current: &str, remote: &str) -> bool {
 }
 
 /// The updater accepts only signed stable artifacts owned by this repository.
+#[cfg(test)]
 pub fn is_official_stable_release(release: &RemoteRelease) -> bool {
     if !release.version.pre.is_empty() || !release.version.build.is_empty() {
         return false;
@@ -748,7 +749,7 @@ impl SilentUpdater {
 #[cfg(test)]
 mod release_source_tests {
     use super::*;
-    use tauri_plugin_updater::ReleaseManifestPlatform;
+    use tauri_plugin_updater::{ReleaseManifestPlatform, RemoteRelease, RemoteReleaseInner};
 
     fn candidate(version: &str, url: &str) -> Result<RemoteRelease, Box<dyn std::error::Error>> {
         Ok(RemoteRelease {

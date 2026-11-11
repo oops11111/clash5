@@ -167,9 +167,9 @@ assert.match(
   'new configurations must default to no automatic update checks',
 )
 assert.match(
-  readFileSync('src-tauri/src/cmd/app.rs', 'utf8'),
-  /in-app updates are disabled for the first release/,
-  'the frontend update-install command must reject first-release installs',
+  readFileSync('src-tauri/src/core/updater.rs', 'utf8'),
+  /ensure!\(\s*FIRST_RELEASE_UPDATER_ENABLED,\s*"in-app updates are disabled for the first release"/,
+  'backend update installs must reject first-release installs',
 )
 assert.match(
   readFileSync('src/services/update.ts', 'utf8'),
