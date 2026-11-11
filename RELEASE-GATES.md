@@ -17,7 +17,7 @@ the original review records before release; the present registry is a skeleton.
 | G-06 | P0-06 | partial | - | Backup path tests pass locally; native save dialog and denied destination runtime checks remain |
 | G-07 | P0-18 | blocked | - | First release excludes browser companion resources |
 | G-08 | P0-18 | blocked | - | Frozen driver artifacts and accurate product claims |
-| G-09 | P0-07 | partial | scripts/check-proxy-recovery.mjs | Sidecar exit cleanup, persisted proxy lease and bounded recovery checks pass; OS acceptance and service policy alignment remain |
+| G-09 | P0-07 | partial | scripts/check-proxy-recovery.mjs | Sidecar exit cleanup, persisted proxy lease, aligned service watchdog policy and bounded recovery checks pass; OS acceptance remains |
 | G-10 | P0-08 | blocked | - | IPv6 off and respect-rules on; preserve explicit settings |
 | G-11 | P0-09 | blocked | - | Uninstall proxy ownership and scheduled-task cleanup |
 | G-12 | P0-10 | blocked | - | Token-safe subscription naming and migration |
@@ -74,14 +74,18 @@ without switching that unrelated proxy off. Each OS apply uses the same frozen
 target as the lease. A cancelled manual operation or replacement generation
 invalidates the previous recovery request.
 
-Mihomo sidecar recovery and sing-box use the same three-attempt rolling
-five-minute policy, with separate supervisor budgets. The pinned service dependency still has its own watchdog
-(`max_restarts: 10`, 600-second window); its attempts are not governed by the new
-app budget. This policy must be reconciled before G-09 can pass.
+Mihomo sidecar recovery, sing-box and the pinned service watchdog use the same
+three-attempt rolling five-minute policy, with separate supervisor budgets. The
+service watchdog is pinned to `oops11111/clash5-service-ipc` commit
+`6cc9a8aee1dcc4e40fdd22469a42b31cc4cc77b4`; its default is covered by that
+dependency's unit test. The linked dependency change is under review in PR #2.
 Eleven isolated ownership/marker/budget tests passed; no live OS proxy was changed
-by those tests. Linux reads HTTP, HTTPS and SOCKS separately rather than using the
-merged endpoint getter. Live GNOME/KDE acceptance, macOS helper cleanup after app
-termination and actual Windows process-kill/startup recovery remain unverified.
+by those tests. The service crate's default-policy unit test passed. Its Windows
+crash-loop integration test stopped before the test body because securing the
+test-owner directory returned Access Denied; the dependency CI must pass that
+integration test. Linux reads HTTP, HTTPS and SOCKS separately rather than using
+the merged endpoint getter. Live GNOME/KDE acceptance, macOS helper cleanup after
+app termination and actual Windows process-kill/startup recovery remain unverified.
 
 Using the existing `clippy` test feature, all 44 Core manager tests and the
 sing-box budget test passed on Windows, along with 11 archive recovery tests.

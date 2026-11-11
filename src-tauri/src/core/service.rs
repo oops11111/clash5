@@ -1571,7 +1571,9 @@ pub(super) async fn stop_core_by_service() -> Result<()> {
             code if code == clash_verge_service_ipc::ServiceErrorCode::NotActive as u16
                 || code == clash_verge_service_ipc::ServiceErrorCode::StaleOwnerSession as u16
         ) {
-            recover_after_owner_loss_while_locked(OwnerRecoveryReason::Displaced).await;
+            if let Err(cleanup_error) = recover_after_owner_loss_while_locked(OwnerRecoveryReason::Displaced).await {
+                report_owner_recovery_failure(None, Some(cleanup_error));
+            }
         } else {
             start_owner_monitor();
         }

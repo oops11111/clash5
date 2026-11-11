@@ -7,12 +7,15 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (file) => readFile(path.join(root, file), 'utf8')
-const [proxy, state, budget, tests, docs] = await Promise.all([
+const serviceRevision = '6cc9a8aee1dcc4e40fdd22469a42b31cc4cc77b4'
+const [proxy, state, budget, tests, docs, cargoManifest, cargoLock] = await Promise.all([
   read('src-tauri/src/core/proxy_control.rs'),
   read('src-tauri/src/core/manager/state.rs'),
   read('src-tauri/src/core/restart_budget.rs'),
   read('src-tauri/tests/proxy_recovery.rs'),
   read('docs/clash5/CLASH5-BACKLOG-ALL-ROUNDS-2026-11-04.md'),
+  read('src-tauri/Cargo.toml'),
+  read('Cargo.lock'),
 ])
 
 const checks = [
@@ -35,6 +38,9 @@ const checks = [
     tests.includes('abnormal_exit_clears_own_proxy') &&
       tests.includes('mixed_protocol_proxy_does_not_clear_another_application') &&
       tests.includes('persistent_budget_allows_only_three_attempts')],
+  ['service watchdog is pinned to the matching three-per-five-minute policy',
+    cargoManifest.includes(`https://github.com/oops11111/clash5-service-ipc.git", rev = "${serviceRevision}"`) &&
+      cargoLock.includes(`git+https://github.com/oops11111/clash5-service-ipc.git?rev=${serviceRevision}#${serviceRevision}`)],
   ['backlog records the remaining desktop evidence',
     docs.includes('真机杀进程恢复') && docs.includes('Service watchdog')],
 ]
