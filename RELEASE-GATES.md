@@ -29,6 +29,7 @@ define their individual meanings; this ledger does not guess those meanings.
 | G-14 | P0-14: migration snapshot, atomicity, and old-version guard | Migration transaction and compatibility tests | OPEN |
 | G-15 | P0-15: preserve data when configuration is corrupt | Corrupt-configuration preservation tests | OPEN |
 | G-16 | P0-16: signing and first-release updater behavior | Updater-off regression tests; platform signing evidence remains required | BLOCKED |
+| P0-12-CORE-UPDATE | P0-12: core updates ship only with clash5 installers | Command-surface check and desktop installer acceptance | OPEN |
 | G-17…G-22 | R11 additions covering WebDAV, deep links, User-Agent, and related decisions | Individual R11 acceptance evidence; see P0-13 and P1-36 | OPEN |
 | G-23…G-27 | R12 additions | Individual R12 acceptance evidence; see P0-11 and P1-38…P1-40 | OPEN |
 | G-28…G-31 | R13 additions | Individual R13 acceptance evidence; see P0-05 and P1-41 | OPEN |

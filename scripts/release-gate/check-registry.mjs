@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 const registryPath = new URL('../../RELEASE-GATES.md', import.meta.url);
 const requiredGroups = [
   ...Array.from({ length: 16 }, (_, index) => `G-${String(index + 1).padStart(2, '0')}`),
+  'P0-12-CORE-UPDATE',
   'G-17…G-22',
   'G-23…G-27',
   'G-28…G-31',
@@ -16,7 +17,7 @@ const allowedStates = new Set(['OPEN', 'BLOCKED', 'PASS']);
 export function validateRegistry(markdown) {
   const rows = markdown
     .split(/\r?\n/u)
-    .filter((line) => /^\|\s*(?:G-\d{2}(?:…G-\d{2})?|R19-[A-Z-]+)\s*\|/u.test(line))
+    .filter((line) => /^\|\s*(?:G-\d{2}(?:…G-\d{2})?|P0-\d{2}-[A-Z-]+|R19-[A-Z-]+)\s*\|/u.test(line))
     .map((line) => line.split('|').slice(1, -1).map((cell) => cell.trim()));
 
   if (rows.length !== requiredGroups.length) {
@@ -40,7 +41,30 @@ export function validateRegistry(markdown) {
   return rows.length;
 }
 
+export async function verifyNoInAppCoreUpgrade() {
+  const sources = [
+    '../../src-tauri/src/cmd/clash.rs',
+    '../../src-tauri/src/lib.rs',
+    '../../src-tauri/src/feat/mod.rs',
+    '../../src/services/cmds.ts',
+    '../../src/services/tauri-commands.generated.ts',
+    '../../src/components/setting/mods/clash-core-viewer.tsx',
+  ];
+  const forbidden = /upgrade_clash_core|upgradeClashCore|upgrade_core|CoreUpgradeReport/u;
+  for (const source of sources) {
+    const contents = await readFile(new URL(source, import.meta.url), 'utf8');
+    if (forbidden.test(contents)) throw new Error(`in-app core upgrade surface remains in ${source}`);
+  }
+  try {
+    await readFile(new URL('../../src-tauri/src/feat/core_upgrade.rs', import.meta.url));
+    throw new Error('in-app core upgrade module still exists');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const count = validateRegistry(await readFile(registryPath, 'utf8'));
+  await verifyNoInAppCoreUpgrade();
   process.stdout.write(`Validated ${count} release-gate registry rows.\n`);
 }
