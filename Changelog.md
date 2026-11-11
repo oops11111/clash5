@@ -4,6 +4,7 @@
 <summary><strong> 🐞 修复问题 </strong></summary>
 
 - 修复通过 URL 导入订阅时，即使导入的订阅并非当前使用的订阅，也会重新加载当前配置的问题
+- 修复 WebDAV 连接接受无效 TLS 证书和不安全重定向的问题
 
 </details>
 
