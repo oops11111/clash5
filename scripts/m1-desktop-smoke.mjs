@@ -2224,6 +2224,7 @@ try {
     chainFixture = await startChainFixture(true)
   }
   browser = await startWdioSession(capabilities)
+  await browser.setWindowSize(1280, 600)
   phase = 'filesystem scope denial'
   await writeFile(
     fsScopeFixture,
