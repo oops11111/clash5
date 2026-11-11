@@ -1186,6 +1186,7 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
   if (includePluginFixture) await prepareM3PluginFixture()
   const sidebar = await browser.execute(() => {
     const menu = document.querySelector('.the-menu')
+    menu.scrollTop = menu.scrollHeight
     const items = [...menu.querySelectorAll('.MuiListItemButton-root')]
     const last = items.at(-1)?.getBoundingClientRect()
     const viewport = menu.getBoundingClientRect()
