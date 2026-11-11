@@ -11,6 +11,7 @@ import {
   ClearRounded,
   ContentPasteRounded,
   DeleteRounded,
+  FileOpenOutlined,
   FolderOpenOutlined,
   IndeterminateCheckBoxRounded,
   LocalFireDepartmentRounded,
@@ -135,7 +136,10 @@ const ProfilePage = () => {
         }
         const item = {
           type: 'local',
-          name: file.split(/\/|\\/).pop() ?? 'New Profile',
+          name:
+            file
+              .split(file.includes('/') ? '/' : String.fromCharCode(92))
+              .pop() ?? 'New Profile',
           desc: '',
           url: '',
           option: {
@@ -283,6 +287,57 @@ const ProfilePage = () => {
         skipped: report.skipped.length,
         manifest: report.source_manifest_after,
         syncFailures: report.binding_sync_failures,
+      })
+    } catch (error) {
+      showNotice.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const onImportLocalProfiles = async () => {
+    try {
+      const selected = await openDialog({
+        multiple: true,
+        filters: [{ name: 'YAML Profile', extensions: ['yaml', 'yml'] }],
+      })
+      if (!selected) return
+
+      setLoading(true)
+      const paths = Array.isArray(selected) ? selected : [selected]
+      for (const file of paths) {
+        if (!file.endsWith('.yaml') && !file.endsWith('.yml')) {
+          showNotice.error('profiles.page.feedback.errors.onlyYaml')
+          continue
+        }
+
+        try {
+          const item = {
+            type: 'local',
+            name:
+              file
+                .split(file.includes('/') ? '/' : String.fromCharCode(92))
+                .pop() ?? 'New Profile',
+            desc: '',
+            url: '',
+            option: {
+              with_proxy: false,
+              self_proxy: false,
+            },
+          } as IProfileItem
+          const data = await readTextFile(file)
+          await mutate(() => createProfile(item, data), {
+            id: 'create-profile',
+            errorNotice: false,
+            revalidate: [['getProfiles']],
+          })
+        } catch (error) {
+          showNotice.error(error)
+        }
+      }
+      await mutate(() => enhanceProfiles(), {
+        id: 'enhance-profiles',
+        errorNotice: false,
       })
     } catch (error) {
       showNotice.error(error)
@@ -905,6 +960,17 @@ const ProfilePage = () => {
           onClick={() => void onImportVergeData()}
         >
           <FolderOpenOutlined fontSize="small" />
+        </Button>
+        <Button
+          disabled={loading || disabled}
+          variant="outlined"
+          size="small"
+          sx={{ borderRadius: '6px', minWidth: 36, px: 1 }}
+          title={t('profiles.page.actions.import')}
+          aria-label={t('profiles.page.actions.import')}
+          onClick={() => void onImportLocalProfiles()}
+        >
+          <FileOpenOutlined fontSize="small" />
         </Button>
         <Button
           variant="contained"

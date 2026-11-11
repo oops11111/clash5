@@ -13,11 +13,22 @@ import {
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { join } from '@tauri-apps/api/path'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { exists } from '@tauri-apps/plugin-fs'
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { BaseDialog, DialogRef, Switch, TooltipIcon } from '@/components/base'
+import {
+  BaseDialog,
+  type DialogRef,
+  Switch,
+  TooltipIcon,
+} from '@/components/base'
 import { DEFAULT_HOVER_DELAY } from '@/components/proxy/proxy-group-navigator'
 import { useVerge } from '@/hooks/use-verge'
 import { useWindowDecorations } from '@/hooks/use-window'
@@ -57,14 +68,17 @@ export const LayoutViewer = forwardRef<DialogRef>((_, ref) => {
   const [commonIcon, setCommonIcon] = useState('')
   const [sysproxyIcon, setSysproxyIcon] = useState('')
   const [tunIcon, setTunIcon] = useState('')
+  const iconFallbacksRef = useRef<
+    Record<'common' | 'sysproxy' | 'tun', string>
+  >({
+    common: '',
+    sysproxy: '',
+    tun: '',
+  })
 
   const { decorated, toggleDecorations } = useWindowDecorations()
 
-  useEffect(() => {
-    initIconPath()
-  }, [])
-
-  async function initIconPath() {
+  const initIconPath = useCallback(async () => {
     const appDir = await getAppDir()
 
     const icon_dir = await join(appDir, 'icons')
@@ -80,22 +94,19 @@ export const LayoutViewer = forwardRef<DialogRef>((_, ref) => {
       'tun',
     )
 
-    if (await exists(common_icon_ico)) {
-      setCommonIcon(common_icon_ico)
-    } else {
-      setCommonIcon(common_icon_png)
+    setCommonIcon(common_icon_png)
+    setSysproxyIcon(sysproxy_icon_png)
+    setTunIcon(tun_icon_png)
+    iconFallbacksRef.current = {
+      common: common_icon_ico,
+      sysproxy: sysproxy_icon_ico,
+      tun: tun_icon_ico,
     }
-    if (await exists(sysproxy_icon_ico)) {
-      setSysproxyIcon(sysproxy_icon_ico)
-    } else {
-      setSysproxyIcon(sysproxy_icon_png)
-    }
-    if (await exists(tun_icon_ico)) {
-      setTunIcon(tun_icon_ico)
-    } else {
-      setTunIcon(tun_icon_png)
-    }
-  }
+  }, [])
+
+  useEffect(() => {
+    void initIconPath()
+  }, [initIconPath])
 
   useImperativeHandle(ref, () => ({
     open: () => setOpen(true),
@@ -517,7 +528,18 @@ export const LayoutViewer = forwardRef<DialogRef>((_, ref) => {
               startIcon={
                 verge?.common_tray_icon &&
                 commonIcon && (
-                  <img height="20px" src={convertFileSrc(commonIcon)} />
+                  <img
+                    height="20px"
+                    src={convertFileSrc(commonIcon)}
+                    alt=""
+                    aria-hidden="true"
+                    onError={() => {
+                      const fallback = iconFallbacksRef.current.common
+                      if (fallback && commonIcon !== fallback) {
+                        setCommonIcon(fallback)
+                      }
+                    }}
+                  />
                 )
               }
               onClick={async () => {
@@ -572,7 +594,18 @@ export const LayoutViewer = forwardRef<DialogRef>((_, ref) => {
               startIcon={
                 verge?.sysproxy_tray_icon &&
                 sysproxyIcon && (
-                  <img height="20px" src={convertFileSrc(sysproxyIcon)} />
+                  <img
+                    height="20px"
+                    src={convertFileSrc(sysproxyIcon)}
+                    alt=""
+                    aria-hidden="true"
+                    onError={() => {
+                      const fallback = iconFallbacksRef.current.sysproxy
+                      if (fallback && sysproxyIcon !== fallback) {
+                        setSysproxyIcon(fallback)
+                      }
+                    }}
+                  />
                 )
               }
               onClick={async () => {
@@ -624,7 +657,20 @@ export const LayoutViewer = forwardRef<DialogRef>((_, ref) => {
               size="small"
               startIcon={
                 verge?.tun_tray_icon &&
-                tunIcon && <img height="20px" src={convertFileSrc(tunIcon)} />
+                tunIcon && (
+                  <img
+                    height="20px"
+                    src={convertFileSrc(tunIcon)}
+                    alt=""
+                    aria-hidden="true"
+                    onError={() => {
+                      const fallback = iconFallbacksRef.current.tun
+                      if (fallback && tunIcon !== fallback) {
+                        setTunIcon(fallback)
+                      }
+                    }}
+                  />
+                )
               }
               onClick={async () => {
                 if (verge?.tun_tray_icon) {

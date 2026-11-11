@@ -23,6 +23,11 @@ if (!binary)
 const full = process.argv.includes('--full')
 const persisted = process.argv.includes('--persisted')
 const recoveryCancel = process.argv.includes('--recovery-cancel')
+const fsScopeFixture = resolve('target', `webview-scope-${randomUUID()}.txt`)
+const fsScopeWriteFixture = resolve(
+  'target',
+  `webview-scope-write-${randomUUID()}.txt`,
+)
 if ([full, persisted, recoveryCancel].filter(Boolean).length > 1) {
   throw new Error('Choose only one desktop smoke mode')
 }
@@ -2206,6 +2211,61 @@ try {
     chainFixture = await startChainFixture(true)
   }
   browser = await startWdioSession(capabilities)
+  phase = 'filesystem scope denial'
+  await writeFile(
+    fsScopeFixture,
+    'This file must remain outside the WebView filesystem scope.',
+  )
+  const fsScopeResult = await browser.execute(async (path) => {
+    try {
+      await window.__TAURI_INTERNALS__.invoke('plugin:fs|read_text_file', {
+        path,
+      })
+      return { allowed: true }
+    } catch (error) {
+      return { allowed: false, error: String(error) }
+    }
+  }, fsScopeFixture)
+  if (
+    fsScopeResult.allowed ||
+    !/forbidden|scope|not allowed|not permitted/i.test(
+      fsScopeResult.error ?? '',
+    )
+  ) {
+    throw new Error(
+      'Out-of-scope WebView file read was not rejected: ' +
+        JSON.stringify(fsScopeResult),
+    )
+  }
+  process.stdout.write('Out-of-scope WebView file read was rejected\n')
+  phase = 'filesystem scope write denial'
+  const fsScopeWriteResult = await browser.execute(async (path) => {
+    try {
+      await window.__TAURI_INTERNALS__.invoke('plugin:fs|write_text_file', {
+        path,
+        contents: 'This out-of-scope file must not be created.',
+      })
+      return { allowed: true }
+    } catch (error) {
+      return { allowed: false, error: String(error) }
+    }
+  }, fsScopeWriteFixture)
+  if (
+    fsScopeWriteResult.allowed ||
+    !/forbidden|scope|not allowed|not permitted/i.test(
+      fsScopeWriteResult.error ?? '',
+    ) ||
+    (await readFile(fsScopeWriteFixture).then(
+      () => true,
+      () => false,
+    ))
+  ) {
+    throw new Error(
+      'Out-of-scope WebView file write was not rejected: ' +
+        JSON.stringify(fsScopeWriteResult),
+    )
+  }
+  process.stdout.write('Out-of-scope WebView file write was rejected\n')
   phase = 'Tauri bridge'
   let inventory
   let lastError
@@ -2420,6 +2480,16 @@ try {
   throw error
 } finally {
   phase = 'WebDriver cleanup'
+  await rm(fsScopeFixture, { force: true }).catch((error) => {
+    process.stderr.write(
+      `Filesystem scope fixture cleanup failed: ${String(error)}\n`,
+    )
+  })
+  await rm(fsScopeWriteFixture, { force: true }).catch((error) => {
+    process.stderr.write(
+      `Filesystem write fixture cleanup failed: ${String(error)}\n`,
+    )
+  })
   await cleanupM3PluginFixture().catch((error) => {
     process.stderr.write(`M3 fixture cleanup failed: ${String(error)}\n`)
   })

@@ -24,3 +24,6 @@ jobs:
 
       - name: No manual update-flag chains
         run: '! grep -rnE "determine_update_flags|UpdateFlags" src-tauri/src'
+
+      - name: Check WebView security boundaries
+        run: node scripts/check-webview-security.mjs
