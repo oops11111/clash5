@@ -5,6 +5,14 @@ import ts from 'typescript'
 const ROOT = path.resolve(import.meta.dirname, '..')
 const GENERATED = path.join(ROOT, 'src/services/tauri-commands.generated.ts')
 const FRONTEND = path.join(ROOT, 'src/services/cmds.ts')
+const CORE_UPGRADE_FILES = [
+  'src-tauri/src/cmd/clash.rs',
+  'src-tauri/src/feat/mod.rs',
+  'src-tauri/src/lib.rs',
+  'src/components/setting/mods/clash-core-viewer.tsx',
+  'src/services/cmds.ts',
+  'src/services/tauri-commands.generated.ts',
+]
 const config = ts.getParsedCommandLineOfConfigFile(
   path.join(ROOT, 'tsconfig.json'),
   {},
@@ -131,6 +139,30 @@ function checkRegisteredCommands() {
   for (const command of generatedCommands.keys()) {
     if (!registered.has(command))
       failures.push(`Generated command ${command} is not registered`)
+  }
+}
+
+function checkCoreUpgradeDisabled() {
+  const retiredCommand = 'upgrade_' + 'clash_core'
+  const retiredFrontend = 'upgrade' + 'ClashCore'
+  const retiredType = 'CoreUpgrade' + 'Report'
+  for (const relative of CORE_UPGRADE_FILES) {
+    const file = path.join(ROOT, relative)
+    const content = ts.sys.readFile(file) ?? ''
+    if (
+      content.includes(retiredCommand) ||
+      content.includes(retiredFrontend) ||
+      content.includes(retiredType)
+    ) {
+      failures.push(`${relative}: in-app core upgrades must stay disabled`)
+    }
+  }
+  if (
+    ts.sys.fileExists(path.join(ROOT, 'src-tauri/src/feat/core_upgrade.rs'))
+  ) {
+    failures.push(
+      'src-tauri/src/feat/core_upgrade.rs: in-app core upgrades must stay disabled',
+    )
   }
 }
 
@@ -265,6 +297,7 @@ function visitFrontend(node) {
 }
 
 checkRegisteredCommands()
+checkCoreUpgradeDisabled()
 for (const file of config.fileNames) {
   if (path.resolve(file) !== GENERATED)
     visitFrontend(program.getSourceFile(file))
