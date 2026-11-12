@@ -1,18 +1,13 @@
 export const navigationItems = {
   home: { label: 'layout.components.navigation.tabs.home', path: '/' },
-  nodePool: {
-    label: 'layout.components.navigation.tabs.nodePool',
-    path: '/nodes',
+  proxies: {
+    label: 'layout.components.navigation.tabs.proxies',
+    path: '/proxies',
   },
-  profiles: {
+  subscriptions: {
     label: 'layout.components.navigation.tabs.profiles',
-    path: '/profile',
+    path: '/subscriptions',
   },
-  chains: {
-    label: 'layout.components.navigation.tabs.chains',
-    path: '/chains',
-  },
-  rules: { label: 'layout.components.navigation.tabs.rules', path: '/rules' },
   plugins: {
     label: 'layout.components.navigation.tabs.plugins',
     path: '/plugins',

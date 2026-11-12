@@ -7,112 +7,69 @@
   background: var(--background-color);
 
   .layout-content {
-    /* New container for the flex layout */
     display: flex;
-    flex: 1; /* Take remaining height */
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
     overflow: hidden;
 
-    &__left {
-      flex: 0 0 220px;
+    &__navigation {
       display: flex;
-      height: 100%;
-      width: 220px;
-      padding: 0 0 8px;
-      flex-direction: column;
-      align-self: stretch;
-      box-sizing: border-box;
-      user-select: none;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      overflow: hidden;
-      border-right: 1px solid var(--divider-color);
+      flex: 0 0 58px;
+      align-items: center;
+      gap: 24px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--divider-color);
       background: var(--sidebar-background);
       backdrop-filter: var(--glass-filter);
 
       .the-logo {
-        position: relative;
-        flex: 1 0 58px;
         display: flex;
-        height: 100%;
-        padding: 0 20px;
-        flex-direction: column;
-        justify-content: center;
-        align-items: flex-start;
-        align-self: stretch;
-        box-sizing: border-box;
-
-        img,
-        svg {
-          width: 100%;
-          height: 100%;
-          pointer-events: none;
-        }
-
-        .the-newbtn {
-          position: absolute;
-          right: 10px;
-          top: 15px;
-          border-radius: 8px;
-          padding: 2px 4px;
-          transform: scale(0.8);
-        }
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 8px;
+        user-select: none;
       }
 
       .the-menu {
-        flex: 1 1 80%;
-        overflow-y: auto;
-        margin-bottom: 0px;
-        padding-top: 4px;
-        scrollbar-width: none;
+        flex: 1;
+        min-width: 0;
 
-        &::-webkit-scrollbar {
-          width: 0;
-          height: 0;
+        .MuiTab-root {
+          min-width: 84px;
+          min-height: 58px;
+          font-weight: 600;
+          text-transform: none;
         }
       }
 
-      .the-traffic {
-        flex: 0 0 60px;
-
-        > div {
-          margin: 0 auto;
-          padding: 0 20px;
-        }
+      .navigation-actions {
+        display: flex;
+        align-items: center;
       }
     }
 
     &__right {
       position: relative;
-      flex: 1 1 100%;
-      height: 100%;
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 0;
       min-width: 0;
       background: var(--background-color);
 
       .the-bar {
-        height: 36px;
-        display: flex;
-        justify-content: end;
-        box-sizing: border-box;
-        z-index: 2;
-
-        .the-dragbar {
-          margin-top: 5px;
-          app-region: drag;
-        }
+        display: none;
       }
 
       .the-content {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 1px;
-        bottom: 0px;
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
       }
     }
   }
 }
-
 .window-resize-handles {
   --resize-edge-size: 6px;
   --resize-corner-size: 12px;
@@ -199,6 +156,26 @@
   }
 }
 
+.workspace-tabs {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+
+  > .MuiTabs-root {
+    flex: 0 0 auto;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--divider-color);
+    background: var(--header-background);
+  }
+
+  &__page {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
 .linux,
 .windows,
 .unknown {
@@ -216,20 +193,6 @@
         align-self: stretch;
         flex: 1 1 auto;
       }
-    }
-
-    .layout-content__left .the-logo {
-      flex: 1 0 58px;
-      margin-top: 10px;
-      margin-left: 10px;
-      padding-top: 5px;
-      padding-left: 10px;
-      padding-right: 20px;
-      padding-bottom: 16px;
-    }
-
-    .layout-content__right .the-content {
-      top: 5px;
     }
   }
 }
@@ -251,118 +214,6 @@
         order: 1;
       }
     }
-
-    .layout-content__left {
-      padding-top: 5px;
-    }
-
-    .layout-content__right .the-content {
-      top: 5px;
-    }
-
-    .layout-content__left .the-newbtn {
-      right: 9px;
-      top: 2px;
-    }
   }
 }
 
-.layout.layout--nav-collapsed {
-  --layout-nav-collapsed-width: 72px;
-  --layout-nav-item-size: 52px;
-  --layout-nav-item-radius: 12px;
-  --layout-nav-logo-size: 56px;
-
-  .layout-content {
-    &__left {
-      flex: 0 0 var(--layout-nav-collapsed-width) !important;
-      width: var(--layout-nav-collapsed-width) !important;
-      min-width: var(--layout-nav-collapsed-width) !important;
-      max-width: var(--layout-nav-collapsed-width) !important;
-      border-right: none !important;
-
-      .the-traffic {
-        display: none !important;
-      }
-
-      > .MuiBox-root {
-        display: none !important;
-      }
-
-      .the-logo {
-        flex: 0 0 var(--layout-nav-logo-size) !important;
-        height: var(--layout-nav-logo-size) !important;
-        margin: 8px 0 4px !important;
-        padding: 0 !important;
-        align-items: center !important;
-        justify-content: center !important;
-      }
-
-      .the-logo > div {
-        width: 100% !important;
-        height: 100% !important;
-        align-items: center !important;
-        justify-content: center !important;
-      }
-
-      .the-logo > div > span:last-child {
-        display: none !important;
-      }
-
-      .the-logo .MuiSvgIcon-root {
-        margin: 0 !important;
-      }
-
-      .the-logo .the-newbtn {
-        display: none !important;
-      }
-
-      .the-menu {
-        width: var(--layout-nav-collapsed-width) !important;
-        overflow-x: hidden;
-
-        scrollbar-width: none;
-        &::-webkit-scrollbar {
-          width: 0;
-          height: 0;
-        }
-
-        li:last-child {
-          border-bottom: none;
-        }
-
-        .MuiListItem-root {
-          max-width: 100% !important;
-          padding: 0 !important;
-        }
-
-        .MuiListItemButton-root {
-          justify-content: center !important;
-          width: var(--layout-nav-item-size) !important;
-          height: var(--layout-nav-item-size) !important;
-          min-height: var(--layout-nav-item-size) !important;
-          max-width: var(--layout-nav-item-size) !important;
-          flex: 0 0 var(--layout-nav-item-size) !important;
-          flex-grow: 0 !important;
-          flex-shrink: 0 !important;
-          margin: 6px auto !important;
-          padding: 0 !important;
-          border-radius: var(--layout-nav-item-radius) !important;
-        }
-
-        .MuiListItemIcon-root {
-          min-width: auto !important;
-          margin: 0 !important;
-          margin-left: 0 !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-        }
-
-        .MuiListItemText-root {
-          display: none !important;
-        }
-      }
-    }
-  }
-}

@@ -1189,9 +1189,9 @@ async function cleanupM3PluginFixture() {
 
 async function verifyNavigation({ includePluginFixture = true } = {}) {
   if (includePluginFixture) await prepareM3PluginFixture()
-  const sidebar = await browser.execute(() => {
+  const navigation = await browser.execute(() => {
     const menu = document.querySelector('.the-menu')
-    const items = [...menu.querySelectorAll('.MuiListItemButton-root')]
+    const items = [...menu.querySelectorAll('[role="tab"]')]
     const last = items.at(-1)?.getBoundingClientRect()
     const viewport = menu.getBoundingClientRect()
     const logo = document.querySelector('.the-logo')?.getBoundingClientRect()
@@ -1248,33 +1248,25 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
     }
   })
   const expected = [
-    [
-      'Home',
-      'Nodes',
-      'Subscriptions',
-      'Chains',
-      'Rules',
-      'Plugins',
-      'Connections',
-      'Logs',
-      'Settings',
-    ],
-    ['首页', '节点', '订阅', '链路', '规则', '插件', '连接', '日志', '设置'],
-    ['首頁', '節點', '訂閱', '鏈路', '規則', '插件', '連線', '日誌', '設定'],
+    ['Home', 'Proxies', 'Subscriptions', 'Plugins', 'Settings'],
+    ['首页', '代理', '订阅', '插件', '设置'],
+    ['首頁', '代理', '訂閱', '插件', '設定'],
   ]
   if (
-    !sidebar.logoVisible ||
-    !sidebar.lastVisible ||
+    !navigation.logoVisible ||
+    !navigation.lastVisible ||
     !expected.some(
-      (labels) => JSON.stringify(labels) === JSON.stringify(sidebar.labels),
+      (labels) => JSON.stringify(labels) === JSON.stringify(navigation.labels),
     )
   ) {
-    throw new Error(`Unexpected clash5 sidebar: ${JSON.stringify(sidebar)}`)
+    throw new Error(
+      `Unexpected clash5 navigation: ${JSON.stringify(navigation)}`,
+    )
   }
 
   await browser.execute(() => {
     const plugins = [
-      ...document.querySelectorAll('.the-menu .MuiListItemButton-root'),
+      ...document.querySelectorAll('.the-menu [role="tab"]'),
     ].find((item) => ['Plugins', '插件'].includes(item.textContent?.trim()))
     plugins?.click()
   })
@@ -1359,7 +1351,7 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
 async function verifyThemeScreenshots() {
   const settingsOpened = await browser.execute(() => {
     const settings = [
-      ...document.querySelectorAll('.the-menu .MuiListItemButton-root'),
+      ...document.querySelectorAll('.the-menu [role="tab"]'),
     ].find((item) =>
       ['Settings', '设置', '設定'].includes(item.textContent?.trim()),
     )
@@ -1454,7 +1446,7 @@ async function verifyIdentityRotationAndAmbiguousRebind() {
   const cancelLabels = ['Cancel', '取消']
   await browser.execute(() => {
     const plugins = [
-      ...document.querySelectorAll('.the-menu .MuiListItemButton-root'),
+      ...document.querySelectorAll('.the-menu [role="tab"]'),
     ].find((item) => ['Plugins', '插件'].includes(item.textContent?.trim()))
     plugins?.click()
   })
