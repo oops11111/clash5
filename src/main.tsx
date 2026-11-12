@@ -32,7 +32,8 @@ if (!window.ResizeObserver) {
 
 const mainElementId = 'root'
 const container = document.getElementById(mainElementId)
-const emotionNonce = document.querySelector<HTMLStyleElement>('style[nonce]')?.nonce
+const emotionNonce =
+  document.querySelector<HTMLStyleElement>('style[nonce]')?.nonce
 const emotionCache = createCache({
   key: 'css',
   nonce: emotionNonce || undefined,
