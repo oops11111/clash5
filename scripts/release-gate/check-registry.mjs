@@ -130,11 +130,13 @@ export function validateBackupRestoreSecurity(coreSource, featureSource) {
     'MAX_BACKUP_ENTRIES: usize = 10_000',
     'entry.by_ref().take(MAX_BACKUP_ENTRY_BYTES + 1)',
     'zip.len() > MAX_BACKUP_ENTRIES',
+    'candidate.verify_integrity()?',
     'fn is_allowed_backup_path',
     'fn replace_file_staged',
     'rollback_replacements(replacements)',
     'fn restore_allowlist_accepts_only_known_backup_files',
     'fn restore_filename_rejects_path_components',
+    'fn restore_rejects_invalid_database_before_replacing_files',
   ]) {
     if (!featureSource.includes(evidence)) {
       throw new Error(

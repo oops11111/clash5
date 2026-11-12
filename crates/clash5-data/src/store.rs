@@ -365,6 +365,15 @@ impl BindingStore {
         Ok(())
     }
 
+    pub fn verify_integrity(&self) -> Result<(), DataError> {
+        let result: String = self.db.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+        if result == "ok" {
+            Ok(())
+        } else {
+            Err(DataError::Database)
+        }
+    }
+
     fn install_identity_key(&mut self, key: IdentityKey) -> Result<(), DataError> {
         let active: Option<(i64, String)> = self
             .db

@@ -139,6 +139,13 @@ fn extract_backup<R: Read + Seek>(zip: &mut zip::ZipArchive<R>, home: &Path) -> 
         }
 
         let mut database_snapshot = None;
+        for relative in &files {
+            if relative == Path::new(crate::utils::dirs::CLASH5_DATA_DB) {
+                let candidate = clash5_data::BindingStore::open(stage.join(relative))?;
+                candidate.verify_integrity()?;
+                break;
+            }
+        }
         let mut replacements = Vec::new();
         for relative in &files {
             let staged = stage.join(relative);
@@ -752,6 +759,40 @@ mod restore_archive_tests {
         let mut zip = archive(&[("config.yaml", b"restored")]);
         extract_backup(&mut zip, &home).unwrap();
         assert_eq!(std::fs::read(home.join("config.yaml")).unwrap(), b"restored");
+    }
+
+    #[test]
+    fn restore_rejects_invalid_database_before_replacing_files() {
+        let fixture = Fixture::new();
+        let home = fixture.0.join("home");
+        let config = home.join(crate::utils::dirs::CLASH_CONFIG);
+        std::fs::write(&config, b"existing config").unwrap();
+        let database_path = home.join(crate::utils::dirs::CLASH5_DATA_DB);
+        let mut store = clash5_data::BindingStore::open(&database_path).unwrap();
+        let node = clash5_data::Node {
+            kind: "vless".into(),
+            server: "edge.example.invalid".into(),
+            port: 443,
+            credentials: std::collections::BTreeMap::new(),
+            display_name: "existing node".into(),
+            transport: String::new(),
+            sni: String::new(),
+        };
+        let stable_id = store.upsert_manual(&node).unwrap();
+        drop(store);
+
+        let mut zip = archive(&[
+            (crate::utils::dirs::CLASH_CONFIG, b"replacement config"),
+            (crate::utils::dirs::CLASH5_DATA_DB, b"not a SQLite database"),
+        ]);
+        assert!(extract_backup(&mut zip, &home).is_err());
+        assert_eq!(std::fs::read(&config).unwrap(), b"existing config");
+
+        let store = clash5_data::BindingStore::open(&database_path).unwrap();
+        store.verify_integrity().unwrap();
+        let records = store.node_records(false).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].stable_id, stable_id);
     }
 
     #[test]
