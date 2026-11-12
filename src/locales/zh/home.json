@@ -2,27 +2,13 @@
   "page": {
     "tooltips": {
       "lightweightMode": "轻量模式",
-      "manual": "使用手册",
-      "settings": "首页设置"
+      "manual": "使用手册"
     },
     "cards": {
-      "trafficStats": "流量统计",
-      "networkSettings": "网络设置",
-      "proxyMode": "代理模式"
-    },
-    "settings": {
-      "cards": {
-        "profile": "订阅卡",
-        "currentProxy": "当前代理卡",
-        "network": "网络设置卡",
-        "proxyMode": "代理模式卡",
-        "traffic": "流量统计卡",
-        "tests": "网站测试卡",
-        "ip": "IP 信息卡",
-        "clashInfo": "Clash 信息卡",
-        "systemInfo": "系统信息卡"
-      },
-      "title": "首页设置"
+      "systemProxy": "系统代理 / TUN",
+      "proxyGroups": "代理分组",
+      "qualityNodes": "优质节点",
+      "dnsLeak": "DNS 泄漏检测"
     },
     "title": "首页",
     "firstRun": {
@@ -31,7 +17,8 @@
       "importSubscription": "导入订阅",
       "addNode": "添加节点",
       "plugins": "打开插件"
-    }
+    },
+    "dnsLeakUnavailable": "此版本尚未接入 DNS 泄漏检测。"
   },
   "components": {
     "proxyTun": {

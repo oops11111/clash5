@@ -485,6 +485,35 @@ async function verifyImportAndProbe() {
       timeoutMsg: 'First-run state remained after importing active nodes',
     },
   )
+  const homeCards = await browser.execute(() => ({
+    dashboardVisible: Boolean(
+      document.querySelector('[data-testid="home-fixed-dashboard"]'),
+    ),
+    cardIds: [...document.querySelectorAll('[data-testid^="home-card-"]')].map(
+      (card) => card.getAttribute('data-testid'),
+    ),
+    headerActionIds: [
+      ...(document
+        .querySelector('[data-testid="home-header-actions"]')
+        ?.querySelectorAll('button') ?? []),
+    ].map((button) => button.getAttribute('data-testid')),
+  }))
+  const expectedHomeCards = [
+    'home-card-system-proxy',
+    'home-card-proxy-groups',
+    'home-card-quality-nodes',
+    'home-card-dns-leak',
+  ]
+  if (
+    !homeCards.dashboardVisible ||
+    JSON.stringify(homeCards.cardIds) !== JSON.stringify(expectedHomeCards) ||
+    JSON.stringify(homeCards.headerActionIds) !==
+      JSON.stringify(['home-action-lightweight', 'home-action-manual'])
+  ) {
+    throw new Error(
+      `Unexpected fixed home dashboard cards: ${JSON.stringify(homeCards)}`,
+    )
+  }
   await browser.execute(() => {
     window.history.pushState({}, '', '/nodes')
     window.dispatchEvent(new PopStateEvent('popstate'))

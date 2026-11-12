@@ -990,7 +990,7 @@ export const CurrentProxyCard = () => {
 
   return (
     <EnhancedCard
-      title={t('home.components.currentProxy.title')}
+      title={t('home.page.cards.proxyGroups')}
       icon={
         <Tooltip
           title={

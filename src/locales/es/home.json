@@ -2,27 +2,13 @@
   "page": {
     "tooltips": {
       "lightweightMode": "Modo ligero",
-      "manual": "Manual de uso",
-      "settings": "Configuración de la página de inicio"
+      "manual": "Manual de uso"
     },
     "cards": {
-      "trafficStats": "Estadísticas de tráfico",
-      "networkSettings": "Configuración de red",
-      "proxyMode": "Modo de proxy"
-    },
-    "settings": {
-      "cards": {
-        "profile": "Tarjeta de suscripción",
-        "currentProxy": "Tarjeta de proxy actual",
-        "network": "Tarjeta de configuración de red",
-        "proxyMode": "Tarjeta de modo de proxy",
-        "traffic": "Tarjeta de estadísticas de tráfico",
-        "tests": "Tarjeta de pruebas de sitios web",
-        "ip": "Tarjeta de información de IP",
-        "clashInfo": "Tarjetas de información de Clash",
-        "systemInfo": "Tarjetas de información del sistema"
-      },
-      "title": "Configuración de la página de inicio"
+      "systemProxy": "Proxy del sistema / TUN",
+      "proxyGroups": "Grupos de proxy",
+      "qualityNodes": "Nodos de calidad",
+      "dnsLeak": "Prueba de fugas DNS"
     },
     "title": "Hogar",
     "firstRun": {
@@ -31,7 +17,8 @@
       "importSubscription": "Importar suscripción",
       "addNode": "Añadir nodo",
       "plugins": "Abrir plugins"
-    }
+    },
+    "dnsLeakUnavailable": "Las pruebas de fugas DNS aún no están conectadas en esta versión."
   },
   "components": {
     "proxyTun": {

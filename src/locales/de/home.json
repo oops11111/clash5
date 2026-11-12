@@ -2,27 +2,13 @@
   "page": {
     "tooltips": {
       "lightweightMode": "Leichtgewichtiger Modus",
-      "manual": "Bedienungsanleitung",
-      "settings": "Startseite-Einstellungen"
+      "manual": "Bedienungsanleitung"
     },
     "cards": {
-      "trafficStats": "Verkehrsstatistik",
-      "networkSettings": "Netzwerkeinstellungen",
-      "proxyMode": "Proxy-Modus"
-    },
-    "settings": {
-      "cards": {
-        "profile": "Abonnement-Karte",
-        "currentProxy": "Aktueller Proxy-Karte",
-        "network": "Netzwerkeinstellungen-Karte",
-        "proxyMode": "Proxy-Modus-Karte",
-        "traffic": "Verkehrsstatistik-Karte",
-        "tests": "Website-Tests-Karte",
-        "ip": "IP-Informationen-Karte",
-        "clashInfo": "Clash-Informationen-Karten",
-        "systemInfo": "Systeminformationen-Karten"
-      },
-      "title": "Startseite-Einstellungen"
+      "systemProxy": "Systemproxy / TUN",
+      "proxyGroups": "Proxy-Gruppen",
+      "qualityNodes": "Hochwertige Knoten",
+      "dnsLeak": "DNS-Lecktest"
     },
     "title": "Startseite",
     "firstRun": {
@@ -31,7 +17,8 @@
       "importSubscription": "Abonnement importieren",
       "addNode": "Knoten hinzufügen",
       "plugins": "Plugins öffnen"
-    }
+    },
+    "dnsLeakUnavailable": "DNS-Lecktests sind in diesem Build noch nicht angebunden."
   },
   "components": {
     "proxyTun": {

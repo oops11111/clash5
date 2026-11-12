@@ -2,27 +2,13 @@
   "page": {
     "tooltips": {
       "lightweightMode": "Modo leve",
-      "manual": "Manual",
-      "settings": "Configurações do início"
+      "manual": "Manual"
     },
     "cards": {
-      "trafficStats": "Estatísticas de tráfego",
-      "networkSettings": "Configurações de rede",
-      "proxyMode": "Modo de proxy"
-    },
-    "settings": {
-      "cards": {
-        "profile": "Cartão de perfil",
-        "currentProxy": "Cartão do proxy atual",
-        "network": "Cartão de configurações de rede",
-        "proxyMode": "Cartão do modo de proxy",
-        "traffic": "Cartão de estatísticas de tráfego",
-        "tests": "Cartão de testes de sites",
-        "ip": "Cartão de informações de IP",
-        "clashInfo": "Cartões de informações do Clash",
-        "systemInfo": "Cartões de informações do sistema"
-      },
-      "title": "Configurações do início"
+      "systemProxy": "Proxy do sistema / TUN",
+      "proxyGroups": "Grupos de proxy",
+      "qualityNodes": "Nós de qualidade",
+      "dnsLeak": "Teste de vazamento de DNS"
     },
     "title": "Início",
     "firstRun": {
@@ -31,7 +17,8 @@
       "importSubscription": "Importar assinatura",
       "addNode": "Adicionar nó",
       "plugins": "Abrir plugins"
-    }
+    },
+    "dnsLeakUnavailable": "Os testes de vazamento de DNS ainda não estão disponíveis nesta versão."
   },
   "components": {
     "proxyTun": {

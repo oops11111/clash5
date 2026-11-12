@@ -212,10 +212,12 @@ export interface TranslationResources {
       }
       page: {
         cards: {
-          networkSettings: string
-          proxyMode: string
-          trafficStats: string
+          dnsLeak: string
+          proxyGroups: string
+          qualityNodes: string
+          systemProxy: string
         }
+        dnsLeakUnavailable: string
         firstRun: {
           addNode: string
           description: string
@@ -223,25 +225,10 @@ export interface TranslationResources {
           plugins: string
           title: string
         }
-        settings: {
-          cards: {
-            clashInfo: string
-            currentProxy: string
-            ip: string
-            network: string
-            profile: string
-            proxyMode: string
-            systemInfo: string
-            tests: string
-            traffic: string
-          }
-          title: string
-        }
         title: string
         tooltips: {
           lightweightMode: string
           manual: string
-          settings: string
         }
       }
     }

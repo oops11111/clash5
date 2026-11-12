@@ -2,27 +2,13 @@
   "page": {
     "tooltips": {
       "lightweightMode": "Mode Ringan",
-      "manual": "Manual",
-      "settings": "Home Settings"
+      "manual": "Manual"
     },
     "cards": {
-      "trafficStats": "Traffic Stats",
-      "networkSettings": "Network Settings",
-      "proxyMode": "Proxy Mode"
-    },
-    "settings": {
-      "cards": {
-        "profile": "Profile Card",
-        "currentProxy": "Current Proxy Card",
-        "network": "Network Settings Card",
-        "proxyMode": "Proxy Mode Card",
-        "traffic": "Traffic Stats Card",
-        "tests": "Website Tests Card",
-        "ip": "IP Information Card",
-        "clashInfo": "Clash Info Cards",
-        "systemInfo": "System Info Cards"
-      },
-      "title": "Home Settings"
+      "systemProxy": "Proxy sistem / TUN",
+      "proxyGroups": "Grup proxy",
+      "qualityNodes": "Node berkualitas",
+      "dnsLeak": "Tes kebocoran DNS"
     },
     "title": "Home",
     "firstRun": {
@@ -31,7 +17,8 @@
       "importSubscription": "Impor langganan",
       "addNode": "Tambahkan node",
       "plugins": "Buka plugin"
-    }
+    },
+    "dnsLeakUnavailable": "Pemeriksaan kebocoran DNS belum tersedia di build ini."
   },
   "components": {
     "proxyTun": {

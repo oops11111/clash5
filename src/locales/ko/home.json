@@ -2,27 +2,13 @@
   "page": {
     "tooltips": {
       "lightweightMode": "경량 모드",
-      "manual": "사용 설명서",
-      "settings": "홈 설정"
+      "manual": "사용 설명서"
     },
     "cards": {
-      "trafficStats": "트래픽 통계",
-      "networkSettings": "네트워크 설정",
-      "proxyMode": "프록시 모드"
-    },
-    "settings": {
-      "cards": {
-        "profile": "프로필 카드",
-        "currentProxy": "현재 프록시 카드",
-        "network": "네트워크 설정 카드",
-        "proxyMode": "프록시 모드 카드",
-        "traffic": "트래픽 통계 카드",
-        "tests": "웹사이트 테스트 카드",
-        "ip": "IP 정보 카드",
-        "clashInfo": "Clash 정보 카드",
-        "systemInfo": "시스템 정보 카드"
-      },
-      "title": "홈 설정"
+      "systemProxy": "시스템 프록시 / TUN",
+      "proxyGroups": "프록시 그룹",
+      "qualityNodes": "고품질 노드",
+      "dnsLeak": "DNS 누출 테스트"
     },
     "title": "홈",
     "firstRun": {
@@ -31,7 +17,8 @@
       "importSubscription": "구독 가져오기",
       "addNode": "노드 추가",
       "plugins": "플러그인 열기"
-    }
+    },
+    "dnsLeakUnavailable": "이 빌드에서는 DNS 누출 검사가 아직 연결되지 않았습니다."
   },
   "components": {
     "proxyTun": {

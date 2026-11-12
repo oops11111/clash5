@@ -2,27 +2,13 @@
   "page": {
     "tooltips": {
       "lightweightMode": "軽量モード",
-      "manual": "マニュアル",
-      "settings": "ホーム設定"
+      "manual": "マニュアル"
     },
     "cards": {
-      "trafficStats": "トラフィック統計",
-      "networkSettings": "ネットワーク設定",
-      "proxyMode": "プロキシモード"
-    },
-    "settings": {
-      "cards": {
-        "profile": "プロファイルカード",
-        "currentProxy": "現在のプロキシカード",
-        "network": "ネットワーク設定カード",
-        "proxyMode": "プロキシモードカード",
-        "traffic": "トラフィック統計カード",
-        "tests": "ウェブサイトテストカード",
-        "ip": "IP情報カード",
-        "clashInfo": "Clash情報カード",
-        "systemInfo": "システム情報カード"
-      },
-      "title": "ホーム設定"
+      "systemProxy": "システムプロキシ / TUN",
+      "proxyGroups": "プロキシグループ",
+      "qualityNodes": "高品質ノード",
+      "dnsLeak": "DNSリークテスト"
     },
     "title": "ホーム",
     "firstRun": {
@@ -31,7 +17,8 @@
       "importSubscription": "サブスクリプションを読み込む",
       "addNode": "ノードを追加",
       "plugins": "プラグインを開く"
-    }
+    },
+    "dnsLeakUnavailable": "このビルドではDNSリーク検査はまだ利用できません。"
   },
   "components": {
     "proxyTun": {

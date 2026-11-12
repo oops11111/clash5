@@ -2,27 +2,13 @@
   "page": {
     "tooltips": {
       "lightweightMode": "輕量模式",
-      "manual": "使用手冊",
-      "settings": "首頁設定"
+      "manual": "使用手冊"
     },
     "cards": {
-      "trafficStats": "流量統計",
-      "networkSettings": "網路設定",
-      "proxyMode": "代理模式"
-    },
-    "settings": {
-      "cards": {
-        "profile": "訂閱卡",
-        "currentProxy": "目前代理卡",
-        "network": "網路設定卡",
-        "proxyMode": "代理模式卡",
-        "traffic": "流量統計卡",
-        "tests": "網站測試卡",
-        "ip": "IP資訊卡",
-        "clashInfo": "Clash 資訊卡",
-        "systemInfo": "系統資訊卡"
-      },
-      "title": "首頁設定"
+      "systemProxy": "系統代理 / TUN",
+      "proxyGroups": "代理群組",
+      "qualityNodes": "優質節點",
+      "dnsLeak": "DNS 洩漏檢測"
     },
     "title": "首頁",
     "firstRun": {
@@ -31,7 +17,8 @@
       "importSubscription": "匯入訂閱",
       "addNode": "新增節點",
       "plugins": "開啟外掛程式"
-    }
+    },
+    "dnsLeakUnavailable": "此版本尚未接入 DNS 洩漏檢測。"
   },
   "components": {
     "proxyTun": {

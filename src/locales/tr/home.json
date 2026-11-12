@@ -2,27 +2,13 @@
   "page": {
     "tooltips": {
       "lightweightMode": "Hafif Mod",
-      "manual": "Kılavuz",
-      "settings": "Ana Sayfa Ayarları"
+      "manual": "Kılavuz"
     },
     "cards": {
-      "trafficStats": "Trafik İstatistikleri",
-      "networkSettings": "Ağ Ayarları",
-      "proxyMode": "Vekil Modu"
-    },
-    "settings": {
-      "cards": {
-        "profile": "Profil Kartı",
-        "currentProxy": "Geçerli Vekil Kartı",
-        "network": "Ağ Ayarları Kartı",
-        "proxyMode": "Vekil Modu Kartı",
-        "traffic": "Trafik İstatistikleri Kartı",
-        "tests": "Web Sitesi Testleri Kartı",
-        "ip": "IP Bilgi Kartı",
-        "clashInfo": "Clash Bilgi Kartları",
-        "systemInfo": "Sistem Bilgi Kartları"
-      },
-      "title": "Ana Sayfa Ayarları"
+      "systemProxy": "Sistem proxy / TUN",
+      "proxyGroups": "Proxy grupları",
+      "qualityNodes": "Kaliteli düğümler",
+      "dnsLeak": "DNS sızıntı testi"
     },
     "title": "Ana Sayfa",
     "firstRun": {
@@ -31,7 +17,8 @@
       "importSubscription": "Abonelik içe aktar",
       "addNode": "Düğüm ekle",
       "plugins": "Eklentileri aç"
-    }
+    },
+    "dnsLeakUnavailable": "DNS sızıntı denetimi bu derlemede henüz bağlı değil."
   },
   "components": {
     "proxyTun": {
