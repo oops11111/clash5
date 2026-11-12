@@ -1224,9 +1224,7 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
         lastItemTop: last?.top,
         lastItemBottom: last?.bottom,
         logoHeight: logo?.height,
-        itemHeights: items.map(
-          (item) => item.getBoundingClientRect().height,
-        ),
+        itemHeights: items.map((item) => item.getBoundingClientRect().height),
         menuParents: [
           menu,
           menu.parentElement,
