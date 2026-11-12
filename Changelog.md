@@ -1,5 +1,7 @@
 ## v2.5.9
 
+- 导入 Clash Verge Rev 数据后逐条显示未导入项目的后端原因，同时保留原有数量和源目录清单报告
+
 <details>
 <summary><strong> 🐞 修复问题 </strong></summary>
 

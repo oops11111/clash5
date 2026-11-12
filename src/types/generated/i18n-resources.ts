@@ -735,6 +735,7 @@ export interface TranslationResources {
           backupReminder: string
           chooseSource: string
           failure: string
+          skippedDetails: string
           success: string
         }
       }
