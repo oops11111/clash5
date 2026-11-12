@@ -1,8 +1,5 @@
-import { getAppUptime, type RunState, type RunningMode } from '@/services/cmds'
-import { useQuery } from '@/services/query-client'
+import { type RunState, type RunningMode } from '@/services/cmds'
 import { useAppReads, useRunState } from '@/store/app-store-context'
-
-const appUptimeQueryKey = ['appUptime'] as const
 
 /** Fail closed until the first snapshot so TUN never flashes as available. */
 const unknownRunState: RunState = {
@@ -35,18 +32,4 @@ export function useSystemState() {
     mutateSystemState: readRunState,
     isLoading: snapshot == null,
   }
-}
-
-export function useAppUptime() {
-  const { data: uptime = 0 } = useQuery({
-    queryKey: appUptimeQueryKey,
-    queryFn: getAppUptime,
-    staleTime: 5000,
-    refetchInterval: 3000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    retry: 1,
-  })
-
-  return uptime
 }

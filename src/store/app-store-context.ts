@@ -56,5 +56,3 @@ export const useSetProfileLoading = () => {
     [dispatch],
   )
 }
-
-export const useTestAllCounter = () => useSelector((s) => s.testAllCounter)

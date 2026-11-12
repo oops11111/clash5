@@ -424,15 +424,3 @@ export const useTrafficMonitorEnhanced = (options?: {
     samplerStats: latestSnapshot.samplerStats,
   }
 }
-
-/**
- * 图表数据Hook
- */
-export const useTrafficGraphDataEnhanced = () => {
-  const { graphData, samplerStats } = useTrafficMonitorEnhanced()
-
-  return {
-    ...graphData,
-    samplerStats,
-  }
-}

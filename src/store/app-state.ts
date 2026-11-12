@@ -18,8 +18,6 @@ export interface AppStoreState {
   readonly pendingFailures: readonly PendingFailure[]
   readonly sidecarFailure: SidecarFailureSnapshot | null
   readonly profileUpdates: ProfileUpdatesState
-  /** Bumped once per test-all request; test items run their delay test per bump. */
-  readonly testAllCounter: number
 }
 
 export const initialAppStoreState: AppStoreState = {
@@ -31,7 +29,6 @@ export const initialAppStoreState: AppStoreState = {
     updateRevisions: new Map(),
     timerRevisions: new Map(),
   },
-  testAllCounter: 0,
 }
 
 export type AppStoreAction =
@@ -42,7 +39,6 @@ export type AppStoreAction =
   | { type: 'profileUpdate/completed'; uid: string }
   | { type: 'profileUpdate/timerTick'; uid: string }
   | { type: 'profileLoading/set'; uids: readonly string[]; loading: boolean }
-  | { type: 'testAll/requested' }
 
 const bumpRevision = (
   map: ReadonlyMap<string, number>,
@@ -118,7 +114,5 @@ export function appStoreReducer(
       }
     case 'profileLoading/set':
       return withLoading(state, action.uids, action.loading)
-    case 'testAll/requested':
-      return { ...state, testAllCounter: state.testAllCounter + 1 }
   }
 }

@@ -9,8 +9,7 @@ import { createEventBus } from './create-bus-handlers'
 
 /**
  * Mounts the event bus exactly once (layout root): one `listen` per contract
- * event plus the frontend-internal test-all event. Replaces every scattered
- * subscription; teardown disposes late-resolving registrations.
+ * event; teardown disposes late-resolving registrations.
  */
 export const useEventBus = (
   handleNotice: (payload: [string, string]) => void,

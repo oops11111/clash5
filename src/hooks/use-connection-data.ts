@@ -24,33 +24,15 @@ interface ConnectionMonitorData {
   closedConnections: IConnectionsItem[]
 }
 
-interface ConnectionSummaryPayload {
-  count?: number
-}
-
-interface ConnectionSummaryData {
-  activeConnectionCount: number
-}
-
-const initConnSummaryData: ConnectionSummaryData = {
-  activeConnectionCount: 0,
-}
-
 let connectionData: ConnectionMonitorData = initConnData
-let connectionSummary: ConnectionSummaryData = initConnSummaryData
 let flushTimer: ReturnType<typeof setTimeout> | null = null
 let pendingMessageData: string | null = null
 let lastFlushAt = 0
 
 const connectionListeners = new Set<ConnectionListener>()
-const summaryListeners = new Set<ConnectionListener>()
 
 const notifyConnectionListeners = () => {
   connectionListeners.forEach((listener) => listener())
-}
-
-const notifySummaryListeners = () => {
-  summaryListeners.forEach((listener) => listener())
 }
 
 const sameMetadata = (left: ConnectionMetadata, right: ConnectionMetadata) =>
@@ -205,12 +187,6 @@ const mergeConnectionSnapshot = (
   }
 }
 
-const mergeConnectionSummary = (
-  payload: ConnectionSummaryPayload,
-): ConnectionSummaryData => ({
-  activeConnectionCount: payload.count ?? 0,
-})
-
 const flushPendingMessage = () => {
   flushTimer = null
   const messageData = pendingMessageData
@@ -351,22 +327,6 @@ const createSocketSupervisor = (options: {
   }
 }
 
-const handleSummaryText = (messageData: string) => {
-  let payload: ConnectionSummaryPayload
-  try {
-    payload = JSON.parse(messageData) as ConnectionSummaryPayload
-  } catch (err) {
-    console.error(
-      '[Connections] Failed to parse connections count payload',
-      err,
-    )
-    return
-  }
-
-  connectionSummary = mergeConnectionSummary(payload)
-  notifySummaryListeners()
-}
-
 const connectionSupervisor = createSocketSupervisor({
   listeners: connectionListeners,
   connectSocket: () => MihomoWebSocket.connect_connections(),
@@ -375,15 +335,7 @@ const connectionSupervisor = createSocketSupervisor({
   onIdle: clearPendingMessage,
 })
 
-const summarySupervisor = createSocketSupervisor({
-  listeners: summaryListeners,
-  connectSocket: () => MihomoWebSocket.connect_connections_count(),
-  onText: handleSummaryText,
-  closeLogLabel: 'connections count',
-})
-
 const getConnectionSnapshot = () => connectionData
-const getConnectionSummarySnapshot = () => connectionSummary
 
 const subscribeConnectionData = (listener: ConnectionListener) => {
   connectionListeners.add(listener)
@@ -391,15 +343,6 @@ const subscribeConnectionData = (listener: ConnectionListener) => {
   return () => {
     connectionListeners.delete(listener)
     connectionSupervisor.stopIfIdle()
-  }
-}
-
-const subscribeConnectionSummary = (listener: ConnectionListener) => {
-  summaryListeners.add(listener)
-  summarySupervisor.start()
-  return () => {
-    summaryListeners.delete(listener)
-    summarySupervisor.stopIfIdle()
   }
 }
 
@@ -432,24 +375,5 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
   return {
     response,
     clearClosedConnections,
-  }
-}
-
-export const useConnectionSummaryData = (options?: { enabled?: boolean }) => {
-  const enabled = options?.enabled ?? true
-  const subscribe = useCallback(
-    (listener: ConnectionListener) =>
-      enabled ? subscribeConnectionSummary(listener) : () => {},
-    [enabled],
-  )
-  const data = useSyncExternalStore(
-    subscribe,
-    getConnectionSummarySnapshot,
-    getConnectionSummarySnapshot,
-  )
-  const response = useMemo(() => ({ data }), [data])
-
-  return {
-    response,
   }
 }

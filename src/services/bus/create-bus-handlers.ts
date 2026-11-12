@@ -2,16 +2,13 @@ import type { VergeEventPayloads } from '@/services/contract'
 import { forgetShownStartupError } from '@/services/notice-handlers'
 import type { AppStoreAction } from '@/store/app-state'
 
-/** Frontend-internal event: home test card → test items. Not in the backend contract. */
-export const TEST_ALL_EVENT = 'verge://test-all'
-
-type BusEventName = keyof VergeEventPayloads | typeof TEST_ALL_EVENT
+type BusEventName = keyof VergeEventPayloads
 
 type BusHandlers = {
   [Name in BusEventName]: (
     payload: Name extends keyof VergeEventPayloads
       ? VergeEventPayloads[Name]
-      : null,
+      : never,
   ) => void
 }
 
@@ -66,7 +63,6 @@ export const createEventBus = (deps: BusHandlerDeps) => {
         'getVersion',
         'getClashConfig',
         'getClashInfo',
-        'getClashMode',
         'getRuntimeConfig',
         'getRules',
         'getRuleProviders',
@@ -95,7 +91,6 @@ export const createEventBus = (deps: BusHandlerDeps) => {
       if (payload.mode !== 'NotRunning') forgetShownStartupError()
     },
     'verge://pending-failures-changed': () => deps.readPendingFailures(),
-    [TEST_ALL_EVENT]: () => deps.dispatch({ type: 'testAll/requested' }),
   }
 
   const onSubscribed = () => {

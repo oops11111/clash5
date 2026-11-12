@@ -335,10 +335,6 @@ export async function getClashInfo() {
 }
 
 // Fallback mode read independent of strict mihomo `/configs` deserialization.
-export async function getClashMode() {
-  return invoke<string | null>('get_clash_mode')
-}
-
 export async function getRuntimeConfig() {
   return (await invoke<unknown | null>(
     'get_runtime_config',
@@ -574,10 +570,6 @@ export async function syncRuntimeProviders() {
   })
 }
 
-export async function cmdTestDelay(url: string) {
-  return invoke<number>('test_delay', { url })
-}
-
 export async function invoke_uwp_tool() {
   return invoke<null>('invoke_uwp_tool').catch((err) =>
     showNotice.error(err, 1500),
@@ -594,20 +586,6 @@ export async function exitApp() {
 
 export async function exportDiagnosticInfo() {
   return invoke<null>('export_diagnostic_info')
-}
-
-interface SystemInfo {
-  system_name: string
-  system_version: string
-  system_kernel_version: string
-  system_arch: string
-  app_version: string
-  app_core_mode: string
-  app_is_admin: boolean
-}
-
-export async function getSystemInfo() {
-  return invoke<SystemInfo>('get_system_info')
 }
 
 export async function copyIconFile(

@@ -1295,27 +1295,32 @@ async function verifyFirstRunEmptyState() {
   }
 
   const goHome = async () => {
-    await browser.execute(() => {
-      const home = [
-        ...document.querySelectorAll('.the-menu [role="tab"]'),
-      ].find((tab) =>
-        ['Home', '首页', '首頁'].includes(tab.textContent?.trim()),
-      )
-      home?.click()
-    })
+    const homeTabExists = await browser.execute(() =>
+      Boolean(document.querySelector('[data-testid="main-tab-home"]')),
+    )
+    if (!homeTabExists) throw new Error('Home navigation tab was not rendered')
+    await browser.execute(() =>
+      document.querySelector('[data-testid="main-tab-home"]')?.click(),
+    )
+    await browser.waitUntil(
+      () => browser.execute(() => window.location.pathname === '/'),
+      {
+        timeout: 10_000,
+        interval: 250,
+        timeoutMsg: 'Home navigation tab did not return to the Home route',
+      },
+    )
     await browser.waitUntil(
       () =>
-        browser.execute(
-          () =>
-            window.location.pathname === '/' &&
-            Boolean(
-              document.querySelector('[data-testid="first-run-empty-state"]'),
-            ),
+        browser.execute(() =>
+          Boolean(
+            document.querySelector('[data-testid="first-run-empty-state"]'),
+          ),
         ),
       {
         timeout: 10_000,
         interval: 250,
-        timeoutMsg: 'First-run state did not return on Home',
+        timeoutMsg: 'First-run state did not render after returning Home',
       },
     )
   }
