@@ -1185,6 +1185,30 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
     const last = items.at(-1)?.getBoundingClientRect()
     const viewport = menu.getBoundingClientRect()
     const logo = document.querySelector('.the-logo')?.getBoundingClientRect()
+    const measure = (element) => {
+      if (!element) return null
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return {
+        tag: element.tagName,
+        className: element.className,
+        rect: { top: rect.top, height: rect.height, bottom: rect.bottom },
+        css: {
+          display: style.display,
+          position: style.position,
+          flex: style.flex,
+          flexGrow: style.flexGrow,
+          flexShrink: style.flexShrink,
+          flexBasis: style.flexBasis,
+          height: style.height,
+          minHeight: style.minHeight,
+          maxHeight: style.maxHeight,
+          overflow: style.overflow,
+          transform: style.transform,
+          zoom: style.zoom,
+        },
+      }
+    }
     return {
       labels: items.map((item) => item.textContent?.trim()),
       lastVisible: Boolean(
@@ -1196,10 +1220,19 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
         menuHeight: viewport.height,
         menuClientHeight: menu.clientHeight,
         menuScrollHeight: menu.scrollHeight,
+        menuScrollTop: menu.scrollTop,
         lastItemTop: last?.top,
         lastItemBottom: last?.bottom,
         logoHeight: logo?.height,
-        itemHeights: items.map((item) => item.getBoundingClientRect().height),
+        itemHeights: items.map(
+          (item) => item.getBoundingClientRect().height,
+        ),
+        menuParents: [
+          menu,
+          menu.parentElement,
+          menu.parentElement?.parentElement,
+        ].map(measure),
+        firstItemParents: [items[0], items[0]?.parentElement].map(measure),
       },
       logoVisible: Boolean(
         document.querySelector('.the-logo img[alt="clash5"]'),
