@@ -30,19 +30,78 @@ test('P0-06 traversal and absolute-path regression tests remain registered', asy
 })
 
 test('registry validation fails if a required gate test is removed', async () => {
-  const backupSource = await readFile(
-    new URL('../../src-tauri/src/feat/backup.rs', import.meta.url),
-    'utf8',
-  )
+  const [backupSource, clashSource, dnsInitSource, frontendDnsTestSource] =
+    await Promise.all([
+      readFile(
+        new URL('../../src-tauri/src/feat/backup.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL('../../src-tauri/src/config/clash.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL('../../src-tauri/src/utils/init.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL(
+          '../../src/utils/dns-privacy-defaults.test.ts',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ])
   assert.throws(
     () =>
-      validateAutomatedEvidence(
-        backupSource.replace(
+      validateAutomatedEvidence({
+        backupSource: backupSource.replace(
           'fn export_rejects_traversal()',
           'fn removed_test()',
         ),
-      ),
+        clashSource,
+        dnsInitSource,
+        frontendDnsTestSource,
+      }),
     /missing automated test export_rejects_traversal/u,
+  )
+})
+
+test('G-10 requires backend and frontend DNS privacy default evidence', async () => {
+  const [backupSource, clashSource, dnsInitSource, frontendDnsTestSource] =
+    await Promise.all([
+      readFile(
+        new URL('../../src-tauri/src/feat/backup.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL('../../src-tauri/src/config/clash.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL('../../src-tauri/src/utils/init.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL(
+          '../../src/utils/dns-privacy-defaults.test.ts',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ])
+  assert.throws(
+    () =>
+      validateAutomatedEvidence({
+        backupSource,
+        clashSource: clashSource.replace(
+          'fn clash_template_defaults_ipv6_off()',
+          'fn removed_test()',
+        ),
+        dnsInitSource,
+        frontendDnsTestSource,
+      }),
+    /missing automated test clash_template_defaults_ipv6_off/u,
   )
 })
 
