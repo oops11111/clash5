@@ -43,7 +43,6 @@ const Layout = () => {
   const { theme } = useCustomTheme()
   const { verge } = useVerge()
   const { language } = verge ?? {}
-  const navCollapsed = verge?.collapse_navbar ?? false
   const { switchLanguage } = useI18n()
   const navigate = useNavigate()
   const themeReady = useMemo(() => Boolean(theme), [theme])
@@ -135,7 +134,7 @@ const Layout = () => {
       <Paper
         square
         elevation={0}
-        className={`${OS} layout${navCollapsed ? ' layout--nav-collapsed' : ''}`}
+        className={`${OS} layout`}
         style={{
           borderTopLeftRadius: '0px',
           borderTopRightRadius: '0px',
@@ -168,7 +167,7 @@ const Layout = () => {
         {customTitlebar}
 
         <div className="layout-content">
-          <LayoutSidebar isDark={isDark} isCollapsed={navCollapsed} />
+          <LayoutSidebar isDark={isDark} />
 
           <div className="layout-content__right">
             <div className="the-bar"></div>

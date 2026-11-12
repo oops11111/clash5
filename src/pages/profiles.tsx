@@ -82,7 +82,7 @@ const debugProfileSwitch = (action: string, profile: string, extra?: any) => {
   debugLog(`[Profile-Debug][${timestamp}] ${action}: ${profile}`, extra || '')
 }
 
-const ProfilePage = () => {
+const ProfilePage = ({ compact = false }: { compact?: boolean }) => {
   const { t } = useTranslation()
   const location = useLocation()
   const [url, setUrl] = useState('')
@@ -722,6 +722,7 @@ const ProfilePage = () => {
 
   return (
     <BasePage
+      compact={compact}
       full
       title={t('profiles.page.title')}
       contentStyle={{ height: '100%' }}

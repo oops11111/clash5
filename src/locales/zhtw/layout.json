@@ -3,7 +3,7 @@
     "navigation": {
       "tabs": {
         "home": "首頁",
-        "proxies": "代 理",
+        "proxies": "代理",
         "nodePool": "節點",
         "profiles": "訂閱",
         "chains": "鏈路",
@@ -11,7 +11,7 @@
         "connections": "連線",
         "rules": "規則",
         "logs": "日誌",
-        "unlock": "解 鎖",
+        "unlock": "診斷",
         "settings": "設定"
       },
       "proxyGroups": "代理群組",

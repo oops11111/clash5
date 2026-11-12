@@ -3,7 +3,7 @@
     "navigation": {
       "tabs": {
         "home": "首页",
-        "proxies": "代 理",
+        "proxies": "代理",
         "nodePool": "节点",
         "profiles": "订阅",
         "chains": "链路",
@@ -11,7 +11,7 @@
         "connections": "连接",
         "rules": "规则",
         "logs": "日志",
-        "unlock": "测 试",
+        "unlock": "诊断",
         "settings": "设置"
       },
       "proxyGroups": "代理组",

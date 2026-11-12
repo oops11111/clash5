@@ -11,7 +11,7 @@
         "connections": "Connections",
         "rules": "Rules",
         "logs": "Logs",
-        "unlock": "Test",
+        "unlock": "Diagnostics",
         "settings": "Settings"
       },
       "proxyGroups": "Proxy groups",

@@ -267,35 +267,3 @@ const TrafficErrorFallback: React.FC<TrafficErrorFallbackProps> = ({
     </Box>
   )
 }
-
-export const LightweightTrafficErrorBoundary: React.FC<{
-  children: ReactNode
-}> = ({ children }) => {
-  const { t } = useTranslation()
-
-  return (
-    <TrafficErrorBoundary
-      fallbackComponent={
-        <Box
-          sx={{
-            p: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: 60,
-            bgcolor: 'error.light',
-            borderRadius: 1,
-            color: 'error.contrastText',
-          }}
-        >
-          <ErrorOutlineRounded sx={{ mr: 1, fontSize: 20 }} />
-          <Typography variant="caption">
-            {t('shared.feedback.errors.trafficUnavailable')}
-          </Typography>
-        </Box>
-      }
-    >
-      {children}
-    </TrafficErrorBoundary>
-  )
-}

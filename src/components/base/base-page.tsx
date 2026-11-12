@@ -10,15 +10,16 @@ interface Props {
   contentStyle?: React.CSSProperties
   children?: ReactNode
   full?: boolean
+  compact?: boolean
 }
 
 export const BasePage: React.FC<Props> = (props) => {
-  const { title, header, contentStyle, full, children } = props
+  const { title, header, contentStyle, full, compact, children } = props
   const theme = useTheme()
 
   return (
     <BaseErrorBoundary>
-      <div className="base-page">
+      <div className={`base-page${compact ? ' base-page--compact' : ''}`}>
         <header data-tauri-drag-region="true" style={{ userSelect: 'none' }}>
           <Typography
             sx={{ fontSize: '20px', fontWeight: '700 ' }}

@@ -1,10 +1,7 @@
-import { createBrowserRouter, RouteObject } from 'react-router'
+import { createBrowserRouter, Navigate, RouteObject } from 'react-router'
 
 import Layout from './_layout'
 import { navItems } from './_navigation'
-import ProxyPage from './proxies'
-import UnlockPage from './unlock'
-
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -18,8 +15,34 @@ export const router = createBrowserRouter([
           }) as RouteObject,
       )
       .concat([
-        { path: '/proxies', Component: ProxyPage },
-        { path: '/unlock', Component: UnlockPage },
+        {
+          path: '/nodes',
+          element: <Navigate replace to="/subscriptions?section=nodes" />,
+        },
+        {
+          path: '/profile',
+          element: <Navigate replace to="/subscriptions?section=sources" />,
+        },
+        {
+          path: '/chains',
+          element: <Navigate replace to="/?section=chains" />,
+        },
+        {
+          path: '/rules',
+          element: <Navigate replace to="/proxies?section=rules" />,
+        },
+        {
+          path: '/connections',
+          element: <Navigate replace to="/settings?section=connections" />,
+        },
+        {
+          path: '/logs',
+          element: <Navigate replace to="/settings?section=logs" />,
+        },
+        {
+          path: '/unlock',
+          element: <Navigate replace to="/settings?section=unlock" />,
+        },
       ]),
   },
 ])
