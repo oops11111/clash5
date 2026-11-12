@@ -37,6 +37,12 @@ export function validateRegistry(markdown) {
     seen.add(id);
     if (!scope || !evidence) throw new Error(`gate ${id} is missing scope or evidence`);
     if (!allowedStates.has(state)) throw new Error(`gate ${id} has unknown state ${state}`);
+    if (
+      id === 'G-06' &&
+      !['export_rejects_traversal', 'export_rejects_absolute'].every((testName) => evidence.includes(testName))
+    ) {
+      throw new Error('release gate G-06 must reference both backup export path tests');
+    }
   }
   return rows.length;
 }
@@ -63,8 +69,91 @@ export async function verifyNoInAppCoreUpgrade() {
   }
 }
 
+export function validateAutomatedEvidence(backupSource) {
+  for (const testName of ['export_rejects_traversal', 'export_rejects_absolute']) {
+    if (!new RegExp(`\\bfn ${testName}\\s*\\(`, 'u').test(backupSource)) {
+      throw new Error(`release gate G-06 is missing automated test ${testName}`);
+    }
+  }
+}
+
+export async function verifyAutomatedEvidence() {
+  const backupSource = await readFile(
+    new URL('../../src-tauri/src/feat/backup.rs', import.meta.url),
+    'utf8',
+  );
+  validateAutomatedEvidence(backupSource);
+}
+
+export function validateWebviewSecurity(config, capability, monacoSource) {
+  const security = config.app?.security;
+  if (!security?.csp || typeof security.csp !== 'object') {
+    throw new Error('release gate G-04 requires a production CSP');
+  }
+  const productionCsp = security.csp;
+  if (
+    productionCsp['default-src'] !== "'self'" ||
+    !productionCsp['worker-src']?.includes("'self'") ||
+    !productionCsp['worker-src']?.includes('blob:') ||
+    !productionCsp['connect-src']?.includes('ipc:') ||
+    productionCsp['connect-src']?.includes('https:') ||
+    !productionCsp['img-src']?.includes('asset:') ||
+    !productionCsp['img-src']?.includes('http://asset.localhost') ||
+    !productionCsp['object-src']?.includes("'none'")
+  ) {
+    throw new Error('release gate G-04 CSP must preserve local workers and Tauri IPC');
+  }
+  const developmentCsp = security.devCsp;
+  if (
+    !developmentCsp?.['worker-src']?.includes("'self'") ||
+    !developmentCsp['worker-src']?.includes('blob:') ||
+    !developmentCsp['connect-src']?.includes('ws://localhost:3000')
+  ) {
+    throw new Error('release gate G-04 development CSP must preserve local workers and Vite HMR');
+  }
+
+  const assetScope = security.assetProtocol?.scope?.allow;
+  if (
+    !Array.isArray(assetScope) ||
+    assetScope.length === 0 ||
+    assetScope.some((path) => path === '**' || !/^\$(?:APPDATA|RESOURCE)\//u.test(path))
+  ) {
+    throw new Error('release gate G-04 asset scope must stay inside app data and bundled resources');
+  }
+
+  const permissions = capability.permissions ?? [];
+  const filesystemScopes = permissions
+    .filter((permission) => typeof permission === 'object' && permission.identifier === 'fs:scope')
+    .flatMap((permission) => permission.allow ?? []);
+  if (
+    filesystemScopes.length === 0 ||
+    filesystemScopes.some((path) => path === '**' || !/^\$(?:APPDATA|RESOURCE)\//u.test(path))
+  ) {
+    throw new Error('release gate G-04 filesystem scopes must stay inside app data and bundled resources');
+  }
+  for (const permission of ['fs:allow-read-file', 'fs:allow-write-file', 'dialog:default']) {
+    if (!permissions.includes(permission)) {
+      throw new Error(`release gate G-04 must preserve system-dialog import/export permission ${permission}`);
+    }
+  }
+  if (!/enableSchemaRequest:\s*false/u.test(monacoSource)) {
+    throw new Error('release gate G-04 must disable remote Monaco schema requests');
+  }
+}
+
+export async function verifyWebviewSecurity() {
+  const [configSource, capabilitySource, monacoSource] = await Promise.all([
+    readFile(new URL('../../src-tauri/tauri.conf.json', import.meta.url), 'utf8'),
+    readFile(new URL('../../src-tauri/capabilities/migrated.json', import.meta.url), 'utf8'),
+    readFile(new URL('../../src/services/monaco.ts', import.meta.url), 'utf8'),
+  ]);
+  validateWebviewSecurity(JSON.parse(configSource), JSON.parse(capabilitySource), monacoSource);
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const count = validateRegistry(await readFile(registryPath, 'utf8'));
   await verifyNoInAppCoreUpgrade();
+  await verifyAutomatedEvidence();
+  await verifyWebviewSecurity();
   process.stdout.write(`Validated ${count} release-gate registry rows.\n`);
 }

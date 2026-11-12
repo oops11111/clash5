@@ -16,9 +16,9 @@ define their individual meanings; this ledger does not guess those meanings.
 | G-01 | P0-01: invalid route target degrades to REJECT | Per-target route tests and Windows acceptance | OPEN |
 | G-02 | P0-03: only promote a release candidate to a published release | Release-tag and candidate-origin checks | OPEN |
 | G-03 | P0-02: cross-profile isolation and materialized nodes | Data-layer isolation tests | OPEN |
-| G-04 | P0-04: WebView CSP and filesystem/asset scopes | CSP and filesystem-scope regression tests | OPEN |
+| G-04 | P0-04: WebView CSP and filesystem/asset scopes | CI config guard; dialog-flow and local-worker acceptance | OPEN |
 | G-05 | P0-05: trusted plugin signer list | Signer trust, tamper, rotation, and rollback tests | OPEN |
-| G-06 | P0-06: backup export traversal | Traversal regression tests | OPEN |
+| G-06 | P0-06: backup export traversal | Rust tests `export_rejects_traversal` and `export_rejects_absolute` | OPEN |
 | G-07 | P0-18: conditional browser-extension naming gate | Conditional scope review recorded in issue #68 | OPEN |
 | G-08 | P0-18: takeover wording and frozen driver scope | Forbidden-copy check and product review | OPEN |
 | G-09 | P0-07: system proxy cleanup and dirty-exit recovery | Windows proxy lifecycle tests | OPEN |

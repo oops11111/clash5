@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { validateRegistry, verifyNoInAppCoreUpgrade } from './check-registry.mjs';
+import {
+  validateRegistry,
+  validateAutomatedEvidence,
+  validateWebviewSecurity,
+  verifyAutomatedEvidence,
+  verifyNoInAppCoreUpgrade,
+  verifyWebviewSecurity,
+} from './check-registry.mjs';
 
 const registry = await readFile(new URL('../../RELEASE-GATES.md', import.meta.url), 'utf8');
 
@@ -11,6 +18,61 @@ test('release gate registry covers all reviewed gate groups', () => {
 
 test('the in-app core upgrade command and implementation are absent', async () => {
   await verifyNoInAppCoreUpgrade();
+});
+
+test('P0-06 traversal and absolute-path regression tests remain registered', async () => {
+  await verifyAutomatedEvidence();
+});
+
+test('registry validation fails if a required gate test is removed', async () => {
+  const backupSource = await readFile(
+    new URL('../../src-tauri/src/feat/backup.rs', import.meta.url),
+    'utf8',
+  );
+  assert.throws(
+    () => validateAutomatedEvidence(backupSource.replace('fn export_rejects_traversal()', 'fn removed_test()')),
+    /missing automated test export_rejects_traversal/u,
+  );
+});
+
+test('P0-04 keeps scoped assets, local workers, and system dialogs', async () => {
+  await verifyWebviewSecurity();
+});
+
+test('registry policy rejects an unrestricted filesystem scope', async () => {
+  const config = JSON.parse(
+    await readFile(new URL('../../src-tauri/tauri.conf.json', import.meta.url), 'utf8'),
+  );
+  const capability = JSON.parse(
+    await readFile(new URL('../../src-tauri/capabilities/migrated.json', import.meta.url), 'utf8'),
+  );
+  const monaco = await readFile(new URL('../../src/services/monaco.ts', import.meta.url), 'utf8');
+  capability.permissions.find((permission) => permission.identifier === 'fs:scope').allow.push('**');
+  assert.throws(
+    () => validateWebviewSecurity(config, capability, monaco),
+    /filesystem scopes must stay inside app data/u,
+  );
+});
+
+test('registry policy rejects an unrestricted asset scope and network policy', async () => {
+  const config = JSON.parse(
+    await readFile(new URL('../../src-tauri/tauri.conf.json', import.meta.url), 'utf8'),
+  );
+  const capability = JSON.parse(
+    await readFile(new URL('../../src-tauri/capabilities/migrated.json', import.meta.url), 'utf8'),
+  );
+  const monaco = await readFile(new URL('../../src/services/monaco.ts', import.meta.url), 'utf8');
+  config.app.security.assetProtocol.scope.allow.push('**');
+  assert.throws(
+    () => validateWebviewSecurity(config, capability, monaco),
+    /asset scope must stay inside/u,
+  );
+  config.app.security.assetProtocol.scope.allow.pop();
+  config.app.security.csp['connect-src'] += ' https:';
+  assert.throws(
+    () => validateWebviewSecurity(config, capability, monaco),
+    /CSP must preserve local workers/u,
+  );
 });
 
 test('registry validation fails when a gate row is missing', () => {

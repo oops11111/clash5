@@ -5,6 +5,12 @@ on:
     paths:
       - '.github/workflows/clash5-release-candidate.yml'
       - 'RELEASE-GATES.md'
+      - 'Changelog.md'
+      - 'src-tauri/tauri.conf.json'
+      - 'src-tauri/capabilities/migrated.json'
+      - 'src-tauri/src/core/backup.rs'
+      - 'src-tauri/src/feat/backup.rs'
+      - 'src/services/monaco.ts'
       - 'scripts/release-gate/**'
   workflow_dispatch:
     inputs:

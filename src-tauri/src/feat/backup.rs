@@ -15,7 +15,7 @@ use serde::Serialize;
 use smartstring::alias::String;
 use std::{
     io,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 use tokio::fs;
 
@@ -394,14 +394,14 @@ pub async fn restore_local_backup(filename: String) -> Result<()> {
 #[tracing::instrument(skip_all, level = "info", fields(filename = %filename, destination = %destination))]
 pub async fn export_local_backup(filename: String, destination: String) -> Result<()> {
     let backup_dir = local_backup_dir()?;
-    let source_path = backup_dir.join(filename.as_str());
+    let source_path = export_source_path(&backup_dir, filename.as_str())?;
     if !source_path.exists() {
         return Err(anyhow!("Backup file not found: {}", filename));
     }
 
-    let dest_path = PathBuf::from(destination.as_str());
-    if let Some(parent) = dest_path.parent() {
-        fs::create_dir_all(parent).await?;
+    let dest_path = export_destination_path(destination.as_str())?;
+    if source_path == dest_path {
+        return Err(anyhow!("Backup export destination must differ from its source"));
     }
 
     fs::copy(&source_path, &dest_path)
@@ -409,4 +409,102 @@ pub async fn export_local_backup(filename: String, destination: String) -> Resul
         .map(|_| ())
         .map_err(|err| anyhow!("Failed to export backup file: {err:#}"))?;
     Ok(())
+}
+
+fn export_source_path(backup_dir: &Path, filename: &str) -> Result<PathBuf> {
+    let name = Path::new(filename);
+    if filename.is_empty()
+        || name.is_absolute()
+        || name.components().count() != 1
+        || !matches!(name.components().next(), Some(Component::Normal(_)))
+    {
+        return Err(anyhow!("Invalid backup filename"));
+    }
+
+    let canonical_dir = backup_dir.canonicalize()?;
+    let canonical_source = canonical_dir.join(name).canonicalize()?;
+    if !canonical_source.starts_with(&canonical_dir) || !canonical_source.is_file() {
+        return Err(anyhow!("Backup file is outside the local backup directory"));
+    }
+    Ok(canonical_source)
+}
+
+fn export_destination_path(destination: &str) -> Result<PathBuf> {
+    let path = Path::new(destination);
+    if !path.is_absolute()
+        || path
+            .components()
+            .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err(anyhow!("Invalid backup export destination"));
+    }
+
+    let file_name = path
+        .file_name()
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| anyhow!("Invalid backup export destination"))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| anyhow!("Invalid backup export destination"))?
+        .canonicalize()?;
+    let normalized = parent.join(file_name);
+
+    if let Ok(metadata) = std::fs::symlink_metadata(&normalized) {
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(anyhow!("Backup export destination must be a regular file"));
+        }
+        let canonical_destination = normalized.canonicalize()?;
+        if !canonical_destination.starts_with(&parent) {
+            return Err(anyhow!("Backup export destination is outside its selected directory"));
+        }
+        return Ok(canonical_destination);
+    }
+
+    Ok(normalized)
+}
+
+#[cfg(test)]
+mod export_path_tests {
+    use super::{export_destination_path, export_source_path};
+    use std::{fs, path::PathBuf};
+
+    struct Fixture(PathBuf);
+
+    impl Fixture {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!("clash5-backup-export-{}", nanoid::nanoid!()));
+            fs::create_dir_all(path.join("backups")).unwrap();
+            fs::write(path.join("backups").join("backup.zip"), b"backup").unwrap();
+            fs::write(path.join("outside.zip"), b"outside").unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn export_rejects_traversal() {
+        let fixture = Fixture::new();
+        let result = export_source_path(&fixture.0.join("backups"), "../outside.zip");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn export_rejects_absolute() {
+        let fixture = Fixture::new();
+        let absolute = fixture.0.join("outside.zip");
+        let result = export_source_path(&fixture.0.join("backups"), absolute.to_str().unwrap());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn export_requires_an_absolute_dialog_destination_without_parent_traversal() {
+        assert!(export_destination_path("relative.zip").is_err());
+        let path = std::env::temp_dir().join("..").join("clash5-export.zip");
+        assert!(export_destination_path(path.to_str().unwrap()).is_err());
+    }
 }
