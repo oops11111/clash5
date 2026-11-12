@@ -45,7 +45,10 @@ fn snapshot_integrity_rejects_empty_and_non_database_files() {
     std::fs::write(&invalid, [0_u8; 128]).unwrap();
 
     assert_eq!(BindingStore::verify_snapshot_integrity(empty), Err(DataError::Database));
-    assert_eq!(BindingStore::verify_snapshot_integrity(invalid), Err(DataError::Database));
+    assert_eq!(
+        BindingStore::verify_snapshot_integrity(invalid),
+        Err(DataError::Database)
+    );
 }
 #[test]
 fn identity_snapshot_matches_typescript_v1() {
