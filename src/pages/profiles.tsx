@@ -17,7 +17,18 @@ import {
   RefreshRounded,
   TextSnippetOutlined,
 } from '@mui/icons-material'
-import { Box, Button, Divider, Grid, IconButton, Stack } from '@mui/material'
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Grid,
+  IconButton,
+  Stack,
+} from '@mui/material'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
@@ -40,6 +51,7 @@ import {
   ProfileViewer,
   type ProfileViewerRef,
 } from '@/components/profile/profile-viewer'
+import { SkippedImportReasons } from '@/components/profile/skipped-import-reasons'
 import { ConfigViewer } from '@/components/setting/mods/config-viewer'
 import { fetchProfilesIntoCache, useProfiles } from '@/hooks/use-profiles'
 import {
@@ -94,6 +106,9 @@ const ProfilePage = ({ compact = false }: { compact?: boolean }) => {
     string | null
   >(null)
   const [loading, setLoading] = useState(false)
+  const [skippedImportItems, setSkippedImportItems] = useState<string[] | null>(
+    null,
+  )
 
   const [batchMode, setBatchMode] = useState(false)
   const [selectedProfiles, setSelectedProfiles] = useState<Set<string>>(
@@ -284,6 +299,7 @@ const ProfilePage = ({ compact = false }: { compact?: boolean }) => {
         manifest: report.source_manifest_after,
         syncFailures: report.binding_sync_failures,
       })
+      if (report.skipped.length > 0) setSkippedImportItems(report.skipped)
     } catch (error) {
       showNotice.error(error)
     } finally {
@@ -1021,6 +1037,26 @@ const ProfilePage = ({ compact = false }: { compact?: boolean }) => {
         }}
       />
       <ConfigViewer ref={configRef} />
+      <Dialog
+        open={skippedImportItems !== null}
+        onClose={() => setSkippedImportItems(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {t('profiles.page.vergeImport.skippedDetails', {
+            count: skippedImportItems?.length ?? 0,
+          })}
+        </DialogTitle>
+        <DialogContent dividers>
+          <SkippedImportReasons reasons={skippedImportItems ?? []} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSkippedImportItems(null)}>
+            {t('shared.actions.close')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </BasePage>
   )
 }

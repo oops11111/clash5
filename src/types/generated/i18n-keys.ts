@@ -339,6 +339,7 @@ export const translationKeys = [
   'profiles.page.vergeImport.backupReminder',
   'profiles.page.vergeImport.success',
   'profiles.page.vergeImport.failure',
+  'profiles.page.vergeImport.skippedDetails',
   'profiles.page.batch.actions.delete',
   'profiles.page.batch.actions.selectAll',
   'profiles.page.batch.actions.deselectAll',
