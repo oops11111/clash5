@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
+        "description": "الإعدادات الأقل استخدامًا وأدوات الصيانة.",
+        "confirmExitTitle": "الخروج من clash5؟",
+        "confirmExitMessage": "قد تتوقف النواة وينقطع اتصال الوكيل.",
+        "confirmLiteModeTitle": "الدخول إلى الوضع الخفيف؟",
+        "confirmLiteModeMessage": "سيُغلق النافذة بينما تستمر النواة في العمل. أعد فتح clash5 من علبة النظام.",
         "title": "الإعدادات الأساسية  Verge",
         "tooltips": {
           "backupInfo": "Support local or WebDAV backup of configuration files",

@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
+        "description": "Configurações pouco usadas e ferramentas de manutenção.",
+        "confirmExitTitle": "Sair do clash5?",
+        "confirmExitMessage": "O núcleo pode parar e as conexões do proxy podem ser interrompidas.",
+        "confirmLiteModeTitle": "Entrar no modo leve?",
+        "confirmLiteModeMessage": "A janela será fechada enquanto o núcleo continua em execução. Abra o clash5 novamente pela bandeja do sistema.",
         "title": "Configurações Avançadas do Verge",
         "tooltips": {
           "backupInfo": "Suporta backup local ou via WebDAV dos arquivos de configuração",

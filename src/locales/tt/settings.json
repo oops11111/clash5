@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
+        "description": "Сирәк кулланыла торган көйләүләр һәм хезмәт күрсәтү кораллары.",
+        "confirmExitTitle": "clash5 программасыннан чыгасызмы?",
+        "confirmExitMessage": "Ядро туктарга, прокси тоташулары өзелергә мөмкин.",
+        "confirmLiteModeTitle": "Җиңел режимга күчәсезме?",
+        "confirmLiteModeMessage": "Тәрәзә ябылачак, ләкин ядро эшләвен дәвам итәчәк. clash5 программасын система өлкәсеннән яңадан ачыгыз.",
         "title": "Verge Киңәйтелгән көйләүләр",
         "tooltips": {
           "backupInfo": "WebDAV аша конфигурация файлын саклауны хуплый",

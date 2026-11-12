@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
+        "description": "Редко используемые настройки и инструменты обслуживания.",
+        "confirmExitTitle": "Выйти из clash5?",
+        "confirmExitMessage": "Ядро может остановиться, а прокси-соединения — прерваться.",
+        "confirmLiteModeTitle": "Перейти в облегчённый режим?",
+        "confirmLiteModeMessage": "Окно закроется, но ядро продолжит работу. Откройте clash5 снова из системного трея.",
         "title": "Расширенные настройки Verge",
         "tooltips": {
           "backupInfo": "Поддерживается резервное копирование файлов конфигурации через WebDAV",

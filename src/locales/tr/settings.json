@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
+        "description": "Nadiren kullanılan ayarlar ve bakım araçları.",
+        "confirmExitTitle": "clash5 kapatılsın mı?",
+        "confirmExitMessage": "Çekirdek durabilir ve proxy bağlantıları kesilebilir.",
+        "confirmLiteModeTitle": "Hafif moda geçilsin mi?",
+        "confirmLiteModeMessage": "Pencere kapanırken çekirdek çalışmaya devam eder. clash5 uygulamasını sistem tepsisinden yeniden açın.",
         "title": "Verge Gelişmiş Ayarı",
         "tooltips": {
           "backupInfo": "WebDAV yedekleme yapılandırma dosyalarını destekler",

@@ -1398,6 +1398,148 @@ async function verifyThemeScreenshots() {
     { timeout: 10_000, interval: 250, timeoutMsg: 'Settings did not render' },
   )
 
+  phase = 'advanced settings progressive disclosure and confirmations'
+  const advancedDisclosure = await browser.execute(() => {
+    const accordion = document.querySelector(
+      '[data-testid="advanced-settings-accordion"]',
+    )
+    const summary = accordion?.querySelector('.MuiAccordionSummary-root')
+    return {
+      present: Boolean(accordion && summary),
+      expanded: summary?.getAttribute('aria-expanded'),
+    }
+  })
+  if (!advancedDisclosure.present || advancedDisclosure.expanded !== 'false') {
+    throw new Error(
+      `Advanced settings did not start collapsed: ${JSON.stringify(advancedDisclosure)}`,
+    )
+  }
+
+  await browser.execute(() => {
+    document
+      .querySelector(
+        '[data-testid="advanced-settings-accordion"] .MuiAccordionSummary-root',
+      )
+      ?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () =>
+          document
+            .querySelector(
+              '[data-testid="advanced-settings-accordion"] .MuiAccordionSummary-root',
+            )
+            ?.getAttribute('aria-expanded') === 'true',
+      ),
+    {
+      timeout: 5_000,
+      interval: 100,
+      timeoutMsg: 'Advanced settings did not expand',
+    },
+  )
+
+  await browser.execute(() =>
+    document.querySelector('[data-testid="advanced-settings-exit"]')?.click(),
+  )
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        Boolean(
+          document.querySelector(
+            '[data-testid="advanced-settings-exit-confirmation"]',
+          ),
+        ),
+      ),
+    {
+      timeout: 5_000,
+      interval: 100,
+      timeoutMsg: 'Exit confirmation did not open',
+    },
+  )
+  await browser.keys('Escape')
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () =>
+          !document.querySelector(
+            '[data-testid="advanced-settings-exit-confirmation"]',
+          ),
+      ),
+    {
+      timeout: 5_000,
+      interval: 100,
+      timeoutMsg: 'Exit confirmation did not close with Escape',
+    },
+  )
+  await invoke('get_verge_config')
+
+  await browser.execute(() =>
+    document
+      .querySelector('[data-testid="advanced-settings-lite-mode"]')
+      ?.click(),
+  )
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        Boolean(
+          document.querySelector('[data-testid="lite-mode-settings-dialog"]'),
+        ),
+      ),
+    {
+      timeout: 5_000,
+      interval: 100,
+      timeoutMsg: 'Lite mode settings did not open',
+    },
+  )
+  await browser.execute(() =>
+    document.querySelector('[data-testid="lite-mode-enter"]')?.click(),
+  )
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        Boolean(
+          document.querySelector(
+            '[data-testid="lite-mode-entry-confirmation"]',
+          ),
+        ),
+      ),
+    {
+      timeout: 5_000,
+      interval: 100,
+      timeoutMsg: 'Lite mode entry confirmation did not open',
+    },
+  )
+  await browser.keys('Escape')
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () =>
+          !document.querySelector(
+            '[data-testid="lite-mode-entry-confirmation"]',
+          ),
+      ),
+    {
+      timeout: 5_000,
+      interval: 100,
+      timeoutMsg: 'Lite mode entry confirmation did not close with Escape',
+    },
+  )
+  await browser.keys('Escape')
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () =>
+          !document.querySelector('[data-testid="lite-mode-settings-dialog"]'),
+      ),
+    {
+      timeout: 5_000,
+      interval: 100,
+      timeoutMsg: 'Lite mode settings did not close with Escape',
+    },
+  )
+  await invoke('get_verge_config')
+
   const selectTheme = async (labels, mode, canvasColor) => {
     const clicked = await browser.execute((values) => {
       const button = [...document.querySelectorAll('.base-page button')].find(

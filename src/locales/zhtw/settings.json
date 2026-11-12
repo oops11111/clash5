@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "無法取得系統記憶體資訊；自動保護暫時無法更新。"
       },
       "advanced": {
+        "description": "較少使用的設定與維護工具。",
+        "confirmExitTitle": "結束 clash5？",
+        "confirmExitMessage": "核心可能停止執行，代理連線也可能中斷。",
+        "confirmLiteModeTitle": "進入輕量模式？",
+        "confirmLiteModeMessage": "視窗將關閉，但核心會繼續執行。你可以從系統匣重新開啟 clash5。",
         "title": "Verge 進階設定",
         "tooltips": {
           "backupInfo": "支援本機或 WebDAV 方式備份配置檔案",

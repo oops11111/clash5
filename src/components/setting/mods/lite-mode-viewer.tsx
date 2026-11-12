@@ -1,4 +1,5 @@
 import {
+  Button,
   InputAdornment,
   List,
   ListItem,
@@ -22,6 +23,7 @@ export function LiteModeViewer({ ref }: { ref?: Ref<DialogRef> }) {
   const { verge, patchVerge } = useVerge()
 
   const [open, setOpen] = useState(false)
+  const [confirmEnter, setConfirmEnter] = useState(false)
   const [values, setValues] = useState({
     autoEnterLiteMode: false,
     autoEnterLiteModeDelay: 10, // 默认10分钟
@@ -51,105 +53,120 @@ export function LiteModeViewer({ ref }: { ref?: Ref<DialogRef> }) {
   })
 
   return (
-    <BaseDialog
-      open={open}
-      title={t('settings.modals.liteMode.title')}
-      contentSx={{ width: 450 }}
-      okBtn={t('shared.actions.save')}
-      cancelBtn={t('shared.actions.cancel')}
-      onClose={() => setOpen(false)}
-      onCancel={() => setOpen(false)}
-      onOk={onSave}
-    >
-      <List>
-        <ListItem sx={{ padding: '5px 2px' }}>
-          <ListItemText
-            primary={t('settings.modals.liteMode.actions.enterNow')}
-          />
-          <Typography
-            variant="button"
-            sx={{
-              cursor: 'pointer',
-              color: 'primary.main',
-              '&:hover': { textDecoration: 'underline' },
-            }}
-            onClick={async () =>
-              await mutate(() => entry_lightweight_mode(), {
-                id: 'entry-lightweight-mode',
-                errorNotice: false,
-              })
-            }
-          >
-            {t('shared.actions.enable')}
-          </Typography>
-        </ListItem>
+    <>
+      <BaseDialog
+        testId="lite-mode-settings-dialog"
+        open={open}
+        title={t('settings.modals.liteMode.title')}
+        contentSx={{ width: 450 }}
+        okBtn={t('shared.actions.save')}
+        cancelBtn={t('shared.actions.cancel')}
+        onClose={() => setOpen(false)}
+        onCancel={() => setOpen(false)}
+        onOk={onSave}
+      >
+        <List>
+          <ListItem sx={{ padding: '5px 2px' }}>
+            <ListItemText
+              primary={t('settings.modals.liteMode.actions.enterNow')}
+            />
+            <Button
+              data-testid="lite-mode-enter"
+              variant="text"
+              size="small"
+              onClick={() => setConfirmEnter(true)}
+            >
+              {t('shared.actions.enable')}
+            </Button>
+          </ListItem>
 
-        <ListItem sx={{ padding: '5px 2px' }}>
-          <ListItemText
-            primary={t('settings.modals.liteMode.toggles.autoEnter')}
-            sx={{ maxWidth: 'fit-content' }}
-          />
-          <TooltipIcon
-            title={t('settings.modals.liteMode.tooltips.autoEnter')}
-            sx={{ opacity: '0.7' }}
-          />
-          <Switch
-            edge="end"
-            checked={values.autoEnterLiteMode}
-            onChange={(_, c) =>
-              setValues((v) => ({ ...v, autoEnterLiteMode: c }))
-            }
-            sx={{ marginLeft: 'auto' }}
-          />
-        </ListItem>
+          <ListItem sx={{ padding: '5px 2px' }}>
+            <ListItemText
+              primary={t('settings.modals.liteMode.toggles.autoEnter')}
+              sx={{ maxWidth: 'fit-content' }}
+            />
+            <TooltipIcon
+              title={t('settings.modals.liteMode.tooltips.autoEnter')}
+              sx={{ opacity: '0.7' }}
+            />
+            <Switch
+              edge="end"
+              checked={values.autoEnterLiteMode}
+              onChange={(_, c) =>
+                setValues((v) => ({ ...v, autoEnterLiteMode: c }))
+              }
+              sx={{ marginLeft: 'auto' }}
+            />
+          </ListItem>
 
-        {values.autoEnterLiteMode && (
-          <>
-            <ListItem sx={{ padding: '5px 2px' }}>
-              <ListItemText
-                primary={t('settings.modals.liteMode.fields.delay')}
-              />
-              <TextField
-                autoComplete="off"
-                size="small"
-                type="number"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck="false"
-                sx={{ width: 150 }}
-                value={values.autoEnterLiteModeDelay}
-                onChange={(e) =>
-                  setValues((v) => ({
-                    ...v,
-                    autoEnterLiteModeDelay: parseInt(e.target.value) || 1,
-                  }))
-                }
-                slotProps={{
-                  input: {
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        {t('shared.units.minutes')}
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-            </ListItem>
+          {values.autoEnterLiteMode && (
+            <>
+              <ListItem sx={{ padding: '5px 2px' }}>
+                <ListItemText
+                  primary={t('settings.modals.liteMode.fields.delay')}
+                />
+                <TextField
+                  autoComplete="off"
+                  size="small"
+                  type="number"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                  sx={{ width: 150 }}
+                  value={values.autoEnterLiteModeDelay}
+                  onChange={(e) =>
+                    setValues((v) => ({
+                      ...v,
+                      autoEnterLiteModeDelay: parseInt(e.target.value) || 1,
+                    }))
+                  }
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          {t('shared.units.minutes')}
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
+              </ListItem>
 
-            <ListItem sx={{ padding: '5px 2px' }}>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ fontStyle: 'italic' }}
-              >
-                {t('settings.modals.liteMode.messages.autoEnterHint', {
-                  n: values.autoEnterLiteModeDelay,
-                })}
-              </Typography>
-            </ListItem>
-          </>
-        )}
-      </List>
-    </BaseDialog>
+              <ListItem sx={{ padding: '5px 2px' }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ fontStyle: 'italic' }}
+                >
+                  {t('settings.modals.liteMode.messages.autoEnterHint', {
+                    n: values.autoEnterLiteModeDelay,
+                  })}
+                </Typography>
+              </ListItem>
+            </>
+          )}
+        </List>
+      </BaseDialog>
+      <BaseDialog
+        testId="lite-mode-entry-confirmation"
+        open={confirmEnter}
+        title={t('settings.components.verge.advanced.confirmLiteModeTitle')}
+        okBtn={t('shared.actions.enable')}
+        cancelBtn={t('shared.actions.cancel')}
+        onClose={() => setConfirmEnter(false)}
+        onCancel={() => setConfirmEnter(false)}
+        onOk={async () => {
+          setConfirmEnter(false)
+          await mutate(() => entry_lightweight_mode(), {
+            id: 'entry-lightweight-mode',
+            errorNotice: false,
+          })
+        }}
+      >
+        <Typography>
+          {t('settings.components.verge.advanced.confirmLiteModeMessage')}
+        </Typography>
+      </BaseDialog>
+    </>
   )
 }

@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
+        "description": "Selten verwendete Einstellungen und Wartungswerkzeuge.",
+        "confirmExitTitle": "clash5 beenden?",
+        "confirmExitMessage": "Der Kern kann angehalten werden und Proxy-Verbindungen können unterbrochen werden.",
+        "confirmLiteModeTitle": "Leichtmodus aktivieren?",
+        "confirmLiteModeMessage": "Das Fenster wird geschlossen, während der Kern weiterläuft. Öffne clash5 erneut über die Taskleiste.",
         "title": "Verge-Erweiterte Einstellungen",
         "tooltips": {
           "backupInfo": "Unterstützt die Sicherung von Konfigurationsdateien über WebDAV",

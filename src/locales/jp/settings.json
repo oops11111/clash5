@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
+        "description": "使用頻度の低い設定とメンテナンス機能です。",
+        "confirmExitTitle": "clash5 を終了しますか？",
+        "confirmExitMessage": "コアが停止し、プロキシ接続が切断される場合があります。",
+        "confirmLiteModeTitle": "ライトモードに切り替えますか？",
+        "confirmLiteModeMessage": "ウィンドウは閉じますがコアは動作を続けます。システムトレイから clash5 を再度開けます。",
         "title": "Verge詳細設定",
         "tooltips": {
           "backupInfo": "WebDAVを使用した設定ファイルのバックアップをサポートします。",

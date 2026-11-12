@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
+        "description": "Less-used settings and maintenance tools.",
+        "confirmExitTitle": "Exit clash5?",
+        "confirmExitMessage": "The core may stop running and proxy connections may be interrupted.",
+        "confirmLiteModeTitle": "Enter lite mode?",
+        "confirmLiteModeMessage": "The window will close while the core keeps running. Reopen clash5 from the system tray.",
         "title": "Verge Advanced Setting",
         "tooltips": {
           "backupInfo": "Support local or WebDAV backup of configuration files",

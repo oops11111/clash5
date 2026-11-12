@@ -14,6 +14,7 @@ import isAsyncFunction from '@/utils/is-async-function'
 
 interface ItemProps {
   label: ReactNode
+  testId?: string
   extra?: ReactNode
   children?: ReactNode
   secondary?: ReactNode
@@ -22,6 +23,7 @@ interface ItemProps {
 
 export const SettingItem: React.FC<ItemProps> = ({
   label,
+  testId,
   extra,
   children,
   secondary,
@@ -50,7 +52,11 @@ export const SettingItem: React.FC<ItemProps> = ({
 
   return clickable ? (
     <ListItem disablePadding>
-      <ListItemButton onClick={handleClick} disabled={isLoading}>
+      <ListItemButton
+        data-testid={testId}
+        onClick={handleClick}
+        disabled={isLoading}
+      >
         <ListItemText primary={primary} secondary={secondary} />
         {isLoading ? (
           <CircularProgress color="inherit" size={20} />

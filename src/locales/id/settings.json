@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
+        "description": "Pengaturan yang jarang digunakan dan alat pemeliharaan.",
+        "confirmExitTitle": "Keluar dari clash5?",
+        "confirmExitMessage": "Core dapat berhenti dan koneksi proxy mungkin terputus.",
+        "confirmLiteModeTitle": "Masuk ke mode ringan?",
+        "confirmLiteModeMessage": "Jendela akan ditutup sementara core tetap berjalan. Buka kembali clash5 dari baki sistem.",
         "title": "Pengaturan Lanjutan Verge",
         "tooltips": {
           "backupInfo": "Mendukung file konfigurasi cadangan WebDAV",

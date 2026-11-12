@@ -10,6 +10,7 @@ import {
 import { ReactNode } from 'react'
 
 interface Props {
+  testId?: string
   title: ReactNode
   open: boolean
   okBtn?: ReactNode
@@ -32,6 +33,7 @@ export interface DialogRef {
 }
 
 export const BaseDialog: React.FC<Props> = ({
+  testId,
   open,
   title,
   children,
@@ -49,6 +51,7 @@ export const BaseDialog: React.FC<Props> = ({
 }) => {
   return (
     <Dialog
+      data-testid={testId}
       open={open}
       onClose={onClose}
       disableEnforceFocus={disableEnforceFocus}

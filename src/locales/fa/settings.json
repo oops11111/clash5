@@ -194,6 +194,11 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
+        "description": "تنظیمات کم‌استفاده و ابزارهای نگهداری.",
+        "confirmExitTitle": "از clash5 خارج می‌شوید؟",
+        "confirmExitMessage": "ممکن است هسته متوقف شود و اتصال‌های پراکسی قطع شوند.",
+        "confirmLiteModeTitle": "وارد حالت سبک می‌شوید؟",
+        "confirmLiteModeMessage": "پنجره بسته می‌شود و هسته به کار ادامه می‌دهد. clash5 را از سینی سیستم دوباره باز کنید.",
         "title": "تنظیمات پیشرفته Verge",
         "tooltips": {
           "backupInfo": "از فایل های پیکربندی پشتیبان WebDAV پشتیبانی می کند",
