@@ -14,7 +14,7 @@ use std::{
     sync::{Arc, OnceLock},
     time::Duration,
 };
-use tokio::{fs, io::AsyncWriteExt, time::timeout};
+use tokio::{fs, io::AsyncWriteExt as _, time::timeout};
 use zip::write::SimpleFileOptions;
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -216,7 +216,7 @@ impl WebDavClient {
                 .content_length()
                 .is_some_and(|length| length > 512 * 1024 * 1024)
             {
-                return Err(anyhow::anyhow!("Backup archive exceeds the 512 MiB limit").into());
+                return Err(anyhow::anyhow!("Backup archive exceeds the 512 MiB limit"));
             }
             let mut response = response;
             let mut output = fs::File::create(&storage_path).await?;
@@ -224,7 +224,7 @@ impl WebDavClient {
             while let Some(chunk) = response.chunk().await? {
                 total = total.saturating_add(chunk.len() as u64);
                 if total > 512 * 1024 * 1024 {
-                    return Err(anyhow::anyhow!("Backup archive exceeds the 512 MiB limit").into());
+                    return Err(anyhow::anyhow!("Backup archive exceeds the 512 MiB limit"));
                 }
                 output.write_all(&chunk).await?;
             }

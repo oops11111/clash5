@@ -130,9 +130,9 @@ fn extract_backup<R: Read + Seek>(zip: &mut zip::ZipArchive<R>, home: &Path) -> 
                 .as_array()
                 .ok_or_else(|| anyhow!("Invalid backup manifest includes list"))?;
             if includes.iter().any(|entry| {
-                entry.as_str().map_or(true, |name| {
-                    !is_allowed_backup_path(Path::new(name)) && name != "profiles/"
-                })
+                entry
+                    .as_str()
+                    .is_none_or(|name| !is_allowed_backup_path(Path::new(name)) && name != "profiles/")
             }) {
                 return Err(anyhow!("Backup manifest lists unsupported files"));
             }
@@ -155,13 +155,15 @@ fn extract_backup<R: Read + Seek>(zip: &mut zip::ZipArchive<R>, home: &Path) -> 
                 }
             }
         }
-        if let Some(snapshot) = database_snapshot {
-            if let Err(error) = clash5_data::BindingStore::open(home.join(crate::utils::dirs::CLASH5_DATA_DB))
-                .and_then(|mut store| store.restore_from(&snapshot))
-            {
-                rollback_replacements(replacements);
-                return Err(error.into());
-            }
+        let snapshot_result = database_snapshot
+            .map(|snapshot| {
+                clash5_data::BindingStore::open(home.join(crate::utils::dirs::CLASH5_DATA_DB))
+                    .and_then(|mut store| store.restore_from(&snapshot))
+            })
+            .transpose();
+        if let Err(error) = snapshot_result {
+            rollback_replacements(replacements);
+            return Err(error.into());
         }
         for (_, previous) in replacements {
             if let Some(previous) = previous {
@@ -682,9 +684,11 @@ mod export_path_tests {
 
 #[cfg(test)]
 mod restore_archive_tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::{extract_backup, is_allowed_backup_path, validate_backup_filename};
     use std::{
-        io::Write,
+        io::Write as _,
         path::{Path, PathBuf},
     };
 
