@@ -1265,6 +1265,30 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
   }
 
   await browser.execute(() => {
+    window.history.pushState({}, '', '/nodes')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        Boolean(
+          document.querySelector('[data-testid="subscriptions-source-pane"]') &&
+            document.querySelector('[data-testid="subscriptions-node-pane"]') &&
+            document
+              .querySelector('.subscription-workspace')
+              ?.getAttribute('data-focused-pane') === 'nodes' &&
+            window.location.pathname === '/subscriptions',
+        ),
+      ),
+    {
+      timeout: 20_000,
+      interval: 250,
+      timeoutMsg:
+        'The legacy node route did not open the combined subscription workspace',
+    },
+  )
+
+  await browser.execute(() => {
     const plugins = [
       ...document.querySelectorAll('.the-menu [role="tab"]'),
     ].find((item) => ['Plugins', '插件'].includes(item.textContent?.trim()))

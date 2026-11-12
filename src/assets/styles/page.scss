@@ -50,3 +50,9 @@
     }
   }
 }
+
+.base-page--compact > header {
+  flex-basis: 52px;
+  padding-right: 16px;
+  padding-left: 16px;
+}

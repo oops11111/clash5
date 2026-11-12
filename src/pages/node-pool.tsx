@@ -65,7 +65,7 @@ const isSubscriptionUrl = (value: string) => {
   }
 }
 
-const NodePoolPage = () => {
+const NodePoolPage = ({ compact = false }: { compact?: boolean }) => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const dark = useTheme().palette.mode === 'dark'
@@ -306,6 +306,7 @@ const NodePoolPage = () => {
 
   return (
     <BasePage
+      compact={compact}
       header={
         <Button onClick={() => navigate('/proxies')}>
           {t('layout.components.navigation.proxyGroups')}

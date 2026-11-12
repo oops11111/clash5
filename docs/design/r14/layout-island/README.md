@@ -2,11 +2,11 @@
 
 ## 已定五标签（左→右）
 **首页 · 代理 · 订阅 · 插件 · 设置**  
-文案取自 `locales/zh/layout.json` → `layout.components.navigation.tabs.*`（`proxies` 原文「代 理」，图中排版为「代理」）。  
+文案取自 `locales/zh/layout.json` → `layout.components.navigation.tabs.*`。
 **不新造第六标签。**
 
 ## 源码事实（只读）
-- `src/pages/_navigation.tsx:36-88` 现有 `navItems` 为 9 入口：首页 / 节点 / 订阅 / 代理 / 链路 / 规则 / 插件 / 诊断 / 设置
+- 实施前 `src/pages/_navigation.tsx` 的 `navItems` 为九个独立入口；实施后固定为五个主入口。
 - `_navigation-meta.ts` 另定义 connections / logs 文案键，但不在 navItems 中
 
 ## 合并归属（已写入决策）
@@ -27,3 +27,5 @@
 - `0x-*.svg/png`：线框草稿
 - `renders/`：浅色 + 暗色高保真 PNG
 - `src/`：渲染用 HTML
+
+全局确认、错误、空、骨架、按钮加载与焦点状态参考见 `../interaction-states/`。
