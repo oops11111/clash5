@@ -130,6 +130,7 @@ export function validateBackupRestoreSecurity(coreSource, featureSource) {
     'MAX_BACKUP_ENTRIES: usize = 10_000',
     'entry.by_ref().take(MAX_BACKUP_ENTRY_BYTES + 1)',
     'zip.len() > MAX_BACKUP_ENTRIES',
+    'BindingStore::verify_snapshot_integrity(&candidate_path)?',
     'candidate.verify_integrity()?',
     'fn is_allowed_backup_path',
     'fn replace_file_staged',
@@ -147,7 +148,7 @@ export function validateBackupRestoreSecurity(coreSource, featureSource) {
 }
 
 export async function verifyBackupRestoreSecurity() {
-  const [coreSource, featureSource] = await Promise.all([
+  const [coreSource, featureSource, dataStoreSource, dataTestSource] = await Promise.all([
     readFile(
       new URL('../../src-tauri/src/core/backup.rs', import.meta.url),
       'utf8',
@@ -156,8 +157,23 @@ export async function verifyBackupRestoreSecurity() {
       new URL('../../src-tauri/src/feat/backup.rs', import.meta.url),
       'utf8',
     ),
+    readFile(new URL('../../crates/clash5-data/src/store.rs', import.meta.url), 'utf8'),
+    readFile(new URL('../../crates/clash5-data/tests/m0.rs', import.meta.url), 'utf8'),
   ])
   validateBackupRestoreSecurity(coreSource, featureSource)
+  for (const evidence of [
+    'pub fn verify_snapshot_integrity',
+    'SQLITE_OPEN_READ_ONLY',
+    'PRAGMA quick_check',
+    "name='nodes'",
+  ]) {
+    if (!dataStoreSource.includes(evidence)) {
+      throw new Error(`P0-13 SQLite snapshot validation is missing: ${evidence}`)
+    }
+  }
+  if (!dataTestSource.includes('fn snapshot_integrity_rejects_empty_and_non_database_files')) {
+    throw new Error('P0-13 SQLite snapshot validation regression test is missing')
+  }
 }
 
 export function validateWebviewSecurity(config, capability, monacoSource) {

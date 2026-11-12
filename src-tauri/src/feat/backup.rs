@@ -141,7 +141,9 @@ fn extract_backup<R: Read + Seek>(zip: &mut zip::ZipArchive<R>, home: &Path) -> 
         let mut database_snapshot = None;
         for relative in &files {
             if relative == Path::new(crate::utils::dirs::CLASH5_DATA_DB) {
-                let candidate = clash5_data::BindingStore::open(stage.join(relative))?;
+                let candidate_path = stage.join(relative);
+                clash5_data::BindingStore::verify_snapshot_integrity(&candidate_path)?;
+                let candidate = clash5_data::BindingStore::open(candidate_path)?;
                 candidate.verify_integrity()?;
                 break;
             }
