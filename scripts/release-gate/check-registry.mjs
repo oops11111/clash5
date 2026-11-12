@@ -148,18 +148,25 @@ export function validateBackupRestoreSecurity(coreSource, featureSource) {
 }
 
 export async function verifyBackupRestoreSecurity() {
-  const [coreSource, featureSource, dataStoreSource, dataTestSource] = await Promise.all([
-    readFile(
-      new URL('../../src-tauri/src/core/backup.rs', import.meta.url),
-      'utf8',
-    ),
-    readFile(
-      new URL('../../src-tauri/src/feat/backup.rs', import.meta.url),
-      'utf8',
-    ),
-    readFile(new URL('../../crates/clash5-data/src/store.rs', import.meta.url), 'utf8'),
-    readFile(new URL('../../crates/clash5-data/tests/m0.rs', import.meta.url), 'utf8'),
-  ])
+  const [coreSource, featureSource, dataStoreSource, dataTestSource] =
+    await Promise.all([
+      readFile(
+        new URL('../../src-tauri/src/core/backup.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL('../../src-tauri/src/feat/backup.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL('../../crates/clash5-data/src/store.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL('../../crates/clash5-data/tests/m0.rs', import.meta.url),
+        'utf8',
+      ),
+    ])
   validateBackupRestoreSecurity(coreSource, featureSource)
   for (const evidence of [
     'pub fn verify_snapshot_integrity',
@@ -168,11 +175,19 @@ export async function verifyBackupRestoreSecurity() {
     "name='nodes'",
   ]) {
     if (!dataStoreSource.includes(evidence)) {
-      throw new Error(`P0-13 SQLite snapshot validation is missing: ${evidence}`)
+      throw new Error(
+        `P0-13 SQLite snapshot validation is missing: ${evidence}`,
+      )
     }
   }
-  if (!dataTestSource.includes('fn snapshot_integrity_rejects_empty_and_non_database_files')) {
-    throw new Error('P0-13 SQLite snapshot validation regression test is missing')
+  if (
+    !dataTestSource.includes(
+      'fn snapshot_integrity_rejects_empty_and_non_database_files',
+    )
+  ) {
+    throw new Error(
+      'P0-13 SQLite snapshot validation regression test is missing',
+    )
   }
 }
 
