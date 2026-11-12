@@ -4,11 +4,7 @@ use crate::{
     config::{PrfItem, profiles_append_item_to_safe, runtime::IRuntime},
     constants::{files, timing},
     core::{
-        CoreManager,
-        handle::{self, Handle},
-        listener::MIXED_PORT_KEY,
-        runtime_bundle::resolve_provider_path_conflicts,
-        tray,
+        CoreManager, handle, listener::MIXED_PORT_KEY, runtime_bundle::resolve_provider_path_conflicts,
         validate::CoreConfigValidator,
     },
     enhance,
@@ -82,18 +78,6 @@ impl Config {
         let verge = Self::verge().await.latest_arc();
         clash_verge_i18n::sync_locale(verge.language.as_deref());
 
-        Ok(())
-    }
-
-    pub(crate) async fn disable_tun_and_persist() -> Result<()> {
-        let verge = Self::verge().await;
-        verge.edit_draft(|draft| {
-            draft.enable_tun_mode = Some(false);
-        });
-        verge.apply();
-        verge.data_arc().save_file().await?;
-        Handle::refresh_verge();
-        let _ = tray::Tray::global().update_menu().await;
         Ok(())
     }
 

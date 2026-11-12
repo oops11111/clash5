@@ -86,19 +86,13 @@ impl RunState {
         )
     }
 
-    /// Unknown, in-flight, and attention-required states are inconclusive.
+    /// Whether this session must suspend requested TUN. The saved preference is untouched.
     #[must_use]
     pub const fn tun_should_be_disabled(&self, tun_enabled: bool) -> bool {
         if !tun_enabled || self.tun_capable() {
             return false;
         }
         !matches!(self.health, ServiceHealth::Unknown) && !self.op_in_flight && !self.service_needs_attention()
-    }
-
-    /// Present-but-broken services remain in the repair flow rather than being disabled here.
-    #[must_use]
-    pub const fn startup_tun_should_be_disabled(&self, tun_enabled: bool) -> bool {
-        matches!(self.health, ServiceHealth::NotInstalled) && self.tun_should_be_disabled(tun_enabled)
     }
 
     #[must_use]
@@ -262,56 +256,8 @@ mod tests {
     }
 
     #[test]
-    fn tun_is_disabled_once_we_know_it_cannot_work() {
+    fn tun_is_suspended_once_we_know_it_cannot_work() {
         assert!(state(ServiceHealth::NotInstalled, false, false).tun_should_be_disabled(true));
-    }
-
-    #[test]
-    fn startup_tun_is_disabled_only_for_a_confirmed_absent_service() {
-        assert!(
-            state(ServiceHealth::NotInstalled, false, false).startup_tun_should_be_disabled(true),
-            "a non-elevated reinstall must not keep an unusable TUN setting"
-        );
-
-        for health in [
-            ServiceHealth::Unknown,
-            ServiceHealth::Ready,
-            ServiceHealth::VersionMismatch,
-            ServiceHealth::Unavailable("socket refused".into()),
-        ] {
-            assert!(
-                !state(health.clone(), false, false).startup_tun_should_be_disabled(true),
-                "{health:?} is not proof that the Service was removed"
-            );
-        }
-    }
-
-    #[test]
-    fn startup_leaves_a_present_but_broken_service_to_the_runtime_reconciler() {
-        for health in [
-            ServiceHealth::VersionMismatch,
-            ServiceHealth::Unavailable("socket refused".into()),
-        ] {
-            let mut settled = state(health.clone(), false, false);
-            settled.sidecar_allowed = true;
-
-            assert!(settled.tun_should_be_disabled(true), "{health:?}");
-            assert!(!settled.startup_tun_should_be_disabled(true), "{health:?}");
-        }
-    }
-
-    #[test]
-    fn startup_tun_is_kept_when_disabled_elevated_or_still_undecided() {
-        assert!(!state(ServiceHealth::NotInstalled, false, false).startup_tun_should_be_disabled(false));
-        assert!(!state(ServiceHealth::NotInstalled, true, false).startup_tun_should_be_disabled(true));
-        assert!(!state(ServiceHealth::NotInstalled, false, true).startup_tun_should_be_disabled(true));
-
-        let mut requested = state(ServiceHealth::NotInstalled, false, false);
-        requested.pending = Some(PendingAction::Install);
-        assert!(
-            !requested.startup_tun_should_be_disabled(true),
-            "an install the user has still to answer is not a settled absence"
-        );
     }
 
     #[test]
@@ -326,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn tun_is_never_disabled_while_a_decision_is_pending() {
+    fn tun_is_not_suspended_while_a_decision_is_pending() {
         for health in [
             ServiceHealth::VersionMismatch,
             ServiceHealth::Unavailable("boom".into()),
@@ -343,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn tun_is_disabled_once_the_user_settles_on_sidecar() {
+    fn tun_is_suspended_once_the_user_settles_on_sidecar() {
         let mut settled = state(ServiceHealth::NotInstalled, false, false);
         settled.sidecar_allowed = true;
 
