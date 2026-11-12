@@ -5,6 +5,7 @@ const registryPath = new URL('../../RELEASE-GATES.md', import.meta.url);
 const requiredGroups = [
   ...Array.from({ length: 16 }, (_, index) => `G-${String(index + 1).padStart(2, '0')}`),
   'P0-12-CORE-UPDATE',
+  'P0-13-BACKUP-RESTORE',
   'G-17…G-22',
   'G-23…G-27',
   'G-28…G-31',
@@ -85,6 +86,39 @@ export async function verifyAutomatedEvidence() {
   validateAutomatedEvidence(backupSource);
 }
 
+export function validateBackupRestoreSecurity(coreSource, featureSource) {
+  if (/danger_accept_invalid_certs\s*\(\s*true\s*\)/u.test(coreSource)) {
+    throw new Error('P0-13 WebDAV TLS must validate certificates');
+  }
+  if (!coreSource.includes('while let Some(chunk) = response.chunk().await?')) {
+    throw new Error('P0-13 WebDAV downloads must enforce the archive size limit while streaming');
+  }
+  for (const evidence of [
+    'MAX_BACKUP_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024',
+    'MAX_BACKUP_ENTRY_BYTES: u64 = 64 * 1024 * 1024',
+    'MAX_BACKUP_ENTRIES: usize = 10_000',
+    'entry.by_ref().take(MAX_BACKUP_ENTRY_BYTES + 1)',
+    'zip.len() > MAX_BACKUP_ENTRIES',
+    'fn is_allowed_backup_path',
+    'fn replace_file_staged',
+    'rollback_replacements(replacements)',
+    'fn restore_allowlist_accepts_only_known_backup_files',
+    'fn restore_filename_rejects_path_components',
+  ]) {
+    if (!featureSource.includes(evidence)) {
+      throw new Error(`P0-13 backup restore security evidence is missing: ${evidence}`);
+    }
+  }
+}
+
+export async function verifyBackupRestoreSecurity() {
+  const [coreSource, featureSource] = await Promise.all([
+    readFile(new URL('../../src-tauri/src/core/backup.rs', import.meta.url), 'utf8'),
+    readFile(new URL('../../src-tauri/src/feat/backup.rs', import.meta.url), 'utf8'),
+  ]);
+  validateBackupRestoreSecurity(coreSource, featureSource);
+}
+
 export function validateWebviewSecurity(config, capability, monacoSource) {
   const security = config.app?.security;
   if (!security?.csp || typeof security.csp !== 'object') {
@@ -155,5 +189,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   await verifyNoInAppCoreUpgrade();
   await verifyAutomatedEvidence();
   await verifyWebviewSecurity();
+  await verifyBackupRestoreSecurity();
   process.stdout.write(`Validated ${count} release-gate registry rows.\n`);
 }

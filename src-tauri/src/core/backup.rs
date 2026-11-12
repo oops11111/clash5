@@ -14,11 +14,11 @@ use std::{
     sync::{Arc, OnceLock},
     time::Duration,
 };
-use tokio::{fs, time::timeout};
+use tokio::{fs, io::AsyncWriteExt, time::timeout};
 use zip::write::SimpleFileOptions;
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
-const BACKUP_FORMAT_VERSION: u32 = 2;
+pub(crate) const BACKUP_FORMAT_VERSION: u32 = 2;
 
 const TIMEOUT_UPLOAD: u64 = 300;
 const TIMEOUT_DOWNLOAD: u64 = 300;
@@ -106,7 +106,6 @@ impl WebDavClient {
             .set_agent(
                 reqwest::Client::builder()
                     .use_rustls_tls()
-                    .danger_accept_invalid_certs(true)
                     .timeout(Duration::from_secs(op.timeout()))
                     .user_agent(format!("clash-verge/{APP_VERSION} ({OS} WebDAV-Client)"))
                     .redirect(reqwest::redirect::Policy::custom(|attempt| {
@@ -213,8 +212,23 @@ impl WebDavClient {
 
         let fut = async {
             let response = client.get(path.as_str()).await?;
-            let content = response.bytes().await?;
-            fs::write(&storage_path, &content).await?;
+            if response
+                .content_length()
+                .is_some_and(|length| length > 512 * 1024 * 1024)
+            {
+                return Err(anyhow::anyhow!("Backup archive exceeds the 512 MiB limit").into());
+            }
+            let mut response = response;
+            let mut output = fs::File::create(&storage_path).await?;
+            let mut total = 0u64;
+            while let Some(chunk) = response.chunk().await? {
+                total = total.saturating_add(chunk.len() as u64);
+                if total > 512 * 1024 * 1024 {
+                    return Err(anyhow::anyhow!("Backup archive exceeds the 512 MiB limit").into());
+                }
+                output.write_all(&chunk).await?;
+            }
+            output.flush().await?;
             Ok::<(), Error>(())
         };
 

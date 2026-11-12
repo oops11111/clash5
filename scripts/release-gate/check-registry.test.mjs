@@ -5,15 +5,17 @@ import {
   validateRegistry,
   validateAutomatedEvidence,
   validateWebviewSecurity,
+  validateBackupRestoreSecurity,
   verifyAutomatedEvidence,
   verifyNoInAppCoreUpgrade,
   verifyWebviewSecurity,
+  verifyBackupRestoreSecurity,
 } from './check-registry.mjs';
 
 const registry = await readFile(new URL('../../RELEASE-GATES.md', import.meta.url), 'utf8');
 
 test('release gate registry covers all reviewed gate groups', () => {
-  assert.equal(validateRegistry(registry), 23);
+  assert.equal(validateRegistry(registry), 24);
 });
 
 test('the in-app core upgrade command and implementation are absent', async () => {
@@ -37,6 +39,17 @@ test('registry validation fails if a required gate test is removed', async () =>
 
 test('P0-04 keeps scoped assets, local workers, and system dialogs', async () => {
   await verifyWebviewSecurity();
+});
+
+test('P0-13 enforces strict WebDAV TLS and staged archive restore bounds', async () => {
+  await verifyBackupRestoreSecurity();
+});
+
+test('P0-13 rejects invalid-certificate WebDAV configuration', () => {
+  assert.throws(
+    () => validateBackupRestoreSecurity('.danger_accept_invalid_certs(true)', ''),
+    /must validate certificates/u,
+  );
 });
 
 test('registry policy rejects an unrestricted filesystem scope', async () => {
@@ -77,7 +90,7 @@ test('registry policy rejects an unrestricted asset scope and network policy', a
 
 test('registry validation fails when a gate row is missing', () => {
   const incomplete = registry.replace(/^\| G-10 .*\r?\n/mu, '');
-  assert.throws(() => validateRegistry(incomplete), /expected 23 gate rows/u);
+  assert.throws(() => validateRegistry(incomplete), /expected 24 gate rows/u);
 });
 
 test('registry validation fails for an unknown state', () => {
