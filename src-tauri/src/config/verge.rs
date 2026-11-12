@@ -19,11 +19,14 @@ pub enum PerformancePreset {
     PowerSaving,
 }
 
+pub const DEFAULT_PROBE_CONCURRENCY: usize = 10;
+pub const MAX_PROBE_CONCURRENCY: usize = 16;
+
 impl PerformancePreset {
     pub const fn probe_concurrency(self) -> usize {
         match self {
-            Self::Balanced => 12,
-            Self::Performance => 16,
+            Self::Balanced => DEFAULT_PROBE_CONCURRENCY,
+            Self::Performance => MAX_PROBE_CONCURRENCY,
             Self::PowerSaving => 4,
         }
     }

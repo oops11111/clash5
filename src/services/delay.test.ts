@@ -7,7 +7,11 @@ vi.mock('tauri-plugin-mihomo-api', () => ({
 
 import type { ResolvedProxyMember } from '@/types/proxy-view'
 
-import delayManager from './delay'
+import delayManager, {
+  DEFAULT_DELAY_CONCURRENCY,
+  effectiveDelayConcurrency,
+  MAX_DELAY_CONCURRENCY,
+} from './delay'
 
 const node = (name: string) =>
   ({
@@ -36,6 +40,15 @@ beforeEach(() => {
 afterEach(() => unsubscribe())
 
 describe('group delay completion', () => {
+  test('uses the reviewed default and clamps explicit concurrency to the cap', () => {
+    expect(DEFAULT_DELAY_CONCURRENCY).toBe(10)
+    expect(MAX_DELAY_CONCURRENCY).toBe(16)
+    expect(effectiveDelayConcurrency(DEFAULT_DELAY_CONCURRENCY, 40)).toBe(10)
+    expect(effectiveDelayConcurrency(16, 40)).toBe(16)
+    expect(effectiveDelayConcurrency(36, 40)).toBe(16)
+    expect(effectiveDelayConcurrency(16, 4)).toBe(4)
+  })
+
   test('notifies once after a batch settles', async () => {
     const proxies = Array.from({ length: 6 }, (_, index) => node(`n${index}`))
 

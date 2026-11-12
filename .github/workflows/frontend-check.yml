@@ -94,6 +94,10 @@ jobs:
         if: steps.check_frontend.outputs.frontend == 'true'
         run: pnpm test
 
+      - name: Check probe concurrency across layers
+        if: steps.check_frontend.outputs.frontend == 'true'
+        run: pnpm check:probe-concurrency
+
       - name: Check release draft boundary
         if: steps.check_frontend.outputs.frontend == 'true'
         run: node scripts/check-release-draft.mjs
