@@ -104,9 +104,19 @@ async function startM4SingboxFixture() {
   const child = spawn(
     process.platform === 'win32' ? 'sing-box.exe' : 'sing-box',
     ['run', '-c', 'stdin'],
-    { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true },
+    { stdio: ['pipe', 'ignore', 'pipe'], windowsHide: true },
   )
   let startupError
+  let startupOutput = ''
+  child.stderr.on('data', (chunk) => {
+    startupOutput = `${startupOutput}${chunk.toString()}`.slice(-8192)
+  })
+  const startupDetails = () =>
+    startupOutput.replaceAll(password, '[redacted]').trim()
+  const startupSuffix = () => {
+    const details = startupDetails()
+    return details ? `; ${details}` : ''
+  }
   child.once('error', (error) => {
     startupError = error
   })
@@ -136,11 +146,11 @@ async function startM4SingboxFixture() {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     if (startupError)
       throw new Error(
-        `M4 sing-box fixture could not start: ${startupError.message}`,
+        `M4 sing-box fixture could not start: ${startupError.message}${startupSuffix()}`,
       )
     if (child.exitCode !== null)
       throw new Error(
-        `M4 sing-box fixture exited early with code ${child.exitCode}`,
+        `M4 sing-box fixture exited early with code ${child.exitCode}${startupSuffix()}`,
       )
     try {
       await new Promise((done, reject) => {
