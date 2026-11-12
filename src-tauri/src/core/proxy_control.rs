@@ -4,18 +4,21 @@ use crate::{
         CoreManager,
         manager::RunningMode,
         notification::{self, FailedOperation},
+        proxy_lease::{self, ForeignProxyPolicy, LeaseStore, ProxyTarget},
+        proxy_snapshot,
         runstate::RUN_STATE,
         service,
         sysopt::Sysopt,
     },
     process::AsyncHandler,
     utils::{
+        dirs,
         notification::{NotificationEvent, needs_system_notification, notify_event},
         server,
         window_manager::WindowManager,
     },
 };
-use anyhow::{Result, ensure};
+use anyhow::{Context as _, Result, ensure};
 use clash_verge_logging::{Type, logging};
 use clash_verge_service_ipc::{MacosProxyConfig, OwnerSessionProof, ProxyApplyOutcome};
 use std::{
@@ -27,6 +30,39 @@ use tokio::{sync::Mutex, time::timeout};
 
 const CLEAR_ATTEMPTS: u32 = 3;
 const CLEAR_RETRY_DELAY: Duration = Duration::from_millis(100);
+static LEASE_OPERATION: Mutex<()> = Mutex::const_new(());
+
+fn lease_owner() -> &'static str {
+    static OWNER: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    OWNER.get_or_init(|| nanoid::nanoid!())
+}
+
+pub(crate) async fn recover_previous_proxy() -> Result<()> {
+    let _operation = LEASE_OPERATION.lock().await;
+    let store = LeaseStore::new(&dirs::app_home_dir()?);
+    proxy_lease::recover_previous(
+        &store,
+        Some(lease_owner()),
+        ForeignProxyPolicy::PreserveMarker,
+        || async { tokio::task::spawn_blocking(proxy_snapshot::enabled_targets).await? },
+        clear_and_retire_lease,
+    )
+    .await
+}
+
+pub(crate) async fn clear_after_unexpected_exit() -> Result<()> {
+    let _operation = LEASE_OPERATION.lock().await;
+    stop_guard().await;
+    let store = LeaseStore::new(&dirs::app_home_dir()?);
+    proxy_lease::recover_previous(
+        &store,
+        None,
+        ForeignProxyPolicy::PreserveMarker,
+        || async { tokio::task::spawn_blocking(proxy_snapshot::enabled_targets).await? },
+        clear_and_retire_lease,
+    )
+    .await
+}
 
 /// Actionable system-proxy failure attached to an `anyhow` chain.
 ///
@@ -472,17 +508,64 @@ fn table_effect(result: &Result<()>) -> TableEffect<'_> {
 
 #[tracing::instrument(skip_all, level = "info", fields(route = tracing::field::Empty))]
 pub async fn apply() -> Result<()> {
+    let _operation = LEASE_OPERATION.lock().await;
     let running_mode = CoreManager::global().get_running_mode();
     let verge = Config::verge().await.latest_arc();
+    let store = LeaseStore::new(&dirs::app_home_dir()?);
+    if !verge.enable_system_proxy.unwrap_or_default() {
+        stop_guard().await;
+        let result = proxy_lease::recover_previous(
+            &store,
+            None,
+            ForeignProxyPolicy::RetireMarker,
+            || async { tokio::task::spawn_blocking(proxy_snapshot::enabled_targets).await? },
+            clear_and_retire_lease,
+        )
+        .await;
+        return settle_clear_result(result);
+    }
     let route = proxy_backend_route(cfg!(target_os = "macos"), &running_mode);
+    let port = MixedPort::desired().await;
+    let pac_port = if matches!(route, ProxyBackendRoute::Local)
+        || (verge.enable_system_proxy.unwrap_or_default() && verge.proxy_auto_config.unwrap_or_default())
+    {
+        server::embedded_server_port()?
+    } else {
+        0
+    };
+    let service_proxy = if matches!(route, ProxyBackendRoute::Service) {
+        Some(service_proxy_config(&verge, port, pac_port)?)
+    } else {
+        None
+    };
+    let target = match &service_proxy {
+        Some(MacosProxyConfig::Global { host, port, .. }) => Some(ProxyTarget::global(&format!("{host}:{port}"))?),
+        Some(MacosProxyConfig::Pac { url }) => Some(ProxyTarget::Pac { url: url.clone() }),
+        Some(MacosProxyConfig::Disabled) => None,
+        None if !verge.enable_system_proxy.unwrap_or_default() => None,
+        None if verge.proxy_auto_config.unwrap_or_default() => Some(ProxyTarget::Pac {
+            url: format!(
+                "http://{}:{pac_port}/commands/pac",
+                verge.proxy_host.as_deref().unwrap_or("127.0.0.1")
+            ),
+        }),
+        None => Some(ProxyTarget::global(&format!(
+            "{}:{port}",
+            verge.proxy_host.as_deref().unwrap_or("127.0.0.1")
+        ))?),
+    };
+    if let Some(target) = &target {
+        store.begin(lease_owner(), target)?;
+    }
+
     tracing::Span::current().record("route", tracing::field::debug(&route));
     let result = match route {
-        ProxyBackendRoute::Local => match Sysopt::global().update_sysproxy().await {
+        ProxyBackendRoute::Local => match Sysopt::global().update_sysproxy(&verge, port, pac_port).await {
             Ok(()) => Ok(()),
             Err(error) => Err(classify_local_apply_failure(error).await),
         },
         ProxyBackendRoute::Service => {
-            let proxy = current_service_proxy_config(&verge).await?;
+            let proxy = service_proxy.context("service proxy intent is missing")?;
             apply_through_service(
                 || Sysopt::global().stop_proxy_guard(),
                 || async {
@@ -496,6 +579,10 @@ pub async fn apply() -> Result<()> {
             .await
         }
     };
+    let result = result.and_then(|()| match target {
+        Some(target) => store.settle(lease_owner(), target),
+        None => store.remove(),
+    });
     // Settle failures where every proxy-apply path converges.
     settle_table(
         table_effect(&result),
@@ -508,7 +595,18 @@ pub async fn apply() -> Result<()> {
 }
 
 pub async fn clear() -> Result<()> {
-    let result = clear_with_retry().await;
+    let _operation = LEASE_OPERATION.lock().await;
+    clear_and_retire_lease().await
+}
+
+async fn clear_and_retire_lease() -> Result<()> {
+    let result = clear_with_retry()
+        .await
+        .and_then(|()| LeaseStore::new(&dirs::app_home_dir()?).remove());
+    settle_clear_result(result)
+}
+
+fn settle_clear_result(result: Result<()>) -> Result<()> {
     // Clear failures must be filed even when a restart aborts before apply.
     settle_table(
         clear_table_effect(&result),

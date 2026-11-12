@@ -1,6 +1,7 @@
 mod config;
 pub(crate) use config::ConfigUpdateGuard;
 mod lifecycle;
+mod recovery;
 mod state;
 
 use crate::{
@@ -105,6 +106,11 @@ pub struct CoreManager {
     core_readiness_state: AtomicU64,
     singbox_degraded: AtomicBool,
     startup_error: parking_lot::Mutex<Option<CoreFailure>>,
+    recovery_generation: AtomicU64,
+    recovery_request: parking_lot::Mutex<Option<crate::core::restart_budget::RecoveryRequest>>,
+    recovery_notify: tokio::sync::Notify,
+    recovery_supervisor_running: AtomicBool,
+    recovery_budget: parking_lot::Mutex<crate::core::restart_budget::RestartBudget>,
     sidecar_exit: tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
     /// The optional sing-box route currently replacing one selected generated landing node.
     singbox_route: tokio::sync::Mutex<Option<SingboxRoute>>,
@@ -137,6 +143,11 @@ impl Default for CoreManager {
             core_readiness_state: AtomicU64::new(0),
             singbox_degraded: AtomicBool::new(false),
             startup_error: parking_lot::Mutex::new(None),
+            recovery_generation: AtomicU64::new(0),
+            recovery_request: parking_lot::Mutex::new(None),
+            recovery_notify: tokio::sync::Notify::new(),
+            recovery_supervisor_running: AtomicBool::new(false),
+            recovery_budget: parking_lot::Mutex::new(Default::default()),
             sidecar_exit: tokio::sync::Mutex::new(None),
             singbox_route: tokio::sync::Mutex::new(None),
             lifecycle_lock: tokio::sync::Mutex::new(()),
@@ -531,6 +542,9 @@ impl CoreManager {
     #[tracing::instrument(skip_all, level = "info", fields(retries = 0))]
     pub async fn init(&self) -> Result<bool> {
         const MAX_PORT_FALLBACK_RETRIES: usize = 3;
+
+        Self::spawn_sidecar_recovery_supervisor();
+        crate::core::proxy_control::recover_previous_proxy().await?;
 
         if let Some(reason) = crate::config::Config::startup_core_block_reason() {
             anyhow::bail!("core startup blocked after mixed proxy port fallback failure: {reason}");
