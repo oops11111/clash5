@@ -12,9 +12,10 @@ use crate::{
 use anyhow::{Context as _, Result};
 use chrono::{Local, TimeZone as _};
 use clash_verge_logging::Type;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use std::path::Path;
-use std::{path::PathBuf, str::FromStr as _};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr as _,
+};
 use tauri_plugin_shell::ShellExt as _;
 use tokio::fs;
 use tokio::fs::DirEntry;
@@ -424,7 +425,7 @@ pub(super) async fn init_dns_config() -> Result<()> {
     initialize_dns_config_file(&dns_path, &default_dns_config).await
 }
 
-async fn initialize_dns_config_file(dns_path: &PathBuf, default_dns_config: &serde_yaml_ng::Mapping) -> Result<()> {
+async fn initialize_dns_config_file(dns_path: &Path, default_dns_config: &serde_yaml_ng::Mapping) -> Result<()> {
     if !dns_path.exists() {
         logging!(info, Type::Setup, "Creating default DNS config file");
         help::save_yaml(dns_path, default_dns_config, Some("# clash5 DNS Config")).await?;
@@ -451,37 +452,6 @@ async fn ensure_directories() -> Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{default_dns_config, initialize_dns_config_file};
-    use serde_yaml_ng::Value;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    #[test]
-    fn dns_defaults_disable_ipv6_and_respect_rules() {
-        let config = default_dns_config();
-        let dns = config.get("dns").and_then(Value::as_mapping).unwrap();
-
-        assert_eq!(dns.get("ipv6"), Some(&Value::Bool(false)));
-        assert_eq!(dns.get("respect-rules"), Some(&Value::Bool(true)));
-    }
-
-    #[tokio::test]
-    async fn existing_dns_config_is_preserved() {
-        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let dir = std::env::temp_dir().join(format!("clash5-dns-defaults-{nonce}"));
-        tokio::fs::create_dir_all(&dir).await.unwrap();
-        let path = dir.join("dns_config.yaml");
-        let explicit = "dns:\n  ipv6: true\n  respect-rules: false\n";
-        tokio::fs::write(&path, explicit).await.unwrap();
-
-        initialize_dns_config_file(&path, &default_dns_config()).await.unwrap();
-
-        assert_eq!(tokio::fs::read_to_string(&path).await.unwrap(), explicit);
-        tokio::fs::remove_dir_all(dir).await.unwrap();
-    }
 }
 
 async fn initialize_config_files() -> Result<()> {
@@ -687,4 +657,40 @@ async fn handle_copy(src: &PathBuf, dest: &PathBuf, file: &str) {
             );
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{default_dns_config, initialize_dns_config_file};
+    use serde_yaml_ng::Value;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn dns_defaults_disable_ipv6_and_respect_rules() -> anyhow::Result<()> {
+        let config = default_dns_config();
+        let dns = config
+            .get("dns")
+            .and_then(Value::as_mapping)
+            .ok_or_else(|| anyhow::anyhow!("default DNS config is missing its dns mapping"))?;
+
+        assert_eq!(dns.get("ipv6"), Some(&Value::Bool(false)));
+        assert_eq!(dns.get("respect-rules"), Some(&Value::Bool(true)));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn existing_dns_config_is_preserved() -> anyhow::Result<()> {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let dir = std::env::temp_dir().join(format!("clash5-dns-defaults-{nonce}"));
+        tokio::fs::create_dir_all(&dir).await?;
+        let path = dir.join("dns_config.yaml");
+        let explicit = "dns:\n  ipv6: true\n  respect-rules: false\n";
+        tokio::fs::write(&path, explicit).await?;
+
+        initialize_dns_config_file(&path, &default_dns_config()).await?;
+
+        assert_eq!(tokio::fs::read_to_string(&path).await?, explicit);
+        tokio::fs::remove_dir_all(dir).await?;
+        Ok(())
+    }
 }
