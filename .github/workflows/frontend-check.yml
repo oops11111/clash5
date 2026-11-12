@@ -90,6 +90,10 @@ jobs:
         if: steps.check_frontend.outputs.frontend == 'true'
         run: pnpm typecheck
 
+      - name: Check English fallback keys
+        if: steps.check_frontend.outputs.frontend == 'true'
+        run: pnpm i18n:fallback:check
+
       - name: Run tests
         if: steps.check_frontend.outputs.frontend == 'true'
         run: pnpm test
