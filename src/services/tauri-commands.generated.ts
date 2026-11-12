@@ -42,11 +42,6 @@ export const commands = {
   cancelUpdateDownload: () => __TAURI_INVOKE<void>('cancel_update_download'),
   restartCore: () =>
     typedError<null, CommandFailure_Serialize>(__TAURI_INVOKE('restart_core')),
-  /**  Replaces the managed core binary atomically instead of letting mihomo overwrite itself. */
-  upgradeClashCore: (force: boolean) =>
-    typedError<CoreUpgradeReport, CommandFailure_Serialize>(
-      __TAURI_INVOKE('upgrade_clash_core', { force }),
-    ),
   /**  Returns one coherent core/service snapshot instead of independently refreshed state. */
   getRuntimeState: () =>
     typedError<RunStateView, string>(__TAURI_INVOKE('get_runtime_state')),
@@ -667,13 +662,6 @@ export type ConfigProvenance =
 export type CoreFailure =
   | { kind: 'startFailed'; detail: string }
   | { kind: 'serviceCoreStopped'; detail: string }
-
-export type CoreUpgradeReport = {
-  /**  False when the managed core was already at the latest version. */
-  upgraded: boolean
-  from: string
-  to: string
-}
 
 export type DelayHistoryContract = {
   time: string

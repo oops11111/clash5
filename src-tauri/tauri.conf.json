@@ -17,7 +17,7 @@
     "copyright": "GNU General Public License v3.0",
     "category": "DeveloperTool",
     "shortDescription": "clash5",
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": false
   },
   "build": {
     "beforeBuildCommand": "pnpm run web:build",
@@ -30,6 +30,7 @@
   "identifier": "io.github.oops11111.clash5",
   "plugins": {
     "updater": {
+      "active": false,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyOEMyRjBCQkVGOUJEREYKUldUZnZmbStDeStNMHU5Mmo1N24xQXZwSVRYbXA2NUpzZE5oVzlqeS9Bc0t6RVV4MmtwVjBZaHgK",
       "endpoints": [],
       "requireSignedVersion": true,
@@ -49,11 +50,30 @@
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["**"],
+          "allow": ["$APPDATA/**", "$RESOURCE/**"],
           "requireLiteralLeadingDot": false
         }
       },
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "ipc: http://ipc.localhost",
+        "img-src": "'self' asset: http://asset.localhost data: blob: http: https:",
+        "font-src": "'self' asset: http://asset.localhost data:",
+        "style-src": "'self' 'unsafe-inline'",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "connect-src": "ipc: http://ipc.localhost ws://localhost:3000",
+        "img-src": "'self' asset: http://asset.localhost data: blob: http: https:",
+        "font-src": "'self' asset: http://asset.localhost data:",
+        "style-src": "'self' 'unsafe-inline'",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'"
+      }
     }
   }
 }

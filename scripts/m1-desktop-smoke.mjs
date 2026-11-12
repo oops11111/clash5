@@ -104,9 +104,19 @@ async function startM4SingboxFixture() {
   const child = spawn(
     process.platform === 'win32' ? 'sing-box.exe' : 'sing-box',
     ['run', '-c', 'stdin'],
-    { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true },
+    { stdio: ['pipe', 'ignore', 'pipe'], windowsHide: true },
   )
   let startupError
+  let startupOutput = ''
+  child.stderr.on('data', (chunk) => {
+    startupOutput = `${startupOutput}${chunk.toString()}`.slice(-8192)
+  })
+  const startupDetails = () =>
+    startupOutput.replaceAll(password, '[redacted]').trim()
+  const startupSuffix = () => {
+    const details = startupDetails()
+    return details ? `; ${details}` : ''
+  }
   child.once('error', (error) => {
     startupError = error
   })
@@ -136,11 +146,11 @@ async function startM4SingboxFixture() {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     if (startupError)
       throw new Error(
-        `M4 sing-box fixture could not start: ${startupError.message}`,
+        `M4 sing-box fixture could not start: ${startupError.message}${startupSuffix()}`,
       )
     if (child.exitCode !== null)
       throw new Error(
-        `M4 sing-box fixture exited early with code ${child.exitCode}`,
+        `M4 sing-box fixture exited early with code ${child.exitCode}${startupSuffix()}`,
       )
     try {
       await new Promise((done, reject) => {
@@ -1184,11 +1194,54 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
     const items = [...menu.querySelectorAll('.MuiListItemButton-root')]
     const last = items.at(-1)?.getBoundingClientRect()
     const viewport = menu.getBoundingClientRect()
+    const logo = document.querySelector('.the-logo')?.getBoundingClientRect()
+    const measure = (element) => {
+      if (!element) return null
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return {
+        tag: element.tagName,
+        className: element.className,
+        rect: { top: rect.top, height: rect.height, bottom: rect.bottom },
+        css: {
+          display: style.display,
+          position: style.position,
+          flex: style.flex,
+          flexGrow: style.flexGrow,
+          flexShrink: style.flexShrink,
+          flexBasis: style.flexBasis,
+          height: style.height,
+          minHeight: style.minHeight,
+          maxHeight: style.maxHeight,
+          overflow: style.overflow,
+          transform: style.transform,
+          zoom: style.zoom,
+        },
+      }
+    }
     return {
       labels: items.map((item) => item.textContent?.trim()),
       lastVisible: Boolean(
         last && last.top >= viewport.top && last.bottom <= viewport.bottom + 1,
       ),
+      geometry: {
+        windowHeight: window.innerHeight,
+        menuTop: viewport.top,
+        menuHeight: viewport.height,
+        menuClientHeight: menu.clientHeight,
+        menuScrollHeight: menu.scrollHeight,
+        menuScrollTop: menu.scrollTop,
+        lastItemTop: last?.top,
+        lastItemBottom: last?.bottom,
+        logoHeight: logo?.height,
+        itemHeights: items.map((item) => item.getBoundingClientRect().height),
+        menuParents: [
+          menu,
+          menu.parentElement,
+          menu.parentElement?.parentElement,
+        ].map(measure),
+        firstItemParents: [items[0], items[0]?.parentElement].map(measure),
+      },
       logoVisible: Boolean(
         document.querySelector('.the-logo img[alt="clash5"]'),
       ),

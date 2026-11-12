@@ -24,6 +24,8 @@
 <details>
 <summary><strong> 🐞 修复问题 </strong></summary>
 
+- 修复异常备份可能覆盖应用目录外文件的问题
+
 </details>
 
 <details>

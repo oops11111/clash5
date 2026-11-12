@@ -1,5 +1,5 @@
 use crate::{DataError, IdentityKey, Node, ProxyChain, StableId, identity::text};
-use rusqlite::{Connection, DatabaseName, OptionalExtension, Transaction, backup::Progress, params};
+use rusqlite::{Connection, DatabaseName, OpenFlags, OptionalExtension, Transaction, backup::Progress, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -363,6 +363,41 @@ impl BindingStore {
     pub fn restore_from(&mut self, path: impl AsRef<Path>) -> Result<(), DataError> {
         self.db.restore(DatabaseName::Main, path, None::<fn(Progress)>)?;
         Ok(())
+    }
+
+    pub fn verify_snapshot_integrity(path: impl AsRef<Path>) -> Result<(), DataError> {
+        let path = path.as_ref();
+        let metadata = std::fs::metadata(path).map_err(|_| DataError::Database)?;
+        if metadata.len() < 100 {
+            return Err(DataError::Database);
+        }
+        let mut file = std::fs::File::open(path).map_err(|_| DataError::Database)?;
+        let mut header = [0; 16];
+        std::io::Read::read_exact(&mut file, &mut header).map_err(|_| DataError::Database)?;
+        if &header != b"SQLite format 3\0" {
+            return Err(DataError::Database);
+        }
+
+        let db = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        let integrity: String = db.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+        let has_nodes_table: bool = db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='nodes')",
+            [],
+            |row| row.get(0),
+        )?;
+        if integrity != "ok" || !has_nodes_table {
+            return Err(DataError::Database);
+        }
+        Ok(())
+    }
+
+    pub fn verify_integrity(&self) -> Result<(), DataError> {
+        let result: String = self.db.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
+        if result == "ok" {
+            Ok(())
+        } else {
+            Err(DataError::Database)
+        }
     }
 
     fn install_identity_key(&mut self, key: IdentityKey) -> Result<(), DataError> {

@@ -29,7 +29,6 @@
     "gen:contract": "node scripts/gen-contract.mjs",
     "gen:command-contract": "node scripts/gen-command-contract.mjs",
     "check:command-contract": "node scripts/check-command-contract.mjs",
-    "check:proxy-recovery": "node scripts/check-proxy-recovery.mjs",
     "arch:check": "node scripts/check-architecture.mjs listen emit invoke",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -42,13 +41,15 @@
     "perf:build": "node scripts/perf/build.mjs",
     "perf:run": "node scripts/perf/run.mjs",
     "perf:compare": "node scripts/perf/compare.mjs",
-    "perf:test": "node --test scripts/perf/report.test.mjs"
+    "perf:test": "node --test scripts/perf/report.test.mjs",
+    "check:proxy-recovery": "node scripts/check-proxy-recovery.mjs"
   },
   "dependencies": {
     "@dnd-kit/collision": "^0.5.0",
     "@dnd-kit/dom": "^0.5.0",
     "@dnd-kit/helpers": "^0.5.0",
     "@dnd-kit/react": "^0.5.0",
+    "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@juggle/resize-observer": "^3.4.0",

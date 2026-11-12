@@ -29,7 +29,6 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
     autoCloseConnection: true,
     singboxPersistent: false,
     singboxDegraded: false,
-    autoCheckUpdate: true,
     enableBuiltinEnhanced: true,
     proxyLayoutColumn: 6,
     enableAutoDelayDetection: false,
@@ -49,7 +48,6 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
         autoCloseConnection: verge?.auto_close_connection ?? true,
         singboxPersistent: verge?.singbox_persistent ?? false,
         singboxDegraded: false,
-        autoCheckUpdate: verge?.auto_check_update ?? true,
         enableBuiltinEnhanced: verge?.enable_builtin_enhanced ?? true,
         proxyLayoutColumn: verge?.proxy_layout_column || 6,
         enableAutoDelayDetection: verge?.enable_auto_delay_detection ?? false,
@@ -76,7 +74,6 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
         app_log_max_count: values.appLogMaxCount,
         auto_close_connection: values.autoCloseConnection,
         singbox_persistent: values.singboxPersistent,
-        auto_check_update: values.autoCheckUpdate,
         enable_builtin_enhanced: values.enableBuiltinEnhanced,
         proxy_layout_column: values.proxyLayoutColumn,
         enable_auto_delay_detection: values.enableAutoDelayDetection,
@@ -231,19 +228,6 @@ export const MiscViewer = forwardRef<DialogRef>((props, ref) => {
               setValues((v) => ({ ...v, singboxPersistent: c }))
             }
             sx={{ marginLeft: 'auto' }}
-          />
-        </ListItem>
-
-        <ListItem sx={{ padding: '5px 2px' }}>
-          <ListItemText
-            primary={t('settings.modals.misc.fields.autoCheckUpdate')}
-          />
-          <Switch
-            edge="end"
-            checked={values.autoCheckUpdate}
-            onChange={(_, c) =>
-              setValues((v) => ({ ...v, autoCheckUpdate: c }))
-            }
           />
         </ListItem>
 

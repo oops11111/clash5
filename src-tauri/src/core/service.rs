@@ -842,29 +842,6 @@ fn force_reinstall_service() -> Result<()> {
     })
 }
 
-/// Publishes a core into the Service's approved directory through the elevated installer.
-///
-/// The Service only executes administrator-approved copies from its own directory, never the file
-/// beside the app, so a freshly replaced core has to be handed over before a service-mode restart
-/// asks for it. The digest pins the exact bytes being attested: it rides the elevated process's
-/// command line, which no other local account can alter, so a file swapped on disk after this
-/// hash was computed is refused by the installer instead of published.
-pub fn stage_approved_core(core_path: &Path) -> Result<()> {
-    tokio::task::block_in_place(|| {
-        invoke_service_install(
-            &[clash_verge_service_ipc::management::CoreSource {
-                name: core_path
-                    .file_name()
-                    .context("core has no filename")?
-                    .to_string_lossy()
-                    .into_owned(),
-                path: core_path.to_path_buf(),
-            }],
-            true,
-        )
-    })
-}
-
 /// Dispatches a privileged platform operation on a blocking thread.
 pub(crate) fn run_privileged_service_action(action: PendingAction) -> Result<()> {
     let (operation, label): (fn() -> Result<()>, &'static str) = match action {

@@ -135,9 +135,7 @@ fn conflicting_generated_names_and_later_missing_nodes_roll_back_all_chains() {
 #[test]
 fn chain_survives_restart_without_persisting_credentials_and_rejects_invalid_edits() {
     let (chain, _, _) = fixture();
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
-    std::fs::create_dir_all(&root).unwrap();
-    let directory = tempfile::tempdir_in(root).unwrap();
+    let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("m2.sqlite");
     {
         let mut store = BindingStore::open(&path).unwrap();

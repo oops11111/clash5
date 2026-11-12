@@ -28,11 +28,27 @@ fn backup_snapshot_restores_committed_wal_data() {
     assert!(live_path.with_extension("sqlite-wal").exists());
 
     live.snapshot_to(&snapshot_path).unwrap();
+    BindingStore::verify_snapshot_integrity(&snapshot_path).unwrap();
     let mut restored = BindingStore::open(&restored_path).unwrap();
     restored.restore_from(&snapshot_path).unwrap();
     let records = restored.node_records(false).unwrap();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].stable_id, stable_id);
+}
+
+#[test]
+fn snapshot_integrity_rejects_empty_and_non_database_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let empty = dir.path().join("empty.sqlite");
+    let invalid = dir.path().join("invalid.sqlite");
+    std::fs::write(&empty, []).unwrap();
+    std::fs::write(&invalid, [0_u8; 128]).unwrap();
+
+    assert_eq!(BindingStore::verify_snapshot_integrity(empty), Err(DataError::Database));
+    assert_eq!(
+        BindingStore::verify_snapshot_integrity(invalid),
+        Err(DataError::Database)
+    );
 }
 #[test]
 fn identity_snapshot_matches_typescript_v1() {
@@ -758,9 +774,7 @@ fn purge_is_filtered_and_permanent() {
 
 #[test]
 fn database_reopen_and_atomic_failure() {
-    let test_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
-    std::fs::create_dir_all(&test_root).unwrap();
-    let directory = tempfile::tempdir_in(test_root).unwrap();
+    let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("store.sqlite");
     let first = node();
     let id = first.stable_id().unwrap();
@@ -869,9 +883,7 @@ fn binding_ipc_source_and_draft_fields_are_stable() {
 
 #[test]
 fn sqlite_and_audit_do_not_contain_node_credentials() {
-    let test_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
-    std::fs::create_dir_all(&test_root).unwrap();
-    let directory = tempfile::tempdir_in(test_root).unwrap();
+    let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("private.sqlite");
     let mut first = node();
     let password = format!("synthetic-{}", "x".repeat(36));

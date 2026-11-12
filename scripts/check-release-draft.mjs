@@ -134,7 +134,48 @@ for (const configPath of [
     true,
     `${configPath}: updater signatures must bind the release version`,
   )
+  assert.equal(
+    tauri.plugins.updater.active,
+    false,
+    `${configPath}: in-app updater must stay disabled for the first release`,
+  )
 }
+assert.equal(
+  JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')).bundle
+    .createUpdaterArtifacts,
+  false,
+  'the first release must not generate in-app updater artifacts',
+)
+assert.doesNotMatch(
+  readFileSync('src-tauri/capabilities/desktop.json', 'utf8'),
+  /"updater:/,
+  'frontend capabilities must not expose updater operations',
+)
+assert.doesNotMatch(
+  readFileSync('src-tauri/src/lib.rs', 'utf8'),
+  /tauri_plugin_updater::Builder/,
+  'the updater plugin must not be registered for the first release',
+)
+assert.match(
+  readFileSync('src-tauri/src/core/updater.rs', 'utf8'),
+  /FIRST_RELEASE_UPDATER_ENABLED: bool = false/,
+  'backend updater paths must remain compile-time disabled',
+)
+assert.match(
+  readFileSync('src-tauri/src/config/verge.rs', 'utf8'),
+  /auto_check_update: Some\(false\)/,
+  'new configurations must default to no automatic update checks',
+)
+assert.match(
+  readFileSync('src-tauri/src/core/updater.rs', 'utf8'),
+  /ensure!\(\s*FIRST_RELEASE_UPDATER_ENABLED,\s*"in-app updates are disabled for the first release"/,
+  'backend update installs must reject first-release installs',
+)
+assert.match(
+  readFileSync('src/services/update.ts', 'utf8'),
+  /FIRST_RELEASE_UPDATER_ENABLED = false/,
+  'frontend update checks must stay disabled for the first release',
+)
 
 for (const filename of readdirSync('.github/ISSUE_TEMPLATE')) {
   if (!filename.endsWith('.yml')) continue

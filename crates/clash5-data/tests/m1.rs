@@ -113,9 +113,7 @@ fn duplicate_fingerprint_has_deterministic_name_and_preserves_scope() {
 
 #[test]
 fn v1_database_migrates_without_discarding_nodes() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
-    std::fs::create_dir_all(&root).unwrap();
-    let dir = tempfile::tempdir_in(root).unwrap();
+    let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("v1.sqlite");
     let db = rusqlite::Connection::open(&path).unwrap();
     db.execute_batch("CREATE TABLE nodes(source_kind TEXT, provider_id TEXT, stable_id TEXT, display_name TEXT, active INTEGER); CREATE TABLE quality_cache(source_kind TEXT, provider_id TEXT, stable_id TEXT, quality TEXT); INSERT INTO nodes VALUES('manual','','v1:old','Old',1); PRAGMA user_version=1;").unwrap();
@@ -157,9 +155,7 @@ fn v1_database_migrates_without_discarding_nodes() {
 
 #[test]
 fn orphan_retention_is_configurable_and_expired_cleanup_preserves_recent_bindings() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
-    std::fs::create_dir_all(&root).unwrap();
-    let dir = tempfile::tempdir_in(root).unwrap();
+    let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("orphan-retention.sqlite");
     let source = Source::Subscription {
         provider_id: "retention-provider".into(),

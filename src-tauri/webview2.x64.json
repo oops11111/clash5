@@ -23,7 +23,7 @@
   },
   "plugins": {
     "updater": {
-      "active": true,
+      "active": false,
       "dialog": false,
       "endpoints": [],
       "requireSignedVersion": true,

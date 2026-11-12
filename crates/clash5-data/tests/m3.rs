@@ -158,9 +158,7 @@ fn plugin_audit_records_metadata_without_binding_settings() {
 
 #[test]
 fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
-    std::fs::create_dir_all(&root).unwrap();
-    let directory = tempfile::tempdir_in(&root).unwrap();
+    let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("m2.sqlite");
     {
         let db = rusqlite::Connection::open(&path).unwrap();
@@ -184,7 +182,7 @@ fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
     assert_eq!(version, 5);
     assert!(table_exists);
 
-    let rollback_directory = tempfile::tempdir_in(&root).unwrap();
+    let rollback_directory = tempfile::tempdir().unwrap();
     let rollback_path = rollback_directory.path().join("m2.sqlite");
     {
         let db = rusqlite::Connection::open(&rollback_path).unwrap();
@@ -208,11 +206,8 @@ fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
 
 #[test]
 fn prior_m3_and_m2_schemas_upgrade_to_v5() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-data");
-    std::fs::create_dir_all(&root).unwrap();
-
     for version in [3, 4] {
-        let directory = tempfile::tempdir_in(&root).unwrap();
+        let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join(format!("v{version}.sqlite"));
         {
             let db = rusqlite::Connection::open(&path).unwrap();

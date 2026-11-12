@@ -50,7 +50,6 @@ pub fn export_frontend_command_contract() -> Result<(), Box<dyn std::error::Erro
             cmd::install_update,
             cmd::cancel_update_download,
             cmd::restart_core,
-            cmd::upgrade_clash_core,
             cmd::get_runtime_state,
             cmd::clash5_memory_mitigation_status,
             cmd::get_pending_failures,
@@ -190,18 +189,6 @@ mod app_init {
         let mut builder = builder
             .plugin(tauri_plugin_clash_verge_sysinfo::init())
             .plugin(tauri_plugin_notification::init())
-            .plugin(
-                tauri_plugin_updater::Builder::new()
-                    .default_version_comparator(|current, release| {
-                        core::updater::is_official_stable_release(&release)
-                            && (release.version > current
-                                || core::updater::is_build_to_stable(
-                                    &current.to_string(),
-                                    &release.version.to_string(),
-                                ))
-                    })
-                    .build(),
-            )
             .plugin(tauri_plugin_clipboard_manager::init())
             .plugin(tauri_plugin_process::init())
             .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -292,7 +279,6 @@ mod app_init {
             cmd::install_update,
             cmd::cancel_update_download,
             cmd::restart_core,
-            cmd::upgrade_clash_core,
             cmd::get_runtime_state,
             cmd::clash5_memory_mitigation_status,
             cmd::get_pending_failures,
