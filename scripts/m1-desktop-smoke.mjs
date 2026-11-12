@@ -802,7 +802,9 @@ async function verifyWorkspaceControls() {
   await selectFilter(['All', '全部'], active)
 
   phase = 'search controls'
-  const search = await browser.$('.base-page input[placeholder]')
+  const search = await browser.$(
+    '.subscription-workspace__nodes .base-page input[placeholder]',
+  )
   await search.setValue('M1-provider')
   await browser.waitUntil(
     async () =>
