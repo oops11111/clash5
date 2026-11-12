@@ -24,7 +24,14 @@
       },
       "title": "Configurações do início"
     },
-    "title": "Início"
+    "title": "Início",
+    "firstRun": {
+      "title": "Ainda não há dados de proxy",
+      "description": "Importe uma assinatura, adicione um nó ou explore os plugins para começar.",
+      "importSubscription": "Importar assinatura",
+      "addNode": "Adicionar nó",
+      "plugins": "Abrir plugins"
+    }
   },
   "components": {
     "proxyTun": {

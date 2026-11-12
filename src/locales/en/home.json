@@ -24,7 +24,14 @@
       },
       "title": "Home Settings"
     },
-    "title": "Home"
+    "title": "Home",
+    "firstRun": {
+      "title": "No proxy data yet",
+      "description": "Import a subscription, add a node, or explore plugins to get started.",
+      "importSubscription": "Import subscription",
+      "addNode": "Add node",
+      "plugins": "Open plugins"
+    }
   },
   "components": {
     "proxyTun": {

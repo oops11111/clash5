@@ -24,7 +24,14 @@
       },
       "title": "Startseite-Einstellungen"
     },
-    "title": "Startseite"
+    "title": "Startseite",
+    "firstRun": {
+      "title": "Noch keine Proxydaten",
+      "description": "Importiere ein Abonnement, füge einen Knoten hinzu oder öffne die Plugins.",
+      "importSubscription": "Abonnement importieren",
+      "addNode": "Knoten hinzufügen",
+      "plugins": "Plugins öffnen"
+    }
   },
   "components": {
     "proxyTun": {

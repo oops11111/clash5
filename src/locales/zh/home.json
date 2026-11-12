@@ -24,7 +24,14 @@
       },
       "title": "首页设置"
     },
-    "title": "首页"
+    "title": "首页",
+    "firstRun": {
+      "title": "暂无可用代理数据",
+      "description": "导入订阅、添加节点，或打开插件页开始使用。",
+      "importSubscription": "导入订阅",
+      "addNode": "添加节点",
+      "plugins": "打开插件"
+    }
   },
   "components": {
     "proxyTun": {

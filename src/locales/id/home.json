@@ -24,7 +24,14 @@
       },
       "title": "Home Settings"
     },
-    "title": "Home"
+    "title": "Home",
+    "firstRun": {
+      "title": "Belum ada data proxy",
+      "description": "Impor langganan, tambahkan node, atau buka plugin untuk memulai.",
+      "importSubscription": "Impor langganan",
+      "addNode": "Tambahkan node",
+      "plugins": "Buka plugin"
+    }
   },
   "components": {
     "proxyTun": {

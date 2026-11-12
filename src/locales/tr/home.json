@@ -24,7 +24,14 @@
       },
       "title": "Ana Sayfa Ayarları"
     },
-    "title": "Ana Sayfa"
+    "title": "Ana Sayfa",
+    "firstRun": {
+      "title": "Henüz proxy verisi yok",
+      "description": "Başlamak için bir abonelik içe aktarın, düğüm ekleyin veya eklentileri açın.",
+      "importSubscription": "Abonelik içe aktar",
+      "addNode": "Düğüm ekle",
+      "plugins": "Eklentileri aç"
+    }
   },
   "components": {
     "proxyTun": {

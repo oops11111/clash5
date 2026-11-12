@@ -24,7 +24,14 @@
       },
       "title": "首頁設定"
     },
-    "title": "首頁"
+    "title": "首頁",
+    "firstRun": {
+      "title": "尚無可用代理資料",
+      "description": "匯入訂閱、加入節點，或開啟外掛程式頁面開始使用。",
+      "importSubscription": "匯入訂閱",
+      "addNode": "新增節點",
+      "plugins": "開啟外掛程式"
+    }
   },
   "components": {
     "proxyTun": {

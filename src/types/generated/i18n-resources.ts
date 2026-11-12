@@ -216,6 +216,13 @@ export interface TranslationResources {
           proxyMode: string
           trafficStats: string
         }
+        firstRun: {
+          addNode: string
+          description: string
+          importSubscription: string
+          plugins: string
+          title: string
+        }
         settings: {
           cards: {
             clashInfo: string

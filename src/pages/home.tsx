@@ -22,7 +22,14 @@ import {
   Tooltip,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import { Suspense, lazy, useCallback, useMemo, useState } from 'react'
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BasePage } from '@/components/base'
@@ -30,11 +37,13 @@ import { ClashModeCard } from '@/components/home/clash-mode-card'
 import { CurrentProxyCard } from '@/components/home/current-proxy-card'
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import { EnhancedTrafficStats } from '@/components/home/enhanced-traffic-stats'
+import { FirstRunEmptyState } from '@/components/home/first-run-empty-state'
+import { shouldShowFirstRunEmptyState } from '@/components/home/first-run-empty-state-model'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
-import { entry_lightweight_mode } from '@/services/cmds'
+import { entry_lightweight_mode, listClash5Nodes } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
 import { openExternalUrl } from '@/utils/open-external-url'
@@ -234,6 +243,24 @@ const HomePage = () => {
   const { t } = useTranslation()
   const { verge } = useVerge()
   const { current, mutateProfiles } = useProfiles()
+  const [nodeInventory, setNodeInventory] = useState<
+    { active: boolean }[] | null
+  >(null)
+  const [nodeInventoryError, setNodeInventoryError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    listClash5Nodes()
+      .then((nodes) => {
+        if (!cancelled) setNodeInventory(nodes)
+      })
+      .catch(() => {
+        if (!cancelled) setNodeInventoryError(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // 设置弹窗的状态
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -353,11 +380,15 @@ const HomePage = () => {
         </Box>
       }
     >
-      <Grid container spacing={1.5} columns={{ xs: 6, sm: 6, md: 12 }}>
-        {criticalCards}
+      {shouldShowFirstRunEmptyState(nodeInventory, nodeInventoryError) ? (
+        <FirstRunEmptyState />
+      ) : (
+        <Grid container spacing={1.5} columns={{ xs: 6, sm: 6, md: 12 }}>
+          {criticalCards}
 
-        {nonCriticalCards}
-      </Grid>
+          {nonCriticalCards}
+        </Grid>
+      )}
 
       {/* 首页设置弹窗 */}
       {settingsOpen && (

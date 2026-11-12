@@ -24,7 +24,14 @@
       },
       "title": "Home Settings"
     },
-    "title": "Home"
+    "title": "Home",
+    "firstRun": {
+      "title": "لا توجد بيانات وكيل بعد",
+      "description": "استورد اشتراكًا أو أضف عقدة أو استكشف الإضافات للبدء.",
+      "importSubscription": "استيراد اشتراك",
+      "addNode": "إضافة عقدة",
+      "plugins": "فتح الإضافات"
+    }
   },
   "components": {
     "proxyTun": {

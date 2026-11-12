@@ -24,7 +24,14 @@
       },
       "title": "홈 설정"
     },
-    "title": "홈"
+    "title": "홈",
+    "firstRun": {
+      "title": "프록시 데이터가 없습니다",
+      "description": "구독을 가져오거나 노드를 추가하거나 플러그인을 둘러보세요.",
+      "importSubscription": "구독 가져오기",
+      "addNode": "노드 추가",
+      "plugins": "플러그인 열기"
+    }
   },
   "components": {
     "proxyTun": {

@@ -24,7 +24,14 @@
       },
       "title": "Home Settings"
     },
-    "title": "Home"
+    "title": "Home",
+    "firstRun": {
+      "title": "هنوز داده‌ای برای پراکسی وجود ندارد",
+      "description": "برای شروع یک اشتراک وارد کنید، گره‌ای اضافه کنید یا افزونه‌ها را بررسی کنید.",
+      "importSubscription": "وارد کردن اشتراک",
+      "addNode": "افزودن گره",
+      "plugins": "باز کردن افزونه‌ها"
+    }
   },
   "components": {
     "proxyTun": {

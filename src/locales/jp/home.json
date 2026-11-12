@@ -24,7 +24,14 @@
       },
       "title": "ホーム設定"
     },
-    "title": "ホーム"
+    "title": "ホーム",
+    "firstRun": {
+      "title": "プロキシデータがありません",
+      "description": "サブスクリプションを読み込むか、ノードを追加するか、プラグインを確認してください。",
+      "importSubscription": "サブスクリプションを読み込む",
+      "addNode": "ノードを追加",
+      "plugins": "プラグインを開く"
+    }
   },
   "components": {
     "proxyTun": {

@@ -466,6 +466,41 @@ async function verifyImportAndProbe() {
     )
   }
 
+  await browser.execute(() => {
+    const home = [...document.querySelectorAll('.the-menu [role="tab"]')].find(
+      (tab) => ['Home', '首页', '首頁'].includes(tab.textContent?.trim()),
+    )
+    home?.click()
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(
+        () =>
+          window.location.pathname === '/' &&
+          !document.querySelector('[data-testid="first-run-empty-state"]'),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'First-run state remained after importing active nodes',
+    },
+  )
+  await browser.execute(() => {
+    window.history.pushState({}, '', '/nodes')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        Boolean(document.querySelector('.base-page input[placeholder]')),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'Node workspace did not reopen after first-run verification',
+    },
+  )
+
   await clickButton(['Probe nodes', '探测节点'])
   await browser.waitUntil(
     async () => {
@@ -1187,6 +1222,109 @@ async function cleanupM3PluginFixture() {
     const pluginDirectory = join(m3AppDirectory, 'plugins', 'm3.smoke.plugin')
     await rm(pluginDirectory, { recursive: true, force: true })
   }
+}
+
+async function verifyFirstRunEmptyState() {
+  phase = 'first-run empty state entry points'
+  await browser.waitUntil(
+    () =>
+      browser.execute(() =>
+        Boolean(
+          document.querySelector('[data-testid="first-run-empty-state"]'),
+        ),
+      ),
+    {
+      timeout: 10_000,
+      interval: 250,
+      timeoutMsg: 'First-run empty state did not render for an empty inventory',
+    },
+  )
+
+  const entryPoints = await browser.execute(() => {
+    const card = document.querySelector('[data-testid="first-run-empty-state"]')
+    return [...(card?.querySelectorAll('button') ?? [])].map((button) => ({
+      id: button.dataset.testid,
+      label: button.textContent?.trim(),
+      keyboardReachable: button.tabIndex >= 0,
+    }))
+  })
+  const expected = [
+    'first-run-import-subscription',
+    'first-run-add-node',
+    'first-run-open-plugins',
+  ]
+  if (
+    JSON.stringify(entryPoints.map(({ id }) => id)) !==
+      JSON.stringify(expected) ||
+    entryPoints.some(
+      ({ label, keyboardReachable }) => !label || !keyboardReachable,
+    )
+  ) {
+    throw new Error(
+      `Unexpected first-run entry points: ${JSON.stringify(entryPoints)}`,
+    )
+  }
+
+  const goHome = async () => {
+    await browser.execute(() => {
+      const home = [
+        ...document.querySelectorAll('.the-menu [role="tab"]'),
+      ].find((tab) =>
+        ['Home', '首页', '首頁'].includes(tab.textContent?.trim()),
+      )
+      home?.click()
+    })
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          () =>
+            window.location.pathname === '/' &&
+            Boolean(
+              document.querySelector('[data-testid="first-run-empty-state"]'),
+            ),
+        ),
+      {
+        timeout: 10_000,
+        interval: 250,
+        timeoutMsg: 'First-run state did not return on Home',
+      },
+    )
+  }
+
+  const clickEntry = async (id, section) => {
+    await browser.execute((testId) => {
+      document.querySelector(`[data-testid="${testId}"]`)?.click()
+    }, id)
+    await browser.waitUntil(
+      () =>
+        browser.execute(
+          (expectedSection) =>
+            window.location.pathname === expectedSection.path &&
+            (expectedSection.section === undefined ||
+              new URLSearchParams(window.location.search).get('section') ===
+                expectedSection.section),
+          section,
+        ),
+      {
+        timeout: 10_000,
+        interval: 250,
+        timeoutMsg: `${id} did not open its destination`,
+      },
+    )
+  }
+
+  await clickEntry('first-run-import-subscription', {
+    path: '/subscriptions',
+    section: 'sources',
+  })
+  await goHome()
+  await clickEntry('first-run-add-node', {
+    path: '/subscriptions',
+    section: 'nodes',
+  })
+  await goHome()
+  await clickEntry('first-run-open-plugins', { path: '/plugins' })
+  await goHome()
 }
 
 async function verifyNavigation({ includePluginFixture = true } = {}) {
@@ -2475,6 +2613,7 @@ try {
   if (!persisted && !recoveryCancel && inventory.length !== 0) {
     throw new Error(`Fresh desktop session contains ${inventory.length} nodes`)
   }
+  if (!persisted && !recoveryCancel) await verifyFirstRunEmptyState()
   const persistedManual = inventory.filter(
     (node) => node.source.kind === 'manual',
   )

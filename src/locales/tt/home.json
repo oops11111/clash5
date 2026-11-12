@@ -24,7 +24,14 @@
       },
       "title": "Home Settings"
     },
-    "title": "Home"
+    "title": "Home",
+    "firstRun": {
+      "title": "Әлегә прокси мәгълүматлары юк",
+      "description": "Башлау өчен язылуны импортлагыз, төен өстәгез яки плагиннарны карагыз.",
+      "importSubscription": "Язылуны импортлау",
+      "addNode": "Төен өстәү",
+      "plugins": "Плагиннарны ачу"
+    }
   },
   "components": {
     "proxyTun": {
