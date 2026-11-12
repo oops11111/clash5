@@ -88,7 +88,7 @@ const SettingVergeAdvanced = ({ onError: _ }: Props) => {
           sx={{ minHeight: 64, px: 2 }}
         >
           <Stack spacing={0.25}>
-            <Typography variant="subtitle1" fontWeight={700}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
               {t('settings.components.verge.advanced.title')}
             </Typography>
             <Typography variant="body2" color="text.secondary">

@@ -879,6 +879,11 @@ export interface TranslationResources {
             actions: {
               copyVersion: string
             }
+            confirmExitMessage: string
+            confirmExitTitle: string
+            confirmLiteModeMessage: string
+            confirmLiteModeTitle: string
+            description: string
             fields: {
               backupSetting: string
               checkUpdates: string
