@@ -1,9 +1,11 @@
+#[cfg(test)]
+use crate::core::restart_budget::RESTART_WINDOW;
+use crate::core::restart_budget::RestartBudget;
 use crate::core::{singbox_config, singbox_process::SingboxProcess, singbox_relay::AuthenticatedRelay};
 use anyhow::{Context as _, Result};
 use reqwest::Method;
 use serde_yaml_ng::Value as YamlValue;
 use std::{
-    collections::VecDeque,
     ffi::OsString,
     net::SocketAddr,
     process::Command,
@@ -14,8 +16,6 @@ use tokio::{net::TcpListener, time::sleep};
 
 const SINGBOX_READY_TIMEOUT: Duration = Duration::from_secs(10);
 const SINGBOX_READY_INTERVAL: Duration = Duration::from_millis(50);
-const MAX_RESTARTS_PER_WINDOW: usize = 3;
-const RESTART_WINDOW: Duration = Duration::from_secs(10 * 60);
 
 /// Applies a runtime config from memory so relay credentials never need a config file.
 /// Mihomo accepts the complete YAML config in `PUT /configs`'s `payload` field.
@@ -52,35 +52,13 @@ pub struct SingboxRoute {
     relay: Option<AuthenticatedRelay>,
 }
 
-#[derive(Default)]
-struct RestartBudget {
-    attempts: VecDeque<Instant>,
-}
-
-impl RestartBudget {
-    fn try_start(&mut self, now: Instant) -> bool {
-        while self
-            .attempts
-            .front()
-            .is_some_and(|attempt| now.duration_since(*attempt) >= RESTART_WINDOW)
-        {
-            self.attempts.pop_front();
-        }
-        if self.attempts.len() >= MAX_RESTARTS_PER_WINDOW {
-            return false;
-        }
-        self.attempts.push_back(now);
-        true
-    }
-}
-
 impl std::fmt::Debug for SingboxRoute {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("SingboxRoute")
             .field("landing_name", &self.landing_name)
             .field("running", &self.process.is_some())
-            .field("restart_count", &self.restart_budget.attempts.len())
+            .field("restart_count", &self.restart_budget.attempt_count())
             .finish_non_exhaustive()
     }
 }
@@ -177,7 +155,7 @@ impl SingboxRoute {
         }
     }
 
-    /// Restarts a dead child at most three times in any rolling ten-minute window.
+    /// Restarts a dead child at most three times in any rolling five-minute window.
     pub async fn restart_if_exited(&mut self) -> Result<bool> {
         if self.is_running().await? {
             return Ok(false);
@@ -269,7 +247,7 @@ mod tests {
     use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
     #[test]
-    fn restart_budget_allows_three_attempts_per_rolling_ten_minutes() {
+    fn restart_budget_allows_three_attempts_per_rolling_five_minutes() {
         let start = Instant::now();
         let mut budget = RestartBudget::default();
         assert!(budget.try_start(start));

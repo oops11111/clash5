@@ -46,3 +46,11 @@ duplicate, malformed, or reordered gate rows and unknown state values. It does
 not promote open or blocked gates to passing; a release is not cleared until
 all applicable rows have passing evidence and required manual evidence is
 recorded.
+
+## G-09 current evidence
+
+The app persists ownership leases before global proxy or PAC changes, compares enabled system endpoints with the lease at startup, and preserves unrelated proxy settings. Sidecar, sing-box and the pinned service watchdog use a three-attempt rolling five-minute policy. The service dependency is pinned to commit `6cc9a8aee1dcc4e40fdd22469a42b31cc4cc77b4` in [PR #2](https://github.com/oops11111/clash5-service-ipc/pull/2), which remains under review.
+
+The 11 isolated proxy lease and recovery tests passed, and the service cleanup-error visibility test passed. The service watchdog default-policy test passed. Its Windows crash-loop integration test could not initialize the test-owner ACL locally (`Access denied`); dependency CI still needs to verify it. The main app's `cargo check --locked` passed. No live OS proxy was changed during these checks.
+
+Live GNOME/KDE acceptance, macOS helper cleanup after app termination and actual Windows process-kill/startup recovery remain unverified. The G-09 release gate therefore remains OPEN.
