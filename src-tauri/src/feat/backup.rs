@@ -638,6 +638,8 @@ fn export_destination_path(destination: &str) -> Result<PathBuf> {
 
 #[cfg(test)]
 mod export_path_tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::{export_destination_path, export_source_path};
     use std::{fs, path::PathBuf};
 
