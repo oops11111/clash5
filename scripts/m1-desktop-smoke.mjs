@@ -1184,11 +1184,23 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
     const items = [...menu.querySelectorAll('.MuiListItemButton-root')]
     const last = items.at(-1)?.getBoundingClientRect()
     const viewport = menu.getBoundingClientRect()
+    const logo = document.querySelector('.the-logo')?.getBoundingClientRect()
     return {
       labels: items.map((item) => item.textContent?.trim()),
       lastVisible: Boolean(
         last && last.top >= viewport.top && last.bottom <= viewport.bottom + 1,
       ),
+      geometry: {
+        windowHeight: window.innerHeight,
+        menuTop: viewport.top,
+        menuHeight: viewport.height,
+        menuClientHeight: menu.clientHeight,
+        menuScrollHeight: menu.scrollHeight,
+        lastItemTop: last?.top,
+        lastItemBottom: last?.bottom,
+        logoHeight: logo?.height,
+        itemHeights: items.map((item) => item.getBoundingClientRect().height),
+      },
       logoVisible: Boolean(
         document.querySelector('.the-logo img[alt="clash5"]'),
       ),
