@@ -1,5 +1,7 @@
 import './assets/styles/index.scss'
 
+import createCache from '@emotion/cache'
+import { CacheProvider } from '@emotion/react'
 import { ResizeObserver } from '@juggle/resize-observer'
 import { ComposeContextProvider } from 'foxact/compose-context-provider'
 import React from 'react'
@@ -30,6 +32,11 @@ if (!window.ResizeObserver) {
 
 const mainElementId = 'root'
 const container = document.getElementById(mainElementId)
+const emotionNonce = document.querySelector<HTMLStyleElement>('style[nonce]')?.nonce
+const emotionCache = createCache({
+  key: 'css',
+  nonce: emotionNonce || undefined,
+})
 
 if (!container) {
   throw new Error(`No container '${mainElementId}' found to render application`)
@@ -47,17 +54,19 @@ const initializeApp = (initialThemeMode: 'light' | 'dark') => {
   const root = createRoot(container)
   root.render(
     <React.StrictMode>
-      <ComposeContextProvider contexts={contexts}>
-        <BaseErrorBoundary>
-          <SWRConfig value={swrConfig}>
-            <WindowProvider>
-              <AppDataProvider>
-                <RouterProvider router={router} />
-              </AppDataProvider>
-            </WindowProvider>
-          </SWRConfig>
-        </BaseErrorBoundary>
-      </ComposeContextProvider>
+      <CacheProvider value={emotionCache}>
+        <ComposeContextProvider contexts={contexts}>
+          <BaseErrorBoundary>
+            <SWRConfig value={swrConfig}>
+              <WindowProvider>
+                <AppDataProvider>
+                  <RouterProvider router={router} />
+                </AppDataProvider>
+              </WindowProvider>
+            </SWRConfig>
+          </BaseErrorBoundary>
+        </ComposeContextProvider>
+      </CacheProvider>
     </React.StrictMode>,
   )
 }
