@@ -842,7 +842,6 @@ fn force_reinstall_service() -> Result<()> {
     })
 }
 
-
 /// Dispatches a privileged platform operation on a blocking thread.
 pub(crate) fn run_privileged_service_action(action: PendingAction) -> Result<()> {
     let (operation, label): (fn() -> Result<()>, &'static str) = match action {
