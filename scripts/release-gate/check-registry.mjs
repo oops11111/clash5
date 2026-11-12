@@ -13,6 +13,7 @@ const requiredGroups = [
   'G-23…G-27',
   'G-28…G-31',
   'G-32…G-34',
+  'P1-13-TRAFFIC-TOTALS',
   'R19-LINUX-KEYSTORE',
   'R19-NO-CREDENTIALS',
 ]
@@ -22,7 +23,7 @@ export function validateRegistry(markdown) {
   const rows = markdown
     .split(/\r?\n/u)
     .filter((line) =>
-      /^\|\s*(?:G-\d{2}(?:…G-\d{2})?|P0-\d{2}-[A-Z-]+|R19-[A-Z-]+)\s*\|/u.test(
+      /^\|\s*(?:G-\d{2}(?:…G-\d{2})?|P0-\d{2}-[A-Z-]+|P1-\d{2}-[A-Z-]+|R19-[A-Z-]+)\s*\|/u.test(
         line,
       ),
     )

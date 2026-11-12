@@ -18,7 +18,7 @@ const registry = await readFile(
 )
 
 test('release gate registry covers all reviewed gate groups', () => {
-  assert.equal(validateRegistry(registry), 24)
+  assert.equal(validateRegistry(registry), 25)
 })
 
 test('the in-app core upgrade command and implementation are absent', async () => {
@@ -120,7 +120,7 @@ test('registry policy rejects an unrestricted asset scope and network policy', a
 
 test('registry validation fails when a gate row is missing', () => {
   const incomplete = registry.replace(/^\| G-10 .*\r?\n/mu, '')
-  assert.throws(() => validateRegistry(incomplete), /expected 24 gate rows/u)
+  assert.throws(() => validateRegistry(incomplete), /expected 25 gate rows/u)
 })
 
 test('registry validation fails for an unknown state', () => {

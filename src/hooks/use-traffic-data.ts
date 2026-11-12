@@ -1,4 +1,8 @@
-import { MihomoWebSocket, Traffic } from 'tauri-plugin-mihomo-api'
+import { useEffect } from 'react'
+import { MihomoWebSocket, type Traffic } from 'tauri-plugin-mihomo-api'
+
+import { useRunState } from '@/store/app-store-context'
+import { trafficSessionTotals } from '@/utils/traffic-session'
 
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 import { useTrafficMonitorEnhanced } from './use-traffic-monitor'
@@ -27,11 +31,12 @@ const shouldSkipDuplicateTraffic = (traffic: Traffic) => {
 
 export const useTrafficData = (options?: { enabled?: boolean }) => {
   const enabled = options?.enabled ?? true
+  const runState = useRunState()
 
   const {
     graphData: { appendData },
   } = useTrafficMonitorEnhanced({ subscribe: false, enabled })
-  const { response, refresh } = useMihomoWsSubscription<ITrafficItem>({
+  const { response, refresh, setData } = useMihomoWsSubscription<ITrafficItem>({
     storageKey: 'mihomo_traffic_date',
     buildSubscriptKey: (date) => (enabled ? `getClashTraffic-${date}` : null),
     fallbackData: FALLBACK_TRAFFIC,
@@ -51,13 +56,19 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
             return
           }
           appendData(parsed)
-          next(null, parsed)
+          next(null, trafficSessionTotals.normalize(parsed))
         } catch (error) {
           next(error, FALLBACK_TRAFFIC)
         }
       },
     }),
   })
+
+  useEffect(() => {
+    if (runState && trafficSessionTotals.observeMode(runState.mode)) {
+      setData(FALLBACK_TRAFFIC)
+    }
+  }, [runState, setData])
 
   return { response, refreshGetClashTraffic: refresh }
 }

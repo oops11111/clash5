@@ -35,6 +35,7 @@ define their individual meanings; this ledger does not guess those meanings.
 | G-23…G-27 | R12 additions | Individual R12 acceptance evidence; see P0-11 and P1-38…P1-40 | OPEN |
 | G-28…G-31 | R13 additions | Individual R13 acceptance evidence; see P0-05 and P1-41 | OPEN |
 | G-32…G-34 | R14 additions | Individual R14 UI/accessibility acceptance evidence; see P1-42 | OPEN |
+| P1-13-TRAFFIC-TOTALS | P1-13: traffic totals start at zero for each Mihomo core session | Stop/start regression test; Windows desktop restart acceptance; live rates and graph sampling remain intact | OPEN |
 | R19-LINUX-KEYSTORE | P1-48: Linux credential storage uses the system keystore | Linux keystore integration test and platform acceptance | OPEN |
 | R19-NO-CREDENTIALS | P1-49: manual-node list responses contain no credentials | Response serialization regression test | OPEN |
 
