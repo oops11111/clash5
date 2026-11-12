@@ -17,6 +17,11 @@ const fn should_wait_for_service(tun_enabled: bool, service_ready: bool, is_admi
     tun_enabled && !service_ready && !is_admin
 }
 
+#[cfg(any(target_os = "windows", test))]
+const fn should_watch_for_tun_handoff(mode: RunningMode, tun_requested: bool) -> bool {
+    matches!(mode, RunningMode::Sidecar) && tun_requested
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum StartupDecision {
     Service,
@@ -387,8 +392,7 @@ impl CoreManager {
         defer! {
             self.finish_config_update();
         }
-        // Lock order is config then lifecycle. disable_tun_and_persist commits the shared Verge
-        // draft without claiming it, so without this it can commit another transaction's staged patch.
+        // Lock order is config then lifecycle.
         let config_write = Config::lock_config_write().await;
         let _life = self.lifecycle_lock.lock().await;
         // Record failures before releasing the lifecycle lock, including preparation and rollback errors.
@@ -408,20 +412,8 @@ impl CoreManager {
             if !matches!(status, ServiceStatus::SidecarAllowed) {
                 SERVICE_MANAGER.allow_sidecar_for_session()?;
             }
-            // Settling on Sidecar is what makes the verdict final, so ask only once it is recorded.
-            // Elevation alone carries TUN on Sidecar; a Sidecar that cannot must write it off.
-            let prepared = async {
-                let tun_enabled = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
-                if crate::core::runstate::RUN_STATE
-                    .state()
-                    .tun_should_be_disabled(tun_enabled)
-                {
-                    tracing::Span::current().record("tun_disabled", true);
-                    Config::disable_tun_and_persist().await?;
-                }
-                Config::generate().await
-            }
-            .await;
+            // The saved preference remains on; Sidecar config applies the session capability.
+            let prepared = Config::generate().await;
             drop(config_write);
             if let Err(error) = prepared {
                 SERVICE_MANAGER.withdraw_sidecar_allowance();
@@ -475,17 +467,7 @@ impl CoreManager {
                     .handle_service_status(ServiceStatus::UninstallRequired)
                     .await
             },
-            || async {
-                // Must be asked after the uninstall: until then the Service still makes TUN capable.
-                let tun_enabled = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
-                if crate::core::runstate::RUN_STATE
-                    .state()
-                    .tun_should_be_disabled(tun_enabled)
-                {
-                    Config::disable_tun_and_persist().await?;
-                }
-                Config::generate().await
-            },
+            || async { Config::generate().await },
             || async {
                 self.start_core_inner().await?;
                 if !matches!(*self.get_running_mode(), RunningMode::Sidecar)
@@ -880,10 +862,10 @@ impl CoreManager {
         use std::sync::atomic::Ordering;
         use std::time::Instant;
 
-        // An accepted Sidecar is the user's decision for this session, not a wait for the Service.
-        let needs_service = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false)
-            && !crate::core::runstate::RUN_STATE.state().sidecar_allowed;
-        if !needs_service {
+        if !should_watch_for_tun_handoff(
+            *self.get_running_mode(),
+            Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false),
+        ) {
             return;
         }
 
@@ -933,6 +915,17 @@ impl CoreManager {
     }
 
     #[cfg(target_os = "windows")]
+    pub(crate) async fn reconcile_tun_handoff(&self) {
+        if !should_watch_for_tun_handoff(
+            *self.get_running_mode(),
+            Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false),
+        ) {
+            return;
+        }
+        self.spawn_service_handoff_watcher().await;
+    }
+
+    #[cfg(target_os = "windows")]
     async fn refresh_service_readiness_for_handoff() -> bool {
         if SERVICE_MANAGER.confirm_ready().await.is_err() {
             return false;
@@ -943,10 +936,6 @@ impl CoreManager {
     #[cfg(target_os = "windows")]
     #[tracing::instrument(skip_all, level = "debug", fields(outcome = tracing::field::Empty))]
     async fn try_handoff_sidecar_to_service(&self) -> HandoffOutcome {
-        // Before probing: a probe reply records an observation, which clears sidecar_allowed.
-        if crate::core::runstate::RUN_STATE.state().sidecar_allowed {
-            return HandoffOutcome::Done;
-        }
         if !Self::refresh_service_readiness_for_handoff().await {
             return HandoffOutcome::NotReady;
         }
@@ -963,7 +952,6 @@ impl CoreManager {
 
         if !matches!(*self.get_running_mode(), RunningMode::Sidecar)
             || !Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false)
-            || crate::core::runstate::RUN_STATE.state().sidecar_allowed
         {
             return HandoffOutcome::Done;
         }
@@ -1041,7 +1029,7 @@ mod tests {
         CoreManager, ProxyRestoreExpectation, ProxyStopIntent, StartupDecision, can_allow_sidecar_for_session,
         run_controlled_stop_transition, run_core_replacement_transition, run_core_start_transition,
         run_ready_core_start_transition, run_service_config_replacement_transition, run_sidecar_termination_transition,
-        run_uninstall_transition, should_wait_for_service, startup_decision,
+        run_uninstall_transition, should_wait_for_service, should_watch_for_tun_handoff, startup_decision,
     };
     use crate::core::{manager::RunningMode, service::ServiceStatus};
     use parking_lot::Mutex;
@@ -1536,6 +1524,14 @@ mod tests {
         assert!(!should_wait_for_service(true, false, true));
         assert!(!should_wait_for_service(true, true, false));
         assert!(!should_wait_for_service(false, false, false));
+    }
+
+    #[test]
+    fn requested_tun_keeps_a_sidecar_handoff_watcher_alive() {
+        assert!(should_watch_for_tun_handoff(RunningMode::Sidecar, true));
+        assert!(!should_watch_for_tun_handoff(RunningMode::Sidecar, false));
+        assert!(!should_watch_for_tun_handoff(RunningMode::Service, true));
+        assert!(!should_watch_for_tun_handoff(RunningMode::NotRunning, true));
     }
 
     #[test]

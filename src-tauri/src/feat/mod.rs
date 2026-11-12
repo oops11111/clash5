@@ -9,7 +9,6 @@ mod icon;
 mod listener;
 mod profile;
 mod proxy;
-mod tun;
 mod window;
 
 // Re-export all functions from modules
@@ -22,5 +21,4 @@ pub use icon::*;
 pub use listener::*;
 pub use profile::*;
 pub use proxy::*;
-pub use tun::*;
 pub use window::*;
