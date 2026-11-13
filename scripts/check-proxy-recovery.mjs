@@ -9,7 +9,15 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const recovery = spawnSync(
   'cargo',
-  ['test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '--all-features', '--test', 'proxy_recovery'],
+  [
+    'test',
+    '--locked',
+    '--manifest-path',
+    'src-tauri/Cargo.toml',
+    '--all-features',
+    '--test',
+    'proxy_recovery',
+  ],
   { cwd: root, stdio: 'inherit' },
 )
 if (recovery.error) throw recovery.error
