@@ -234,7 +234,7 @@ impl NetworkManager {
                 ));
             }
         }
-        let body = String::from_utf8(body)
+        let body = std::string::String::from_utf8(body)
             .map_err(|_| anyhow::anyhow!("response body is not valid UTF-8"))?
             .into();
 

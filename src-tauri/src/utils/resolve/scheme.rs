@@ -52,7 +52,7 @@ async fn confirm_subscription_import(url: &str, name: Option<&String>) -> bool {
     let title = clash_verge_i18n::t!("notifications.deepLinkImport.title");
     let body = clash_verge_i18n::t!("notifications.deepLinkImport.body")
         .replace("{url}", &help::mask_url(url))
-        .replace("{name}", name.map(std::string::String::as_str).unwrap_or("-"));
+        .replace("{name}", name.map(|value| &**value).unwrap_or("-"));
     let import = clash_verge_i18n::t!("notifications.deepLinkImport.import").into_owned();
     let cancel = clash_verge_i18n::t!("notifications.deepLinkImport.cancel").into_owned();
 
