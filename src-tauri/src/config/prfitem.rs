@@ -160,8 +160,7 @@ impl PrfOption {
                 result.self_proxy = b_ref.self_proxy.or(result.self_proxy);
                 result.danger_accept_invalid_certs =
                     b_ref.danger_accept_invalid_certs.or(result.danger_accept_invalid_certs);
-                result.allow_insecure_http =
-                    b_ref.allow_insecure_http.or(result.allow_insecure_http);
+                result.allow_insecure_http = b_ref.allow_insecure_http.or(result.allow_insecure_http);
                 result.allow_auto_update = b_ref.allow_auto_update.or(result.allow_auto_update);
                 result.update_interval = b_ref.update_interval.or(result.update_interval);
                 result.merge = b_ref.merge.clone().or(result.merge);
@@ -305,9 +304,7 @@ impl PrfItem {
         // Plain HTTP exposes the subscription token and the whole config to
         // anyone on the path. Only fetch it when the user opted in for this
         // subscription.
-        if url.scheme() == "http"
-            && !option.is_some_and(|o| o.allow_insecure_http.unwrap_or(false))
-        {
+        if url.scheme() == "http" && !option.is_some_and(|o| o.allow_insecure_http.unwrap_or(false)) {
             bail!(
                 "plain HTTP subscription URLs are blocked by default; enable \"Allow plain HTTP\" for this subscription to fetch {}",
                 help::mask_url(url.as_str())

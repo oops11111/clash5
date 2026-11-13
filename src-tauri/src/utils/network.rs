@@ -213,7 +213,10 @@ impl NetworkManager {
 
         let status = response.status();
         let headers = response.headers().to_owned();
-        if response.content_length().is_some_and(|len| len > MAX_RESPONSE_BYTES as u64) {
+        if response
+            .content_length()
+            .is_some_and(|len| len > MAX_RESPONSE_BYTES as u64)
+        {
             return Err(anyhow::anyhow!(
                 "response body exceeds the {MAX_RESPONSE_BYTES} byte limit"
             ));
