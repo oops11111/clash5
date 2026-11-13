@@ -34,6 +34,15 @@ notifications:
     body: 新版本 (v{version}) 已下载完成，是否立即安装？
     installNow: 立即安装
     later: 稍后
+  deepLinkImport:
+    title: 导入订阅？
+    body: |
+      一个链接请求 clash5 导入以下订阅：
+      {url}
+      名称：{name}
+      订阅只会添加，不会自动启用。如信任该订阅，请在订阅页手动切换。
+    import: 导入
+    cancel: 取消
 service:
   adminInstallPrompt: 安装 Clash Verge 服务需要管理员权限
   adminUninstallPrompt: 卸载 Clash Verge 服务需要管理员权限

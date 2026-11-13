@@ -78,7 +78,7 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
     };
     let inline_snapshot = item.file_data.as_ref().map(std::string::ToString::to_string);
 
-    if let Err(e) = profiles_append_item_safe(item).await {
+    if let Err(e) = profiles_append_item_safe(item, true).await {
         logging!(error, Type::Cmd, "[导入订阅] 保存配置失败: {e:#}");
         return Err(coded_error("PROFILE_IMPORT_FAILED", e));
     }

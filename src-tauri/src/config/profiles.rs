@@ -183,7 +183,7 @@ impl IProfiles {
         bail!("failed to get the profile item \"uid:{}\"", uid_str);
     }
 
-    async fn append_item(&mut self, item: &mut PrfItem) -> Result<()> {
+    async fn append_item(&mut self, item: &mut PrfItem, activate: bool) -> Result<()> {
         let uid = &item.uid;
         if uid.is_none() {
             bail!("the uid should not be null");
@@ -205,7 +205,12 @@ impl IProfiles {
                 .with_context(|| format!("failed to write to file \"{file}\""))?;
         }
 
-        if self.current.is_none() && (item.itype == Some("remote".into()) || item.itype == Some("local".into())) {
+        // Deep link imports pass activate=false: the subscription is added
+        // but never becomes current on its own, so it cannot hijack traffic.
+        if activate
+            && self.current.is_none()
+            && (item.itype == Some("remote".into()) || item.itype == Some("local".into()))
+        {
             self.current = uid.to_owned();
         }
 
@@ -435,19 +440,23 @@ pub(crate) async fn profiles_append_item_with_filedata_safe(
     file_data: Option<String>,
 ) -> Result<Option<std::string::String>> {
     let item = &mut PrfItem::from(item, file_data).await?;
-    profiles_append_item_safe(item).await?;
+    profiles_append_item_safe(item, true).await?;
     Ok(item.uid.as_deref().map(ToString::to_string))
 }
 
-pub(crate) async fn profiles_append_item_safe(item: &mut PrfItem) -> Result<()> {
+pub(crate) async fn profiles_append_item_safe(item: &mut PrfItem, activate: bool) -> Result<()> {
     let profiles = Config::profiles().await;
-    profiles_append_item_to_safe(&profiles, item).await
+    profiles_append_item_to_safe(&profiles, item, activate).await
 }
 
-pub(super) async fn profiles_append_item_to_safe(profiles: &Draft<IProfiles>, item: &mut PrfItem) -> Result<()> {
+pub(super) async fn profiles_append_item_to_safe(
+    profiles: &Draft<IProfiles>,
+    item: &mut PrfItem,
+    activate: bool,
+) -> Result<()> {
     profiles
         .with_data_modify(|mut profiles| async move {
-            profiles.append_item(item).await?;
+            profiles.append_item(item, activate).await?;
             Ok((profiles, ()))
         })
         .await

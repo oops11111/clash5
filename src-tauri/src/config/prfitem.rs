@@ -125,6 +125,12 @@ pub struct PrfOption {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub danger_accept_invalid_certs: Option<bool>,
 
+    /// Allow plain HTTP subscription URLs.
+    /// Default is `false`: subscriptions are fetched over HTTPS only
+    /// unless the user opts in per subscription.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_insecure_http: Option<bool>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allow_auto_update: Option<bool>,
 
@@ -154,6 +160,8 @@ impl PrfOption {
                 result.self_proxy = b_ref.self_proxy.or(result.self_proxy);
                 result.danger_accept_invalid_certs =
                     b_ref.danger_accept_invalid_certs.or(result.danger_accept_invalid_certs);
+                result.allow_insecure_http =
+                    b_ref.allow_insecure_http.or(result.allow_insecure_http);
                 result.allow_auto_update = b_ref.allow_auto_update.or(result.allow_auto_update);
                 result.update_interval = b_ref.update_interval.or(result.update_interval);
                 result.merge = b_ref.merge.clone().or(result.merge);
@@ -217,27 +225,27 @@ impl PrfItem {
 
         if merge.is_none() {
             let merge_item = &mut Self::from_merge(None);
-            profiles::profiles_append_item_safe(merge_item).await?;
+            profiles::profiles_append_item_safe(merge_item, true).await?;
             merge = merge_item.uid.clone();
         }
         if script.is_none() {
             let script_item = &mut Self::from_script(None);
-            profiles::profiles_append_item_safe(script_item).await?;
+            profiles::profiles_append_item_safe(script_item, true).await?;
             script = script_item.uid.clone();
         }
         if rules.is_none() {
             let rules_item = &mut Self::from_rules();
-            profiles::profiles_append_item_safe(rules_item).await?;
+            profiles::profiles_append_item_safe(rules_item, true).await?;
             rules = rules_item.uid.clone();
         }
         if proxies.is_none() {
             let proxies_item = &mut Self::from_proxies();
-            profiles::profiles_append_item_safe(proxies_item).await?;
+            profiles::profiles_append_item_safe(proxies_item, true).await?;
             proxies = proxies_item.uid.clone();
         }
         if groups.is_none() {
             let groups_item = &mut Self::from_groups();
-            profiles::profiles_append_item_safe(groups_item).await?;
+            profiles::profiles_append_item_safe(groups_item, true).await?;
             groups = groups_item.uid.clone();
         }
         Ok(Self {
@@ -293,6 +301,18 @@ impl PrfItem {
         };
 
         let url = fix_dirty_url(url)?;
+
+        // Plain HTTP exposes the subscription token and the whole config to
+        // anyone on the path. Only fetch it when the user opted in for this
+        // subscription.
+        if url.scheme() == "http"
+            && !option.is_some_and(|o| o.allow_insecure_http.unwrap_or(false))
+        {
+            bail!(
+                "plain HTTP subscription URLs are blocked by default; enable \"Allow plain HTTP\" for this subscription to fetch {}",
+                help::mask_url(url.as_str())
+            );
+        }
 
         let resp = match NetworkManager::new()
             .get(
@@ -396,27 +416,27 @@ impl PrfItem {
 
         if merge.is_none() {
             let merge_item = &mut Self::from_merge(None);
-            profiles::profiles_append_item_safe(merge_item).await?;
+            profiles::profiles_append_item_safe(merge_item, true).await?;
             merge = merge_item.uid.clone();
         }
         if script.is_none() {
             let script_item = &mut Self::from_script(None);
-            profiles::profiles_append_item_safe(script_item).await?;
+            profiles::profiles_append_item_safe(script_item, true).await?;
             script = script_item.uid.clone();
         }
         if rules.is_none() {
             let rules_item = &mut Self::from_rules();
-            profiles::profiles_append_item_safe(rules_item).await?;
+            profiles::profiles_append_item_safe(rules_item, true).await?;
             rules = rules_item.uid.clone();
         }
         if proxies.is_none() {
             let proxies_item = &mut Self::from_proxies();
-            profiles::profiles_append_item_safe(proxies_item).await?;
+            profiles::profiles_append_item_safe(proxies_item, true).await?;
             proxies = proxies_item.uid.clone();
         }
         if groups.is_none() {
             let groups_item = &mut Self::from_groups();
-            profiles::profiles_append_item_safe(groups_item).await?;
+            profiles::profiles_append_item_safe(groups_item, true).await?;
             groups = groups_item.uid.clone();
         }
 

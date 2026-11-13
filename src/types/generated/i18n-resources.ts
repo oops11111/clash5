@@ -564,6 +564,7 @@ export interface TranslationResources {
           fields: {
             acceptInvalidCerts: string
             allowAutoUpdate: string
+            allowInsecureHttp: string
             description: string
             httpTimeout: string
             subscriptionUrl: string
@@ -583,6 +584,7 @@ export interface TranslationResources {
           }
           warnings: {
             frequentUpdate: string
+            insecureHttp: string
           }
         }
         proxiesEditor: {
@@ -1633,6 +1635,16 @@ export interface TranslationResources {
         tableView: string
         upgrade: string
       }
+      confirmations: {
+        enableLan: {
+          message: string
+          title: string
+        }
+        lanController: {
+          message: string
+          title: string
+        }
+      }
       editorModes: {
         advanced: string
         visualization: string
@@ -1738,6 +1750,9 @@ export interface TranslationResources {
       }
       validation: {
         invalidRegex: string
+      }
+      warnings: {
+        lanProxyExposed: string
       }
       window: {
         maximize: string

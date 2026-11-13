@@ -10,6 +10,11 @@ use std::{sync::Arc, time::Duration};
 use sysproxy::Sysproxy;
 use tauri::Url;
 
+/// Maximum subscription response size, same caliber as the 4 MiB single-file
+/// import limit: a malicious server must not be able to exhaust memory by
+/// returning an unbounded body.
+const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+
 #[derive(Debug)]
 pub struct HttpResponse {
     status: StatusCode,
@@ -199,7 +204,7 @@ impl NetworkManager {
             request_builder = request_builder.header(key, value);
         }
 
-        let response = match request_builder.send().await {
+        let mut response = match request_builder.send().await {
             Ok(resp) => resp,
             Err(e) => {
                 return Err(Self::context_reqwest_error(e, "Request failed"));
@@ -208,12 +213,27 @@ impl NetworkManager {
 
         let status = response.status();
         let headers = response.headers().to_owned();
-        let body = match response.text().await {
-            Ok(text) => text.into(),
-            Err(e) => {
-                return Err(Self::context_reqwest_error(e, "Failed to read response body"));
+        if response.content_length().is_some_and(|len| len > MAX_RESPONSE_BYTES as u64) {
+            return Err(anyhow::anyhow!(
+                "response body exceeds the {MAX_RESPONSE_BYTES} byte limit"
+            ));
+        }
+        let mut body = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| Self::context_reqwest_error(e, "Failed to read response body"))?
+        {
+            body.extend_from_slice(&chunk);
+            if body.len() > MAX_RESPONSE_BYTES {
+                return Err(anyhow::anyhow!(
+                    "response body exceeds the {MAX_RESPONSE_BYTES} byte limit"
+                ));
             }
-        };
+        }
+        let body = String::from_utf8(body)
+            .map_err(|_| anyhow::anyhow!("response body is not valid UTF-8"))?
+            .into();
 
         Ok(HttpResponse::new(status, headers, body))
     }

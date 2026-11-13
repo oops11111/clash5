@@ -14,7 +14,9 @@ import { useVerge } from '@/hooks/use-verge'
 import { invoke_uwp_tool, setDnsOverride } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
+import { revalidateQuery } from '@/services/query-client'
 import getSystem from '@/utils/get-system'
+import { generateRandomSecret } from '@/utils/random-secret'
 
 import { ClashCoreViewer } from './mods/clash-core-viewer'
 import { ClashPortViewer } from './mods/clash-port-viewer'
@@ -59,6 +61,7 @@ const SettingClash = ({ onError }: Props) => {
     source: string
   } | null>(null)
   const [dnsUpdating, setDnsUpdating] = useState(false)
+  const [lanConfirmation, setLanConfirmation] = useState(false)
 
   const webRef = useRef<DialogRef>(null)
   const portRef = useRef<DialogRef>(null)
@@ -155,6 +158,28 @@ const SettingClash = ({ onError }: Props) => {
       </BaseDialog>
       <HeaderConfiguration ref={corsRef} />
       <TunnelsViewer ref={tunnelRef} />
+      <BaseDialog
+        open={lanConfirmation}
+        title={t('shared.confirmations.enableLan.title')}
+        okBtn={t('shared.actions.confirm')}
+        cancelBtn={t('shared.actions.cancel')}
+        contentSx={{ width: { xs: 320, sm: 420 } }}
+        onCancel={() => setLanConfirmation(false)}
+        onClose={() => setLanConfirmation(false)}
+        onOk={() => {
+          setLanConfirmation(false)
+          // Rotate the controller secret before the proxy port becomes
+          // reachable from the LAN.
+          void patchClash({
+            'allow-lan': true,
+            secret: generateRandomSecret(),
+          }).then(() => revalidateQuery(['getClashInfo']))
+        }}
+      >
+        <Typography variant="body2">
+          {t('shared.confirmations.enableLan.message')}
+        </Typography>
+      </BaseDialog>
       <SettingItem
         label={t('settings.sections.clash.form.fields.allowLan')}
         extra={
@@ -168,17 +193,26 @@ const SettingClash = ({ onError }: Props) => {
           />
         }
       >
-        <GuardState
-          value={allowLan ?? false}
-          valueProps="checked"
-          onCatch={onError}
-          onFormat={onSwitchFormat}
-          onChange={(e) => onChangeData({ 'allow-lan': e })}
-          onGuard={(e) => patchClash({ 'allow-lan': e })}
-        >
-          <Switch edge="end" />
-        </GuardState>
+        <Switch
+          edge="end"
+          checked={allowLan ?? false}
+          onChange={(_, checked) => {
+            if (checked) {
+              setLanConfirmation(true)
+            } else {
+              void patchClash({ 'allow-lan': false })
+            }
+          }}
+        />
       </SettingItem>
+      {allowLan && (
+        <Typography
+          variant="body2"
+          sx={{ color: 'warning.main', px: 2, pb: 1 }}
+        >
+          {t('shared.warnings.lanProxyExposed')}
+        </Typography>
+      )}
 
       <SettingItem
         label={t('settings.sections.clash.form.fields.dnsOverwrite')}
