@@ -32,6 +32,21 @@ struct WebDavConfig {
     password: String,
 }
 
+fn validate_webdav_url(value: &str) -> Result<reqwest::Url, Error> {
+    let url = reqwest::Url::parse(value).map_err(|_| anyhow::anyhow!("Invalid WebDAV server URL"))?;
+    anyhow::ensure!(url.scheme() == "https", "WebDAV server must use HTTPS");
+    anyhow::ensure!(url.host_str().is_some(), "WebDAV server URL must include a host");
+    anyhow::ensure!(
+        url.username().is_empty() && url.password().is_none(),
+        "Set WebDAV credentials in the username and password fields"
+    );
+    Ok(url)
+}
+
+fn is_allowed_webdav_redirect(from: &reqwest::Url, to: &reqwest::Url) -> bool {
+    to.scheme() == "https" && to.username().is_empty() && to.password().is_none() && from.origin() == to.origin()
+}
+
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 enum Operation {
     Upload,
@@ -87,11 +102,8 @@ impl WebDavClient {
                 }
 
                 let config = WebDavConfig {
-                    url: verge
-                        .webdav_url
-                        .clone()
-                        .unwrap_or_default()
-                        .trim_end_matches('/')
+                    url: validate_webdav_url(verge.webdav_url.as_deref().unwrap_or_default().trim_end_matches('/'))?
+                        .to_string()
                         .into(),
                     username: verge.webdav_username.clone().unwrap_or_default(),
                     password: verge.webdav_password.clone().unwrap_or_default(),
@@ -111,8 +123,14 @@ impl WebDavClient {
                     .redirect(reqwest::redirect::Policy::custom(|attempt| {
                         if attempt.previous().len() >= 5 {
                             attempt.error("重定向次数过多")
-                        } else {
+                        } else if attempt
+                            .previous()
+                            .last()
+                            .is_some_and(|previous| is_allowed_webdav_redirect(previous, attempt.url()))
+                        {
                             attempt.follow()
+                        } else {
+                            attempt.error("WebDAV redirect must stay on the same HTTPS origin")
                         }
                     }))
                     .build()?,
@@ -211,7 +229,7 @@ impl WebDavClient {
         let path = format!("{}/{}", dirs::BACKUP_DIR, filename);
 
         let fut = async {
-            let response = client.get(path.as_str()).await?;
+            let response = client.get(path.as_str()).await?.error_for_status()?;
             if response
                 .content_length()
                 .is_some_and(|length| length > 512 * 1024 * 1024)
@@ -219,7 +237,11 @@ impl WebDavClient {
                 return Err(anyhow::anyhow!("Backup archive exceeds the 512 MiB limit"));
             }
             let mut response = response;
-            let mut output = fs::File::create(&storage_path).await?;
+            let mut output = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&storage_path)
+                .await?;
             let mut total = 0u64;
             while let Some(chunk) = response.chunk().await? {
                 total = total.saturating_add(chunk.len() as u64);
@@ -368,7 +390,27 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{BACKUP_FORMAT_VERSION, dirs};
+    use super::{BACKUP_FORMAT_VERSION, dirs, is_allowed_webdav_redirect, validate_webdav_url};
+
+    #[test]
+    fn webdav_url_requires_https_and_separate_credentials() {
+        assert!(validate_webdav_url("https://example.com/dav").is_ok());
+        assert!(validate_webdav_url("http://example.com/dav").is_err());
+        assert!(validate_webdav_url("https://user:password@example.com/dav").is_err());
+    }
+
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    fn webdav_redirect_stays_on_same_https_origin() {
+        let source = reqwest::Url::parse("https://example.com/dav").unwrap();
+        let same_origin = reqwest::Url::parse("https://example.com/dav/archive").unwrap();
+        let other_host = reqwest::Url::parse("https://attacker.example/dav").unwrap();
+        let http = reqwest::Url::parse("http://example.com/dav").unwrap();
+
+        assert!(is_allowed_webdav_redirect(&source, &same_origin));
+        assert!(!is_allowed_webdav_redirect(&source, &other_host));
+        assert!(!is_allowed_webdav_redirect(&source, &http));
+    }
 
     #[test]
     fn portable_backup_contract_excludes_identity_key() {

@@ -581,7 +581,22 @@ pub async fn export_local_backup(filename: String, destination: String) -> Resul
         return Err(anyhow!("Backup file not found: {}", filename));
     }
 
+    use tauri_plugin_fs::FsExt as _;
+
+    let dest_path = PathBuf::from(destination.as_str());
+    anyhow::ensure!(
+        crate::core::handle::Handle::app_handle()
+            .fs_scope()
+            .is_allowed(&dest_path),
+        "Export destination must be selected through the save dialog"
+    );
     let dest_path = export_destination_path(destination.as_str())?;
+    anyhow::ensure!(
+        crate::core::handle::Handle::app_handle()
+            .fs_scope()
+            .is_allowed(&dest_path),
+        "Export destination must be selected through the save dialog"
+    );
     if source_path == dest_path {
         return Err(anyhow!("Backup export destination must differ from its source"));
     }
