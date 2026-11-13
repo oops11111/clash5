@@ -230,7 +230,7 @@ fn restrict_key_file(path: &Path) {
 }
 
 #[cfg(not(unix))]
-fn restrict_key_file(_path: &Path) {}
+const fn restrict_key_file(_path: &Path) {}
 
 #[cfg(unix)]
 fn write_key_file(path: &Path, key: &[u8]) -> Result<()> {

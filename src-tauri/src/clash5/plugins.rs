@@ -118,9 +118,7 @@ pub(crate) fn list_trusted_signers(plugin_root: &Path) -> Vec<TrustedPluginSigne
 pub(crate) fn pin_trusted_signer(plugin_root: &Path, signer: &str) -> Result<(), PluginFailure> {
     let path = trusted_signers_path(plugin_root);
     let mut signers: Vec<String> = match fs::read(&path) {
-        Ok(bytes) if bytes.len() <= MAX_TRUSTED_SIGNERS_BYTES => {
-            serde_json::from_slice(&bytes).unwrap_or_default()
-        }
+        Ok(bytes) if bytes.len() <= MAX_TRUSTED_SIGNERS_BYTES => serde_json::from_slice(&bytes).unwrap_or_default(),
         _ => Vec::new(),
     };
     let signer = signer.trim().to_owned();

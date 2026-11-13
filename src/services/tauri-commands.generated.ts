@@ -293,6 +293,7 @@ export const commands = {
         name: string
         description: string
         permissions: string[]
+        writable_paths: string[]
         signer_fingerprint: string
         signer: string
       } | null,
@@ -1162,11 +1163,6 @@ export type PluginSummary = {
   signer_fingerprint: string
 }
 
-export type TrustedPluginSigner = {
-  signer: string
-  fingerprint: string
-}
-
 export type PrfExtra = {
   upload: number
   download: number
@@ -1522,6 +1518,15 @@ export type SystemProxyWire = {
 export type ToggleableProxyPort = {
   enabled: boolean
   port: number
+}
+
+/**
+ *  A signer the user explicitly pinned when first installing one of its
+ *  plugins. Stored as the full minisign public key text.
+ */
+export type TrustedPluginSigner = {
+  signer: string
+  fingerprint: string
 }
 
 export type UnlockItem = {
