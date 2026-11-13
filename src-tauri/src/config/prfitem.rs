@@ -309,7 +309,9 @@ impl PrfItem {
             .host_str()
             .map(|host| {
                 host.eq_ignore_ascii_case("localhost")
-                    || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
+                    || host
+                        .parse::<std::net::IpAddr>()
+                        .is_ok_and(|ip| ip.is_loopback())
             })
             .unwrap_or(false);
         if url.scheme() == "http"
