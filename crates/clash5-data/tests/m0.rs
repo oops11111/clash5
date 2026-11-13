@@ -1,6 +1,6 @@
 use clash5_data::{
     Binding, BindingStore, DataError, ExitPolicy, IdentityKey, IdentitySourceSnapshot, Node, NodeQuality, NodeRef,
-    ProxyChain, Source, parse_inline_nodes,
+    PluginBinding, PluginBindingTarget, ProxyChain, Source, parse_inline_nodes,
 };
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -176,6 +176,68 @@ fn planned_key_rotation_moves_exact_snapshots_and_preserves_unresolved_orphans()
 }
 
 #[test]
+fn planned_key_rotation_moves_plugin_bindings_with_nodes() {
+    let old_key = IdentityKey::from_bytes(&[11; 32]).unwrap();
+    let new_key = IdentityKey::from_bytes(&[12; 32]).unwrap();
+    let mut store = BindingStore::memory_with_identity(old_key.clone()).unwrap();
+    let node = node();
+    let source_a = Source::Subscription {
+        provider_id: "provider-a".into(),
+    };
+    let source_b = Source::Subscription {
+        provider_id: "provider-b".into(),
+    };
+    let old_a = store
+        .refresh_provider("provider-a", std::slice::from_ref(&node))
+        .unwrap()
+        .added
+        .remove(0);
+    let old_b = store
+        .refresh_provider("provider-b", std::slice::from_ref(&node))
+        .unwrap()
+        .added
+        .remove(0);
+    plugin_bind(
+        &mut store,
+        PluginBindingTarget::Node {
+            source: source_a.clone(),
+            stable_id: old_a.clone(),
+        },
+    );
+    plugin_bind(
+        &mut store,
+        PluginBindingTarget::Node {
+            source: source_b.clone(),
+            stable_id: old_b.clone(),
+        },
+    );
+    store
+        .rotate_identity_key(
+            new_key.clone(),
+            &[IdentitySourceSnapshot {
+                source: source_a.clone(),
+                nodes: vec![node.clone()],
+            }],
+        )
+        .unwrap();
+    let new_a = node.stable_id_v2(&new_key).unwrap();
+    let target_a = PluginBindingTarget::Node {
+        source: source_a.clone(),
+        stable_id: new_a,
+    };
+    let migrated = store.plugin_bindings(Some(&target_a)).unwrap().remove(0);
+    assert!(!migrated.orphan);
+    assert_eq!(store.effective_plugin_bindings(&target_a).unwrap().len(), 1);
+    let target_b = PluginBindingTarget::Node {
+        source: source_b.clone(),
+        stable_id: old_b,
+    };
+    let unresolved = store.plugin_bindings(Some(&target_b)).unwrap().remove(0);
+    assert!(unresolved.orphan);
+    assert!(store.effective_plugin_bindings(&target_b).unwrap().is_empty());
+}
+
+#[test]
 fn planned_key_rotation_rekeys_saved_chain_references_atomically() {
     let old_key = IdentityKey::from_bytes(&[13; 32]).unwrap();
     let new_key = IdentityKey::from_bytes(&[14; 32]).unwrap();
@@ -239,6 +301,74 @@ fn planned_key_rotation_rekeys_saved_chain_references_atomically() {
             provider_id: "provider-a".into(),
         }
     );
+    assert_eq!(
+        chains[0].landing.stable_id,
+        subscription_node.stable_id_v2(&new_key).unwrap()
+    );
+}
+
+#[test]
+fn planned_key_rotation_rekeys_saved_chain_references_from_legacy_v1_nodes() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("legacy-chain-rotation.sqlite");
+    let old_key = IdentityKey::from_bytes(&[15; 32]).unwrap();
+    let new_key = IdentityKey::from_bytes(&[16; 32]).unwrap();
+    let manual_node = node();
+    let mut subscription_node = node();
+    subscription_node.port = 8443;
+    let manual_old_id;
+    let subscription_old_id;
+    {
+        let mut store = BindingStore::open(&path).unwrap();
+        manual_old_id = store.upsert_manual(&manual_node).unwrap();
+        subscription_old_id = store
+            .refresh_provider("provider-a", std::slice::from_ref(&subscription_node))
+            .unwrap()
+            .added
+            .remove(0);
+        assert!(!manual_old_id.starts_with("v2:"));
+        assert!(!subscription_old_id.starts_with("v2:"));
+        let chain = ProxyChain {
+            schema_version: 1,
+            id: "18dc0b8a-7485-49bc-8a91-f48bdc736846".into(),
+            name: "Legacy rotation chain".into(),
+            profile_id: Some("profile-a".into()),
+            front: NodeRef {
+                source: Source::Manual,
+                stable_id: manual_old_id.clone(),
+            },
+            landing: NodeRef {
+                source: Source::Subscription {
+                    provider_id: "provider-a".into(),
+                },
+                stable_id: subscription_old_id.clone(),
+            },
+            enabled: true,
+            exit_policy: ExitPolicy::Warn,
+        };
+        store.save_proxy_chain(&chain).unwrap();
+    }
+    let mut store = BindingStore::open_with_identity(&path, old_key).unwrap();
+    store
+        .rotate_identity_key(
+            new_key.clone(),
+            &[
+                IdentitySourceSnapshot {
+                    source: Source::Manual,
+                    nodes: vec![manual_node.clone()],
+                },
+                IdentitySourceSnapshot {
+                    source: Source::Subscription {
+                        provider_id: "provider-a".into(),
+                    },
+                    nodes: vec![subscription_node.clone()],
+                },
+            ],
+        )
+        .unwrap();
+    let chains = store.proxy_chains().unwrap();
+    assert_eq!(chains.len(), 1);
+    assert_eq!(chains[0].front.stable_id, manual_node.stable_id_v2(&new_key).unwrap());
     assert_eq!(
         chains[0].landing.stable_id,
         subscription_node.stable_id_v2(&new_key).unwrap()
@@ -465,6 +595,48 @@ fn exact_v1_refresh_migrates_node_binding_and_quality_atomically() {
 }
 
 #[test]
+fn exact_v1_refresh_migrates_plugin_binding_and_keeps_it_effective() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("v1-plugin-binding.sqlite");
+    let current = node();
+    let old_id;
+    {
+        let mut old = BindingStore::open(&path).unwrap();
+        old_id = old
+            .refresh_provider("provider-a", std::slice::from_ref(&current))
+            .unwrap()
+            .added
+            .remove(0);
+        plugin_bind(
+            &mut old,
+            PluginBindingTarget::Node {
+                source: Source::Subscription {
+                    provider_id: "provider-a".into(),
+                },
+                stable_id: old_id.clone(),
+            },
+        );
+    }
+    let mut current_store =
+        BindingStore::open_with_identity(&path, IdentityKey::from_bytes(&[2; 32]).unwrap()).unwrap();
+    let new_id = current_store
+        .refresh_provider("provider-a", &[current])
+        .unwrap()
+        .added
+        .remove(0);
+    assert_ne!(old_id, new_id);
+    let target = PluginBindingTarget::Node {
+        source: Source::Subscription {
+            provider_id: "provider-a".into(),
+        },
+        stable_id: new_id.clone(),
+    };
+    let moved = current_store.plugin_bindings(Some(&target)).unwrap().remove(0);
+    assert!(!moved.orphan);
+    assert_eq!(current_store.effective_plugin_bindings(&target).unwrap().len(), 1);
+}
+
+#[test]
 fn credential_rotation_rebinds_only_unique_source_scoped_candidates() {
     let mut store = BindingStore::memory_with_identity(IdentityKey::from_bytes(&[6; 32]).unwrap()).unwrap();
     let source_a = Source::Subscription {
@@ -565,6 +737,91 @@ fn credential_rotation_rebinds_only_unique_source_scoped_candidates() {
 }
 
 #[test]
+fn credential_rotation_rebinds_plugin_bindings_with_unique_candidates() {
+    let mut store = BindingStore::memory_with_identity(IdentityKey::from_bytes(&[6; 32]).unwrap()).unwrap();
+    let source_a = Source::Subscription {
+        provider_id: "provider-a".into(),
+    };
+    let mut old = node();
+    old.credentials
+        .insert("uuid".into(), "11111111-1111-1111-1111-111111111111".into());
+    let old_id = store
+        .refresh_provider("provider-a", &[old.clone()])
+        .unwrap()
+        .added
+        .remove(0);
+    plugin_bind(
+        &mut store,
+        PluginBindingTarget::Node {
+            source: source_a.clone(),
+            stable_id: old_id.clone(),
+        },
+    );
+    store.refresh_provider("provider-a", &[]).unwrap();
+    let mut rotated = old.clone();
+    rotated
+        .credentials
+        .insert("uuid".into(), "22222222-2222-2222-2222-222222222222".into());
+    let new_id = store
+        .refresh_provider("provider-a", &[rotated])
+        .unwrap()
+        .added
+        .remove(0);
+    let target = PluginBindingTarget::Node {
+        source: source_a.clone(),
+        stable_id: new_id.clone(),
+    };
+    let moved = store.plugin_bindings(Some(&target)).unwrap().remove(0);
+    assert!(!moved.orphan);
+    assert_eq!(store.effective_plugin_bindings(&target).unwrap().len(), 1);
+    assert!(store.pending_identity_rebinds(Some(&source_a)).unwrap().is_empty());
+
+    let source_b = Source::Subscription {
+        provider_id: "provider-b".into(),
+    };
+    let mut first = node();
+    first
+        .credentials
+        .insert("uuid".into(), "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa".into());
+    let mut second = node();
+    second
+        .credentials
+        .insert("uuid".into(), "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb".into());
+    let ids = store
+        .refresh_provider("provider-b", &[first.clone(), second.clone()])
+        .unwrap()
+        .added;
+    for id in &ids {
+        plugin_bind(
+            &mut store,
+            PluginBindingTarget::Node {
+                source: source_b.clone(),
+                stable_id: id.clone(),
+            },
+        );
+    }
+    store.refresh_provider("provider-b", &[]).unwrap();
+    let mut third = first;
+    third
+        .credentials
+        .insert("uuid".into(), "cccccccc-cccc-cccc-cccc-cccccccccccc".into());
+    let third_id = store.refresh_provider("provider-b", &[third]).unwrap().added.remove(0);
+    let pending = store.pending_identity_rebinds(Some(&source_b)).unwrap();
+    assert_eq!(pending.len(), 2);
+    store
+        .resolve_identity_rebind(&source_b, &pending[0].old_stable_id, &third_id)
+        .unwrap();
+    let resolved_target = PluginBindingTarget::Node {
+        source: source_b.clone(),
+        stable_id: third_id.clone(),
+    };
+    let resolved = store.plugin_bindings(Some(&resolved_target)).unwrap();
+    assert_eq!(resolved.len(), 1);
+    assert!(!resolved[0].orphan);
+    assert_eq!(store.effective_plugin_bindings(&resolved_target).unwrap().len(), 1);
+}
+
+#[test]
 fn missing_key_keeps_data_readable_and_explicit_reset_preserves_orphaned_bindings() {
     let mut store = BindingStore::memory_with_identity(IdentityKey::from_bytes(&[1; 32]).unwrap()).unwrap();
     let source = Source::Subscription {
@@ -624,6 +881,39 @@ fn missing_key_keeps_data_readable_and_explicit_reset_preserves_orphaned_binding
     assert!(retained.orphan);
     assert!(store.pending_identity_rebinds(Some(&source)).unwrap().is_empty());
 }
+
+#[test]
+fn identity_reset_orphans_plugin_bindings_for_stale_v2_nodes() {
+    let mut store = BindingStore::memory_with_identity(IdentityKey::from_bytes(&[1; 32]).unwrap()).unwrap();
+    let source = Source::Subscription {
+        provider_id: "restore-provider".into(),
+    };
+    let current = node();
+    let old_id = store
+        .refresh_provider("restore-provider", std::slice::from_ref(&current))
+        .unwrap()
+        .added
+        .remove(0);
+    plugin_bind(
+        &mut store,
+        PluginBindingTarget::Node {
+            source: source.clone(),
+            stable_id: old_id.clone(),
+        },
+    );
+    store.enter_identity_recovery();
+    let generation = store
+        .reset_identity_key(IdentityKey::from_bytes(&[5; 32]).unwrap())
+        .unwrap();
+    assert_eq!(generation, 2);
+    let target = PluginBindingTarget::Node {
+        source: source.clone(),
+        stable_id: old_id.clone(),
+    };
+    let orphaned = store.plugin_bindings(Some(&target)).unwrap().remove(0);
+    assert!(orphaned.orphan);
+    assert!(store.effective_plugin_bindings(&target).unwrap().is_empty());
+}
 fn source(provider: &str) -> Source {
     Source::Subscription {
         provider_id: provider.into(),
@@ -638,6 +928,20 @@ fn bind(db: &mut BindingStore, source: Source, id: &str, enabled: bool) {
         priority: 7,
         enabled,
         config: json!({}),
+        orphan: false,
+        disappeared_at: None,
+    })
+    .unwrap();
+}
+
+fn plugin_bind(db: &mut BindingStore, target: PluginBindingTarget) {
+    db.upsert_plugin_binding(&PluginBinding {
+        id: "plugin-binding".into(),
+        plugin_id: "plugin-a".into(),
+        target,
+        priority: 80,
+        enabled: true,
+        config: json!({"mode": "safe"}),
         orphan: false,
         disappeared_at: None,
     })
