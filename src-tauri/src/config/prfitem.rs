@@ -303,8 +303,21 @@ impl PrfItem {
 
         // Plain HTTP exposes the subscription token and the whole config to
         // anyone on the path. Only fetch it when the user opted in for this
-        // subscription.
-        if url.scheme() == "http" && !option.is_some_and(|o| o.allow_insecure_http.unwrap_or(false)) {
+        // subscription. Loopback URLs never leave the machine, so they are
+        // exempt (same treatment as a browser secure context).
+        let host_is_loopback = url
+            .host_str()
+            .map(|host| {
+                host.eq_ignore_ascii_case("localhost")
+                    || host
+                        .parse::<std::net::IpAddr>()
+                        .is_ok_and(|ip| ip.is_loopback())
+            })
+            .unwrap_or(false);
+        if url.scheme() == "http"
+            && !host_is_loopback
+            && !option.is_some_and(|o| o.allow_insecure_http.unwrap_or(false))
+        {
             bail!(
                 "plain HTTP subscription URLs are blocked by default; enable \"Allow plain HTTP\" for this subscription to fetch {}",
                 help::mask_url(url.as_str())
