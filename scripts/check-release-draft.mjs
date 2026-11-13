@@ -15,10 +15,13 @@ assert.deepEqual(
   Object.keys(jobs).sort(),
   [
     'check_tag_version',
+    'checks',
     'prepare_release',
     'release',
     'release-for-fixed-webview2',
     'release-for-linux-arm',
+    'sign_windows',
+    'validate_gates',
   ].sort(),
 )
 assert.match(source, /RELEASE_BRANCH=dev/)
