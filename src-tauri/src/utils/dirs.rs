@@ -155,22 +155,102 @@ pub fn path_to_str(path: &Path) -> Result<&str> {
         .ok_or_else(|| anyhow::anyhow!("failed to get path from {:?}", path))
 }
 
+/// OS keyring entry for the config encryption key. Same service as the
+/// identity key, a different account name.
+const ENCRYPTION_KEY_SERVICE: &str = "io.github.oops11111.clash5";
+const ENCRYPTION_KEY_ACCOUNT: &str = "encryption-key";
+
+fn keyring_entry() -> Option<keyring::Entry> {
+    keyring::Entry::new(ENCRYPTION_KEY_SERVICE, ENCRYPTION_KEY_ACCOUNT).ok()
+}
+
+/// Tighten the permissions of a leftover on-disk encryption key, if one exists.
+/// New keys live in the OS keyring; this only covers the pre-migration file.
+pub fn restrict_legacy_encryption_key_file() {
+    if let Ok(app_dir) = app_home_dir() {
+        let key_path = app_dir.join(".encryption_key");
+        if key_path.exists() {
+            restrict_key_file(&key_path);
+        }
+    }
+}
+
 pub fn get_encryption_key() -> Result<Vec<u8>> {
+    let entry = keyring_entry();
+    // Migrate into the keyring only when it holds no entry yet; never
+    // overwrite an entry we could not read.
+    let migrate = match entry.as_ref().map(|entry| entry.get_secret()) {
+        Some(Ok(bytes)) => return Ok(bytes),
+        Some(Err(keyring::Error::NoEntry)) => true,
+        Some(Err(_)) | None => false,
+    };
+    get_encryption_key_from_file_or_new(&entry, migrate)
+}
+
+fn get_encryption_key_from_file_or_new(entry: &Option<keyring::Entry>, migrate: bool) -> Result<Vec<u8>> {
     let app_dir = app_home_dir()?;
     let key_path = app_dir.join(".encryption_key");
 
     if key_path.exists() {
-        fs::read(&key_path).map_err(|e| anyhow::anyhow!("Failed to read encryption key: {}", e))
-    } else {
-        let mut key = vec![0u8; 32];
-        getrandom::fill(&mut key)?;
-
-        if let Some(parent) = key_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| anyhow::anyhow!("Failed to create key directory: {}", e))?;
+        let key = fs::read(&key_path).map_err(|e| anyhow::anyhow!("Failed to read encryption key: {}", e))?;
+        // Migrate the on-disk key into the keyring and drop the file; when the
+        // keyring is unavailable the file stays, with tightened permissions.
+        if migrate
+            && let Some(entry) = entry
+            && entry.set_secret(&key).is_ok()
+        {
+            let _ = fs::remove_file(&key_path);
+        } else {
+            restrict_key_file(&key_path);
         }
-        fs::write(&key_path, &key).map_err(|e| anyhow::anyhow!("Failed to save encryption key: {}", e))?;
-        Ok(key)
+        return Ok(key);
     }
+
+    let mut key = vec![0u8; 32];
+    getrandom::fill(&mut key)?;
+
+    if migrate
+        && let Some(entry) = entry
+        && entry.set_secret(&key).is_ok()
+    {
+        return Ok(key);
+    }
+
+    if let Some(parent) = key_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| anyhow::anyhow!("Failed to create key directory: {}", e))?;
+    }
+    write_key_file(&key_path, &key)?;
+    Ok(key)
+}
+
+#[cfg(unix)]
+fn restrict_key_file(path: &Path) {
+    use std::os::unix::fs::PermissionsExt as _;
+    let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+}
+
+#[cfg(not(unix))]
+const fn restrict_key_file(_path: &Path) {}
+
+#[cfg(unix)]
+fn write_key_file(path: &Path, key: &[u8]) -> Result<()> {
+    use std::io::Write as _;
+    use std::os::unix::fs::OpenOptionsExt as _;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)
+        .map_err(|e| anyhow::anyhow!("Failed to save encryption key: {}", e))?;
+    file.write_all(key)
+        .map_err(|e| anyhow::anyhow!("Failed to save encryption key: {}", e))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn write_key_file(path: &Path, key: &[u8]) -> Result<()> {
+    fs::write(path, key).map_err(|e| anyhow::anyhow!("Failed to save encryption key: {}", e))
 }
 
 pub fn ipc_path() -> Result<PathBuf> {

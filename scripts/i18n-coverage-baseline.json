@@ -202,69 +202,69 @@
   },
   "layout": {
     "ar": {
-      "identical": 90,
+      "identical": 94,
       "missing": 0,
-      "total": 117
+      "total": 121
     },
     "de": {
-      "identical": 75,
+      "identical": 79,
       "missing": 0,
-      "total": 117
+      "total": 121
     },
     "es": {
-      "identical": 90,
+      "identical": 94,
       "missing": 0,
-      "total": 117
+      "total": 121
     },
     "fa": {
-      "identical": 90,
+      "identical": 94,
       "missing": 0,
-      "total": 117
+      "total": 121
     },
     "id": {
-      "identical": 90,
+      "identical": 94,
       "missing": 0,
-      "total": 117
+      "total": 121
     },
     "jp": {
-      "identical": 89,
+      "identical": 93,
       "missing": 0,
-      "total": 117
+      "total": 121
     },
     "ko": {
-      "identical": 86,
-      "missing": 0,
-      "total": 117
-    },
-    "pt": {
-      "identical": 77,
-      "missing": 0,
-      "total": 117
-    },
-    "ru": {
-      "identical": 83,
-      "missing": 0,
-      "total": 117
-    },
-    "tr": {
-      "identical": 75,
-      "missing": 0,
-      "total": 117
-    },
-    "tt": {
       "identical": 90,
       "missing": 0,
-      "total": 117
+      "total": 121
+    },
+    "pt": {
+      "identical": 81,
+      "missing": 0,
+      "total": 121
+    },
+    "ru": {
+      "identical": 87,
+      "missing": 0,
+      "total": 121
+    },
+    "tr": {
+      "identical": 79,
+      "missing": 0,
+      "total": 121
+    },
+    "tt": {
+      "identical": 94,
+      "missing": 0,
+      "total": 121
     },
     "zh": {
-      "identical": 0,
+      "identical": 4,
       "missing": 0,
-      "total": 117
+      "total": 121
     },
     "zhtw": {
-      "identical": 0,
+      "identical": 4,
       "missing": 0,
-      "total": 117
+      "total": 121
     }
   }
 }

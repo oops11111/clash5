@@ -2,12 +2,14 @@ import ExtensionOutlinedIcon from '@mui/icons-material/ExtensionOutlined'
 import {
   Alert,
   Button,
+  Checkbox,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Paper,
@@ -32,6 +34,7 @@ import {
   listClash5PluginBindings,
   listClash5PluginAuditEvents,
   listClash5Plugins,
+  listTrustedPluginSigners,
   stageClash5PluginPackage,
   saveClash5PluginBindings,
   deleteClash5PluginBinding,
@@ -45,6 +48,7 @@ import type {
   Clash5PluginEffectiveConfig,
   Clash5PluginPackagePreview,
   Clash5PluginSummary,
+  Clash5TrustedPluginSigner,
 } from '@/types/clash5-plugin'
 import type { Clash5PluginBindingTarget } from '@/types/clash5-plugin'
 
@@ -67,6 +71,18 @@ const valueAtPointer = (
     }, config)
 }
 
+const SENSITIVE_WRITABLE_PATHS = [
+  '/secret',
+  '/proxies',
+  '/dns',
+  '/external-controller',
+]
+
+const isSensitiveWritablePath = (path: string) =>
+  SENSITIVE_WRITABLE_PATHS.some(
+    (base) => path === base || path.startsWith(`${base}/`),
+  )
+
 type BindingTargetOption = {
   key: string
   label: string
@@ -88,6 +104,10 @@ const PluginsPage = () => {
   const [pluginError, setPluginError] = useState(false)
   const [packagePreview, setPackagePreview] =
     useState<Clash5PluginPackagePreview | null>(null)
+  const [trustedSigners, setTrustedSigners] = useState<
+    Clash5TrustedPluginSigner[] | null
+  >(null)
+  const [trustSigner, setTrustSigner] = useState(false)
   const [busy, setBusy] = useState(false)
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false)
   const [targetOptions, setTargetOptions] = useState<BindingTargetOption[]>([])
@@ -186,6 +206,12 @@ const PluginsPage = () => {
     }
   }, [tab, t])
 
+  const isSignerTrusted =
+    packagePreview !== null &&
+    (trustedSigners ?? []).some(
+      (entry) => entry.signer === packagePreview.signer,
+    )
+
   const installPackage = async () => {
     if (!packagePreview) return
     setBusy(true)
@@ -193,8 +219,11 @@ const PluginsPage = () => {
       await installStagedClash5Plugin(
         packagePreview.staging_id,
         packagePreview.signer,
+        !isSignerTrusted && trustSigner,
       )
       setPackagePreview(null)
+      setTrustSigner(false)
+      setTrustedSigners(null)
       setPlugins(await listClash5Plugins())
     } catch {
       setPluginError(true)
@@ -332,8 +361,15 @@ const PluginsPage = () => {
     setBusy(true)
     setPluginError(false)
     try {
-      const preview = await stageClash5PluginPackage()
-      if (preview) setPackagePreview(preview)
+      const [preview, trusted] = await Promise.all([
+        stageClash5PluginPackage(),
+        listTrustedPluginSigners().catch(() => []),
+      ])
+      if (preview) {
+        setTrustedSigners(trusted)
+        setTrustSigner(false)
+        setPackagePreview(preview)
+      }
     } catch {
       setPluginError(true)
     } finally {
@@ -855,6 +891,37 @@ const PluginsPage = () => {
                   <Chip key={permission} size="small" label={permission} />
                 ))}
               </Stack>
+              <Typography variant="body2">
+                {t('layout.components.navigation.pluginWritablePaths')}
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                {packagePreview.writable_paths.map((path) => (
+                  <Chip
+                    key={path}
+                    size="small"
+                    color={isSensitiveWritablePath(path) ? 'error' : 'default'}
+                    label={path}
+                  />
+                ))}
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                {t('layout.components.navigation.pluginSensitivePaths')}
+              </Typography>
+              {isSignerTrusted ? (
+                <Typography variant="body2" color="success.main">
+                  {t('layout.components.navigation.pluginSignerTrusted')}
+                </Typography>
+              ) : (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={trustSigner}
+                      onChange={(event) => setTrustSigner(event.target.checked)}
+                    />
+                  }
+                  label={t('layout.components.navigation.pluginTrustSigner')}
+                />
+              )}
               <Alert severity="warning">
                 {t('layout.components.navigation.pluginTrustWarning')}
               </Alert>
@@ -867,7 +934,7 @@ const PluginsPage = () => {
           </Button>
           <Button
             onClick={() => void installPackage()}
-            disabled={busy}
+            disabled={busy || (!isSignerTrusted && !trustSigner)}
             variant="contained"
           >
             {t('layout.components.navigation.pluginTrustInstall')}
