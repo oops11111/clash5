@@ -326,7 +326,10 @@ if (failures.length > 0) {
   throw new Error(`Tauri command contract mismatch:\n${failures.join('\n')}`)
 }
 
-const calledCommands = new Set([...frontendCommands, ...generatedObjectCommands])
+const calledCommands = new Set([
+  ...frontendCommands,
+  ...generatedObjectCommands,
+])
 const idleCommands = [...registeredCommands]
   .filter((command) => !calledCommands.has(command))
   .sort()

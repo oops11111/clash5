@@ -12,10 +12,10 @@ export interface ProfileUpdatesState {
 }
 
 /** Which backend channel a connection failure came from. */
-export type ConnectionSource = 'websocket' | 'backend'
+type ConnectionSource = 'websocket' | 'backend'
 
 /** Backend link health, shared by WS subscriptions and backend queries. */
-export interface ConnectionStatus {
+interface ConnectionStatus {
   /** Per-channel state: the banner shows while any channel is reconnecting. */
   readonly websocket: 'connected' | 'reconnecting'
   readonly backend: 'connected' | 'reconnecting'
@@ -155,7 +155,10 @@ export function appStoreReducer(
     }
     case 'connection/recovered': {
       if (state.connection[action.source] === 'connected') return state
-      const next = { ...state.connection, [action.source]: 'connected' as const }
+      const next = {
+        ...state.connection,
+        [action.source]: 'connected' as const,
+      }
       return {
         ...state,
         connection: {
