@@ -111,6 +111,7 @@ pub fn export_frontend_command_contract() -> Result<(), Box<dyn std::error::Erro
             cmd::clash5_install_staged_plugin,
             cmd::clash5_list_plugin_audit_events,
             cmd::clash5_list_plugins,
+            cmd::clash5_list_trusted_plugin_signers,
             cmd::clash5_list_pending_identity_rebinds,
             cmd::clash5_resolve_identity_rebind,
             cmd::clash5_identity_status,
@@ -340,6 +341,7 @@ mod app_init {
             cmd::clash5_install_staged_plugin,
             cmd::clash5_list_plugin_audit_events,
             cmd::clash5_list_plugins,
+            cmd::clash5_list_trusted_plugin_signers,
             cmd::clash5_list_pending_identity_rebinds,
             cmd::clash5_resolve_identity_rebind,
             cmd::clash5_identity_status,
@@ -472,6 +474,10 @@ pub fn run() -> std::process::ExitCode {
                 if let Err(e) = resolve::init_work_dir_and_logger() {
                     logging!(error, Type::Setup, "Failed to init work dir/logger: {e:#}");
                 }
+
+                // Pre-migration encryption keys still sit in a plain file; tighten
+                // it at startup until the keyring migration in dirs picks it up.
+                utils::dirs::restrict_legacy_encryption_key_file();
 
                 logging!(debug, Type::Setup, "开始应用初始化...");
                 if let Err(e) = app_init::setup_autostart(app) {

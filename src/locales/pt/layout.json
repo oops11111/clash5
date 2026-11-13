@@ -69,6 +69,10 @@
       "pluginTrustWarning": "The signature confirms the package matches its signer, but does not independently verify the publisher. config.read can expose configuration data, including credentials; config.patch can change only declared fields. The plugin has no network or filesystem interface.",
       "pluginCancel": "Cancel",
       "pluginTrustInstall": "Trust and install",
+      "pluginWritablePaths": "Writable configuration paths",
+      "pluginSensitivePaths": "Paths in red can change proxy, DNS or controller settings.",
+      "pluginTrustSigner": "Trust this signer for future plugin installs",
+      "pluginSignerTrusted": "Trusted signer",
       "empty": {
         "chainsTitle": "No chains yet",
         "chainsDescription": "Chain configuration is coming soon.",

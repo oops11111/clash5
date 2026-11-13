@@ -912,6 +912,7 @@ async function prepareM3PluginFixture() {
   const installed = await invoke('clash5_install_staged_plugin', {
     stagingId,
     confirmedSigner: signer,
+    pinSigner: true,
   })
   if (installed.id !== 'm3.smoke.plugin')
     throw new Error(

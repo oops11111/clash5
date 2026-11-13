@@ -69,6 +69,10 @@
       "pluginTrustWarning": "簽名只證明檔案與簽名相符，不能獨立確認發佈者身分。config.read 可讀取設定資料（包括憑證）；config.patch 只能修改宣告欄位。插件沒有網路和檔案存取介面。",
       "pluginCancel": "取消",
       "pluginTrustInstall": "信任並安裝",
+      "pluginWritablePaths": "Writable configuration paths",
+      "pluginSensitivePaths": "Paths in red can change proxy, DNS or controller settings.",
+      "pluginTrustSigner": "Trust this signer for future plugin installs",
+      "pluginSignerTrusted": "Trusted signer",
       "empty": {
         "chainsTitle": "尚無鏈路",
         "chainsDescription": "鏈路編排功能即將推出。",
