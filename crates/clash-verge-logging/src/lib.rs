@@ -19,7 +19,7 @@ use log::{Level, LevelFilter, Record};
 use parking_lot::RwLock;
 use tracing_estuary::Pipeline;
 
-const SENSITIVE_KEYS: [&str; 16] = [
+const SENSITIVE_KEYS: [&str; 20] = [
     "password",
     "passwd",
     "secret",
@@ -36,6 +36,23 @@ const SENSITIVE_KEYS: [&str; 16] = [
     "x-api-key",
     "cookie",
     "set-cookie",
+    "uuid",
+    "psk",
+    "private-key",
+    "client-id",
+];
+
+/// URL schemes whose whole token is credentials: the host is masked along
+/// with the rest, unlike http(s) where the host is kept for context.
+const PROXY_SCHEMES: [&str; 8] = [
+    "ss://",
+    "vmess://",
+    "vless://",
+    "trojan://",
+    "hysteria://",
+    "hy2://",
+    "tuic://",
+    "anytls://",
 ];
 
 /// Redacts URLs and credential-like key/value fields before they reach logs or user-facing diagnostics.
@@ -44,25 +61,47 @@ pub fn redact(input: &str) -> String {
     let mut cursor = 0;
     while cursor < input.len() {
         let rest = &input[cursor..];
-        let (offset, scheme_len) = match (rest.find("https://"), rest.find("http://")) {
-            (Some(https), Some(http)) if https <= http => (https, 8),
-            (Some(https), None) => (https, 8),
-            (None, Some(http)) => (http, 7),
-            (Some(_), Some(http)) => (http, 7),
-            (None, None) => {
-                output.push_str(rest);
-                break;
-            }
+        let Some((offset, scheme_len, is_proxy)) = find_url_scheme(rest) else {
+            output.push_str(rest);
+            break;
         };
         let start = cursor + offset;
         output.push_str(&input[cursor..start]);
         let end = input[start..]
             .find(|ch: char| ch.is_whitespace() || matches!(ch, ')' | ']' | '}' | '"' | '\''))
             .map_or(input.len(), |end| start + end);
-        output.push_str(&mask_url_token(&input[start..end], scheme_len));
+        if is_proxy {
+            output.push_str(&input[start..start + scheme_len]);
+            output.push_str("***");
+        } else {
+            output.push_str(&mask_url_token(&input[start..end], scheme_len));
+        }
         cursor = end;
     }
     mask_sensitive_fields(&output)
+}
+
+/// Finds the earliest URL scheme in `rest`: http(s) keeps its host visible,
+/// proxy schemes are fully masked. Returns (offset, scheme length, is_proxy).
+fn find_url_scheme(rest: &str) -> Option<(usize, usize, bool)> {
+    let mut found: Option<(usize, usize, bool)> = None;
+    let consider = |found: &mut Option<(usize, usize, bool)>, scheme: &str, is_proxy: bool| {
+        if let Some(offset) = rest.find(scheme) {
+            let earlier = match *found {
+                None => true,
+                Some((best, _, _)) => offset < best,
+            };
+            if earlier {
+                *found = Some((offset, scheme.len(), is_proxy));
+            }
+        }
+    };
+    consider(&mut found, "https://", false);
+    consider(&mut found, "http://", false);
+    for scheme in PROXY_SCHEMES {
+        consider(&mut found, scheme, true);
+    }
+    found
 }
 
 fn mask_url_token(url: &str, scheme_len: usize) -> String {
