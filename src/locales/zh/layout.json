@@ -69,6 +69,10 @@
       "pluginTrustWarning": "签名只证明文件与签名匹配，不能独立确认发布者身份。config.read 可读取配置数据（包括凭证）；config.patch 只能修改声明字段。插件没有网络和文件访问接口。",
       "pluginCancel": "取消",
       "pluginTrustInstall": "信任并安装",
+      "pluginWritablePaths": "Writable configuration paths",
+      "pluginSensitivePaths": "Paths in red can change proxy, DNS or controller settings.",
+      "pluginTrustSigner": "Trust this signer for future plugin installs",
+      "pluginSignerTrusted": "Trusted signer",
       "empty": {
         "chainsTitle": "暂无链路",
         "chainsDescription": "链路编排功能即将推出。",

@@ -300,8 +300,10 @@ export interface TranslationResources {
           pluginRemoveBinding: string
           pluginSaveBinding: string
           pluginSelect: string
+          pluginSensitivePaths: string
           pluginSettingsHint: string
           pluginSigner: string
+          pluginSignerTrusted: string
           pluginTabs: {
             binding: string
             installed: string
@@ -310,7 +312,9 @@ export interface TranslationResources {
           }
           pluginTarget: string
           pluginTrustInstall: string
+          pluginTrustSigner: string
           pluginTrustWarning: string
+          pluginWritablePaths: string
           proxyGroups: string
           purgeExpiredOrphans: string
           purgeExpiredOrphansConfirm: string

@@ -649,6 +649,7 @@ pub struct PluginPackagePreview {
     name: String,
     description: String,
     permissions: Vec<String>,
+    writable_paths: Vec<String>,
     signer_fingerprint: String,
     signer: String,
 }
@@ -702,6 +703,7 @@ pub async fn clash5_stage_plugin_package() -> CmdResult<Option<PluginPackagePrev
         name: package.manifest.name,
         description: package.manifest.description,
         permissions: package.manifest.permissions,
+        writable_paths: package.manifest.writable_paths,
         signer_fingerprint,
         signer: package.signer,
     }))
@@ -712,6 +714,7 @@ pub async fn clash5_stage_plugin_package() -> CmdResult<Option<PluginPackagePrev
 pub async fn clash5_install_staged_plugin(
     staging_id: String,
     confirmed_signer: String,
+    pin_signer: bool,
 ) -> CmdResult<plugins::PluginSummary> {
     if staging_id.len() != 21
         || !staging_id
@@ -728,13 +731,31 @@ pub async fn clash5_install_staged_plugin(
     let bytes = tokio::fs::read(&staged)
         .await
         .map_err(|_| coded_error("C5-PLUGIN-001", "staged plugin package is unavailable"))?;
+    // The package's own signer key is never sufficient on its own: install
+    // only when the signer is already pinned, or the user explicitly pins it
+    // now after confirming the fingerprint shown in the install dialog.
+    let trusted = plugins::list_trusted_signers(&root);
+    let is_trusted = trusted
+        .iter()
+        .any(|pinned| pinned.signer.trim() == confirmed_signer.trim());
+    if !is_trusted && !pin_signer {
+        return Err(coded_error(
+            "C5-PLUGIN-002",
+            "plugin signer is not trusted; confirm the signer fingerprint to trust it",
+        ));
+    }
     let package = plugins::verify_package(&bytes, &[confirmed_signer]).map_err(plugin_failure)?;
+    if pin_signer && !is_trusted {
+        plugins::pin_trusted_signer(&root, &package.signer)
+            .map_err(|_| coded_error("C5-PLUGIN-004", "trusted plugin signer could not be saved"))?;
+    }
     let audit_details = serde_json::json!({
         "plugin_id": package.manifest.id.clone(),
         "version": package.manifest.version.clone(),
         "permissions": package.manifest.permissions.clone(),
         "signer_fingerprint": sha2::Sha256::digest(package.signer.as_bytes())
             .iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+        "signer_pinned": pin_signer && !is_trusted,
     });
     let plugin_root = root.clone();
     let installed = tokio::task::spawn_blocking(move || plugins::install_package(package, &plugin_root))
@@ -760,6 +781,17 @@ pub async fn clash5_list_plugin_audit_events(limit: Option<u32>) -> CmdResult<Ve
     })
     .await
     .map_err(failure)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_list_trusted_plugin_signers() -> CmdResult<Vec<plugins::TrustedPluginSigner>> {
+    let root = dirs::app_home_dir()
+        .map_err(super::CommandFailure::plain)?
+        .join("plugins");
+    tokio::task::spawn_blocking(move || plugins::list_trusted_signers(&root))
+        .await
+        .map_err(|_| coded_error("C5-PLUGIN-004", "trusted plugin signers could not be listed"))
 }
 
 #[tauri::command]

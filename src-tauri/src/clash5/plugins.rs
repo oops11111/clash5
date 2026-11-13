@@ -76,6 +76,65 @@ pub(crate) struct PluginSummary {
     pub signer_fingerprint: String,
 }
 
+/// A signer the user explicitly pinned when first installing one of its
+/// plugins. Stored as the full minisign public key text.
+#[derive(Serialize, specta::Type)]
+pub(crate) struct TrustedPluginSigner {
+    pub signer: String,
+    pub fingerprint: String,
+}
+
+const TRUSTED_SIGNERS_FILE: &str = "trusted-signers.json";
+const MAX_TRUSTED_SIGNERS_BYTES: usize = 64 * 1024;
+
+fn trusted_signers_path(plugin_root: &Path) -> std::path::PathBuf {
+    plugin_root.join(TRUSTED_SIGNERS_FILE)
+}
+
+/// Signers pinned by the user. A missing or unreadable file means none.
+pub(crate) fn list_trusted_signers(plugin_root: &Path) -> Vec<TrustedPluginSigner> {
+    let Ok(bytes) = fs::read(trusted_signers_path(plugin_root)) else {
+        return Vec::new();
+    };
+    if bytes.len() > MAX_TRUSTED_SIGNERS_BYTES {
+        return Vec::new();
+    }
+    let Ok(signers) = serde_json::from_slice::<Vec<String>>(&bytes) else {
+        return Vec::new();
+    };
+    let mut seen = HashSet::new();
+    signers
+        .into_iter()
+        .map(|signer| signer.trim().to_owned())
+        .filter(|signer| !signer.is_empty() && seen.insert(signer.clone()))
+        .map(|signer| {
+            let fingerprint = hex_digest(signer.as_bytes());
+            TrustedPluginSigner { signer, fingerprint }
+        })
+        .collect()
+}
+
+/// Pin a signer after the user explicitly confirmed its fingerprint.
+pub(crate) fn pin_trusted_signer(plugin_root: &Path, signer: &str) -> Result<(), PluginFailure> {
+    let path = trusted_signers_path(plugin_root);
+    let mut signers: Vec<String> = match fs::read(&path) {
+        Ok(bytes) if bytes.len() <= MAX_TRUSTED_SIGNERS_BYTES => {
+            serde_json::from_slice(&bytes).unwrap_or_default()
+        }
+        _ => Vec::new(),
+    };
+    let signer = signer.trim().to_owned();
+    if !signer.is_empty() && !signers.iter().any(|pinned| pinned.trim() == signer) {
+        signers.push(signer);
+    }
+    let bytes = serde_json::to_vec(&signers).map_err(|_| PluginFailure::ExecutionFailed)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|_| PluginFailure::ExecutionFailed)?;
+    }
+    fs::write(path, bytes).map_err(|_| PluginFailure::ExecutionFailed)?;
+    Ok(())
+}
+
 #[derive(Serialize)]
 pub(crate) struct PluginInvocation<'a> {
     pub configuration: &'a JsonValue,
@@ -759,5 +818,19 @@ mod tests {
             execute_blocking(module.to_vec(), b"{}".to_vec(), vec![]),
             Err(PluginFailure::TimedOut)
         );
+    }
+
+    #[test]
+    fn trusted_signer_pin_persists_and_lists_once() {
+        let root = std::env::temp_dir().join(format!("clash5-trusted-signers-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        assert!(list_trusted_signers(&root).is_empty());
+        assert_eq!(pin_trusted_signer(&root, TEST_SIGNER), Ok(()));
+        assert_eq!(pin_trusted_signer(&root, TEST_SIGNER), Ok(()));
+        let listed = list_trusted_signers(&root);
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].signer, TEST_SIGNER);
+        assert_eq!(listed[0].fingerprint, hex_digest(TEST_SIGNER.as_bytes()));
+        let _ = fs::remove_dir_all(&root);
     }
 }

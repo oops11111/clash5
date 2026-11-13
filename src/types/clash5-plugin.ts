@@ -80,6 +80,12 @@ export interface Clash5PluginPackagePreview {
   name: string
   description: string
   permissions: string[]
+  writable_paths: string[]
   signer_fingerprint: string
   signer: string
+}
+
+export interface Clash5TrustedPluginSigner {
+  signer: string
+  fingerprint: string
 }

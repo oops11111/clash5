@@ -29,6 +29,7 @@ import type {
   RunStateView,
   RunningMode as GeneratedRunningMode,
   ServiceInstallOutcome as GeneratedServiceInstallOutcome,
+  TrustedPluginSigner as GeneratedTrustedPluginSigner,
   UnlockItem as GeneratedUnlockItem,
   ValidationOutcome,
   WebDavBackupEntry,
@@ -164,13 +165,17 @@ export const listClash5Plugins = () =>
   invoke<Clash5PluginSummary[]>('clash5_list_plugins')
 export const stageClash5PluginPackage = () =>
   invoke<Clash5PluginPackagePreview | null>('clash5_stage_plugin_package')
+export const listTrustedPluginSigners = () =>
+  invoke<GeneratedTrustedPluginSigner[]>('clash5_list_trusted_plugin_signers')
 export const installStagedClash5Plugin = (
   stagingId: string,
   confirmedSigner: string,
+  pinSigner: boolean,
 ) =>
   invoke<Clash5PluginSummary>('clash5_install_staged_plugin', {
     stagingId,
     confirmedSigner,
+    pinSigner,
   })
 
 export type Clash5PendingIdentityRebind = GeneratedPendingIdentityRebind

@@ -298,11 +298,16 @@ export const commands = {
       } | null,
       CommandFailure_Serialize
     >(__TAURI_INVOKE('clash5_stage_plugin_package')),
-  clash5InstallStagedPlugin: (stagingId: string, confirmedSigner: string) =>
+  clash5InstallStagedPlugin: (
+    stagingId: string,
+    confirmedSigner: string,
+    pinSigner: boolean,
+  ) =>
     typedError<PluginSummary, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_install_staged_plugin', {
         stagingId,
         confirmedSigner,
+        pinSigner,
       }),
     ),
   clash5ListPluginAuditEvents: (limit: number | null) =>
@@ -312,6 +317,10 @@ export const commands = {
   clash5ListPlugins: () =>
     typedError<PluginSummary[], CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_list_plugins'),
+    ),
+  clash5ListTrustedPluginSigners: () =>
+    typedError<TrustedPluginSigner[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_trusted_plugin_signers'),
     ),
   clash5ListPendingIdentityRebinds: (
     source:
@@ -1138,6 +1147,7 @@ export type PluginPackagePreview = {
   name: string
   description: string
   permissions: string[]
+  writable_paths: string[]
   signer_fingerprint: string
   signer: string
 }
@@ -1150,6 +1160,11 @@ export type PluginSummary = {
   permissions: string[]
   writable_paths: string[]
   signer_fingerprint: string
+}
+
+export type TrustedPluginSigner = {
+  signer: string
+  fingerprint: string
 }
 
 export type PrfExtra = {
