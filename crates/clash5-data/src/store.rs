@@ -258,6 +258,10 @@ fn migrate_exact_v1_identity(
         params![kind,provider,old_id,new_id],
     )?;
     tx.execute(
+        "UPDATE plugin_bindings SET target_id=?4,orphan=0,disappeared_at=NULL WHERE target_type='node' AND source_kind=?1 AND provider_id=?2 AND target_id=?3",
+        params![kind, provider, old_id, new_id],
+    )?;
+    tx.execute(
         "INSERT INTO quality_cache(source_kind,provider_id,stable_id,quality) SELECT source_kind,provider_id,?4,quality FROM quality_cache WHERE source_kind=?1 AND provider_id=?2 AND stable_id=?3",
         params![kind,provider,old_id,new_id],
     )?;
@@ -319,6 +323,7 @@ fn reconcile_rotated_credentials(
         new_ids.dedup();
         if new_ids.len() == 1 && target_counts.get(&new_ids[0]) == Some(&1) {
             tx.execute("UPDATE bindings SET target_id=?3,orphan=0,disappeared_at=NULL WHERE source_kind='subscription' AND provider_id=?1 AND target_id=?2", params![provider_id,old_id,new_ids[0]])?;
+            tx.execute("UPDATE plugin_bindings SET target_id=?3,orphan=0,disappeared_at=NULL WHERE target_type='node' AND source_kind='subscription' AND provider_id=?1 AND target_id=?2", params![provider_id, old_id, new_ids[0]])?;
             tx.execute(
                 "DELETE FROM quality_cache WHERE source_kind='subscription' AND provider_id=?1 AND stable_id=?2",
                 params![provider_id, old_id],
@@ -516,6 +521,7 @@ impl BindingStore {
             [generation],
         )?;
         let bindings = tx.execute("UPDATE bindings SET orphan=1,disappeared_at=COALESCE(disappeared_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE EXISTS(SELECT 1 FROM nodes n WHERE n.source_kind=bindings.source_kind AND n.provider_id=bindings.provider_id AND n.stable_id=bindings.target_id AND n.stable_id_version=2 AND n.key_generation<>?1)",[generation])?;
+        tx.execute("UPDATE plugin_bindings SET orphan=1,disappeared_at=COALESCE(disappeared_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE target_type='node' AND EXISTS(SELECT 1 FROM nodes n WHERE n.source_kind=plugin_bindings.source_kind AND n.provider_id=plugin_bindings.provider_id AND n.stable_id=plugin_bindings.target_id AND n.stable_id_version=2 AND n.key_generation<>?1)",[generation])?;
         tx.execute("DELETE FROM pending_identity_rebinds", [])?;
         audit(
             &tx,
@@ -630,6 +636,10 @@ impl BindingStore {
                         params![kind, provider, old_id, new_id],
                     )?;
                     tx.execute(
+                        "UPDATE plugin_bindings SET target_id=?4,orphan=0,disappeared_at=NULL WHERE target_type='node' AND source_kind=?1 AND provider_id=?2 AND target_id=?3",
+                        params![kind, provider, old_id, new_id],
+                    )?;
+                    tx.execute(
                         "UPDATE quality_cache SET stable_id=?4 WHERE source_kind=?1 AND provider_id=?2 AND stable_id=?3",
                         params![kind, provider, old_id, new_id],
                     )?;
@@ -658,6 +668,12 @@ impl BindingStore {
                         duplicate_count,
                         new_generation,
                     )? {
+                        // The v1 identity migrates to the same rekey map as v2, so
+                        // saved chain references to the legacy id are redirected below.
+                        rekeyed_ids.insert(
+                            (kind.to_owned(), provider.to_owned(), old_v1_id.clone()),
+                            new_id.clone(),
+                        );
                         migrated_nodes += 1;
                         migrated_bindings += old_v1_bindings;
                     } else {
@@ -719,6 +735,14 @@ impl BindingStore {
         )?;
         unresolved_bindings += tx.execute(
             "UPDATE bindings SET orphan=1,disappeared_at=COALESCE(disappeared_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE EXISTS(SELECT 1 FROM nodes n WHERE n.source_kind=bindings.source_kind AND n.provider_id=bindings.provider_id AND n.stable_id=bindings.target_id AND n.stable_id_version=1)",
+            [],
+        )?;
+        tx.execute(
+            "UPDATE plugin_bindings SET orphan=1,disappeared_at=COALESCE(disappeared_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE target_type='node' AND EXISTS(SELECT 1 FROM nodes n WHERE n.source_kind=plugin_bindings.source_kind AND n.provider_id=plugin_bindings.provider_id AND n.stable_id=plugin_bindings.target_id AND n.stable_id_version=2 AND n.key_generation=?1)",
+            [old_generation],
+        )?;
+        tx.execute(
+            "UPDATE plugin_bindings SET orphan=1,disappeared_at=COALESCE(disappeared_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE target_type='node' AND EXISTS(SELECT 1 FROM nodes n WHERE n.source_kind=plugin_bindings.source_kind AND n.provider_id=plugin_bindings.provider_id AND n.stable_id=plugin_bindings.target_id AND n.stable_id_version=1)",
             [],
         )?;
         tx.execute("DELETE FROM pending_identity_rebinds", [])?;
@@ -1308,6 +1332,7 @@ PRAGMA user_version=5;
             return Err(DataError::NotFound);
         }
         let moved = tx.execute("UPDATE bindings SET target_id=?4,orphan=0,disappeared_at=NULL WHERE source_kind=?1 AND provider_id=?2 AND target_id=?3",params![kind,provider,old_id,new_id])?;
+        tx.execute("UPDATE plugin_bindings SET target_id=?4,orphan=0,disappeared_at=NULL WHERE target_type='node' AND source_kind=?1 AND provider_id=?2 AND target_id=?3",params![kind,provider,old_id,new_id])?;
         tx.execute(
             "DELETE FROM pending_identity_rebinds WHERE source_kind=?1 AND provider_id=?2 AND old_stable_id=?3",
             params![kind, provider, old_id],
