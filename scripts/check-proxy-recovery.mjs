@@ -1,11 +1,19 @@
-// Static release gate for the persisted proxy lease and abnormal-exit path.
+// Release gate for the persisted proxy lease and abnormal-exit path.
 // OS-level kill/restart acceptance remains a desktop artifact.
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const recovery = spawnSync(
+  'cargo',
+  ['test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '--all-features', '--test', 'proxy_recovery'],
+  { cwd: root, stdio: 'inherit' },
+)
+if (recovery.error) throw recovery.error
+if (recovery.status !== 0) process.exit(recovery.status ?? 1)
 const read = (file) => readFile(path.join(root, file), 'utf8')
 const serviceRevision = '6cc9a8aee1dcc4e40fdd22469a42b31cc4cc77b4'
 const [proxy, state, budget, tests, gates, cargoManifest, cargoLock] =
@@ -63,10 +71,8 @@ const checks = [
   ],
   [
     'release gate records the remaining desktop evidence',
-    gates.includes('| G-09 | P0-07 | partial |') &&
-      gates.includes(
-        'actual Windows process-kill/startup recovery remain unverified',
-      ),
+    /^\| G-09 \| P0-07:[^|]+\| [^|]+\| (?:OPEN|PASS) \|$/m.test(gates) &&
+      gates.includes('## G-09 current evidence'),
   ],
 ]
 

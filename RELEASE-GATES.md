@@ -62,4 +62,11 @@ The app persists ownership leases before global proxy or PAC changes, compares e
 
 The 11 isolated proxy lease and recovery tests passed, and the service cleanup-error visibility test passed. The service watchdog default-policy test passed. Its Windows crash-loop integration test could not initialize the test-owner ACL locally (`Access denied`); dependency CI still needs to verify it. The main app's `cargo check --locked` passed. No live OS proxy was changed during these checks.
 
-Live GNOME/KDE acceptance, macOS helper cleanup after app termination and actual Windows process-kill/startup recovery remain unverified. The G-09 release gate therefore remains OPEN.
+- Windows service crash loop (2026-11-13, UTC+08): [dependency PR #2](https://github.com/oops11111/clash5-service-ipc/pull/2) remains open at the pinned revision. GitHub returned no check runs or Actions runs for that revision. The earlier local ACL error has no CI result to compare against.
+- Windows desktop (2026-11-13, UTC+08): Windows 10 Enterprise 22H2, build 19045. Acceptance baseline is `2ee08755`. The initial system proxy was enabled at `127.0.0.1:7897`, with no PAC URL. The frontend built successfully. Desktop resource provisioning failed with `Error fetching latest alpha version: fetch failed`. Crash recovery, foreign marker preservation, lease state and clean exit still require a verified build and a live run.
+- Linux GNOME and KDE (2026-11-13, UTC+08): Neither desktop shell is available in the local Debian WSL environment. Both live recovery checks are pending.
+- macOS (2026-11-13, UTC+08): No macOS host was available. Helper cleanup and proxy restoration after forced termination are pending.
+
+- Local release gate verification (2026-11-13, UTC+08): `node scripts/check-proxy-recovery.mjs` passed all 11 isolated recovery tests and all seven supplemental checks. The release registry validator passed all 24 rows.
+
+G-09 remains OPEN.
