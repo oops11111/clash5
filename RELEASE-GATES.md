@@ -47,6 +47,15 @@ not promote open or blocked gates to passing; a release is not cleared until
 all applicable rows have passing evidence and required manual evidence is
 recorded.
 
+The draft release workflow (.github/workflows/release.yml) runs the same
+registry validation in its validate_gates job before any build job starts,
+so a tag push with a malformed registry fails fast. Before publishing a
+draft release in the GitHub UI, run the Release Candidate Gate workflow
+(workflow_dispatch) with the tag: it verifies the draft assets and updater
+signatures. Stable (non-prerelease) tags must point at a commit on the main
+branch; create main from dev before cutting the first stable tag:
+`git branch main dev && git push origin main`.
+
 ## G-09 current evidence
 
 The app persists ownership leases before global proxy or PAC changes, compares enabled system endpoints with the lease at startup, and preserves unrelated proxy settings. Sidecar, sing-box and the pinned service watchdog use a three-attempt rolling five-minute policy. The service dependency is pinned to commit `6cc9a8aee1dcc4e40fdd22469a42b31cc4cc77b4` in [PR #2](https://github.com/oops11111/clash5-service-ipc/pull/2), which remains under review.

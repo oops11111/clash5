@@ -107,15 +107,17 @@ const SettingVergeAdvanced = ({ onError: _ }: Props) => {
         label={t('settings.components.verge.advanced.fields.openLogsDir')}
       />
 
-      <SettingItem
-        onClick={() => {
-          void mutate(() => openDevTools(), {
-            id: 'open-devtools',
-            errorNotice: false,
-          }).catch(() => {})
-        }}
-        label={t('settings.components.verge.advanced.fields.openDevTools')}
-      />
+      {import.meta.env.DEV && (
+        <SettingItem
+          onClick={() => {
+            void mutate(() => openDevTools(), {
+              id: 'open-devtools',
+              errorNotice: false,
+            }).catch(() => {})
+          }}
+          label={t('settings.components.verge.advanced.fields.openDevTools')}
+        />
+      )}
 
       <SettingItem
         label={t('settings.components.verge.advanced.fields.liteModeSettings')}
