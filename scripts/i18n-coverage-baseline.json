@@ -1,0 +1,270 @@
+{
+  "chains": {
+    "ar": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "de": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "es": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "fa": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "id": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "jp": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "ko": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "pt": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "ru": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "tr": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "tt": {
+      "identical": 43,
+      "missing": 0,
+      "total": 43
+    },
+    "zh": {
+      "identical": 0,
+      "missing": 0,
+      "total": 43
+    },
+    "zhtw": {
+      "identical": 0,
+      "missing": 0,
+      "total": 43
+    }
+  },
+  "nodePool": {
+    "ar": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "de": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "es": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "fa": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "id": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "jp": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "ko": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "pt": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "ru": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "tr": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "tt": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    },
+    "zh": {
+      "identical": 0,
+      "missing": 0,
+      "total": 50
+    },
+    "zhtw": {
+      "identical": 48,
+      "missing": 0,
+      "total": 50
+    }
+  },
+  "settings": {
+    "ar": {
+      "identical": 174,
+      "missing": 0,
+      "total": 437
+    },
+    "de": {
+      "identical": 21,
+      "missing": 0,
+      "total": 437
+    },
+    "es": {
+      "identical": 92,
+      "missing": 0,
+      "total": 437
+    },
+    "fa": {
+      "identical": 128,
+      "missing": 0,
+      "total": 437
+    },
+    "id": {
+      "identical": 170,
+      "missing": 0,
+      "total": 437
+    },
+    "jp": {
+      "identical": 89,
+      "missing": 0,
+      "total": 437
+    },
+    "ko": {
+      "identical": 48,
+      "missing": 0,
+      "total": 437
+    },
+    "pt": {
+      "identical": 22,
+      "missing": 0,
+      "total": 437
+    },
+    "ru": {
+      "identical": 20,
+      "missing": 0,
+      "total": 437
+    },
+    "tr": {
+      "identical": 13,
+      "missing": 0,
+      "total": 437
+    },
+    "tt": {
+      "identical": 178,
+      "missing": 0,
+      "total": 437
+    },
+    "zh": {
+      "identical": 8,
+      "missing": 0,
+      "total": 437
+    },
+    "zhtw": {
+      "identical": 18,
+      "missing": 0,
+      "total": 437
+    }
+  },
+  "layout": {
+    "ar": {
+      "identical": 90,
+      "missing": 0,
+      "total": 117
+    },
+    "de": {
+      "identical": 75,
+      "missing": 0,
+      "total": 117
+    },
+    "es": {
+      "identical": 90,
+      "missing": 0,
+      "total": 117
+    },
+    "fa": {
+      "identical": 90,
+      "missing": 0,
+      "total": 117
+    },
+    "id": {
+      "identical": 90,
+      "missing": 0,
+      "total": 117
+    },
+    "jp": {
+      "identical": 89,
+      "missing": 0,
+      "total": 117
+    },
+    "ko": {
+      "identical": 86,
+      "missing": 0,
+      "total": 117
+    },
+    "pt": {
+      "identical": 77,
+      "missing": 0,
+      "total": 117
+    },
+    "ru": {
+      "identical": 83,
+      "missing": 0,
+      "total": 117
+    },
+    "tr": {
+      "identical": 75,
+      "missing": 0,
+      "total": 117
+    },
+    "tt": {
+      "identical": 90,
+      "missing": 0,
+      "total": 117
+    },
+    "zh": {
+      "identical": 0,
+      "missing": 0,
+      "total": 117
+    },
+    "zhtw": {
+      "identical": 0,
+      "missing": 0,
+      "total": 117
+    }
+  }
+}

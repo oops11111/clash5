@@ -46,6 +46,9 @@ jobs:
               - '.github/workflows/telegram-notify.yml'
               - '.github/ISSUE_TEMPLATE/*.yml'
               - 'scripts/check-release-draft.mjs'
+              - 'scripts/check-webview-scope.mjs'
+              - 'scripts/check-i18n-coverage.mjs'
+              - 'scripts/i18n-coverage-baseline.json'
               - 'scripts/release-version.mjs'
               - 'src-tauri/webview2.*.json'
               - 'src-tauri/tauri.conf.json'
@@ -105,6 +108,14 @@ jobs:
       - name: Architecture gates (listen/emit only in the event bus, invoke only in services)
         if: steps.check_frontend.outputs.frontend == 'true'
         run: node scripts/check-architecture.mjs listen emit invoke
+
+      - name: WebView scope guard (no wildcard fs/asset scope, CSP present, HTTP allow-listed)
+        if: steps.check_frontend.outputs.frontend == 'true'
+        run: pnpm check:webview-scope
+
+      - name: i18n coverage guard (no new untranslated values in chains, nodePool, settings, layout)
+        if: steps.check_frontend.outputs.frontend == 'true'
+        run: pnpm i18n:coverage
 
   contract-parity:
     runs-on: ubuntu-26.04

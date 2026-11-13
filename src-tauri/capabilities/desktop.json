@@ -14,11 +14,16 @@
     "autostart:allow-is-enabled",
     "core:window:allow-set-theme",
     "notification:default",
-    "http:default",
-    "http:allow-fetch",
     {
-      "identifier": "http:default",
-      "allow": [{ "url": "https://*/*" }, { "url": "http://*/*" }]
+      "identifier": "http:allow-fetch",
+      "allow": [
+        { "url": "https://api.ip.sb/*" },
+        { "url": "https://ipapi.co/*" },
+        { "url": "https://api.ipapi.is/*" },
+        { "url": "https://ipwho.is/*" },
+        { "url": "https://ip.api.skk.moe/*" },
+        { "url": "https://get.geojs.io/*" }
+      ]
     },
     "mihomo:default"
   ]

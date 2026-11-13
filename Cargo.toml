@@ -58,7 +58,7 @@ clash-verge-logging = { path = "crates/clash-verge-logging" }
 clash-verge-signal = { path = "crates/clash-verge-signal" }
 clash-verge-i18n = { path = "crates/clash-verge-i18n" }
 clash-verge-limiter = { path = "crates/clash-verge-limiter" }
-tracing-estuary = { git = "https://github.com/Tunglies/tracing-estuary.git", branch = "main" }
+tracing-estuary = { git = "https://github.com/Tunglies/tracing-estuary.git", rev = "dbfce033fa4cff8f936f3e7c2282af1277546f3c" }
 tauri-plugin-clash-verge-sysinfo = { path = "crates/tauri-plugin-clash-verge-sysinfo" }
 tracing = "0.1.44"
 
