@@ -49,6 +49,7 @@ jobs:
               - 'scripts/check-webview-scope.mjs'
               - 'scripts/check-i18n-coverage.mjs'
               - 'scripts/i18n-coverage-baseline.json'
+              - 'scripts/cleanup-unused-i18n.mjs'
               - 'scripts/release-version.mjs'
               - 'src-tauri/webview2.*.json'
               - 'src-tauri/tauri.conf.json'
@@ -116,6 +117,10 @@ jobs:
       - name: i18n coverage guard (no new untranslated values in chains, nodePool, settings, layout)
         if: steps.check_frontend.outputs.frontend == 'true'
         run: pnpm i18n:coverage
+
+      - name: i18n key check (no unused, extra, or missing-source keys)
+        if: steps.check_frontend.outputs.frontend == 'true'
+        run: pnpm i18n:check
 
   contract-parity:
     runs-on: ubuntu-26.04
