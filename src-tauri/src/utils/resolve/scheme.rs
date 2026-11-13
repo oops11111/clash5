@@ -35,8 +35,40 @@ pub(super) async fn resolve_scheme(param: &str) -> Result<()> {
         return Ok(());
     };
 
+    // A deep link must never import silently: the user confirms the masked
+    // URL and name first, and the import never activates the profile.
+    if !confirm_subscription_import(&url, name.as_ref()).await {
+        logging!(info, Type::Config, "deep link import declined by user");
+        return Ok(());
+    }
+
     import_subscription(&url, name.as_ref()).await;
     Ok(())
+}
+
+async fn confirm_subscription_import(url: &str, name: Option<&String>) -> bool {
+    use tauri_plugin_dialog::{DialogExt as _, MessageDialogButtons, MessageDialogKind};
+
+    let title = clash_verge_i18n::t!("notifications.deepLinkImport.title");
+    let body = clash_verge_i18n::t!("notifications.deepLinkImport.body")
+        .replace("{url}", &help::mask_url(url))
+        .replace("{name}", name.map(|value| &**value).unwrap_or("-"));
+    let import = clash_verge_i18n::t!("notifications.deepLinkImport.import").into_owned();
+    let cancel = clash_verge_i18n::t!("notifications.deepLinkImport.cancel").into_owned();
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    handle::Handle::app_handle()
+        .dialog()
+        .message(body)
+        .title(title)
+        .buttons(MessageDialogButtons::OkCancelCustom(import, cancel))
+        .kind(MessageDialogKind::Warning)
+        .show(move |confirmed| {
+            let _ = tx.send(confirmed);
+        });
+
+    rx.await.unwrap_or(false)
 }
 
 fn extract_subscription_info(link_parsed: &Url) -> Option<(std::string::String, Option<String>)> {
@@ -91,7 +123,7 @@ async fn import_subscription(url: &str, name: Option<&String>) {
     };
 
     let uid = item.uid.clone().unwrap_or_default();
-    if let Err(e) = profiles::profiles_append_item_safe(&mut item).await {
+    if let Err(e) = profiles::profiles_append_item_safe(&mut item, false).await {
         logging!(error, Type::Config, "failed to import subscription url: {:?}", e);
         Config::profiles().await.discard();
         handle::Handle::notice(NoticeStatus::ImportSubUrlError, e.to_string());

@@ -451,6 +451,12 @@ export const commands = {
       timeout_seconds?: number | null
       /**  default is `false` */
       danger_accept_invalid_certs?: boolean | null
+      /**
+       *  Allow plain HTTP subscription URLs.
+       *  Default is `false`: subscriptions are fetched over HTTPS only
+       *  unless the user opts in per subscription.
+       */
+      allow_insecure_http?: boolean | null
       allow_auto_update?: boolean | null
       merge?: string | null
       script?: string | null
@@ -480,6 +486,12 @@ export const commands = {
       timeout_seconds?: number | null
       /**  default is `false` */
       danger_accept_invalid_certs?: boolean | null
+      /**
+       *  Allow plain HTTP subscription URLs.
+       *  Default is `false`: subscriptions are fetched over HTTPS only
+       *  unless the user opts in per subscription.
+       */
+      allow_insecure_http?: boolean | null
       allow_auto_update?: boolean | null
       merge?: string | null
       script?: string | null
@@ -1195,6 +1207,12 @@ export type PrfOption_Deserialize = {
   timeout_seconds?: number | null
   /**  default is `false` */
   danger_accept_invalid_certs?: boolean | null
+  /**
+   *  Allow plain HTTP subscription URLs.
+   *  Default is `false`: subscriptions are fetched over HTTPS only
+   *  unless the user opts in per subscription.
+   */
+  allow_insecure_http?: boolean | null
   allow_auto_update?: boolean | null
   merge?: string | null
   script?: string | null
@@ -1215,6 +1233,12 @@ export type PrfOption_Serialize = {
   timeout_seconds?: number | null
   /**  default is `false` */
   danger_accept_invalid_certs?: boolean | null
+  /**
+   *  Allow plain HTTP subscription URLs.
+   *  Default is `false`: subscriptions are fetched over HTTPS only
+   *  unless the user opts in per subscription.
+   */
+  allow_insecure_http?: boolean | null
   allow_auto_update?: boolean | null
   merge: string | null
   script: string | null

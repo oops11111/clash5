@@ -27,12 +27,25 @@ impl IClashTemp {
             Ok(mut map) => {
                 Self::apply_template_defaults(&mut map);
 
-                // 确保 secret 字段存在且不为空
-                if let Some(val) = map.get_mut("secret")
-                    && let Value::String(s) = val
-                    && s.is_empty()
-                {
-                    *s = "set-your-secret".into();
+                // A missing, empty, or well-known default secret is rotated
+                // to a fresh random value once and persisted, so installs
+                // upgraded from the public default do not keep using it.
+                let needs_rotation = match map.get("secret") {
+                    Some(Value::String(s)) => s.is_empty() || s == "set-your-secret",
+                    Some(_) => false,
+                    None => true,
+                };
+                if needs_rotation {
+                    map.insert("secret".into(), Self::generate_secret().into());
+                    let rotated = Self(Self::guard(map));
+                    if let Err(err) = rotated.save_config().await {
+                        logging!(
+                            warn,
+                            Type::Config,
+                            "failed to persist rotated controller secret: {err:#}"
+                        );
+                    }
+                    return rotated;
                 }
 
                 Self(Self::guard(map))
@@ -87,7 +100,9 @@ impl IClashTemp {
             Self::guard_external_controller_ipc().into(),
         );
         map.insert("tun".into(), tun_config.into());
-        cors_map.insert("allow-private-network".into(), true.into());
+        // Third-party dashboards are opt-in: users add them in the CORS
+        // settings dialog. The default only allows this app's own origins.
+        cors_map.insert("allow-private-network".into(), false.into());
         cors_map.insert(
             "allow-origins".into(),
             vec![
@@ -96,16 +111,31 @@ impl IClashTemp {
                 // Only enable this in dev mode
                 #[cfg(feature = "verge-dev")]
                 "http://localhost:3000",
-                "https://yacd.metacubex.one",
-                "https://metacubex.github.io",
-                "https://board.zash.run.place",
             ]
             .into(),
         );
-        map.insert("secret".into(), "set-your-secret".into());
+        map.insert("secret".into(), Self::generate_secret().into());
         map.insert("external-controller-cors".into(), cors_map.into());
         map.insert("unified-delay".into(), true.into());
         Self(map)
+    }
+
+    /// Generates a fresh random controller secret (getrandom 32 bytes, hex).
+    ///
+    /// The default secret must never be a well-known constant: anyone who
+    /// can read the config file or reach an allowed dashboard origin would
+    /// know it. On the (unexpected) getrandom failure, fall back to a
+    /// process-unique value rather than a constant.
+    fn generate_secret() -> String {
+        let mut secret = [0_u8; 32];
+        if getrandom::fill(&mut secret).is_ok() {
+            return secret.iter().map(|byte| format!("{byte:02x}")).collect();
+        }
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or(0);
+        format!("{nanos:032x}{:032x}", std::process::id() as u128)
     }
 
     fn apply_template_defaults(map: &mut Mapping) {
@@ -279,7 +309,17 @@ impl IClashTemp {
                         false => Cow::Borrowed(val_str),
                     };
 
-                    SocketAddr::from_str(&val).ok().map(|s| s.to_string())
+                    SocketAddr::from_str(&val).ok().map(|mut socket| {
+                        // The controller has no authentication beyond the
+                        // secret: never listen on all interfaces. A LAN
+                        // address typed deliberately in Settings is kept;
+                        // the controller dialog confirms it and rotates the
+                        // secret first.
+                        if socket.ip().is_unspecified() {
+                            socket.set_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+                        }
+                        socket.to_string()
+                    })
                 }
                 None => None,
             })
@@ -435,6 +475,21 @@ mod tests {
     #[test]
     fn clash_template_defaults_ipv6_off() {
         assert_eq!(IClashTemp::template().0.get("ipv6"), Some(&Value::Bool(false)));
+    }
+
+    #[test]
+    fn guard_server_ctrl_forces_loopback_for_wildcard() {
+        let mut map = Mapping::new();
+        map.insert("external-controller".into(), "0.0.0.0:8080".into());
+        assert_eq!(IClashTemp::guard_server_ctrl(&map), "127.0.0.1:8080");
+
+        let mut map = Mapping::new();
+        map.insert("external-controller".into(), "[::]:8080".into());
+        assert_eq!(IClashTemp::guard_server_ctrl(&map), "127.0.0.1:8080");
+
+        let mut map = Mapping::new();
+        map.insert("external-controller".into(), "127.0.0.1:8080".into());
+        assert_eq!(IClashTemp::guard_server_ctrl(&map), "127.0.0.1:8080");
     }
 
     #[test]

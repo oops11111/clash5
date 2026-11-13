@@ -135,5 +135,18 @@
       "warn": "WARN",
       "error": "ERROR"
     }
+  },
+  "warnings": {
+    "lanProxyExposed": "Allow LAN is on: the proxy port has no authentication and is reachable from every device on your local network."
+  },
+  "confirmations": {
+    "enableLan": {
+      "title": "Expose Proxy to LAN?",
+      "message": "Turning on Allow LAN makes the proxy port reachable from every device on your local network. The proxy port has no authentication, so anyone on the LAN can use it. The controller secret will be rotated first."
+    },
+    "lanController": {
+      "title": "Expose Controller to LAN?",
+      "message": "This controller address is reachable from other devices on your local network. Anyone on the LAN with the secret can control the core. The secret will be rotated first."
+    }
   }
 }

@@ -131,7 +131,8 @@
         "useSystemProxy": "Use System Proxy",
         "useClashProxy": "Use Clash Proxy",
         "acceptInvalidCerts": "Allows Invalid Certificates (Danger)",
-        "allowAutoUpdate": "Allow Auto Update"
+        "allowAutoUpdate": "Allow Auto Update",
+        "allowInsecureHttp": "Allow Plain HTTP (Not Recommended)"
       },
       "types": {
         "remote": "Remote",
@@ -144,7 +145,8 @@
         "saveFailed": "Failed to save profile"
       },
       "warnings": {
-        "frequentUpdate": "A short interval reloads the core that often and drops existing connections. {{minutes}} minutes (24 hours) is recommended."
+        "frequentUpdate": "A short interval reloads the core that often and drops existing connections. {{minutes}} minutes (24 hours) is recommended.",
+        "insecureHttp": "Plain HTTP sends the subscription token and the whole configuration in cleartext. Only enable this for subscriptions you trust."
       },
       "feedback": {
         "notifications": {

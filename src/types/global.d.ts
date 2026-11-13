@@ -247,6 +247,7 @@ interface IProfileOption {
   update_interval?: number
   timeout_seconds?: number
   danger_accept_invalid_certs?: boolean
+  allow_insecure_http?: boolean
   allow_auto_update?: boolean
   merge?: string
   script?: string
