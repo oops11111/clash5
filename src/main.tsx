@@ -57,7 +57,11 @@ const initializeApp = (initialThemeMode: 'light' | 'dark') => {
     <React.StrictMode>
       <CacheProvider value={emotionCache}>
         <ComposeContextProvider contexts={contexts}>
-          <BaseErrorBoundary>
+          <BaseErrorBoundary
+            onGoHome={() => {
+              window.location.href = '/'
+            }}
+          >
             <SWRConfig value={swrConfig}>
               <WindowProvider>
                 <AppDataProvider>

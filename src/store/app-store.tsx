@@ -34,7 +34,13 @@ export const AppStoreProvider = ({ children }: { children?: ReactNode }) => {
 
   useEffect(() => {
     const readRunState = () => {
-      void reads.readRunState().catch(() => {})
+      void reads.readRunState().catch((error) => {
+        dispatch({
+          type: 'connection/failed',
+          source: 'backend',
+          message: error instanceof Error ? error.message : String(error),
+        })
+      })
     }
     const { readPendingFailures } = reads
 

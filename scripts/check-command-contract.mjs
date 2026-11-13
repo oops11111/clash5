@@ -5,6 +5,11 @@ import ts from 'typescript'
 const ROOT = path.resolve(import.meta.dirname, '..')
 const GENERATED = path.join(ROOT, 'src/services/tauri-commands.generated.ts')
 const FRONTEND = path.join(ROOT, 'src/services/cmds.ts')
+
+// The 124 hand-written invoke() sites in src/services/cmds.ts are the legacy
+// layer: new code must use the generated `commands` object, so the count may
+// only shrink, never grow.
+const MAX_HAND_WRITTEN_INVOKE_SITES = 124
 const config = ts.getParsedCommandLineOfConfigFile(
   path.join(ROOT, 'tsconfig.json'),
   {},
@@ -58,6 +63,12 @@ function propertyName(node) {
   return undefined
 }
 
+// Method name (camelCase) -> command name (snake_case), plus the `commands`
+// variable declaration itself, so `commands.foo()` call sites can be
+// recognised as calls of the generated command.
+const generatedMethodNames = new Map()
+let generatedCommandsDeclaration = null
+
 function collectGeneratedCommands() {
   const commands = new Map()
   function visit(node) {
@@ -68,6 +79,7 @@ function collectGeneratedCommands() {
       node.initializer &&
       ts.isObjectLiteralExpression(node.initializer)
     ) {
+      generatedCommandsDeclaration = node
       for (const member of node.initializer.properties) {
         if (
           ts.isPropertyAssignment(member) &&
@@ -85,6 +97,12 @@ function collectGeneratedCommands() {
             ts.isStringLiteral(invocation.arguments[0])
           ) {
             commands.set(invocation.arguments[0].text, signature)
+            // Method names are camelCase (clash5PurgeOrphans) while the
+            // command names are snake_case (clash5_purge_orphans).
+            generatedMethodNames.set(
+              propertyName(member.name),
+              invocation.arguments[0].text,
+            )
           } else {
             throw new Error(
               `Cannot inspect generated command ${propertyName(member.name)}`,
@@ -101,6 +119,8 @@ function collectGeneratedCommands() {
 
 const generatedCommands = collectGeneratedCommands()
 const frontendCommands = new Set()
+const generatedObjectCommands = new Set()
+let frontendInvokeSites = 0
 
 function checkRegisteredCommands() {
   const source = fs.readFileSync(
@@ -132,6 +152,29 @@ function checkRegisteredCommands() {
     if (!registered.has(command))
       failures.push(`Generated command ${command} is not registered`)
   }
+  return registered
+}
+
+/**
+ * If the node is a `commands.foo()` call on the generated commands object,
+ * return the underlying command name; otherwise undefined. This keeps the
+ * idle-command output correct once new code migrates to the generated object.
+ */
+function generatedObjectCall(node) {
+  if (!generatedCommandsDeclaration) return undefined
+  if (!ts.isCallExpression(node)) return undefined
+  const target = node.expression
+  if (!ts.isPropertyAccessExpression(target)) return undefined
+  if (!ts.isIdentifier(target.expression)) return undefined
+  if (target.expression.text !== 'commands') return undefined
+  if (!ts.isIdentifier(target.name)) return undefined
+  let symbol = checker.getSymbolAtLocation(target.expression)
+  if (!symbol) return undefined
+  if (symbol.flags & ts.SymbolFlags.Alias)
+    symbol = checker.getAliasedSymbol(symbol)
+  if (!symbol?.declarations?.includes(generatedCommandsDeclaration))
+    return undefined
+  return generatedMethodNames.get(target.name.text)
 }
 
 function typeDescription(type, location) {
@@ -164,6 +207,8 @@ function collectArguments(argument) {
 }
 
 function visitFrontend(node) {
+  const generatedCommand = generatedObjectCall(node)
+  if (generatedCommand) generatedObjectCommands.add(generatedCommand)
   let symbol = ts.isCallExpression(node)
     ? checker.getSymbolAtLocation(node.expression)
     : undefined
@@ -178,6 +223,7 @@ function visitFrontend(node) {
     }
     const command = node.arguments[0].text
     if (command.startsWith('plugin:')) return
+    frontendInvokeSites += 1
     frontendCommands.add(command)
     const signature = generatedCommands.get(command)
 
@@ -264,16 +310,32 @@ function visitFrontend(node) {
   ts.forEachChild(node, visitFrontend)
 }
 
-checkRegisteredCommands()
+const registeredCommands = checkRegisteredCommands()
 for (const file of config.fileNames) {
   if (path.resolve(file) !== GENERATED)
     visitFrontend(program.getSourceFile(file))
+}
+
+if (frontendInvokeSites > MAX_HAND_WRITTEN_INVOKE_SITES) {
+  failures.push(
+    `Hand-written invoke sites grew to ${frontendInvokeSites} (max ${MAX_HAND_WRITTEN_INVOKE_SITES}); new code must use the generated commands object`,
+  )
 }
 
 if (failures.length > 0) {
   throw new Error(`Tauri command contract mismatch:\n${failures.join('\n')}`)
 }
 
+const calledCommands = new Set([...frontendCommands, ...generatedObjectCommands])
+const idleCommands = [...registeredCommands]
+  .filter((command) => !calledCommands.has(command))
+  .sort()
+if (idleCommands.length > 0) {
+  console.log(
+    `[check:command-contract] registered-but-uncalled commands (${idleCommands.length}): ${idleCommands.join(', ')}`,
+  )
+}
+
 console.log(
-  `[check:command-contract] verified frontend command names, argument keys/types, and result types (${generatedCommands.size} generated; ${frontendCommands.size} invoked)`,
+  `[check:command-contract] verified frontend command names, argument keys/types, and result types (${generatedCommands.size} generated; ${calledCommands.size} invoked; ${frontendInvokeSites} hand-written invoke sites)`,
 )

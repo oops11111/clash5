@@ -4,7 +4,10 @@ use crate::{
 };
 use clash_verge_logging::{Type, logging};
 use smartstring::alias::String;
-use std::path::{Component, Path, PathBuf};
+use std::{
+    path::{Component, Path, PathBuf},
+    time::Duration,
+};
 use tokio::fs;
 use tokio::io::AsyncWriteExt as _;
 
@@ -73,6 +76,12 @@ fn is_supported_icon_content(content: &[u8]) -> bool {
     tauri::image::Image::from_bytes(content).is_ok() || looks_like_svg(content)
 }
 
+/// Maximum icon download size: a malicious icon host must not be able to
+/// exhaust memory by returning an unbounded body.
+const MAX_ICON_BYTES: usize = 5 * 1024 * 1024;
+/// Total time budget for an icon download.
+const ICON_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(5);
+
 pub async fn download_icon_cache(url: String, name: String) -> CmdResult<String> {
     let icon_cache_dir = dirs::app_home_dir().stringify_err()?.join("icons").join("cache");
     let icon_name = normalize_icon_segment(name.as_str())?;
@@ -89,9 +98,31 @@ pub async fn download_icon_cache(url: String, name: String) -> CmdResult<String>
     let temp_name = format!("{icon_name}.downloading");
     let temp_path = ensure_icon_cache_target(&icon_cache_dir, temp_name.as_str())?;
 
-    let response = reqwest::get(url.as_str()).await.stringify_err()?;
-    let response = response.error_for_status().stringify_err()?;
-    let content = response.bytes().await.stringify_err()?;
+    // Icons arrive from subscription-authored group fields and user-typed
+    // test items, so the URL is untrusted: http(s) only, with a host.
+    // (No allowlist: the fetch receives only (url, name), and no field in
+    // the codebase holds an icon-host allowlist to key one on.)
+    let parsed = tauri::Url::parse(url.as_str()).map_err(|_| "invalid icon URL")?;
+    if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+        return Err("icon URL must use http or https".into());
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(ICON_DOWNLOAD_TIMEOUT)
+        .build()
+        .stringify_err()?;
+    let mut response = client.get(parsed).send().await.stringify_err()?;
+    response = response.error_for_status().stringify_err()?;
+    if response.content_length().is_some_and(|len| len > MAX_ICON_BYTES as u64) {
+        return Err(format!("icon exceeds the {MAX_ICON_BYTES} byte limit").into());
+    }
+    let mut content = Vec::new();
+    while let Some(chunk) = response.chunk().await.stringify_err()? {
+        content.extend_from_slice(&chunk);
+        if content.len() > MAX_ICON_BYTES {
+            return Err(format!("icon exceeds the {MAX_ICON_BYTES} byte limit").into());
+        }
+    }
 
     if !is_supported_icon_content(&content) {
         let _ = temp_path.remove_if_exists().await;

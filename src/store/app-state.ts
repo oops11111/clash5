@@ -11,6 +11,18 @@ export interface ProfileUpdatesState {
   readonly timerRevisions: ReadonlyMap<string, number>
 }
 
+/** Which backend channel a connection failure came from. */
+export type ConnectionSource = 'websocket' | 'backend'
+
+/** Backend link health, shared by WS subscriptions and backend queries. */
+export interface ConnectionStatus {
+  /** Per-channel state: the banner shows while any channel is reconnecting. */
+  readonly websocket: 'connected' | 'reconnecting'
+  readonly backend: 'connected' | 'reconnecting'
+  /** Last failure detail, for diagnosis; null while fully connected. */
+  readonly message: string | null
+}
+
 export interface AppStoreState {
   /** Written by `run-state-changed` events and the store's safety-net poll. */
   readonly runState: RunState | null
@@ -20,6 +32,8 @@ export interface AppStoreState {
   readonly profileUpdates: ProfileUpdatesState
   /** Bumped once per test-all request; test items run their delay test per bump. */
   readonly testAllCounter: number
+  /** Backend link health; WS errors and backend query failures land here. */
+  readonly connection: ConnectionStatus
 }
 
 export const initialAppStoreState: AppStoreState = {
@@ -32,6 +46,7 @@ export const initialAppStoreState: AppStoreState = {
     timerRevisions: new Map(),
   },
   testAllCounter: 0,
+  connection: { websocket: 'connected', backend: 'connected', message: null },
 }
 
 export type AppStoreAction =
@@ -43,6 +58,8 @@ export type AppStoreAction =
   | { type: 'profileUpdate/timerTick'; uid: string }
   | { type: 'profileLoading/set'; uids: readonly string[]; loading: boolean }
   | { type: 'testAll/requested' }
+  | { type: 'connection/failed'; source: ConnectionSource; message: string }
+  | { type: 'connection/recovered'; source: ConnectionSource }
 
 const bumpRevision = (
   map: ReadonlyMap<string, number>,
@@ -120,5 +137,35 @@ export function appStoreReducer(
       return withLoading(state, action.uids, action.loading)
     case 'testAll/requested':
       return { ...state, testAllCounter: state.testAllCounter + 1 }
+    case 'connection/failed': {
+      if (
+        state.connection[action.source] === 'reconnecting' &&
+        state.connection.message === action.message
+      ) {
+        return state
+      }
+      return {
+        ...state,
+        connection: {
+          ...state.connection,
+          [action.source]: 'reconnecting',
+          message: action.message,
+        },
+      }
+    }
+    case 'connection/recovered': {
+      if (state.connection[action.source] === 'connected') return state
+      const next = { ...state.connection, [action.source]: 'connected' as const }
+      return {
+        ...state,
+        connection: {
+          ...next,
+          message:
+            next.websocket === 'connected' && next.backend === 'connected'
+              ? null
+              : state.connection.message,
+        },
+      }
+    }
   }
 }

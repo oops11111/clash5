@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 rust-i18n = "4.2.4"
+serde_json = { workspace = true }
 sys-locale = "0.3.2"
 
 [lints]

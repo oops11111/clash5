@@ -300,8 +300,10 @@ export interface TranslationResources {
           pluginRemoveBinding: string
           pluginSaveBinding: string
           pluginSelect: string
+          pluginSensitivePaths: string
           pluginSettingsHint: string
           pluginSigner: string
+          pluginSignerTrusted: string
           pluginTabs: {
             binding: string
             installed: string
@@ -310,7 +312,9 @@ export interface TranslationResources {
           }
           pluginTarget: string
           pluginTrustInstall: string
+          pluginTrustSigner: string
           pluginTrustWarning: string
+          pluginWritablePaths: string
           proxyGroups: string
           purgeExpiredOrphans: string
           purgeExpiredOrphansConfirm: string
@@ -1651,10 +1655,13 @@ export interface TranslationResources {
       }
       feedback: {
         errors: {
+          backendDisconnected: string
           componentStack: string
           details: string
           label: string
           operationFailed: string
+          pageNotFound: string
+          pageNotFoundDescription: string
           stack: string
           trafficStats: string
           trafficStatsDescription: string

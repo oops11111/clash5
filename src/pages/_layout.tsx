@@ -3,9 +3,10 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Outlet, useNavigate } from 'react-router'
+import { Outlet, useLocation, useNavigate } from 'react-router'
 
 import { BaseErrorBoundary } from '@/components/base'
+import { ConnectionBanner } from '@/components/layout/connection-banner'
 import { LayoutSidebar } from '@/components/layout/layout-sidebar'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { ServiceMigrationDialog } from '@/components/layout/service-migration-dialog'
@@ -45,6 +46,7 @@ const Layout = () => {
   const { language } = verge ?? {}
   const { switchLanguage } = useI18n()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const themeReady = useMemo(() => Boolean(theme), [theme])
   const windowControlsRef = useRef<any>(null)
   const { decorated } = useWindowDecorations()
@@ -172,7 +174,11 @@ const Layout = () => {
           <div className="layout-content__right">
             <div className="the-bar"></div>
             <div className="the-content">
-              <BaseErrorBoundary>
+              <ConnectionBanner />
+              <BaseErrorBoundary
+                resetKeys={[pathname]}
+                onGoHome={() => navigate('/')}
+              >
                 <Outlet />
               </BaseErrorBoundary>
             </div>
