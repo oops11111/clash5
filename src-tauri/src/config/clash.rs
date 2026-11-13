@@ -25,12 +25,7 @@ impl IClashTemp {
 
         match map_result {
             Ok(mut map) => {
-                let template_map = Self::template().0;
-                for (key, value) in template_map.into_iter() {
-                    if !map.contains_key(&key) {
-                        map.insert(key, value);
-                    }
-                }
+                Self::apply_template_defaults(&mut map);
 
                 // 确保 secret 字段存在且不为空
                 if let Some(val) = map.get_mut("secret")
@@ -75,7 +70,7 @@ impl IClashTemp {
         map.insert("port".into(), network::ports::DEFAULT_HTTP.into());
         map.insert("log-level".into(), "info".into());
         map.insert("allow-lan".into(), false.into());
-        map.insert("ipv6".into(), true.into());
+        map.insert("ipv6".into(), false.into());
         map.insert("mode".into(), "rule".into());
         map.insert(
             "external-controller".into(),
@@ -111,6 +106,14 @@ impl IClashTemp {
         map.insert("external-controller-cors".into(), cors_map.into());
         map.insert("unified-delay".into(), true.into());
         Self(map)
+    }
+
+    fn apply_template_defaults(map: &mut Mapping) {
+        for (key, value) in Self::template().0 {
+            if !map.contains_key(&key) {
+                map.insert(key, value);
+            }
+        }
     }
 
     fn guard(mut config: Mapping) -> Mapping {
@@ -423,4 +426,25 @@ pub struct IClashFallbackFilter {
     pub geoip_code: Option<String>,
     pub ipcidr: Option<Vec<String>>,
     pub domain: Option<Vec<String>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clash_template_defaults_ipv6_off() {
+        assert_eq!(IClashTemp::template().0.get("ipv6"), Some(&Value::Bool(false)));
+    }
+
+    #[test]
+    fn template_defaults_preserve_explicit_ipv6_preferences() {
+        for explicit in [false, true] {
+            let mut map = Mapping::from_iter([("ipv6".into(), Value::Bool(explicit))]);
+
+            IClashTemp::apply_template_defaults(&mut map);
+
+            assert_eq!(map.get("ipv6"), Some(&Value::Bool(explicit)));
+        }
+    }
 }

@@ -66,6 +66,19 @@ export function validateRegistry(markdown) {
         'release gate G-06 must reference both backup export path tests',
       )
     }
+    if (
+      id === 'G-10' &&
+      ![
+        'clash_template_defaults_ipv6_off',
+        'existing_dns_config_is_preserved',
+        'dns_defaults_disable_ipv6_and_respect_rules',
+        'dns-privacy-defaults.test.ts',
+      ].every((testName) => evidence.includes(testName))
+    ) {
+      throw new Error(
+        'release gate G-10 must reference backend and frontend DNS default tests',
+      )
+    }
   }
   return rows.length
 }
@@ -96,7 +109,12 @@ export async function verifyNoInAppCoreUpgrade() {
   }
 }
 
-export function validateAutomatedEvidence(backupSource) {
+export function validateAutomatedEvidence({
+  backupSource,
+  clashSource,
+  dnsInitSource,
+  frontendDnsTestSource,
+}) {
   for (const testName of [
     'export_rejects_traversal',
     'export_rejects_absolute',
@@ -105,14 +123,56 @@ export function validateAutomatedEvidence(backupSource) {
       throw new Error(`release gate G-06 is missing automated test ${testName}`)
     }
   }
+
+  for (const [source, testName] of [
+    [clashSource, 'clash_template_defaults_ipv6_off'],
+    [clashSource, 'template_defaults_preserve_explicit_ipv6_preferences'],
+    [dnsInitSource, 'dns_defaults_disable_ipv6_and_respect_rules'],
+    [dnsInitSource, 'existing_dns_config_is_preserved'],
+  ]) {
+    if (!new RegExp(`\\bfn ${testName}\\s*\\(`, 'u').test(source)) {
+      throw new Error(`release gate G-10 is missing automated test ${testName}`)
+    }
+  }
+  for (const testName of [
+    'disables IPv6 and routes DNS by rules by default',
+    'preserves explicit user choices, including false values',
+  ]) {
+    if (!frontendDnsTestSource.includes(testName)) {
+      throw new Error(`release gate G-10 is missing frontend test ${testName}`)
+    }
+  }
 }
 
 export async function verifyAutomatedEvidence() {
-  const backupSource = await readFile(
-    new URL('../../src-tauri/src/feat/backup.rs', import.meta.url),
-    'utf8',
-  )
-  validateAutomatedEvidence(backupSource)
+  const [backupSource, clashSource, dnsInitSource, frontendDnsTestSource] =
+    await Promise.all([
+      readFile(
+        new URL('../../src-tauri/src/feat/backup.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL('../../src-tauri/src/config/clash.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL('../../src-tauri/src/utils/init.rs', import.meta.url),
+        'utf8',
+      ),
+      readFile(
+        new URL(
+          '../../src/utils/dns-privacy-defaults.test.ts',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ])
+  validateAutomatedEvidence({
+    backupSource,
+    clashSource,
+    dnsInitSource,
+    frontendDnsTestSource,
+  })
 }
 
 export function validateBackupRestoreSecurity(coreSource, featureSource) {

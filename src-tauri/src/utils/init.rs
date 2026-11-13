@@ -12,9 +12,10 @@ use crate::{
 use anyhow::{Context as _, Result};
 use chrono::{Local, TimeZone as _};
 use clash_verge_logging::Type;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use std::path::Path;
-use std::{path::PathBuf, str::FromStr as _};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr as _,
+};
 use tauri_plugin_shell::ShellExt as _;
 use tokio::fs;
 use tokio::fs::DirEntry;
@@ -330,20 +331,19 @@ async fn migrate_legacy_macos_logs() -> Result<()> {
     Ok(())
 }
 
-pub(super) async fn init_dns_config() -> Result<()> {
+fn default_dns_config() -> serde_yaml_ng::Mapping {
     use serde_yaml_ng::Value;
 
     let dns_config = serde_yaml_ng::Mapping::from_iter([
         ("enable".into(), Value::Bool(true)),
-        // Must match the frontend default used for authoritative `dns.ipv6`.
-        ("ipv6".into(), Value::Bool(true)),
+        ("ipv6".into(), Value::Bool(false)),
         ("listen".into(), Value::String(":53".into())),
         ("enhanced-mode".into(), Value::String("fake-ip".into())),
         ("fake-ip-range".into(), Value::String("198.18.0.1/16".into())),
         ("fake-ip-range6".into(), Value::String("fdfe:dcba:9876::1/64".into())),
         ("fake-ip-filter-mode".into(), Value::String("blacklist".into())),
         ("prefer-h3".into(), Value::Bool(false)),
-        ("respect-rules".into(), Value::Bool(false)),
+        ("respect-rules".into(), Value::Bool(true)),
         ("use-hosts".into(), Value::Bool(false)),
         ("use-system-hosts".into(), Value::Bool(false)),
         (
@@ -411,17 +411,24 @@ pub(super) async fn init_dns_config() -> Result<()> {
         ),
     ]);
 
-    let default_dns_config = serde_yaml_ng::Mapping::from_iter([
+    serde_yaml_ng::Mapping::from_iter([
         ("dns".into(), Value::Mapping(dns_config)),
         ("hosts".into(), Value::Mapping(serde_yaml_ng::Mapping::new())),
-    ]);
+    ])
+}
 
+pub(super) async fn init_dns_config() -> Result<()> {
+    let default_dns_config = default_dns_config();
     let app_dir = dirs::app_home_dir()?;
     let dns_path = app_dir.join(constants::files::DNS_CONFIG);
 
+    initialize_dns_config_file(&dns_path, &default_dns_config).await
+}
+
+async fn initialize_dns_config_file(dns_path: &Path, default_dns_config: &serde_yaml_ng::Mapping) -> Result<()> {
     if !dns_path.exists() {
         logging!(info, Type::Setup, "Creating default DNS config file");
-        help::save_yaml(&dns_path, &default_dns_config, Some("# clash5 DNS Config")).await?;
+        help::save_yaml(dns_path, default_dns_config, Some("# clash5 DNS Config")).await?;
     }
 
     Ok(())
@@ -650,4 +657,40 @@ async fn handle_copy(src: &PathBuf, dest: &PathBuf, file: &str) {
             );
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{default_dns_config, initialize_dns_config_file};
+    use serde_yaml_ng::Value;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn dns_defaults_disable_ipv6_and_respect_rules() -> anyhow::Result<()> {
+        let config = default_dns_config();
+        let dns = config
+            .get("dns")
+            .and_then(Value::as_mapping)
+            .ok_or_else(|| anyhow::anyhow!("default DNS config is missing its dns mapping"))?;
+
+        assert_eq!(dns.get("ipv6"), Some(&Value::Bool(false)));
+        assert_eq!(dns.get("respect-rules"), Some(&Value::Bool(true)));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn existing_dns_config_is_preserved() -> anyhow::Result<()> {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let dir = std::env::temp_dir().join(format!("clash5-dns-defaults-{nonce}"));
+        tokio::fs::create_dir_all(&dir).await?;
+        let path = dir.join("dns_config.yaml");
+        let explicit = "dns:\n  ipv6: true\n  respect-rules: false\n";
+        tokio::fs::write(&path, explicit).await?;
+
+        initialize_dns_config_file(&path, &default_dns_config()).await?;
+
+        assert_eq!(tokio::fs::read_to_string(&path).await?, explicit);
+        tokio::fs::remove_dir_all(dir).await?;
+        Ok(())
+    }
 }

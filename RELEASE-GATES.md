@@ -22,7 +22,7 @@ define their individual meanings; this ledger does not guess those meanings.
 | G-07 | P0-18: conditional browser-extension naming gate | Conditional scope review recorded in issue #68 | OPEN |
 | G-08 | P0-18: takeover wording and frozen driver scope | Forbidden-copy check and product review | OPEN |
 | G-09 | P0-07: system proxy cleanup and dirty-exit recovery | Windows proxy lifecycle tests | OPEN |
-| G-10 | P0-08: IPv6 and DNS privacy defaults | Default configuration tests | OPEN |
+| G-10 | P0-08: IPv6 and DNS privacy defaults | Backend tests `clash_template_defaults_ipv6_off`, `dns_defaults_disable_ipv6_and_respect_rules`, and `existing_dns_config_is_preserved`; frontend `dns-privacy-defaults.test.ts` | OPEN |
 | G-11 | P0-09: uninstall cleanup | Windows install/uninstall acceptance | OPEN |
 | G-12 | P0-10: prevent subscription names from exposing tokens | Subscription-name redaction regression tests | OPEN |
 | G-13 | P0-11: subscription update channel and User-Agent | Update policy tests and request-header verification | OPEN |
