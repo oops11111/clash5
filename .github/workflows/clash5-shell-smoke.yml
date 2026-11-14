@@ -101,6 +101,10 @@ jobs:
           # preinstalled driver and cannot create a WebDriver session. Provision the
           # matching driver here with pwsh (whose Expand-Archive works) and put it
           # first on PATH, so tauri-service finds it and skips its own download.
+          # Download the driver for the detected runtime version directly: the
+          # LATEST_RELEASE_<major> endpoint returns UTF-16LE as application/octet-stream,
+          # which Invoke-WebRequest decodes with NUL bytes between characters, so the
+          # version regex never matches.
           $clientId = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
           $edgeVersion = $null
           foreach ($key in @(
@@ -120,9 +124,8 @@ jobs:
               return
             }
           }
-          $release = Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/LATEST_RELEASE_$major" -UseBasicParsing -TimeoutSec 30
-          if ($release.Content -match '(\d+\.\d+\.\d+\.\d+)') { $driverVersion = $Matches[1] } else { throw "No msedgedriver release found for Edge major version $major" }
-          if ($driverVersion.Split('.')[0] -ne $major) { throw "msedgedriver release $driverVersion does not match Edge major version $major" }
+          # The driver version matches the WebView2 runtime version exactly.
+          $driverVersion = $edgeVersion
           $driverDir = Join-Path $env:RUNNER_TEMP "clash5-msedgedriver-$driverVersion"
           $archive = Join-Path $driverDir 'edgedriver_win64.zip'
           New-Item -ItemType Directory -Force -Path $driverDir | Out-Null
