@@ -418,7 +418,11 @@ impl CoreConfigValidator {
         logging!(info, Type::Validate, "-------- 验证结果 --------");
 
         if !stderr.is_empty() {
-            logging!(info, Type::Validate, "stderr输出:\n{:?}", stderr);
+            // Log only the first 2 KiB of validation output: a config can
+            // echo credentials back, and the full dump is unbounded.
+            const MAX_VALIDATE_LOG_BYTES: usize = 2 * 1024;
+            let logged = &stderr[..stderr.len().min(MAX_VALIDATE_LOG_BYTES)];
+            logging!(info, Type::Validate, "stderr输出:\n{:?}", logged);
         }
 
         if has_error {

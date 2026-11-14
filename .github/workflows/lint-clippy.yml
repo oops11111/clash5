@@ -23,7 +23,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Check src-tauri changes
+      - name: Check Rust changes
         if: github.event_name != 'workflow_dispatch'
         id: check_changes
         uses: dorny/paths-filter@v4
@@ -31,14 +31,24 @@ jobs:
           filters: |
             rust:
               - 'src-tauri/**'
+              - 'crates/clash-verge-draft/**'
+              - 'crates/clash-verge-i18n/**'
+              - 'crates/clash-verge-limiter/**'
+              - 'crates/clash-verge-logging/**'
+              - 'crates/clash-verge-media-unlock/**'
+              - 'crates/clash-verge-signal/**'
+              - 'crates/tauri-plugin-clash-verge-sysinfo/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.cargo/config.toml'
 
-      - name: Skip if src-tauri not changed
+      - name: Skip if no Rust changes
         if: github.event_name != 'workflow_dispatch' && steps.check_changes.outputs.rust != 'true'
-        run: echo "No src-tauri changes, skipping clippy lint."
+        run: echo "No Rust changes, skipping clippy lint."
 
-      - name: Continue if src-tauri changed
+      - name: Continue if Rust changed
         if: github.event_name != 'workflow_dispatch' && steps.check_changes.outputs.rust == 'true'
-        run: echo "src-tauri changed, running clippy lint."
+        run: echo "Rust changed, running clippy lint."
 
       - name: Manual trigger - always run
         if: github.event_name == 'workflow_dispatch'
@@ -75,18 +85,20 @@ jobs:
           sudo apt-get install -y libxslt1.1 libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
       - name: Run Clippy
-        working-directory: ./src-tauri
-        run: cargo clippy-all
+        run: cargo clippy-workspace
 
       - name: Run Windows security tests
         if: matrix.os == 'windows-latest' && (github.event_name == 'workflow_dispatch' || steps.check_changes.outputs.rust == 'true')
-        working-directory: ./src-tauri
-        run: cargo test --all-features --target ${{ matrix.target }}
+        run: cargo test --workspace --all-features --target ${{ matrix.target }}
 
       - name: Run Unix proxy recovery tests
         if: matrix.os != 'windows-latest' && (github.event_name == 'workflow_dispatch' || steps.check_changes.outputs.rust == 'true')
         working-directory: ./src-tauri
         run: cargo test --all-features --test proxy_recovery --target ${{ matrix.target }}
+
+      - name: Run Unix workspace crate tests
+        if: matrix.os != 'windows-latest' && (github.event_name == 'workflow_dispatch' || steps.check_changes.outputs.rust == 'true')
+        run: cargo test --workspace --exclude clash5 --all-features --target ${{ matrix.target }}
 
       - name: Run Logging Check
         working-directory: ./src-tauri

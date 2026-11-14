@@ -58,3 +58,5 @@ export const useSetProfileLoading = () => {
 }
 
 export const useTestAllCounter = () => useSelector((s) => s.testAllCounter)
+
+export const useConnectionStatus = () => useSelector((s) => s.connection)

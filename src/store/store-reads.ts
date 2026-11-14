@@ -20,6 +20,7 @@ export const createStoreReads = (
     latestRead = null
     current = runState
     dispatch({ type: 'runState/loaded', runState })
+    dispatch({ type: 'connection/recovered', source: 'backend' })
   }
 
   const readRunState = (): Promise<RunState> => {
@@ -28,6 +29,7 @@ export const createStoreReads = (
       if (revision === runRevision) {
         current = runState
         dispatch({ type: 'runState/loaded', runState })
+        dispatch({ type: 'connection/recovered', source: 'backend' })
       }
       if (latestRead && latestRead !== read) return latestRead
       return current ?? runState

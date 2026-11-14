@@ -2,10 +2,14 @@ import { createBrowserRouter, Navigate, RouteObject } from 'react-router'
 
 import Layout from './_layout'
 import { navItems } from './_navigation'
+import { NotFoundPage } from './not-found'
+import { RouteErrorPage } from './route-error-page'
+
 export const router = createBrowserRouter([
   {
     path: '/',
     Component: Layout,
+    errorElement: <RouteErrorPage />,
     children: navItems
       .map(
         (item) =>
@@ -42,6 +46,10 @@ export const router = createBrowserRouter([
         {
           path: '/unlock',
           element: <Navigate replace to="/settings?section=unlock" />,
+        },
+        {
+          path: '*',
+          Component: NotFoundPage,
         },
       ]),
   },
