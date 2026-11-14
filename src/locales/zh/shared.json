@@ -85,7 +85,10 @@
       "trafficUnavailable": "流量数据暂不可用",
       "operationFailed": "操作失败",
       "trafficStats": "流量统计错误",
-      "trafficStatsDescription": "流量统计组件发生错误，为防止崩溃已暂时停用。"
+      "trafficStatsDescription": "流量统计组件发生错误，为防止崩溃已暂时停用。",
+      "backendDisconnected": "Backend disconnected, reconnecting…",
+      "pageNotFound": "Page not found",
+      "pageNotFoundDescription": "The page you are looking for does not exist or has moved."
     },
     "notices": {
       "raw": "{{message}}",

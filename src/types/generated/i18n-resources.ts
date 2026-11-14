@@ -1655,10 +1655,13 @@ export interface TranslationResources {
       }
       feedback: {
         errors: {
+          backendDisconnected: string
           componentStack: string
           details: string
           label: string
           operationFailed: string
+          pageNotFound: string
+          pageNotFoundDescription: string
           stack: string
           trafficStats: string
           trafficStatsDescription: string

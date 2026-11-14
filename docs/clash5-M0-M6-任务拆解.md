@@ -2,7 +2,7 @@
 
 > 基于 [`clash5-工程手册.md`](clash5-工程手册.md) r2 修订稿（待冻结）。后续上游同步拟按 release tag 的独立 merge PR（S2 r2）；产品名 **clash5**。
 > **模型标注**：`[Opus]` = 架构/高风险/复杂并发与安全，使用 Opus-class 或同级高推理模型；`[标准]` = 常规编码模型；`[人工]` = 需账号、设备或真机验收。
-> **进度口径**：原版 M0 已按验收合并至 `dev`；r2 的新增要求仍逐项补齐。M1 节点池及九入口导航已通过桌面验收并分别合并（PR #4、#16）；M0.2 身份恢复已由 PR #23 合并。M2 实现及 Windows Server 2022 原生验收已通过，PR #18 正在同步 `dev`，尚未合并。
+> **进度口径**：原版 M0 已按验收合并至 `dev`；r2 的新增要求仍逐项补齐。M1 节点池及九入口导航已通过桌面验收并分别合并（PR #4、#16）；M0.2 身份恢复已由 PR #23 合并。M2、M3、M4 的代码均已合入 `dev`（M2 经 PR #36 同步，M3 经 PR #20，M4 经 PR #22）；进度只认“代码在 `dev` 基线中是否存在 + 门禁是否通过”，不再以 PR 编号为准。发版验收以 [`RELEASE-GATES.md`](../RELEASE-GATES.md) 为唯一登记处。
 
 ---
 
@@ -37,11 +37,11 @@
 
 ### M0 r2 增量差距（不能按已完成项勾选）
 - [x] `[Opus]` R-01/R-02/R-25：按[已合并的身份迁移决定](clash5/r2-identity-migration.md) 无损迁移至本机密钥 HMAC 并存储版本与密钥代次；密钥丢失须显式重绑，凭证轮换仅在同来源按唯一候选自动重绑，多候选人工确认，附迁移 fixture（PR #23 已合并并通过密钥丢失、错配、轮换和绑定保留 CI/桌面验收）
-- [x] `[Opus]` SQLite WAL 与版本迁移方案：schema v4 从现有版本逐级迁移；孤儿默认 30 天、可设 1–365 天，并提供清理预览、确认和到期清理。PR #23 已合并；CI、Windows 桌面验收及迁移回滚/保留期数据测试通过
+- [x] `[Opus]` SQLite WAL 与版本迁移方案：schema v5 从现有版本逐级迁移；孤儿默认 30 天、可设 1–365 天，并提供清理预览、确认和到期清理。PR #23 已合并；CI、Windows 桌面验收及迁移回滚/保留期数据测试通过
 - [x] `[标准]` R-18：服务与包名隔离、同机共存。PR #27 的 Windows 安装/升级/启动/独立卸载和源配置校验和前后比对、三平台标识审计均通过，已合入 dev；macOS/Linux 安装运行仍留作后续覆盖。
 - [x] `[标准]` R-19：只读导入 verge-rev 数据并比较源目录前后校验和（PR #26 已合并；CI 和 Windows 桌面验收确认不修改源目录）
 - [x] `[Opus]` R-20：统一日志/诊断脱敏（PR #38）。统一出口覆盖 URL 凭证、路径/查询/片段、controller secret、relay token、密码与 IPC 错误详情，并通过日志 crate 回归测试。
-- [x] `[标准]` 对外 `C5-*` 错误码、IPC 契约快照与 r2 CI 矩阵证据。PR #31、#32 已依次合入 dev；PR #34 已实现 108 个 Tauri command 的参数/成功返回/错误类型快照与前端调用校验，并通过完整六项 CI（含 Windows 桌面 smoke）后合入 dev。
+- [x] `[标准]` 对外 `C5-*` 错误码、IPC 契约快照与 r2 CI 矩阵证据。PR #31、#32 已依次合入 dev；PR #34 已实现 108 个 Tauri command 的参数/成功返回/错误类型快照与前端调用校验，并通过完整六项 CI（含 Windows 桌面 smoke）后合入 dev；此后命令数增长到 128 个（`src-tauri/src/lib.rs` 的 `generate_handler` 列表，含 3 个 sysinfo 插件命令），前端生成的 commands 对象覆盖全部 128 个。
 - [ ] `[标准]` 首次 release-tag 同步前核对 M0 所用上游 `dev` 基线，单独 PR 记录取舍
 
 **本阶段 Opus 必做**：M0.2 全部核心逻辑。
@@ -68,38 +68,38 @@
 - [x] `[Opus]` 出口 IP 检测与 L2 告警/可选切换策略
 - [x] `[标准]` 链路详情三栏布局壳
 
-**验收结果**：PR #18 的两跳生成、provider override 与原配置保留、保存/测试/应用、出口 IP 检测、默认告警、经验证的备用切换、失败回滚及旧命令保护已通过 fixture 与 Windows Server 2022 桌面验收。[原生验收](https://github.com/oops11111/clash5/actions/runs/38701837292)通过默认 940 × 700 窗口的页面无横向溢出检查、Tauri 桥接与桌面重启后的链路恢复。M2 代码与桌面验收已完成，待 PR #18 合并。插件输出和绑定仍属于 M3。
+**验收结果**：PR #18 的两跳生成、provider override 与原配置保留、保存/测试/应用、出口 IP 检测、默认告警、经验证的备用切换、失败回滚及旧命令保护已通过 fixture 与 Windows Server 2022 桌面验收。[原生验收](https://github.com/oops11111/clash5/actions/runs/38701837292)通过默认 940 × 700 窗口的页面无横向溢出检查、Tauri 桥接与桌面重启后的链路恢复。插件输出和绑定仍属于 M3。
 
-**当前状态（2026-10-17）**：PR #18 已实现两跳路由、链路编辑、出口 IP 检测与回退策略；Windows 桌面验收及格式、前后端、M0 数据、三平台 Clippy 检查全部通过。PR 已准备好审查，尚未合入 `dev`，因此此处的退出项仍未勾选。
+**当前状态（代码已合入 `dev`）**：M2 代码经 PR #36（`915fd7f1`）同步合入 `dev`，验收提交 `ee6922c` 在 `dev` 历史中；7 个链路命令（`clash5_save_chain` 等）已在 Tauri 命令注册表中。PR 头部通过的 Windows 桌面验收及格式、前后端、M0 数据、三平台 Clippy 检查是合入时的证据；发版验收不再以 PR 编号为准，见 [`RELEASE-GATES.md`](../RELEASE-GATES.md)，其中 G-09（三平台真机 kill/重启验收）仍为 OPEN。
 
 ---
 
 ## M3 · 插件系统
 
-- [ ] `[Opus]` Plugin Host、WASM 沙箱、权限 G3、Manifest/签名校验（I1/H）
-- [ ] `[Opus]` Patch 合并引擎 + 热更新失败回滚通知（D2）
-- [ ] `[Opus]` 节点/链路绑定模型与优先级冲突表
-- [ ] `[标准]` 插件中心 / 绑定弹窗 / 批量绑定 UI
-- [ ] `[Opus]` `getEffectiveConfig` + 来源链数据 API
-- [ ] `[标准]` 生效配置表、来源链弹窗、冲突徽章 UI
-- [ ] `[标准]` 示例插件文档；`[Opus]` 示例 WASM 钩子实现
+- [x] `[Opus]` Plugin Host、WASM 沙箱、权限 G3、Manifest/签名校验（I1/H）
+- [x] `[Opus]` Patch 合并引擎 + 热更新失败回滚通知（D2）
+- [x] `[Opus]` 节点/链路绑定模型与优先级冲突表
+- [x] `[标准]` 插件中心 / 绑定弹窗 / 批量绑定 UI
+- [x] `[Opus]` `getEffectiveConfig` + 来源链数据 API
+- [x] `[标准]` 生效配置表、来源链弹窗、冲突徽章 UI
+- [x] `[标准]` 示例插件文档；`[Opus]` 示例 WASM 钩子实现
 
 **本阶段几乎整段后端标 Opus；UI 标准。**
 
-**当前状态（2026-10-17）**：PR #20 已完成签名 WASM 插件宿主、来源绑定、补丁合并回滚、生效配置来源与插件页；当前头部 CI 和 Windows 桌面验收全部通过，PR 已准备好审查，仍堆叠在 M2 PR #18 上且尚未合入 `dev`。退出项保持未勾选。
+**当前状态（代码已合入 `dev`）**：M3 代码经 PR #20（合并提交 `0fe8912c`）合入 `dev`；WASM 插件宿主（wasmtime）、来源绑定、补丁合并回滚、生效配置来源（`clash5_get_plugin_effective_config`）与插件页均已落地，15 个插件命令在 Tauri 命令注册表中。PR 头部 CI 与 Windows 桌面验收在合入时已通过；发版验收见 [`RELEASE-GATES.md`](../RELEASE-GATES.md)。
 
 ---
 
 ## M4 · sing-box 侧车
 
-- [ ] `[Opus]` 懒启动/退出（E3）、端口与 DNS 隔离、F1 中转
-- [ ] `[Opus]` 配置映射 detour、调度与降级
-- [ ] `[Opus]` 死连接 J2、内核重启 K2
-- [ ] `[标准]` 设置项「常驻/自动退出」、状态展示
+- [x] `[Opus]` 懒启动/退出（E3）、端口与 DNS 隔离、F1 中转
+- [x] `[Opus]` 配置映射 detour、调度与降级
+- [x] `[Opus]` 死连接 J2、内核重启 K2
+- [x] `[标准]` 设置项「常驻/自动退出」、状态展示
 
 **Opus 必做**：双内核生命周期与中转正确性。
 
-**当前状态（2026-10-17）**：PR #22 已实现受监督的 sing-box 侧车、鉴权回环中转、按需启动/退出与回滚；当前头部 Windows 桌面 smoke、前后端、格式及三平台 Clippy 全部通过。PR 已准备好审查，堆叠在 M3 PR #20 上，尚未合入 `dev`，故退出项保持未勾选。
+**当前状态（代码已合入 `dev`）**：M4 代码经 PR #22（合并提交 `8cf9dd16`）合入 `dev`；受监督的 sing-box 侧车（`singbox_binary`/`singbox_process`/`singbox_runtime`/`singbox_relay`/`singbox_config`）、鉴权回环中转、按需启动/退出与回滚、死连接重启预算均已落地。边界：sing-box 只作落地，其前置不在本版本内。PR 头部 Windows 桌面 smoke、前后端、格式及三平台 Clippy 在合入时已通过；发版验收见 [`RELEASE-GATES.md`](../RELEASE-GATES.md)，其中 G-09 仍为 OPEN。
 
 ---
 

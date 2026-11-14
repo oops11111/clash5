@@ -1,6 +1,7 @@
 import { Typography } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import React, { ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 
 import { BaseErrorBoundary } from './base-error-boundary'
 
@@ -16,9 +17,11 @@ interface Props {
 export const BasePage: React.FC<Props> = (props) => {
   const { title, header, contentStyle, full, compact, children } = props
   const theme = useTheme()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
 
   return (
-    <BaseErrorBoundary>
+    <BaseErrorBoundary resetKeys={[pathname]} onGoHome={() => navigate('/')}>
       <div className={`base-page${compact ? ' base-page--compact' : ''}`}>
         <header data-tauri-drag-region="true" style={{ userSelect: 'none' }}>
           <Typography

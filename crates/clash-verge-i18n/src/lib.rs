@@ -1,20 +1,34 @@
 use rust_i18n::i18n;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::LazyLock;
 
-const DEFAULT_LANGUAGE: &str = "zh";
-i18n!("locales", fallback = "zh");
+const DEFAULT_LANGUAGE: &str = "en";
+i18n!("locales", fallback = "en");
 
 static SUPPORTED_LOCALES: LazyLock<Vec<Cow<'static, str>>> = LazyLock::new(|| rust_i18n::available_locales!());
 
+/// Language aliases shared with the frontend (src/services/i18n.ts reads
+/// the same file): the only place where tags are remapped. A malformed
+/// table parses to an empty map; the file is also parsed by the frontend
+/// build, so a bad file fails CI there.
+static LANGUAGE_ALIASES: LazyLock<HashMap<String, String>> = LazyLock::new(|| {
+    const ALIASES_JSON: &str = include_str!("../../../i18n-language-aliases.json");
+    serde_json::from_str::<serde_json::Value>(ALIASES_JSON)
+        .ok()
+        .and_then(|value| value.get("aliases")?.as_object().cloned())
+        .map(|aliases| {
+            aliases
+                .into_iter()
+                .filter_map(|(key, value)| value.as_str().map(|target| (key, target.to_string())))
+                .collect()
+        })
+        .unwrap_or_default()
+});
+
 #[inline]
 fn locale_alias(locale: &str) -> Option<&'static str> {
-    match locale {
-        "ja" | "ja-jp" | "jp" => Some("jp"),
-        "zh" | "zh-cn" | "zh-hans" | "zh-sg" | "zh-my" | "zh-chs" => Some("zh"),
-        "zh-tw" | "zh-hk" | "zh-hant" | "zh-mo" | "zh-cht" => Some("zhtw"),
-        _ => None,
-    }
+    LANGUAGE_ALIASES.get(locale).map(String::as_str)
 }
 
 #[inline]
@@ -94,5 +108,15 @@ mod tests {
     fn system_preference_uses_current_os_locale() {
         assert_eq!(current_language(Some("system")), system_language());
         assert_eq!(current_language(Some("en")), "en");
+    }
+
+    #[test]
+    fn shared_alias_table_resolves_split_tags() {
+        assert_eq!(resolve_supported_language("ja-JP").as_deref(), Some("jp"));
+        assert_eq!(resolve_supported_language("ja").as_deref(), Some("jp"));
+        assert_eq!(resolve_supported_language("zh-TW").as_deref(), Some("zhtw"));
+        assert_eq!(resolve_supported_language("zh-CN").as_deref(), Some("zh"));
+        assert_eq!(resolve_supported_language("xx"), None);
+        assert_eq!(DEFAULT_LANGUAGE, "en");
     }
 }

@@ -8,6 +8,13 @@ describe('language preference', () => {
     expect(resolvePreferredLanguage('system', 'zh-CN')).toBe('zh')
     expect(resolvePreferredLanguage('en', 'zh-CN')).toBe('en')
     expect(resolvePreferredLanguage(null, 'en-US')).toBe('en')
-    expect(resolvePreferredLanguage('system', 'xx-XX')).toBe('zh')
+    expect(resolvePreferredLanguage('system', 'xx-XX')).toBe('en')
+  })
+
+  it('resolves aliased tags through the shared alias table', () => {
+    expect(resolvePreferredLanguage('system', 'ja-JP')).toBe('jp')
+    expect(resolvePreferredLanguage('system', 'ja')).toBe('jp')
+    expect(resolvePreferredLanguage('system', 'zh-TW')).toBe('zhtw')
+    expect(resolvePreferredLanguage('system', 'zh-HK')).toBe('zhtw')
   })
 })

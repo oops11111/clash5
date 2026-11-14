@@ -114,6 +114,12 @@ Options:
   --report <path>    Write a JSON report to the given path
   --src <path>       Include an additional source directory (repeatable)
   --help             Show this message
+
+Exits with code 1 when any unused, extra, or missing-source keys are
+found, so CI can gate on it (pnpm i18n:check). Keys missing from a
+non-baseline locale are not a failure: they are untranslated strings
+that render through the en fallback, and translation completeness is
+tracked separately by the i18n coverage gate (check-i18n-coverage).
 `)
 }
 
@@ -719,7 +725,11 @@ function collectUsedKeysFromRustFile(
     }
   }
 
-  collectUsedKeysFromTextFile(file, baselineNamespaces, usedKeys)
+  // No text-file fallback here: the loose dotted-string match also picks up
+  // non-key literals whose first segment happens to be a locale namespace
+  // (e.g. the "service.legacy" directory name in src-tauri/src/utils/init.rs),
+  // which produced false missing-source findings. All real backend keys go
+  // through t!() (clash_verge_i18n::t! / rust_i18n::t!), covered above.
 }
 
 function collectUsedI18nKeys(sourceFiles, baselineNamespaces) {
@@ -1428,6 +1438,22 @@ function main() {
     }
     writeReport(options.reportPath, payload)
     console.log(`Report written to ${options.reportPath}`)
+  }
+
+  // Findings fail the run so CI can gate on it (pnpm i18n:check); the
+  // report above is still written first. "Missing" keys are excluded:
+  // an untranslated key renders through the en fallback, and translation
+  // completeness is tracked by the i18n coverage gate instead.
+  const overallTotals = summarizeResults(allResults)
+  if (
+    overallTotals.totalUnused > 0 ||
+    overallTotals.totalExtra > 0 ||
+    overallTotals.totalSourceMissing > 0
+  ) {
+    console.log(
+      'i18n cleanup found issues (see totals above); exiting with code 1.',
+    )
+    process.exitCode = 1
   }
 }
 
