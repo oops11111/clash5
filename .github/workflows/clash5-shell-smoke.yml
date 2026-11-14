@@ -118,7 +118,8 @@ jobs:
           $major = $edgeVersion.Split('.')[0]
           $existing = Get-Command msedgedriver.exe -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($existing) {
-            $existingVersion = ((& $existing.Source --version) -replace '^MSEdgeDriver\s+', '').Trim()
+            $existingOutput = & $existing.Source --version
+            if ($existingOutput -match '(\d+\.\d+\.\d+\.\d+)') { $existingVersion = $Matches[1] } else { throw "Could not parse msedgedriver version from: $existingOutput" }
             if ($existingVersion.Split('.')[0] -eq $major) {
               Write-Output "msedgedriver $existingVersion already matches WebView2 $edgeVersion"
               return
@@ -133,7 +134,8 @@ jobs:
           Expand-Archive -LiteralPath $archive -DestinationPath $driverDir -Force
           $driver = Join-Path $driverDir 'msedgedriver.exe'
           if (-not (Test-Path -LiteralPath $driver)) { throw 'Downloaded msedgedriver archive did not contain msedgedriver.exe' }
-          $actualVersion = ((& $driver --version) -replace '^MSEdgeDriver\s+', '').Trim()
+          $driverOutput = & $driver --version
+          if ($driverOutput -match '(\d+\.\d+\.\d+\.\d+)') { $actualVersion = $Matches[1] } else { throw "Could not parse msedgedriver version from: $driverOutput" }
           if ($actualVersion.Split('.')[0] -ne $major) { throw "Provisioned msedgedriver $actualVersion does not match WebView2 major version $major" }
           Add-Content -LiteralPath $env:GITHUB_PATH -Value $driverDir
           Write-Output "Provisioned msedgedriver $actualVersion for WebView2 $edgeVersion"
