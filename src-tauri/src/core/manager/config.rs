@@ -2,7 +2,7 @@ use super::{CoreManager, PROFILE_SELECTIONS_PENDING_COMMIT, RunningMode};
 use crate::core::notify::NoticeStatus;
 use crate::core::service::StageRequest;
 use crate::{
-    config::{Config, IProfiles, runtime::IRuntime},
+    config::{Config, IProfiles, MixedPort, runtime::IRuntime},
     constants::timing,
     core::{
         handle,
@@ -173,11 +173,14 @@ impl CoreManager {
         use crate::constants::files::RUNTIME_CONFIG;
 
         let runtime_path = dirs::app_home_dir()?.join(RUNTIME_CONFIG);
-        let clash_config = &Config::clash().await.latest_arc().0;
+        let mut clash_config = Config::clash().await.latest_arc().0.clone();
+        // A session fallback means the configured port is occupied; the default
+        // configuration must bind the replacement or the core still cannot start.
+        MixedPort::apply_session_fallback(&mut clash_config);
 
         Config::runtime().await.edit_draft(|d| {
             *d = IRuntime {
-                config: Some(clash_config.to_owned()),
+                config: Some(clash_config.clone()),
                 plugin_provenance: Default::default(),
                 plugin_conflicts: Default::default(),
                 dns_override: None,

@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU16, Ordering};
 use anyhow::Result;
 
 use super::Config;
-use crate::core::handle::Handle;
+use crate::core::{handle::Handle, listener::MIXED_PORT_KEY};
 
 /// A startup fallback for this session only; persistence would make the port climb across launches.
 static SESSION_FALLBACK: AtomicU16 = AtomicU16::new(0);
@@ -27,6 +27,14 @@ impl MixedPort {
 
     pub(crate) fn clear_session_fallback() {
         SESSION_FALLBACK.store(0, Ordering::Release);
+    }
+
+    /// Stamps the session fallback port onto a mapping, so a configuration
+    /// built outside the generated path still binds the port this session moved to.
+    pub(crate) fn apply_session_fallback(config: &mut serde_yaml_ng::Mapping) {
+        if let Some(port) = Self::session_fallback() {
+            config.insert(MIXED_PORT_KEY.into(), port.into());
+        }
     }
 
     /// Returns the configured port. Paths staging it must close PAC until the Core catches up.
@@ -78,6 +86,18 @@ mod tests {
         assert_eq!(resolve_desired(Some(7900), Some(9000), 8080), 7900);
         assert_eq!(resolve_desired(None, Some(9000), 8080), 9000);
         assert_eq!(resolve_desired(None, None, 8080), 8080);
+    }
+
+    #[test]
+    fn session_fallback_port_is_stamped_onto_a_mapping() {
+        let mut config = serde_yaml_ng::Mapping::new();
+        config.insert("mixed-port".into(), 7897.into());
+        MixedPort::set_session_fallback(7900);
+        MixedPort::apply_session_fallback(&mut config);
+        assert_eq!(config.get("mixed-port").and_then(|value| value.as_u64()), Some(7900));
+        MixedPort::clear_session_fallback();
+        MixedPort::apply_session_fallback(&mut config);
+        assert_eq!(config.get("mixed-port").and_then(|value| value.as_u64()), Some(7900));
     }
 
     #[tokio::test]
