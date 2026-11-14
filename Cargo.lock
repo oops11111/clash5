@@ -1255,7 +1255,7 @@ dependencies = [
  "socket2",
  "specta",
  "specta-typescript",
- "sysproxy",
+ "sysproxy 0.7.1 (git+https://github.com/clash-verge-rev/sysproxy-rs.git?rev=89ad876a0942c049ae72e1472f9fc3ed62023c5e)",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
@@ -1321,7 +1321,7 @@ dependencies = [
  "sha2 0.11.0",
  "strum",
  "strum_macros",
- "sysproxy",
+ "sysproxy 0.7.1 (git+https://github.com/clash-verge-rev/sysproxy-rs.git?branch=main)",
  "tokio",
  "url",
  "windows-service",
@@ -7559,6 +7559,21 @@ dependencies = [
  "objc2-io-kit",
  "objc2-open-directory",
  "windows 0.62.2",
+]
+
+[[package]]
+name = "sysproxy"
+version = "0.7.1"
+source = "git+https://github.com/clash-verge-rev/sysproxy-rs.git?branch=main#c37a60e1fc9079cc0f074200e2296afd1705208c"
+dependencies = [
+ "log",
+ "system-configuration",
+ "thiserror 2.0.20",
+ "url",
+ "which 8.0.6",
+ "windows 0.62.2",
+ "winreg 0.55.0",
+ "xdg",
 ]
 
 [[package]]

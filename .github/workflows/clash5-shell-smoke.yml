@@ -91,6 +91,54 @@ jobs:
             $source = "src-tauri/sidecar/${core}-x86_64-pc-windows-msvc.exe"
             Copy-Item -LiteralPath $source -Destination (Join-Path $release "$core.exe") -Force
           }
+      - name: Provision matching msedgedriver for WebView2
+        if: github.event_name != 'schedule'
+        shell: pwsh
+        run: |
+          # @wdio/tauri-service downloads msedgedriver with Windows PowerShell 5.1,
+          # whose Expand-Archive fails on this image ("Cannot find an overload for
+          # ExtractToDirectory"), so the smoke test falls back to a mismatched
+          # preinstalled driver and cannot create a WebDriver session. Provision the
+          # matching driver here with pwsh (whose Expand-Archive works) and put it
+          # first on PATH, so tauri-service finds it and skips its own download.
+          # Download the driver for the detected runtime version directly: the
+          # LATEST_RELEASE_<major> endpoint returns UTF-16LE as application/octet-stream,
+          # which Invoke-WebRequest decodes with NUL bytes between characters, so the
+          # version regex never matches.
+          $clientId = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $edgeVersion = $null
+          foreach ($key in @(
+            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$clientId",
+            "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$clientId",
+            "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$clientId")) {
+            $value = (Get-ItemProperty -LiteralPath $key -Name pv -ErrorAction SilentlyContinue).pv
+            if ($value -match '^\d+\.\d+\.\d+\.\d+$') { $edgeVersion = $value; break }
+          }
+          if (-not $edgeVersion) { throw 'Could not detect the WebView2 runtime version from the registry' }
+          $major = $edgeVersion.Split('.')[0]
+          $existing = Get-Command msedgedriver.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($existing) {
+            $existingOutput = & $existing.Source --version
+            if ($existingOutput -match '(\d+\.\d+\.\d+\.\d+)') { $existingVersion = $Matches[1] } else { throw "Could not parse msedgedriver version from: $existingOutput" }
+            if ($existingVersion.Split('.')[0] -eq $major) {
+              Write-Output "msedgedriver $existingVersion already matches WebView2 $edgeVersion"
+              return
+            }
+          }
+          # The driver version matches the WebView2 runtime version exactly.
+          $driverVersion = $edgeVersion
+          $driverDir = Join-Path $env:RUNNER_TEMP "clash5-msedgedriver-$driverVersion"
+          $archive = Join-Path $driverDir 'edgedriver_win64.zip'
+          New-Item -ItemType Directory -Force -Path $driverDir | Out-Null
+          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$driverVersion/edgedriver_win64.zip" -OutFile $archive -UseBasicParsing -TimeoutSec 120
+          Expand-Archive -LiteralPath $archive -DestinationPath $driverDir -Force
+          $driver = Join-Path $driverDir 'msedgedriver.exe'
+          if (-not (Test-Path -LiteralPath $driver)) { throw 'Downloaded msedgedriver archive did not contain msedgedriver.exe' }
+          $driverOutput = & $driver --version
+          if ($driverOutput -match '(\d+\.\d+\.\d+\.\d+)') { $actualVersion = $Matches[1] } else { throw "Could not parse msedgedriver version from: $driverOutput" }
+          if ($actualVersion.Split('.')[0] -ne $major) { throw "Provisioned msedgedriver $actualVersion does not match WebView2 major version $major" }
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $driverDir
+          Write-Output "Provisioned msedgedriver $actualVersion for WebView2 $edgeVersion"
       - name: Verify native Tauri bridge and node workspace
         if: github.event_name != 'schedule'
         run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash5.exe --full
