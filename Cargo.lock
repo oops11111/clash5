@@ -1256,7 +1256,7 @@ dependencies = [
  "socket2",
  "specta",
  "specta-typescript",
- "sysproxy 0.7.1 (git+https://github.com/clash-verge-rev/sysproxy-rs.git?rev=89ad876a0942c049ae72e1472f9fc3ed62023c5e)",
+ "sysproxy",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
@@ -1310,9 +1310,10 @@ dependencies = [
 [[package]]
 name = "clash_verge_service_ipc"
 version = "2.7.6"
-source = "git+https://github.com/oops11111/clash5-service-ipc.git?rev=6cc9a8aee1dcc4e40fdd22469a42b31cc4cc77b4#6cc9a8aee1dcc4e40fdd22469a42b31cc4cc77b4"
+source = "git+https://github.com/oops11111/clash5-service-ipc.git?rev=b9974ae4ba37ecc7d774ce3c999cb1f37d28fa1f#b9974ae4ba37ecc7d774ce3c999cb1f37d28fa1f"
 dependencies = [
  "anyhow",
+ "base64 0.23.1",
  "kode-bridge",
  "libc",
  "log",
@@ -1322,7 +1323,7 @@ dependencies = [
  "sha2 0.11.0",
  "strum",
  "strum_macros",
- "sysproxy 0.7.1 (git+https://github.com/clash-verge-rev/sysproxy-rs.git?branch=main)",
+ "sysproxy",
  "tokio",
  "url",
  "windows-service",
@@ -1423,7 +1424,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3676,7 +3677,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -5330,7 +5331,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.45.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7565,22 +7566,7 @@ dependencies = [
 [[package]]
 name = "sysproxy"
 version = "0.7.1"
-source = "git+https://github.com/clash-verge-rev/sysproxy-rs.git?branch=main#c37a60e1fc9079cc0f074200e2296afd1705208c"
-dependencies = [
- "log",
- "system-configuration",
- "thiserror 2.0.20",
- "url",
- "which 8.0.6",
- "windows 0.62.2",
- "winreg 0.55.0",
- "xdg",
-]
-
-[[package]]
-name = "sysproxy"
-version = "0.7.1"
-source = "git+https://github.com/clash-verge-rev/sysproxy-rs.git?rev=89ad876a0942c049ae72e1472f9fc3ed62023c5e#89ad876a0942c049ae72e1472f9fc3ed62023c5e"
+source = "git+https://github.com/clash-verge-rev/sysproxy-rs.git?branch=main#89ad876a0942c049ae72e1472f9fc3ed62023c5e"
 dependencies = [
  "iptools",
  "log",
@@ -8038,7 +8024,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-mihomo"
 version = "0.6.0"
-source = "git+https://github.com/clash-verge-rev/tauri-plugin-mihomo?rev=7a03d16f4d39b1bb885b7babe66b9e153e34b615#7a03d16f4d39b1bb885b7babe66b9e153e34b615"
+source = "git+https://github.com/clash-verge-rev/tauri-plugin-mihomo?branch=main#7a03d16f4d39b1bb885b7babe66b9e153e34b615"
 dependencies = [
  "arc-swap",
  "clashmap",
@@ -8363,7 +8349,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.2",
@@ -9963,7 +9949,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

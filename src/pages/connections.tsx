@@ -5,13 +5,17 @@ import {
   ViewColumnRounded,
 } from '@mui/icons-material'
 import {
+  Alert,
   Box,
   Button,
   ButtonGroup,
+  FormControlLabel,
   Fab,
   IconButton,
   MenuItem,
+  Switch,
   Tooltip,
+  Typography,
   Zoom,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
@@ -219,6 +223,30 @@ const ConnectionsPage = () => {
         </Box>
       }
     >
+      <Alert severity="info" sx={{ mb: 1, mx: 1 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+            flexWrap: 'wrap',
+          }}
+        >
+          <Box>
+            <Typography variant="subtitle2">
+              {t('connections.processProxy.title')}
+            </Typography>
+            <Typography variant="body2">
+              {t('connections.processProxy.unavailable')}
+            </Typography>
+          </Box>
+          <FormControlLabel
+            control={<Switch checked={false} disabled />}
+            label={t('connections.processProxy.off')}
+          />
+        </Box>
+      </Alert>
       <Box
         sx={{
           pt: 1,

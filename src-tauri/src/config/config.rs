@@ -248,9 +248,13 @@ impl Config {
             config.insert(MIXED_PORT_KEY.into(), port.into());
         }
 
+        let transient_listeners = Self::runtime().await.latest_arc().transient_listeners.clone();
+        crate::clash5::exit_ip::apply_transient_listeners(&mut config, &transient_listeners)?;
+
         Self::runtime().await.edit_draft(|d| {
             *d = IRuntime {
                 config: Some(config),
+                transient_listeners,
                 dns_override: Some(dns_override),
                 exists_keys,
                 chain_logs: logs,

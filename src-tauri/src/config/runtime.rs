@@ -1,6 +1,6 @@
 use serde_yaml_ng::{Mapping, Value};
 use smartstring::alias::String;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::enhance::field::use_keys;
 
@@ -9,6 +9,7 @@ const PATCH_CONFIG_INNER: [&str; 5] = ["allow-lan", "ipv6", "log-level", "unifie
 #[derive(Default, Clone)]
 pub struct IRuntime {
     pub config: Option<Mapping>,
+    pub(crate) transient_listeners: BTreeMap<std::string::String, Value>,
     pub plugin_provenance: std::collections::BTreeMap<std::string::String, clash5_data::ConfigProvenance>,
     pub plugin_conflicts: Vec<clash5_data::PluginConflict>,
     pub(crate) dns_override: Option<super::dns::DnsOverrideState>,

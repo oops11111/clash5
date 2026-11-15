@@ -2,6 +2,12 @@
   "page": {
     "title": "連線"
   },
+  "processProxy": {
+    "title": "依處理程序路由",
+    "toggle": "啟用依處理程序路由",
+    "unavailable": "此版本尚未提供依處理程序路由。所選應用的流量不會被單獨轉送。",
+    "off": "無法使用"
+  },
   "components": {
     "fields": {
       "host": "主機",
