@@ -31,6 +31,7 @@ import { CurrentProxyCard } from '@/components/home/current-proxy-card'
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import { EnhancedTrafficStats } from '@/components/home/enhanced-traffic-stats'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
+import { PerAppProxyCard } from '@/components/home/per-app-proxy-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
@@ -78,7 +79,7 @@ interface HomeCardsSettings {
   network: boolean
   mode: boolean
   traffic: boolean
-  info: boolean
+  perAppProxy: boolean
   clashinfo: boolean
   systeminfo: boolean
   test: boolean
@@ -87,12 +88,12 @@ interface HomeCardsSettings {
 }
 
 const DEFAULT_HOME_CARDS: HomeCardsSettings = {
-  info: false,
   profile: true,
   proxy: true,
   network: true,
   mode: true,
   traffic: true,
+  perAppProxy: true,
   clashinfo: true,
   systeminfo: true,
   test: true,
@@ -128,8 +129,12 @@ const HomeSettingsDialog = ({
   }
 
   const handleSave = async () => {
-    await patchVerge({ home_cards: cards })
-    onClose()
+    try {
+      await patchVerge({ home_cards: cards })
+      onClose()
+    } catch (err) {
+      showNotice.error(err)
+    }
   }
 
   return (
@@ -181,6 +186,15 @@ const HomeSettingsDialog = ({
               />
             }
             label={t('home.page.settings.cards.traffic')}
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={cards.perAppProxy ?? false}
+                onChange={() => handleToggle('perAppProxy')}
+              />
+            }
+            label={t('home.page.settings.cards.perAppProxy')}
           />
           <FormControlLabel
             control={
@@ -242,9 +256,9 @@ const HomePage = () => {
   const homeCards =
     (verge?.home_cards as HomeCardsSettings | undefined) ?? DEFAULT_HOME_CARDS
 
-  // 文档链接函数
+  // 文档链接函数 - point to clash5's own docs, not upstream
   const toGithubDoc = useLockFn(() =>
-    openExternalUrl('https://clash-verge-rev.github.io/index.html').catch(
+    openExternalUrl('https://github.com/oops11111/clash5#readme').catch(
       showNotice.error,
     ),
   )
@@ -293,6 +307,7 @@ const HomePage = () => {
         </EnhancedCard>,
         12,
       ),
+      renderCard('perAppProxy', <PerAppProxyCard />),
       renderCard(
         'test',
         <Suspense fallback={<Skeleton variant="rectangular" height={200} />}>

@@ -38,12 +38,12 @@ const SettingSystem = ({ onError }: Props) => {
       <TunViewer ref={tunRef} />
 
       <ProxyControlSwitches
-        label={t('settings.sections.system.toggles.tunMode')}
+        kind="tunMode"
         onError={onError}
       />
 
       <ProxyControlSwitches
-        label={t('settings.sections.system.toggles.systemProxy')}
+        kind="systemProxy"
         onError={onError}
       />
 

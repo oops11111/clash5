@@ -8,7 +8,8 @@
     "cards": {
       "trafficStats": "流量统计",
       "networkSettings": "网络设置",
-      "proxyMode": "代理模式"
+      "proxyMode": "代理模式",
+      "perAppProxy": "分软件代理"
     },
     "settings": {
       "cards": {
@@ -17,6 +18,7 @@
         "network": "网络设置卡",
         "proxyMode": "代理模式卡",
         "traffic": "流量统计卡",
+        "perAppProxy": "分软件代理卡",
         "tests": "网站测试卡",
         "ip": "IP 信息卡",
         "clashInfo": "Clash 信息卡",
@@ -27,6 +29,9 @@
     "title": "首页"
   },
   "components": {
+    "perAppProxy": {
+      "emptyState": "暂无流量经过核心的软件"
+    },
     "proxyTun": {
       "status": {
         "systemProxyEnabled": "系统代理已启用，您的应用将通过代理访问网络",

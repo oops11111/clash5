@@ -8,7 +8,8 @@
     "cards": {
       "trafficStats": "Traffic Stats",
       "networkSettings": "Network Settings",
-      "proxyMode": "Proxy Mode"
+      "proxyMode": "Proxy Mode",
+      "perAppProxy": "Per-App Proxy"
     },
     "settings": {
       "cards": {
@@ -17,6 +18,7 @@
         "network": "Network Settings Card",
         "proxyMode": "Proxy Mode Card",
         "traffic": "Traffic Stats Card",
+        "perAppProxy": "Per-App Proxy Card",
         "tests": "Website Tests Card",
         "ip": "IP Information Card",
         "clashInfo": "Clash Info Cards",
@@ -27,6 +29,9 @@
     "title": "Home"
   },
   "components": {
+    "perAppProxy": {
+      "emptyState": "No processes have routed traffic through the core"
+    },
     "proxyTun": {
       "status": {
         "systemProxyEnabled": "System Proxy Enabled",

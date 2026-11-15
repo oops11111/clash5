@@ -158,6 +158,9 @@ export interface TranslationResources {
           }
           title: string
         }
+        perAppProxy: {
+          emptyState: string
+        }
         proxyTun: {
           status: {
             systemProxyDisabled: string
@@ -219,6 +222,7 @@ export interface TranslationResources {
       page: {
         cards: {
           networkSettings: string
+          perAppProxy: string
           proxyMode: string
           trafficStats: string
         }
@@ -228,6 +232,7 @@ export interface TranslationResources {
             currentProxy: string
             ip: string
             network: string
+            perAppProxy: string
             profile: string
             proxyMode: string
             systemInfo: string
