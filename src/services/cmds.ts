@@ -23,8 +23,11 @@ import type {
   NetworkInterfaceWire,
   NodeRecord,
   PendingIdentityRebind as GeneratedPendingIdentityRebind,
+  PerAppProxySettings,
   PluginAuditEvent as GeneratedPluginAuditEvent,
   PluginEffectiveConfig as GeneratedPluginEffectiveConfig,
+  ProcessCandidate,
+  ProcessProxyStatus,
   ProxyViewV1_Serialize,
   RunStateView,
   RunningMode as GeneratedRunningMode,
@@ -831,3 +834,25 @@ export async function checkMediaUnlock(onComplete: Channel<UnlockItem>) {
 export async function checkMediaUnlockItem(name: string) {
   return invoke<UnlockItem>('check_media_unlock_item', { name })
 }
+
+// ---------------------------------------------------------------------------
+// Per-App Proxy commands
+// ---------------------------------------------------------------------------
+
+export const clash5ProcessProxyStatus = () =>
+  invoke<ProcessProxyStatus>('clash5_process_proxy_status')
+
+export const clash5AttachProcessProxy = (chainId: string, pid: number) =>
+  invoke<ProcessProxyStatus>('clash5_attach_process_proxy', { chainId, pid })
+
+export const clash5DetachProcessProxy = () =>
+  invoke<ProcessProxyStatus>('clash5_detach_process_proxy')
+
+export const clash5ListProcessCandidates = () =>
+  invoke<ProcessCandidate[]>('clash5_list_process_candidates')
+
+export const clash5GetPerAppProxySettings = () =>
+  invoke<PerAppProxySettings>('clash5_get_per_app_proxy_settings')
+
+export const clash5SetPerAppProxySettings = (settings: PerAppProxySettings) =>
+  invoke<PerAppProxySettings>('clash5_set_per_app_proxy_settings', { settings })

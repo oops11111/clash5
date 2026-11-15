@@ -947,6 +947,7 @@ interface IVergeConfig {
   webdav_username?: string
   webdav_password?: string
   home_cards?: Record<string, boolean>
+  per_app_proxy?: import('@/services/tauri-commands.generated').PerAppProxySettings
   enable_hover_jump_navigator?: boolean
   hover_jump_navigator_delay?: number
   enable_external_controller?: boolean

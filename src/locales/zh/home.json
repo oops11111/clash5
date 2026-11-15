@@ -30,7 +30,42 @@
   },
   "components": {
     "perAppProxy": {
-      "emptyState": "暂无流量经过核心的软件"
+      "emptyState": "暂无流量经过核心的软件",
+      "chainLabel": "链",
+      "noChain": "未选择链",
+      "chainInvalid": "链已失效",
+      "status": {
+        "idle": "未开启",
+        "active": "代理中",
+        "failed": "失败",
+        "recoveryRequired": "需恢复",
+        "unavailable": "不可用"
+      },
+      "actions": {
+        "attach": "开启",
+        "detach": "关闭",
+        "refresh": "刷新"
+      },
+      "disabled": {
+        "nonWindows": "本平台不支持分软件代理",
+        "noService": "需要安装并启动服务模式",
+        "tunActive": "需先关闭 TUN 模式",
+        "singleSession": "已有其他软件正在代理中，请先关闭",
+        "unavailable": "当前不可用",
+        "attaching": "正在操作..."
+      },
+      "feedback": {
+        "attached": "已开启分软件代理",
+        "detached": "已关闭分软件代理",
+        "noChainSelected": "请先为该软件选择链",
+        "processNotRunning": "该软件当前没有活跃连接",
+        "processNotFound": "未找到该进程"
+      },
+      "confirm": {
+        "title": "确认开启分软件代理",
+        "body": "将为 {{processName}} 开启代理，使用链：{{chainName}}",
+        "warning": "开启后该软件的所有流量将通过所选链路由。确定要继续吗？"
+      }
     },
     "proxyTun": {
       "status": {

@@ -163,6 +163,12 @@ pub struct IVerge {
     #[specta(type = Option<specta_typescript::Unknown>)]
     pub home_cards: Option<serde_json::Value>,
 
+    /// Typed per-app proxy settings: maps a process identity to a chain id.
+    /// Stored separately from `home_cards` (which is untyped JSON) to keep
+    /// the per-app mapping validated and queryable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub per_app_proxy: Option<PerAppProxySettings>,
+
     pub auto_close_connection: Option<bool>,
 
     /// Keep the sing-box sidecar alive after its relay becomes idle.
@@ -467,6 +473,7 @@ impl IVerge {
             auto_light_weight_minutes: Some(10),
             enable_dns_settings: Some(false),
             home_cards: None,
+            per_app_proxy: None,
             enable_external_controller: Some(false),
             ..Self::default()
         }
@@ -571,6 +578,7 @@ impl IVerge {
         patch!(auto_light_weight_minutes);
         patch!(enable_dns_settings);
         patch!(home_cards);
+        patch!(per_app_proxy);
         patch!(enable_external_controller);
     }
 
@@ -589,6 +597,42 @@ impl IVerge {
             LevelFilter::Info
         }
     }
+}
+
+/// A single per-app proxy mapping: a process identity to a chain.
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PerAppProxyMapping {
+    /// Process executable name (e.g. "chrome.exe").
+    #[specta(type = std::string::String)]
+    pub process_name: String,
+    /// Full canonical path, used to disambiguate same-name processes.
+    #[serde(default)]
+    #[specta(type = std::string::String)]
+    pub process_path: String,
+    /// Chain identifier from `chains::definitions()`.
+    #[specta(type = std::string::String)]
+    pub chain_id: String,
+    /// Whether this mapping is currently enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Sort order within the per-app proxy list.
+    #[serde(default)]
+    pub order: u32,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Typed per-app proxy configuration, stored in `verge.yaml` under
+/// `per_app_proxy`. Replaces the untyped `home_cards` JSON blob for this
+/// feature so the mapping is validated at the config layer.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PerAppProxySettings {
+    #[serde(default)]
+    pub mappings: Vec<PerAppProxyMapping>,
 }
 
 #[cfg(test)]

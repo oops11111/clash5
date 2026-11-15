@@ -91,6 +91,7 @@ verge_registry! {
     hotkeys => [Hotkey, TrayMenu];
     enable_global_hotkey => NoEffect;
     home_cards => NoEffect;
+    per_app_proxy => NoEffect;
     auto_close_connection => NoEffect;
     singbox_persistent => NoEffect;
     auto_check_update => NoEffect;

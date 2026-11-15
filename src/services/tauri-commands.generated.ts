@@ -439,6 +439,18 @@ export const commands = {
     typedError<ProcessProxyStatus, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_detach_process_proxy'),
     ),
+  clash5ListProcessCandidates: () =>
+    typedError<ProcessCandidate[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_process_candidates'),
+    ),
+  clash5GetPerAppProxySettings: () =>
+    typedError<PerAppProxySettings, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_get_per_app_proxy_settings'),
+    ),
+  clash5SetPerAppProxySettings: (settings: PerAppProxySettings) =>
+    typedError<PerAppProxySettings, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_set_per_app_proxy_settings', { settings }),
+    ),
   enhanceProfiles: () =>
     typedError<ValidationOutcome, CommandFailure_Serialize>(
       __TAURI_INVOKE('enhance_profiles'),
@@ -837,6 +849,7 @@ export type IVerge_Deserialize = {
   hotkeys?: string[] | null
   enable_global_hotkey?: boolean | null
   home_cards?: unknown | null
+  per_app_proxy?: PerAppProxySettings | null
   auto_close_connection?: boolean | null
   /**  Keep the sing-box sidecar alive after its relay becomes idle. */
   singbox_persistent?: boolean | null
@@ -931,6 +944,7 @@ export type IVerge_Serialize = {
   hotkeys?: string[] | null
   enable_global_hotkey: boolean | null
   home_cards: unknown | null
+  per_app_proxy: PerAppProxySettings | null
   auto_close_connection: boolean | null
   /**  Keep the sing-box sidecar alive after its relay becomes idle. */
   singbox_persistent?: boolean | null
@@ -1292,6 +1306,25 @@ export type ProcessProxyStatus =
       target_count: number
     }
   | { status: 'recovery_required'; detail: string }
+
+export type ProcessCandidate = {
+  pid: number
+  processName: string
+  processPath: string
+  createdAt: number
+}
+
+export type PerAppProxyMapping = {
+  processName: string
+  processPath: string
+  chainId: string
+  enabled: boolean
+  order: number
+}
+
+export type PerAppProxySettings = {
+  mappings: PerAppProxyMapping[]
+}
 
 export type ProfileDnsSettings =
   | ProfileDnsSettings_Serialize
