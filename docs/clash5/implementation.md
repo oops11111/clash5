@@ -1,6 +1,6 @@
 # clash5 implementation
 
-Repository: https://github.com/oops11111/clash5. Baseline: upstream `dev` at `27efaf34f457f357bf73daa242df909fef1fa9ee`.
+Repository: https://github.com/oops11111/clash5. Baseline: `p1-batch3` at `8b43f98d` (clash5 `dev` at `2ee08755` plus P1 batch 3); the fork started from upstream `dev` at `27efaf34f457f357bf73daa242df909fef1fa9ee`.
 
 The package display name and Tauri identifier are `clash5` and `io.github.oops11111.clash5`. All desktop platform overrides and the application data resolver use that identifier, so this fork keeps its SQLite database and profiles away from Clash Verge Rev's data directory. Existing upstream attribution remains in README and the GPL license is retained.
 
@@ -40,6 +40,6 @@ The Windows shell smoke workflow provisions real upstream desktop resources, bui
 
 `origin` is the owner's fork; `upstream` is `https://github.com/clash-verge-rev/clash-verge-rev.git`. M0 started from an upstream `dev` commit. The r2 engineering manual proposes following upstream release tags for future synchronization through separate merge PRs; the first such PR must reconcile the existing `dev` baseline with the chosen tag. Do not rewrite shared history. Preserve upstream GPL attribution.
 
-M0 passed its original acceptance and was merged into `dev`; M1 node inventory and the nine-entry clash5 navigation were subsequently merged as PRs #4 and #16. The r2 follow-up adds HMAC identity migration, credential-rotation reattachment, planned key rotation, read-only recovery, explicit orphan rebinding, and configurable orphan retention/cleanup. PR #23 remains open for CI and required Windows desktop key-recovery/rotation acceptance. UI polish, sing-box, injection, Plugin Host, signing/release automation and real Mihomo hot loading remain outside this foundation slice.
+M0 passed its original acceptance and was merged into `dev`; M1 node inventory and the nine-entry clash5 navigation were subsequently merged as PRs #4 and #16. The r2 follow-up adds HMAC identity migration, credential-rotation reattachment, planned key rotation, read-only recovery, explicit orphan rebinding, and configurable orphan retention/cleanup. PR #23 has been merged (`a0ff9772`); the identity migration, recovery, and retention work is in `dev`. UI polish, sing-box, injection, Plugin Host, signing/release automation and real Mihomo hot loading remain outside this foundation slice.
 
 The owner authorized implementation without additional routine approval. Issues is enabled; [issue #1](https://github.com/oops11111/clash5/issues/1) tracks the original M0 integration and [issue #7](https://github.com/oops11111/clash5/issues/7) tracks the r2 identity migration and recovery requirements.
