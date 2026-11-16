@@ -439,14 +439,20 @@ export const commands = {
     typedError<ProcessProxyStatus, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_detach_process_proxy'),
     ),
+  /**
+   *  List processes that have recently routed traffic through the core.
+   *  On Windows this supplements the list with a live process enumeration.
+   */
   clash5ListProcessCandidates: () =>
     typedError<ProcessCandidate[], CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_list_process_candidates'),
     ),
+  /**  Read the typed per-app proxy configuration. */
   clash5GetPerAppProxySettings: () =>
     typedError<PerAppProxySettings, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_get_per_app_proxy_settings'),
     ),
+  /**  Update the typed per-app proxy configuration. */
   clash5SetPerAppProxySettings: (settings: PerAppProxySettings) =>
     typedError<PerAppProxySettings, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_set_per_app_proxy_settings', { settings }),
@@ -849,6 +855,11 @@ export type IVerge_Deserialize = {
   hotkeys?: string[] | null
   enable_global_hotkey?: boolean | null
   home_cards?: unknown | null
+  /**
+   *  Typed per-app proxy settings: maps a process identity to a chain id.
+   *  Stored separately from `home_cards` (which is untyped JSON) to keep
+   *  the per-app mapping validated and queryable.
+   */
   per_app_proxy?: PerAppProxySettings | null
   auto_close_connection?: boolean | null
   /**  Keep the sing-box sidecar alive after its relay becomes idle. */
@@ -944,7 +955,12 @@ export type IVerge_Serialize = {
   hotkeys?: string[] | null
   enable_global_hotkey: boolean | null
   home_cards: unknown | null
-  per_app_proxy: PerAppProxySettings | null
+  /**
+   *  Typed per-app proxy settings: maps a process identity to a chain id.
+   *  Stored separately from `home_cards` (which is untyped JSON) to keep
+   *  the per-app mapping validated and queryable.
+   */
+  per_app_proxy?: PerAppProxySettings | null
   auto_close_connection: boolean | null
   /**  Keep the sing-box sidecar alive after its relay becomes idle. */
   singbox_persistent?: boolean | null
@@ -1115,6 +1131,29 @@ export type PendingIdentityRebind = {
   source: Source
   old_stable_id: string
   candidate_ids: string[]
+}
+
+/**  A single per-app proxy mapping: a process identity to a chain. */
+export type PerAppProxyMapping = {
+  /**  Process executable name (e.g. "chrome.exe"). */
+  processName: string
+  /**  Full canonical path, used to disambiguate same-name processes. */
+  processPath?: string
+  /**  Chain identifier from `chains::definitions()`. */
+  chainId: string
+  /**  Whether this mapping is currently enabled. */
+  enabled?: boolean
+  /**  Sort order within the per-app proxy list. */
+  order?: number
+}
+
+/**
+ *  Typed per-app proxy configuration, stored in `verge.yaml` under
+ *  `per_app_proxy`. Replaces the untyped `home_cards` JSON blob for this
+ *  feature so the mapping is validated at the config layer.
+ */
+export type PerAppProxySettings = {
+  mappings?: PerAppProxyMapping[]
 }
 
 export type PerformancePreset = 'balanced' | 'performance' | 'power_saving'
@@ -1296,6 +1335,15 @@ export type ProbeBatch = {
   failed: number
 }
 
+/**  A process that can be targeted by per-app proxy. */
+export type ProcessCandidate = {
+  pid: number
+  processName: string
+  processPath: string
+  /**  Windows process creation time (100-nanosecond intervals since epoch). */
+  createdAt: number
+}
+
 export type ProcessProxyStatus =
   | { status: 'unavailable' }
   | { status: 'idle' }
@@ -1306,25 +1354,6 @@ export type ProcessProxyStatus =
       target_count: number
     }
   | { status: 'recovery_required'; detail: string }
-
-export type ProcessCandidate = {
-  pid: number
-  processName: string
-  processPath: string
-  createdAt: number
-}
-
-export type PerAppProxyMapping = {
-  processName: string
-  processPath: string
-  chainId: string
-  enabled: boolean
-  order: number
-}
-
-export type PerAppProxySettings = {
-  mappings: PerAppProxyMapping[]
-}
 
 export type ProfileDnsSettings =
   | ProfileDnsSettings_Serialize

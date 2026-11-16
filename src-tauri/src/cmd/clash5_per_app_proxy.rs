@@ -10,6 +10,7 @@ pub struct ProcessCandidate {
     pub process_name: String,
     pub process_path: String,
     /// Windows process creation time (100-nanosecond intervals since epoch).
+    #[specta(type = specta_typescript::Number)]
     pub created_at: u64,
 }
 
@@ -74,7 +75,7 @@ fn enumerate_windows_processes() -> CmdResult<Vec<ProcessCandidate>> {
                     candidates.push(ProcessCandidate {
                         pid,
                         process_name: name,
-                        process_path: String::new(), // path resolution requires additional privileges
+                        process_path: get_process_image_path(pid).unwrap_or_default(),
                         created_at,
                     });
                 }
@@ -115,6 +116,38 @@ fn get_process_creation_time(pid: u32) -> Option<u64> {
             return None;
         }
         Some((u64::from(creation.dwHighDateTime) << 32) | u64::from(creation.dwLowDateTime))
+    }
+}
+
+/// Resolve the full image path for a PID. Requires only
+/// `PROCESS_QUERY_LIMITED_INFORMATION`, so it works for most user processes
+/// without elevation; returns `None` for protected system processes.
+#[cfg(windows)]
+fn get_process_image_path(pid: u32) -> Option<String> {
+    use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+    };
+
+    unsafe {
+        let raw = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if raw.is_null() {
+            return None;
+        }
+        let handle = OwnedHandle::from_raw_handle(raw);
+        let mut buffer = vec![0u16; 32_768];
+        let mut size = buffer.len() as u32;
+        if QueryFullProcessImageNameW(
+            handle.as_raw_handle(),
+            PROCESS_NAME_WIN32,
+            buffer.as_mut_ptr(),
+            &mut size,
+        ) == 0
+        {
+            return None;
+        }
+        buffer.truncate(size as usize);
+        Some(String::from_utf16_lossy(&buffer))
     }
 }
 

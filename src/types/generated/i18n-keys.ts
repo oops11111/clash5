@@ -110,7 +110,6 @@ export const translationKeys = [
   'home.components.perAppProxy.feedback.detached',
   'home.components.perAppProxy.feedback.noChainSelected',
   'home.components.perAppProxy.feedback.processNotRunning',
-  'home.components.perAppProxy.feedback.processNotFound',
   'home.components.perAppProxy.confirm.title',
   'home.components.perAppProxy.confirm.body',
   'home.components.perAppProxy.confirm.warning',

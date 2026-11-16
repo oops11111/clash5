@@ -58,8 +58,7 @@
         "attached": "Per-app proxy enabled",
         "detached": "Per-app proxy disabled",
         "noChainSelected": "Select a chain for this app first",
-        "processNotRunning": "This app has no active connections",
-        "processNotFound": "Process not found"
+        "processNotRunning": "This app is not running"
       },
       "confirm": {
         "title": "Enable Per-App Proxy",

@@ -184,7 +184,6 @@ export interface TranslationResources {
             attached: string
             detached: string
             noChainSelected: string
-            processNotFound: string
             processNotRunning: string
           }
           noChain: string

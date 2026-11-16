@@ -11,6 +11,7 @@ import {
 } from '@/services/command-wire'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
+import { commands } from '@/services/tauri-commands.generated'
 import type {
   Binding as GeneratedBinding,
   ChainWorkspace as GeneratedChainWorkspace,
@@ -26,8 +27,6 @@ import type {
   PerAppProxySettings,
   PluginAuditEvent as GeneratedPluginAuditEvent,
   PluginEffectiveConfig as GeneratedPluginEffectiveConfig,
-  ProcessCandidate,
-  ProcessProxyStatus,
   ProxyViewV1_Serialize,
   RunStateView,
   RunningMode as GeneratedRunningMode,
@@ -839,20 +838,31 @@ export async function checkMediaUnlockItem(name: string) {
 // Per-App Proxy commands
 // ---------------------------------------------------------------------------
 
+/** Unwrap the generated command envelope, rethrowing the structured failure. */
+async function unwrapCommand<T>(
+  result: Promise<
+    { status: 'ok'; data: T } | { status: 'error'; error: unknown }
+  >,
+): Promise<T> {
+  const settled = await result
+  if (settled.status === 'error') throw settled.error
+  return settled.data
+}
+
 export const clash5ProcessProxyStatus = () =>
-  invoke<ProcessProxyStatus>('clash5_process_proxy_status')
+  unwrapCommand(commands.clash5ProcessProxyStatus())
 
 export const clash5AttachProcessProxy = (chainId: string, pid: number) =>
-  invoke<ProcessProxyStatus>('clash5_attach_process_proxy', { chainId, pid })
+  unwrapCommand(commands.clash5AttachProcessProxy(chainId, pid))
 
 export const clash5DetachProcessProxy = () =>
-  invoke<ProcessProxyStatus>('clash5_detach_process_proxy')
+  unwrapCommand(commands.clash5DetachProcessProxy())
 
 export const clash5ListProcessCandidates = () =>
-  invoke<ProcessCandidate[]>('clash5_list_process_candidates')
+  unwrapCommand(commands.clash5ListProcessCandidates())
 
 export const clash5GetPerAppProxySettings = () =>
-  invoke<PerAppProxySettings>('clash5_get_per_app_proxy_settings')
+  unwrapCommand(commands.clash5GetPerAppProxySettings())
 
 export const clash5SetPerAppProxySettings = (settings: PerAppProxySettings) =>
-  invoke<PerAppProxySettings>('clash5_set_per_app_proxy_settings', { settings })
+  unwrapCommand(commands.clash5SetPerAppProxySettings(settings))

@@ -621,7 +621,7 @@ pub struct PerAppProxyMapping {
     pub order: u32,
 }
 
-fn default_true() -> bool {
+const fn default_true() -> bool {
     true
 }
 
@@ -650,6 +650,86 @@ mod performance_preset_tests {
         let yaml = serde_yaml_ng::to_string(&config)?;
         let restored: IVerge = serde_yaml_ng::from_str(&yaml)?;
         assert_eq!(restored.performance_preset, Some(PerformancePreset::PowerSaving));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, reason = "tests assert by panicking")]
+mod per_app_proxy_tests {
+    use super::*;
+
+    fn mapping(process: &str, path: &str, chain: &str) -> PerAppProxyMapping {
+        PerAppProxyMapping {
+            process_name: process.into(),
+            process_path: path.into(),
+            chain_id: chain.into(),
+            enabled: true,
+            order: 0,
+        }
+    }
+
+    #[test]
+    fn mappings_survive_a_verge_yaml_round_trip() -> Result<(), serde_yaml_ng::Error> {
+        let mut config = IVerge::template();
+        config.patch_config(&IVerge {
+            per_app_proxy: Some(PerAppProxySettings {
+                mappings: vec![
+                    mapping("chrome.exe", r"C:\Program Files\Google\Chrome\chrome.exe", "chain-a"),
+                    mapping("code.exe", r"C:\Apps\Code\code.exe", "chain-b"),
+                ],
+            }),
+            ..IVerge::default()
+        });
+
+        let yaml = serde_yaml_ng::to_string(&config)?;
+        let restored: IVerge = serde_yaml_ng::from_str(&yaml)?;
+        let restored = restored.per_app_proxy.expect("per_app_proxy persisted");
+        assert_eq!(restored.mappings.len(), 2);
+        assert_eq!(restored.mappings[0].process_name, "chrome.exe");
+        assert_eq!(restored.mappings[0].chain_id, "chain-a");
+        assert_eq!(restored.mappings[1].order, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_patch_without_per_app_proxy_keeps_the_existing_mappings() {
+        let mut config = IVerge::template();
+        config.patch_config(&IVerge {
+            per_app_proxy: Some(PerAppProxySettings {
+                mappings: vec![mapping("chrome.exe", "", "chain-a")],
+            }),
+            ..IVerge::default()
+        });
+
+        // An unrelated patch must not clear the stored mapping.
+        config.patch_config(&IVerge {
+            language: Some("en".into()),
+            ..IVerge::default()
+        });
+
+        let kept = config.per_app_proxy.expect("mapping kept");
+        assert_eq!(kept.mappings.len(), 1);
+        assert_eq!(kept.mappings[0].chain_id, "chain-a");
+    }
+
+    #[test]
+    fn defaults_fill_in_when_older_configs_omit_optional_fields() -> Result<(), serde_yaml_ng::Error> {
+        // A mapping written by an earlier build may only carry name + chain.
+        let yaml = "per_app_proxy:\n  mappings:\n    - processName: chrome.exe\n      chainId: chain-a\n";
+        let restored: IVerge = serde_yaml_ng::from_str(yaml)?;
+        let settings = restored.per_app_proxy.expect("settings parsed");
+        assert_eq!(settings.mappings.len(), 1);
+        assert_eq!(settings.mappings[0].process_path, "");
+        assert!(settings.mappings[0].enabled, "enabled defaults to true");
+        assert_eq!(settings.mappings[0].order, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn an_empty_section_parses_as_no_mappings() -> Result<(), serde_yaml_ng::Error> {
+        let restored: IVerge = serde_yaml_ng::from_str("per_app_proxy: {}\n")?;
+        assert!(restored.per_app_proxy.expect("settings parsed").mappings.is_empty());
         Ok(())
     }
 }

@@ -52,6 +52,7 @@ import type {
   ProcessProxyStatus,
   ProxyChain,
 } from '@/services/tauri-commands.generated'
+import getSystem from '@/utils/get-system'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -106,7 +107,11 @@ function deriveProcessList(
         runtimeStatus = 'recovery_required'
         errorDetail = globalStatus.detail
       } else if (globalStatus.status === 'active') {
-        runtimeStatus = mapping?.enabled ? 'active' : 'idle'
+        // Only the mapping that matches the live session's chain is the one
+        // actually being proxied; M5 keeps a single session at a time.
+        const matchesLiveChain =
+          mapping?.enabled && globalStatus.chain_id === mapping.chainId
+        runtimeStatus = matchesLiveChain ? 'active' : 'idle'
       }
 
       map.set(key, {
@@ -126,13 +131,17 @@ function deriveProcessList(
   for (const m of mappings) {
     const key = m.processPath ? `${m.processName}|${m.processPath}` : m.processName
     if (!map.has(key)) {
+      const active =
+        globalStatus.status === 'active' &&
+        m.enabled &&
+        globalStatus.chain_id === m.chainId
       map.set(key, {
         processName: m.processName,
-        processPath: m.processPath,
+        processPath: m.processPath ?? '',
         lastSeen: 0,
         connectionCount: 0,
         mapping: m,
-        runtimeStatus: 'idle',
+        runtimeStatus: active ? 'active' : 'idle',
         chainId: m.chainId,
       })
     }
@@ -239,7 +248,7 @@ export const PerAppProxyCard = () => {
   const [confirmTarget, setConfirmTarget] = useState<ProcessEntry | null>(null)
 
   const isTunActive = verge?.enable_tun_mode && isTunModeAvailable
-  const isWindows = navigator.platform.toLowerCase().includes('win')
+  const isWindows = getSystem() === 'windows'
   const isServiceAvailable = runState.serviceUsable
 
   useEffect(() => {
@@ -274,6 +283,9 @@ export const PerAppProxyCard = () => {
     return () => clearInterval(timer)
   }, [])
 
+  // `mappings` is optional on the wire; treat a missing list as empty.
+  const mappings = useMemo(() => settings.mappings ?? [], [settings])
+
   const processList = useMemo(
     () =>
       deriveProcessList(
@@ -281,10 +293,10 @@ export const PerAppProxyCard = () => {
           ...(response.data?.activeConnections ?? []),
           ...(response.data?.closedConnections ?? []),
         ],
-        settings.mappings,
+        mappings,
         proxyStatus,
       ),
-    [response.data, settings.mappings, proxyStatus],
+    [response.data, mappings, proxyStatus],
   )
 
   const chainNameById = useMemo(() => {
@@ -295,24 +307,32 @@ export const PerAppProxyCard = () => {
 
   const hasActiveSession = proxyStatus.status === 'active'
 
-  const handleChainChange = useCallback(
-    async (entry: ProcessEntry, newChainId: string) => {
-      const key = entry.processPath
-        ? `${entry.processName}|${entry.processPath}`
-        : entry.processName
-      const newMappings = [...settings.mappings]
-      const idx = newMappings.findIndex(
-        (m) =>
-          (m.processPath ? `${m.processName}|${m.processPath}` : m.processName) === key,
-      )
+  const mappingKey = (entry: {
+    processName: string
+    processPath?: string
+  }) =>
+    entry.processPath
+      ? `${entry.processName}|${entry.processPath}`
+      : entry.processName
+
+  /** Upsert a mapping for this process and persist it. Returns false on failure. */
+  const persistMapping = useCallback(
+    async (
+      entry: Pick<ProcessEntry, 'processName' | 'processPath' | 'chainId'>,
+      patch: Partial<PerAppProxyMapping>,
+    ): Promise<boolean> => {
+      const key = mappingKey(entry)
+      const previous = settings
+      const newMappings = [...(previous.mappings ?? [])]
+      const idx = newMappings.findIndex((m) => mappingKey(m) === key)
       if (idx >= 0) {
-        newMappings[idx] = { ...newMappings[idx], chainId: newChainId }
+        newMappings[idx] = { ...newMappings[idx], ...patch }
       } else {
         newMappings.push({
           processName: entry.processName,
           processPath: entry.processPath,
-          chainId: newChainId,
-          enabled: false,
+          chainId: patch.chainId ?? entry.chainId ?? '',
+          enabled: patch.enabled ?? false,
           order: newMappings.length,
         })
       }
@@ -320,24 +340,30 @@ export const PerAppProxyCard = () => {
       setSettings(newSettings)
       try {
         await clash5SetPerAppProxySettings(newSettings)
+        return true
       } catch (err) {
         showNotice.error(err)
-        setSettings(settings)
+        setSettings(previous)
+        return false
       }
     },
     [settings],
   )
 
-  const handleToggle = useLockFn(async (entry: ProcessEntry) => {
-    const key = entry.processPath
-      ? `${entry.processName}|${entry.processPath}`
-      : entry.processName
+  const handleChainChange = useCallback(
+    async (entry: ProcessEntry, newChainId: string) => {
+      await persistMapping(entry, { chainId: newChainId })
+    },
+    [persistMapping],
+  )
 
+  const handleToggle = useLockFn(async (entry: ProcessEntry) => {
     if (entry.runtimeStatus === 'active') {
-      setAttaching(key)
+      setAttaching(mappingKey(entry))
       try {
         const status = await clash5DetachProcessProxy()
         setProxyStatus(status)
+        await persistMapping(entry, { enabled: false })
         showNotice.success(t('home.components.perAppProxy.feedback.detached'))
       } catch (err) {
         showNotice.error(err)
@@ -361,32 +387,35 @@ export const PerAppProxyCard = () => {
       return
     }
 
-    const key = entry.processPath
-      ? `${entry.processName}|${entry.processPath}`
-      : entry.processName
-
-    const activeConns = response.data?.activeConnections ?? []
-    const pidConn = activeConns.find(
-      (c) => c.metadata.process === entry.processName,
-    )
-    if (!pidConn) {
-      showNotice.error(t('home.components.perAppProxy.feedback.processNotRunning'))
-      return
-    }
-
-    setAttaching(key)
+    // Only allow attaching to a process that is actually running: the live
+    // enumeration is the authority on PID, since connection metadata carries
+    // no PID and PIDs get reused.
+    setAttaching(mappingKey(entry))
     try {
       const candidates = await clash5ListProcessCandidates()
-      const candidate = candidates.find(
-        (c) => c.processName === entry.processName,
-      )
-      if (!candidate) {
-        showNotice.error(t('home.components.perAppProxy.feedback.processNotFound'))
+      const sameName = candidates.filter((c) => c.processName === entry.processName)
+      const exactPath = entry.processPath
+        ? sameName.filter(
+            (c) => c.processPath.toLowerCase() === entry.processPath.toLowerCase(),
+          )
+        : []
+      const pool = exactPath.length > 0 ? exactPath : sameName
+
+      if (pool.length === 0) {
+        showNotice.error(t('home.components.perAppProxy.feedback.processNotRunning'))
         return
       }
 
+      // Multi-instance apps (browsers, Electron) all share one image path, so
+      // pick the earliest-created instance: that is the parent of the process
+      // tree the redirect follows.
+      const candidate = pool.reduce((earliest, next) =>
+        next.createdAt < earliest.createdAt ? next : earliest,
+      )
+
       const status = await clash5AttachProcessProxy(chainId, candidate.pid)
       setProxyStatus(status)
+      await persistMapping(entry, { enabled: true, chainId })
       showNotice.success(t('home.components.perAppProxy.feedback.attached'))
     } catch (err) {
       showNotice.error(err)
@@ -482,9 +511,12 @@ export const PerAppProxyCard = () => {
                 : entry.processName
               const { disabled, reason } = isDisabled(entry)
               const isAttaching = attaching === key
-              const chainName = entry.chainId
-                ? chainNameById.get(entry.chainId) ?? t('home.components.perAppProxy.chainInvalid')
-                : undefined
+              // A stored chain that no longer exists must be surfaced, not
+              // silently dropped.
+              const chainMissing =
+                entry.chainId !== undefined &&
+                entry.chainId !== '' &&
+                !chainNameById.has(entry.chainId)
 
               return (
                 <Box
@@ -557,8 +589,10 @@ export const PerAppProxyCard = () => {
                     </Select>
                   </FormControl>
 
-                  {entry.runtimeStatus === 'active' && chainName && (
-                    <Chip size="small" label={chainName} color="primary" variant="outlined" />
+                  {chainMissing && (
+                    <Tooltip title={t('home.components.perAppProxy.chainInvalid')}>
+                      <WarningAmberRounded sx={{ fontSize: 18, color: 'warning.main' }} />
+                    </Tooltip>
                   )}
 
                   <Tooltip title={reason || (entry.runtimeStatus === 'active' ? t('home.components.perAppProxy.actions.detach') : t('home.components.perAppProxy.actions.attach'))}>
@@ -606,7 +640,3 @@ export const PerAppProxyCard = () => {
     </>
   )
 }
-
-export const PerAppProxyCardSkeleton = () => (
-  <Skeleton variant="rectangular" height={200} />
-)
