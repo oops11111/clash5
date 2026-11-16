@@ -4,7 +4,7 @@ import type {
 } from '@/services/tauri-commands.generated'
 
 /** Runtime state shown on a per-app block. */
-export type PerAppRuntimeStatus =
+type PerAppRuntimeStatus =
   | 'idle'
   | 'active'
   | 'failed'
