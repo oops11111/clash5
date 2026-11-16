@@ -33,6 +33,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { EnhancedCard } from '@/components/home/enhanced-card'
+import {
+  derivePerAppEntries,
+  entryKey,
+  gateEntry,
+  isChainMissing,
+  type PerAppEntry,
+  type PerAppGateReason,
+} from '@/components/home/per-app-proxy-model'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useSystemState } from '@/hooks/use-system-state'
 import { useVerge } from '@/hooks/use-verge'
@@ -54,107 +62,6 @@ import type {
 } from '@/services/tauri-commands.generated'
 import getSystem from '@/utils/get-system'
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface ProcessEntry {
-  processName: string
-  processPath: string
-  lastSeen: number
-  connectionCount: number
-  mapping?: PerAppProxyMapping
-  runtimeStatus: 'idle' | 'active' | 'failed' | 'recovery_required' | 'unavailable'
-  chainId?: string
-  errorDetail?: string
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function deriveProcessList(
-  connections: IConnectionsItem[],
-  mappings: PerAppProxyMapping[],
-  globalStatus: ProcessProxyStatus,
-): ProcessEntry[] {
-  const map = new Map<string, ProcessEntry>()
-  const mappingByKey = new Map<string, PerAppProxyMapping>()
-  for (const m of mappings) {
-    const key = m.processPath ? `${m.processName}|${m.processPath}` : m.processName
-    mappingByKey.set(key, m)
-  }
-
-  for (const conn of connections) {
-    const processName = conn.metadata.process?.trim()
-    if (!processName) continue
-    const processPath = conn.metadata.processPath?.trim() || ''
-    const key = processPath ? `${processName}|${processPath}` : processName
-    const startTime = Date.parse(conn.start) || 0
-    const existing = map.get(key)
-    const mapping = mappingByKey.get(key)
-
-    if (existing) {
-      existing.connectionCount += 1
-      if (startTime > existing.lastSeen) existing.lastSeen = startTime
-    } else {
-      let runtimeStatus: ProcessEntry['runtimeStatus'] = 'idle'
-      let errorDetail: string | undefined
-
-      if (globalStatus.status === 'unavailable') {
-        runtimeStatus = 'unavailable'
-      } else if (globalStatus.status === 'recovery_required') {
-        runtimeStatus = 'recovery_required'
-        errorDetail = globalStatus.detail
-      } else if (globalStatus.status === 'active') {
-        // Only the mapping that matches the live session's chain is the one
-        // actually being proxied; M5 keeps a single session at a time.
-        const matchesLiveChain =
-          mapping?.enabled && globalStatus.chain_id === mapping.chainId
-        runtimeStatus = matchesLiveChain ? 'active' : 'idle'
-      }
-
-      map.set(key, {
-        processName,
-        processPath,
-        lastSeen: startTime,
-        connectionCount: 1,
-        mapping,
-        runtimeStatus,
-        chainId: mapping?.chainId,
-        errorDetail,
-      })
-    }
-  }
-
-  // Also include mappings that have no recent connections (manually added).
-  for (const m of mappings) {
-    const key = m.processPath ? `${m.processName}|${m.processPath}` : m.processName
-    if (!map.has(key)) {
-      const active =
-        globalStatus.status === 'active' &&
-        m.enabled &&
-        globalStatus.chain_id === m.chainId
-      map.set(key, {
-        processName: m.processName,
-        processPath: m.processPath ?? '',
-        lastSeen: 0,
-        connectionCount: 0,
-        mapping: m,
-        runtimeStatus: active ? 'active' : 'idle',
-        chainId: m.chainId,
-      })
-    }
-  }
-
-  return Array.from(map.values()).sort((a, b) => {
-    if (a.mapping?.enabled !== b.mapping?.enabled) {
-      return a.mapping?.enabled ? -1 : 1
-    }
-    return b.lastSeen - a.lastSeen
-  })
-}
-
 function formatRelativeTime(timestamp: number): string {
   if (!timestamp) return ''
   const diff = Date.now() - timestamp
@@ -170,7 +77,7 @@ function formatRelativeTime(timestamp: number): string {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-const StatusChip = ({ status, errorDetail }: { status: ProcessEntry['runtimeStatus']; errorDetail?: string }) => {
+const StatusChip = ({ status, errorDetail }: { status: PerAppEntry['runtimeStatus']; errorDetail?: string }) => {
   const { t } = useTranslation()
   switch (status) {
     case 'active':
@@ -247,9 +154,9 @@ export const PerAppProxyCard = () => {
   const [proxyStatus, setProxyStatus] = useState<ProcessProxyStatus>({ status: 'idle' })
   const [loading, setLoading] = useState(true)
   const [attaching, setAttaching] = useState<string | null>(null)
-  const [confirmTarget, setConfirmTarget] = useState<ProcessEntry | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<PerAppEntry | null>(null)
 
-  const isTunActive = verge?.enable_tun_mode && isTunModeAvailable
+  const isTunActive = verge?.enable_tun_mode === true && isTunModeAvailable
   const isWindows = getSystem() === 'windows'
   const isServiceAvailable = runState.serviceUsable
 
@@ -298,14 +205,14 @@ export const PerAppProxyCard = () => {
 
   const processList = useMemo(
     () =>
-      deriveProcessList(
-        [
+      derivePerAppEntries({
+        connections: [
           ...(response.data?.activeConnections ?? []),
           ...(response.data?.closedConnections ?? []),
         ],
         mappings,
-        proxyStatus,
-      ),
+        status: proxyStatus,
+      }),
     [response.data, mappings, proxyStatus],
   )
 
@@ -315,26 +222,23 @@ export const PerAppProxyCard = () => {
     return map
   }, [chains])
 
-  const hasActiveSession = proxyStatus.status === 'active'
+  const knownChainIds = useMemo(
+    () => new Set(chainNameById.keys()),
+    [chainNameById],
+  )
 
-  const mappingKey = (entry: {
-    processName: string
-    processPath?: string
-  }) =>
-    entry.processPath
-      ? `${entry.processName}|${entry.processPath}`
-      : entry.processName
+  const hasActiveSession = proxyStatus.status === 'active'
 
   /** Upsert a mapping for this process and persist it. Returns false on failure. */
   const persistMapping = useCallback(
     async (
-      entry: Pick<ProcessEntry, 'processName' | 'processPath' | 'chainId'>,
+      entry: Pick<PerAppEntry, 'processName' | 'processPath' | 'chainId'>,
       patch: Partial<PerAppProxyMapping>,
     ): Promise<boolean> => {
-      const key = mappingKey(entry)
+      const key = entryKey(entry)
       const previous = settings
       const newMappings = [...(previous.mappings ?? [])]
-      const idx = newMappings.findIndex((m) => mappingKey(m) === key)
+      const idx = newMappings.findIndex((m) => entryKey(m) === key)
       if (idx >= 0) {
         newMappings[idx] = { ...newMappings[idx], ...patch }
       } else {
@@ -361,15 +265,15 @@ export const PerAppProxyCard = () => {
   )
 
   const handleChainChange = useCallback(
-    async (entry: ProcessEntry, newChainId: string) => {
+    async (entry: PerAppEntry, newChainId: string) => {
       await persistMapping(entry, { chainId: newChainId })
     },
     [persistMapping],
   )
 
-  const handleToggle = useLockFn(async (entry: ProcessEntry) => {
+  const handleToggle = useLockFn(async (entry: PerAppEntry) => {
     if (entry.runtimeStatus === 'active') {
-      setAttaching(mappingKey(entry))
+      setAttaching(entryKey(entry))
       try {
         const status = await clash5DetachProcessProxy()
         setProxyStatus(status)
@@ -400,7 +304,7 @@ export const PerAppProxyCard = () => {
     // Only allow attaching to a process that is actually running: the live
     // enumeration is the authority on PID, since connection metadata carries
     // no PID and PIDs get reused.
-    setAttaching(mappingKey(entry))
+    setAttaching(entryKey(entry))
     try {
       const candidates = await clash5ListProcessCandidates()
       const sameName = candidates.filter((c) => c.processName === entry.processName)
@@ -461,19 +365,24 @@ export const PerAppProxyCard = () => {
     setLoading(false)
   })
 
-  const isDisabled = (entry: ProcessEntry): { disabled: boolean; reason?: string } => {
-    if (!isWindows) return { disabled: true, reason: t('home.components.perAppProxy.disabled.nonWindows') }
-    if (!isServiceAvailable) return { disabled: true, reason: t('home.components.perAppProxy.disabled.noService') }
-    if (isTunActive) return { disabled: true, reason: t('home.components.perAppProxy.disabled.tunActive') }
-    if (hasActiveSession && entry.runtimeStatus !== 'active') {
-      return { disabled: true, reason: t('home.components.perAppProxy.disabled.singleSession') }
-    }
-    if (entry.runtimeStatus === 'unavailable') {
-      return { disabled: true, reason: t('home.components.perAppProxy.disabled.unavailable') }
-    }
-    if (attaching !== null) return { disabled: true, reason: t('home.components.perAppProxy.disabled.attaching') }
-    return { disabled: false }
+  const gateReasonKey: Record<PerAppGateReason, string> = {
+    nonWindows: 'home.components.perAppProxy.disabled.nonWindows',
+    noService: 'home.components.perAppProxy.disabled.noService',
+    tunActive: 'home.components.perAppProxy.disabled.tunActive',
+    singleSession: 'home.components.perAppProxy.disabled.singleSession',
+    unavailable: 'home.components.perAppProxy.disabled.unavailable',
+    busy: 'home.components.perAppProxy.disabled.attaching',
   }
+
+  const gateFor = (entry: PerAppEntry): PerAppGateReason | null =>
+    gateEntry({
+      entry,
+      platform: isWindows ? 'windows' : getSystem(),
+      serviceUsable: isServiceAvailable,
+      tunActive: isTunActive,
+      activeSession: hasActiveSession,
+      busy: attaching !== null,
+    })
 
   if (loading) {
     return (
@@ -524,19 +433,16 @@ export const PerAppProxyCard = () => {
             }}
           >
             {processList.map((entry) => {
-              const key = entry.processPath
-                ? `${entry.processName}|${entry.processPath}`
-                : entry.processName
-              const { disabled, reason } = isDisabled(entry)
+              const key = entryKey(entry)
+              const gate = gateFor(entry)
+              const disabled = gate !== null
+              const reason = gate ? t(gateReasonKey[gate]) : undefined
               const isAttaching = attaching === key
-              // A stored chain that no longer exists must be surfaced, not
-              // silently dropped. Only claim it is missing once the chain list
-              // actually loaded.
-              const chainMissing =
-                chainsLoaded &&
-                entry.chainId !== undefined &&
-                entry.chainId !== '' &&
-                !chainNameById.has(entry.chainId)
+              const chainMissing = isChainMissing(
+                entry,
+                knownChainIds,
+                chainsLoaded,
+              )
 
               return (
                 <Box
