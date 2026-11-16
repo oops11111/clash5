@@ -120,13 +120,13 @@ pub fn update_interval_migrated_path() -> Result<PathBuf> {
 #[cfg(target_os = "macos")]
 pub fn service_path() -> Result<PathBuf> {
     let res_dir = app_resources_dir()?;
-    Ok(res_dir.join("clash-verge-service"))
+    Ok(res_dir.join("clash5-service"))
 }
 
 #[cfg(windows)]
 pub fn service_path() -> Result<PathBuf> {
     let res_dir = app_resources_dir()?;
-    Ok(res_dir.join("clash-verge-service.exe"))
+    Ok(res_dir.join("clash5-service.exe"))
 }
 
 pub fn sidecar_log_dir() -> Result<PathBuf> {

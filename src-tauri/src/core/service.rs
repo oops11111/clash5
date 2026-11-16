@@ -591,8 +591,8 @@ impl StagedServiceTools {
                     #[cfg(unix)]
                     std::fs::set_permissions(&staging.directory, std::fs::Permissions::from_mode(0o700))?;
                     let suffix = std::env::consts::EXE_SUFFIX;
-                    let installer = staging.directory.join(format!("clash-verge-service-install{suffix}"));
-                    let service = staging.directory.join(format!("clash-verge-service{suffix}"));
+                    let installer = staging.directory.join(format!("clash5-service-install{suffix}"));
+                    let service = staging.directory.join(format!("clash5-service{suffix}"));
                     std::fs::copy(installer_source, &installer)?;
                     std::fs::copy(service_source, &service)?;
                     #[cfg(unix)]
@@ -610,7 +610,7 @@ impl StagedServiceTools {
 
     fn installer_path(&self) -> PathBuf {
         self.directory
-            .join(format!("clash-verge-service-install{}", std::env::consts::EXE_SUFFIX))
+            .join(format!("clash5-service-install{}", std::env::consts::EXE_SUFFIX))
     }
 }
 
@@ -2229,11 +2229,11 @@ mod tests {
         let staged = StagedServiceTools::create(&installer_source, &service_source)?;
         let directory = staged.directory.clone();
         let installer = staged.installer_path();
-        let service = directory.join("clash-verge-service");
+        let service = directory.join("clash5-service");
 
         assert_eq!(
             installer.file_name().and_then(|name| name.to_str()),
-            Some("clash-verge-service-install")
+            Some("clash5-service-install")
         );
         assert_eq!(std::fs::read(&installer)?, b"clash5 installer");
         assert_eq!(std::fs::read(&service)?, b"clash5 service");
@@ -2305,14 +2305,14 @@ mod tests {
 
         let root = TestDirectory::new("development-service-tool")?;
         let home = root.path().join("home");
-        let source = root.path().join("clash-verge-service-install");
+        let source = root.path().join("clash5-service-install");
         std::fs::write(&source, b"development installer")?;
 
         let selected = service_tool_path_for(&source, Some(&home), true)?;
 
         assert_eq!(
             selected,
-            service_tools_staging_directory(&home).join("clash-verge-service-install")
+            service_tools_staging_directory(&home).join("clash5-service-install")
         );
         assert_eq!(std::fs::read(&selected)?, b"development installer");
         assert_ne!(std::fs::metadata(&selected)?.permissions().mode() & 0o111, 0);
