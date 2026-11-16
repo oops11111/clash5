@@ -687,11 +687,11 @@
         "coreAlreadyRunning": "Çekirdek başlatılamıyor: bir çekirdek işlemi zaten çalışıyor. İlgili uygulamayı kapatın veya kalan işlemi sonlandırıp yeniden deneyin. Sorun devam ederse bilgisayarı yeniden başlatın."
       },
       "sysproxy": {
-        "privilegeRequired": "Sistem vekil sunucusu ayarlanamıyor: macOS yetki yetersizliği nedeniyle değişikliği reddetti. Clash Verge hizmetini kurun; yöneticiyseniz Sistem Ayarları → Gizlilik ve Güvenlik bölümündeki gelişmiş seçeneklerden, sistem genelindeki ayarlar için yönetici parolası zorunluluğunu da kapatabilirsiniz.",
+        "privilegeRequired": "Sistem vekil sunucusu ayarlanamıyor: macOS yetki yetersizliği nedeniyle değişikliği reddetti. clash5 hizmetini kurun; yöneticiyseniz Sistem Ayarları → Gizlilik ve Güvenlik bölümündeki gelişmiş seçeneklerden, sistem genelindeki ayarlar için yönetici parolası zorunluluğunu da kapatabilirsiniz.",
         "directFallback": "Sistem vekil sunucusu ayarlanamadı; trafik doğrudan bağlantıya geri döndürüldü.",
         "guardStopped": "Sistem vekil sunucusu koruması art arda birkaç başarısızlıktan sonra durdu. Sistem vekil sunucusu artık otomatik olarak korunmuyor.",
-        "sidecarWhileServiceReady": "Sistem vekil sunucusu ayarlanamadı: Clash Verge hizmeti hazır ancak çekirdek hâlâ Sidecar olarak çalışıyor. Hizmet moduna geçmek için çekirdeği yeniden başlatın.",
-        "coreNotReady": "Çekirdek çalışmadığı için sistem vekil sunucusu etkinleştirilemedi. Çekirdeği başlatın (veya Clash Verge hizmetini kurun/onarın) ve yeniden deneyin.",
+        "sidecarWhileServiceReady": "Sistem vekil sunucusu ayarlanamadı: clash5 hizmeti hazır ancak çekirdek hâlâ Sidecar olarak çalışıyor. Hizmet moduna geçmek için çekirdeği yeniden başlatın.",
+        "coreNotReady": "Çekirdek çalışmadığı için sistem vekil sunucusu etkinleştirilemedi. Çekirdeği başlatın (veya clash5 hizmetini kurun/onarın) ve yeniden deneyin.",
         "systemCallFailed": "Bir Windows sistem çağrısı başarısız olduğu için sistem vekil sunucusu yazılamadı. Bu genellikle geçicidir, yeniden deneyin."
       }
     },
