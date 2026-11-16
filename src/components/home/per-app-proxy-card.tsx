@@ -77,27 +77,74 @@ function formatRelativeTime(timestamp: number): string {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-const StatusChip = ({ status, errorDetail }: { status: PerAppEntry['runtimeStatus']; errorDetail?: string }) => {
+const StatusChip = ({
+  status,
+  errorDetail,
+}: {
+  status: PerAppEntry['runtimeStatus']
+  errorDetail?: string
+}) => {
   const { t } = useTranslation()
   switch (status) {
     case 'active':
-      return <Chip size="small" icon={<CheckCircleOutlineRounded />} label={t('home.components.perAppProxy.status.active')} color="success" variant="outlined" />
+      return (
+        <Chip
+          size="small"
+          icon={<CheckCircleOutlineRounded />}
+          label={t('home.components.perAppProxy.status.active')}
+          color="success"
+          variant="outlined"
+        />
+      )
     case 'failed':
       return (
-        <Tooltip title={errorDetail || t('home.components.perAppProxy.status.failed')}>
-          <Chip size="small" icon={<ErrorOutlineRounded />} label={t('home.components.perAppProxy.status.failed')} color="error" variant="outlined" />
+        <Tooltip
+          title={errorDetail || t('home.components.perAppProxy.status.failed')}
+        >
+          <Chip
+            size="small"
+            icon={<ErrorOutlineRounded />}
+            label={t('home.components.perAppProxy.status.failed')}
+            color="error"
+            variant="outlined"
+          />
         </Tooltip>
       )
     case 'recovery_required':
       return (
-        <Tooltip title={errorDetail || t('home.components.perAppProxy.status.recoveryRequired')}>
-          <Chip size="small" icon={<WarningAmberRounded />} label={t('home.components.perAppProxy.status.recoveryRequired')} color="warning" variant="outlined" />
+        <Tooltip
+          title={
+            errorDetail ||
+            t('home.components.perAppProxy.status.recoveryRequired')
+          }
+        >
+          <Chip
+            size="small"
+            icon={<WarningAmberRounded />}
+            label={t('home.components.perAppProxy.status.recoveryRequired')}
+            color="warning"
+            variant="outlined"
+          />
         </Tooltip>
       )
     case 'unavailable':
-      return <Chip size="small" icon={<BlockRounded />} label={t('home.components.perAppProxy.status.unavailable')} color="default" variant="outlined" />
+      return (
+        <Chip
+          size="small"
+          icon={<BlockRounded />}
+          label={t('home.components.perAppProxy.status.unavailable')}
+          color="default"
+          variant="outlined"
+        />
+      )
     default:
-      return <Chip size="small" label={t('home.components.perAppProxy.status.idle')} variant="outlined" />
+      return (
+        <Chip
+          size="small"
+          label={t('home.components.perAppProxy.status.idle')}
+          variant="outlined"
+        />
+      )
   }
 }
 
@@ -113,14 +160,25 @@ interface AttachConfirmProps {
   onCancel: () => void
 }
 
-const AttachConfirmDialog = ({ open, processName, chainName, onConfirm, onCancel }: AttachConfirmProps) => {
+const AttachConfirmDialog = ({
+  open,
+  processName,
+  chainName,
+  onConfirm,
+  onCancel,
+}: AttachConfirmProps) => {
   const { t } = useTranslation()
   return (
     <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
-      <DialogTitle>{t('home.components.perAppProxy.confirm.title')}</DialogTitle>
+      <DialogTitle>
+        {t('home.components.perAppProxy.confirm.title')}
+      </DialogTitle>
       <DialogContent>
         <DialogContentText>
-          {t('home.components.perAppProxy.confirm.body', { processName, chainName })}
+          {t('home.components.perAppProxy.confirm.body', {
+            processName,
+            chainName,
+          })}
         </DialogContentText>
         <DialogContentText sx={{ mt: 1, fontWeight: 'bold' }}>
           {t('home.components.perAppProxy.confirm.warning')}
@@ -147,11 +205,15 @@ export const PerAppProxyCard = () => {
   const { runState, isTunModeAvailable } = useSystemState()
   const { verge } = useVerge()
 
-  const [settings, setSettings] = useState<PerAppProxySettings>({ mappings: [] })
+  const [settings, setSettings] = useState<PerAppProxySettings>({
+    mappings: [],
+  })
   const [chains, setChains] = useState<ProxyChain[]>([])
   // Distinguishes "chain was deleted" from "we could not read the chain list".
   const [chainsLoaded, setChainsLoaded] = useState(false)
-  const [proxyStatus, setProxyStatus] = useState<ProcessProxyStatus>({ status: 'idle' })
+  const [proxyStatus, setProxyStatus] = useState<ProcessProxyStatus>({
+    status: 'idle',
+  })
   const [loading, setLoading] = useState(true)
   const [attaching, setAttaching] = useState<string | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<PerAppEntry | null>(null)
@@ -188,7 +250,9 @@ export const PerAppProxyCard = () => {
       setLoading(false)
     }
     void load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -297,7 +361,9 @@ export const PerAppProxyCard = () => {
 
     const chainId = entry.chainId
     if (!chainId) {
-      showNotice.error(t('home.components.perAppProxy.feedback.noChainSelected'))
+      showNotice.error(
+        t('home.components.perAppProxy.feedback.noChainSelected'),
+      )
       return
     }
 
@@ -307,16 +373,21 @@ export const PerAppProxyCard = () => {
     setAttaching(entryKey(entry))
     try {
       const candidates = await clash5ListProcessCandidates()
-      const sameName = candidates.filter((c) => c.processName === entry.processName)
+      const sameName = candidates.filter(
+        (c) => c.processName === entry.processName,
+      )
       const exactPath = entry.processPath
         ? sameName.filter(
-            (c) => c.processPath.toLowerCase() === entry.processPath.toLowerCase(),
+            (c) =>
+              c.processPath.toLowerCase() === entry.processPath.toLowerCase(),
           )
         : []
       const pool = exactPath.length > 0 ? exactPath : sameName
 
       if (pool.length === 0) {
-        showNotice.error(t('home.components.perAppProxy.feedback.processNotRunning'))
+        showNotice.error(
+          t('home.components.perAppProxy.feedback.processNotRunning'),
+        )
         return
       }
 
@@ -333,7 +404,9 @@ export const PerAppProxyCard = () => {
       showNotice.success(t('home.components.perAppProxy.feedback.attached'))
     } catch (err) {
       showNotice.error(err)
-      clash5ProcessProxyStatus().then(setProxyStatus).catch(() => {})
+      clash5ProcessProxyStatus()
+        .then(setProxyStatus)
+        .catch(() => {})
     } finally {
       setAttaching(null)
     }
@@ -417,7 +490,14 @@ export const PerAppProxyCard = () => {
         )}
 
         {processList.length === 0 ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 120 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 120,
+            }}
+          >
             <Typography variant="body2" color="text.secondary">
               {t('home.components.perAppProxy.emptyState')}
             </Typography>
@@ -488,15 +568,24 @@ export const PerAppProxyCard = () => {
                     )}
                     {entry.lastSeen > 0 && (
                       <Typography variant="caption" color="text.disabled">
-                        {entry.connectionCount} conn &middot; {formatRelativeTime(entry.lastSeen)}
+                        {entry.connectionCount} conn &middot;{' '}
+                        {formatRelativeTime(entry.lastSeen)}
                       </Typography>
                     )}
                   </Box>
 
-                  <StatusChip status={entry.runtimeStatus} errorDetail={entry.errorDetail} />
+                  <StatusChip
+                    status={entry.runtimeStatus}
+                    errorDetail={entry.errorDetail}
+                  />
 
-                  <FormControl size="small" sx={{ minWidth: 120, maxWidth: 180 }}>
-                    <InputLabel>{t('home.components.perAppProxy.chainLabel')}</InputLabel>
+                  <FormControl
+                    size="small"
+                    sx={{ minWidth: 120, maxWidth: 180 }}
+                  >
+                    <InputLabel>
+                      {t('home.components.perAppProxy.chainLabel')}
+                    </InputLabel>
                     <Select
                       value={entry.chainId || ''}
                       label={t('home.components.perAppProxy.chainLabel')}
@@ -516,17 +605,34 @@ export const PerAppProxyCard = () => {
                   </FormControl>
 
                   {chainMissing && (
-                    <Tooltip title={t('home.components.perAppProxy.chainInvalid')}>
-                      <WarningAmberRounded sx={{ fontSize: 18, color: 'warning.main' }} />
+                    <Tooltip
+                      title={t('home.components.perAppProxy.chainInvalid')}
+                    >
+                      <WarningAmberRounded
+                        sx={{ fontSize: 18, color: 'warning.main' }}
+                      />
                     </Tooltip>
                   )}
 
-                  <Tooltip title={reason || (entry.runtimeStatus === 'active' ? t('home.components.perAppProxy.actions.detach') : t('home.components.perAppProxy.actions.attach'))}>
+                  <Tooltip
+                    title={
+                      reason ||
+                      (entry.runtimeStatus === 'active'
+                        ? t('home.components.perAppProxy.actions.detach')
+                        : t('home.components.perAppProxy.actions.attach'))
+                    }
+                  >
                     <span>
                       <Button
                         size="small"
-                        variant={entry.runtimeStatus === 'active' ? 'contained' : 'outlined'}
-                        color={entry.runtimeStatus === 'active' ? 'error' : 'primary'}
+                        variant={
+                          entry.runtimeStatus === 'active'
+                            ? 'contained'
+                            : 'outlined'
+                        }
+                        color={
+                          entry.runtimeStatus === 'active' ? 'error' : 'primary'
+                        }
                         disabled={disabled}
                         onClick={() => handleToggle(entry)}
                         sx={{ minWidth: 72 }}
@@ -544,7 +650,9 @@ export const PerAppProxyCard = () => {
 
                   {reason && (
                     <Tooltip title={reason}>
-                      <HelpOutlineRounded sx={{ fontSize: 16, color: 'text.disabled' }} />
+                      <HelpOutlineRounded
+                        sx={{ fontSize: 16, color: 'text.disabled' }}
+                      />
                     </Tooltip>
                   )}
                 </Box>
@@ -558,7 +666,11 @@ export const PerAppProxyCard = () => {
         <AttachConfirmDialog
           open
           processName={confirmTarget.processName}
-          chainName={confirmTarget.chainId ? chainNameById.get(confirmTarget.chainId) ?? '' : ''}
+          chainName={
+            confirmTarget.chainId
+              ? (chainNameById.get(confirmTarget.chainId) ?? '')
+              : ''
+          }
           onConfirm={handleConfirmAttach}
           onCancel={() => setConfirmTarget(null)}
         />

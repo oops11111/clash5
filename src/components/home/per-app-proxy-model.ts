@@ -182,5 +182,7 @@ export const isChainMissing = (
   knownChainIds: ReadonlySet<string>,
   chainsLoaded: boolean,
 ): boolean =>
-  chainsLoaded && entry.chainId !== undefined && entry.chainId !== '' &&
+  chainsLoaded &&
+  entry.chainId !== undefined &&
+  entry.chainId !== '' &&
   !knownChainIds.has(entry.chainId)

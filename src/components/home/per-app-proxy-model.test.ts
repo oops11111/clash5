@@ -67,8 +67,16 @@ const entryOf = (over: Partial<PerAppEntry> = {}): PerAppEntry => ({
 test('merges connections of the same process and keeps the latest start', () => {
   const entries = derivePerAppEntries({
     connections: [
-      connection('chrome.exe', 'C:\\Chrome\\chrome.exe', '2026-11-16T01:00:00Z'),
-      connection('chrome.exe', 'C:\\Chrome\\chrome.exe', '2026-11-16T03:00:00Z'),
+      connection(
+        'chrome.exe',
+        'C:\\Chrome\\chrome.exe',
+        '2026-11-16T01:00:00Z',
+      ),
+      connection(
+        'chrome.exe',
+        'C:\\Chrome\\chrome.exe',
+        '2026-11-16T03:00:00Z',
+      ),
     ],
     mappings: [],
     status: idle,
@@ -174,7 +182,10 @@ test('recovery_required keeps the detail so the failure stays visible', () => {
   const entries = derivePerAppEntries({
     connections: [connection('a.exe', 'C:\\a.exe', '2026-11-16T01:00:00Z')],
     mappings: [],
-    status: { status: 'recovery_required', detail: 'relay stopped unexpectedly' },
+    status: {
+      status: 'recovery_required',
+      detail: 'relay stopped unexpectedly',
+    },
   })
 
   expect(entries[0].runtimeStatus).toBe('recovery_required')
@@ -244,9 +255,9 @@ test('a live session blocks other blocks but not the active one', () => {
     busy: false,
   }
 
-  expect(gateEntry({ ...base, entry: entryOf({ runtimeStatus: 'idle' }) })).toBe(
-    'singleSession',
-  )
+  expect(
+    gateEntry({ ...base, entry: entryOf({ runtimeStatus: 'idle' }) }),
+  ).toBe('singleSession')
   expect(
     gateEntry({ ...base, entry: entryOf({ runtimeStatus: 'active' }) }),
   ).toBeNull()

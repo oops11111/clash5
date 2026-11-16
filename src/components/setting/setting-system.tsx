@@ -37,15 +37,9 @@ const SettingSystem = ({ onError }: Props) => {
       <SysproxyViewer ref={sysproxyRef} />
       <TunViewer ref={tunRef} />
 
-      <ProxyControlSwitches
-        kind="tunMode"
-        onError={onError}
-      />
+      <ProxyControlSwitches kind="tunMode" onError={onError} />
 
-      <ProxyControlSwitches
-        kind="systemProxy"
-        onError={onError}
-      />
+      <ProxyControlSwitches kind="systemProxy" onError={onError} />
 
       <SettingItem label={t('settings.sections.system.fields.autoLaunch')}>
         <GuardState
