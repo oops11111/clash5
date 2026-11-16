@@ -100,6 +100,7 @@ export const translationKeys = [
   'home.components.perAppProxy.actions.attach',
   'home.components.perAppProxy.actions.detach',
   'home.components.perAppProxy.actions.refresh',
+  'home.components.perAppProxy.actions.dismiss',
   'home.components.perAppProxy.disabled.nonWindows',
   'home.components.perAppProxy.disabled.noService',
   'home.components.perAppProxy.disabled.tunActive',

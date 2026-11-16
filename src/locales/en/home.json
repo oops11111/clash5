@@ -44,7 +44,8 @@
       "actions": {
         "attach": "Enable",
         "detach": "Disable",
-        "refresh": "Refresh"
+        "refresh": "Refresh",
+        "dismiss": "Dismiss"
       },
       "disabled": {
         "nonWindows": "Per-app proxy is not supported on this platform",

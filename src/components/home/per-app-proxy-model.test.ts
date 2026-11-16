@@ -6,6 +6,7 @@ import type {
 } from '@/services/tauri-commands.generated'
 
 import {
+  applyFailures,
   derivePerAppEntries,
   entryKey,
   gateEntry,
@@ -305,4 +306,46 @@ test('an empty or absent chain id is not treated as missing', () => {
   const known = new Set(['chain-a'])
   expect(isChainMissing({ chainId: '' }, known, true)).toBe(false)
   expect(isChainMissing({ chainId: undefined }, known, true)).toBe(false)
+})
+
+// --- failure retention ------------------------------------------------------
+
+test('a recorded failure marks only its own block as failed', () => {
+  const entries = [
+    entryOf({ processName: 'a.exe', processPath: 'C:\\a.exe' }),
+    entryOf({ processName: 'b.exe', processPath: 'C:\\b.exe' }),
+  ]
+
+  const rows = applyFailures(entries, {
+    'a.exe|C:\\a.exe': 'C5-PROXY-006: TUN is active',
+  })
+
+  expect(rows[0].runtimeStatus).toBe('failed')
+  expect(rows[0].errorDetail).toBe('C5-PROXY-006: TUN is active')
+  expect(rows[1].runtimeStatus).toBe('idle')
+  expect(rows[1].errorDetail).toBeUndefined()
+})
+
+test('a failure survives the next derivation so the block keeps the trace', () => {
+  const entries = derivePerAppEntries({
+    connections: [connection('a.exe', 'C:\\a.exe', '2026-11-16T01:00:00Z')],
+    mappings: [],
+    status: idle,
+  })
+
+  const once = applyFailures(entries, { 'a.exe|C:\\a.exe': 'boom' })
+  const twice = applyFailures(once, { 'a.exe|C:\\a.exe': 'boom' })
+
+  expect(twice[0].runtimeStatus).toBe('failed')
+  expect(twice[0].errorDetail).toBe('boom')
+})
+
+test('no recorded failures leaves the rows untouched', () => {
+  const entries = derivePerAppEntries({
+    connections: [connection('a.exe', 'C:\\a.exe', '2026-11-16T01:00:00Z')],
+    mappings: [],
+    status: idle,
+  })
+
+  expect(applyFailures(entries, {})).toBe(entries)
 })

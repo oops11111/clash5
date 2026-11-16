@@ -162,6 +162,7 @@ export interface TranslationResources {
           actions: {
             attach: string
             detach: string
+            dismiss: string
             refresh: string
           }
           chainInvalid: string

@@ -1,6 +1,7 @@
 import {
   AppsOutlined,
   BlockRounded,
+  CloseRounded,
   CheckCircleOutlineRounded,
   ErrorOutlineRounded,
   HelpOutlineRounded,
@@ -34,6 +35,7 @@ import { useTranslation } from 'react-i18next'
 
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import {
+  applyFailures,
   derivePerAppEntries,
   entryKey,
   gateEntry,
@@ -61,6 +63,30 @@ import type {
   ProxyChain,
 } from '@/services/tauri-commands.generated'
 import getSystem from '@/utils/get-system'
+
+/**
+ * Turn a command failure or a plain error into one line of text for the block.
+ * Structured failures carry `detail`; codes are shown when there is nothing else.
+ */
+function describeError(err: unknown): string {
+  if (typeof err === 'string') return err
+  if (err instanceof Error) return err.message
+  if (typeof err === 'object' && err !== null) {
+    const record = err as {
+      detail?: unknown
+      code?: unknown
+      message?: unknown
+    }
+    if (typeof record.detail === 'string' && record.detail !== '') {
+      return record.detail
+    }
+    if (typeof record.message === 'string' && record.message !== '') {
+      return record.message
+    }
+    if (typeof record.code === 'string') return record.code
+  }
+  return String(err)
+}
 
 function formatRelativeTime(timestamp: number): string {
   if (!timestamp) return ''
@@ -216,6 +242,9 @@ export const PerAppProxyCard = () => {
   })
   const [loading, setLoading] = useState(true)
   const [attaching, setAttaching] = useState<string | null>(null)
+  // Per-block failure text, keyed by entryKey. Kept until the next successful
+  // action on that block or an explicit dismiss.
+  const [failures, setFailures] = useState<Record<string, string>>({})
   const [confirmTarget, setConfirmTarget] = useState<PerAppEntry | null>(null)
 
   const isTunActive = verge?.enable_tun_mode === true && isTunModeAvailable
@@ -280,6 +309,11 @@ export const PerAppProxyCard = () => {
     [response.data, mappings, proxyStatus],
   )
 
+  const rows = useMemo(
+    () => applyFailures(processList, failures),
+    [processList, failures],
+  )
+
   const chainNameById = useMemo(() => {
     const map = new Map<string, string>()
     for (const c of chains) map.set(c.id, c.name)
@@ -292,6 +326,19 @@ export const PerAppProxyCard = () => {
   )
 
   const hasActiveSession = proxyStatus.status === 'active'
+
+  const clearFailure = useCallback((key: string) => {
+    setFailures((current) => {
+      if (!(key in current)) return current
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
+  }, [])
+
+  const recordFailure = useCallback((key: string, err: unknown) => {
+    setFailures((current) => ({ ...current, [key]: describeError(err) }))
+  }, [])
 
   /** Upsert a mapping for this process and persist it. Returns false on failure. */
   const persistMapping = useCallback(
@@ -342,8 +389,10 @@ export const PerAppProxyCard = () => {
         const status = await clash5DetachProcessProxy()
         setProxyStatus(status)
         await persistMapping(entry, { enabled: false })
+        clearFailure(entryKey(entry))
         showNotice.success(t('home.components.perAppProxy.feedback.detached'))
       } catch (err) {
+        recordFailure(entryKey(entry), err)
         showNotice.error(err)
       } finally {
         setAttaching(null)
@@ -385,7 +434,8 @@ export const PerAppProxyCard = () => {
       const pool = exactPath.length > 0 ? exactPath : sameName
 
       if (pool.length === 0) {
-        showNotice.error(
+        recordFailure(
+          entryKey(entry),
           t('home.components.perAppProxy.feedback.processNotRunning'),
         )
         return
@@ -401,8 +451,10 @@ export const PerAppProxyCard = () => {
       const status = await clash5AttachProcessProxy(chainId, candidate.pid)
       setProxyStatus(status)
       await persistMapping(entry, { enabled: true, chainId })
+      clearFailure(entryKey(entry))
       showNotice.success(t('home.components.perAppProxy.feedback.attached'))
     } catch (err) {
+      recordFailure(entryKey(entry), err)
       showNotice.error(err)
       clash5ProcessProxyStatus()
         .then(setProxyStatus)
@@ -489,7 +541,7 @@ export const PerAppProxyCard = () => {
           </Typography>
         )}
 
-        {processList.length === 0 ? (
+        {rows.length === 0 ? (
           <Box
             sx={{
               display: 'flex',
@@ -512,7 +564,7 @@ export const PerAppProxyCard = () => {
               overflowY: 'auto',
             }}
           >
-            {processList.map((entry) => {
+            {rows.map((entry) => {
               const key = entryKey(entry)
               const gate = gateFor(entry)
               const disabled = gate !== null
@@ -524,136 +576,186 @@ export const PerAppProxyCard = () => {
                 chainsLoaded,
               )
 
+              const failure = failures[key]
+
               return (
-                <Box
-                  key={key}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    py: 1,
-                    px: 1,
-                    borderRadius: 1,
-                    opacity: disabled ? 0.6 : 1,
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.04),
-                    },
-                  }}
-                >
-                  <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 500,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {entry.processName}
-                    </Typography>
-                    {entry.processPath && (
+                <Box key={key}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      py: 1,
+                      px: 1,
+                      borderRadius: 1,
+                      opacity: disabled ? 0.6 : 1,
+                      '&:hover': {
+                        backgroundColor: alpha(
+                          theme.palette.primary.main,
+                          0.04,
+                        ),
+                      },
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                       <Typography
-                        variant="caption"
+                        variant="body2"
                         sx={{
-                          display: 'block',
+                          fontWeight: 500,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
-                          color: 'text.disabled',
                         }}
                       >
-                        {entry.processPath}
+                        {entry.processName}
                       </Typography>
+                      {entry.processPath && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            color: 'text.disabled',
+                          }}
+                        >
+                          {entry.processPath}
+                        </Typography>
+                      )}
+                      {entry.lastSeen > 0 && (
+                        <Typography variant="caption" color="text.disabled">
+                          {entry.connectionCount} conn &middot;{' '}
+                          {formatRelativeTime(entry.lastSeen)}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    <StatusChip
+                      status={entry.runtimeStatus}
+                      errorDetail={entry.errorDetail}
+                    />
+
+                    <FormControl
+                      size="small"
+                      sx={{ minWidth: 120, maxWidth: 180 }}
+                    >
+                      <InputLabel>
+                        {t('home.components.perAppProxy.chainLabel')}
+                      </InputLabel>
+                      <Select
+                        value={entry.chainId || ''}
+                        label={t('home.components.perAppProxy.chainLabel')}
+                        disabled={disabled || entry.runtimeStatus === 'active'}
+                        onChange={(e) =>
+                          handleChainChange(entry, e.target.value)
+                        }
+                        size="small"
+                      >
+                        <MenuItem value="">
+                          <em>{t('home.components.perAppProxy.noChain')}</em>
+                        </MenuItem>
+                        {chains.map((c) => (
+                          <MenuItem key={c.id} value={c.id}>
+                            {c.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    {chainMissing && (
+                      <Tooltip
+                        title={t('home.components.perAppProxy.chainInvalid')}
+                      >
+                        <WarningAmberRounded
+                          sx={{ fontSize: 18, color: 'warning.main' }}
+                        />
+                      </Tooltip>
                     )}
-                    {entry.lastSeen > 0 && (
-                      <Typography variant="caption" color="text.disabled">
-                        {entry.connectionCount} conn &middot;{' '}
-                        {formatRelativeTime(entry.lastSeen)}
-                      </Typography>
+
+                    <Tooltip
+                      title={
+                        reason ||
+                        (entry.runtimeStatus === 'active'
+                          ? t('home.components.perAppProxy.actions.detach')
+                          : t('home.components.perAppProxy.actions.attach'))
+                      }
+                    >
+                      <span>
+                        <Button
+                          size="small"
+                          variant={
+                            entry.runtimeStatus === 'active'
+                              ? 'contained'
+                              : 'outlined'
+                          }
+                          color={
+                            entry.runtimeStatus === 'active'
+                              ? 'error'
+                              : 'primary'
+                          }
+                          disabled={disabled}
+                          onClick={() => handleToggle(entry)}
+                          sx={{ minWidth: 72 }}
+                        >
+                          {isAttaching ? (
+                            <CircularProgress size={16} />
+                          ) : entry.runtimeStatus === 'active' ? (
+                            t('home.components.perAppProxy.actions.detach')
+                          ) : (
+                            t('home.components.perAppProxy.actions.attach')
+                          )}
+                        </Button>
+                      </span>
+                    </Tooltip>
+
+                    {reason && (
+                      <Tooltip title={reason}>
+                        <HelpOutlineRounded
+                          sx={{ fontSize: 16, color: 'text.disabled' }}
+                        />
+                      </Tooltip>
                     )}
                   </Box>
 
-                  <StatusChip
-                    status={entry.runtimeStatus}
-                    errorDetail={entry.errorDetail}
-                  />
-
-                  <FormControl
-                    size="small"
-                    sx={{ minWidth: 120, maxWidth: 180 }}
-                  >
-                    <InputLabel>
-                      {t('home.components.perAppProxy.chainLabel')}
-                    </InputLabel>
-                    <Select
-                      value={entry.chainId || ''}
-                      label={t('home.components.perAppProxy.chainLabel')}
-                      disabled={disabled || entry.runtimeStatus === 'active'}
-                      onChange={(e) => handleChainChange(entry, e.target.value)}
-                      size="small"
+                  {failure !== undefined && (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 0.5,
+                        px: 1,
+                        pb: 1,
+                      }}
                     >
-                      <MenuItem value="">
-                        <em>{t('home.components.perAppProxy.noChain')}</em>
-                      </MenuItem>
-                      {chains.map((c) => (
-                        <MenuItem key={c.id} value={c.id}>
-                          {c.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-
-                  {chainMissing && (
-                    <Tooltip
-                      title={t('home.components.perAppProxy.chainInvalid')}
-                    >
-                      <WarningAmberRounded
-                        sx={{ fontSize: 18, color: 'warning.main' }}
+                      <ErrorOutlineRounded
+                        sx={{ fontSize: 16, color: 'error.main', mt: '1px' }}
                       />
-                    </Tooltip>
-                  )}
-
-                  <Tooltip
-                    title={
-                      reason ||
-                      (entry.runtimeStatus === 'active'
-                        ? t('home.components.perAppProxy.actions.detach')
-                        : t('home.components.perAppProxy.actions.attach'))
-                    }
-                  >
-                    <span>
-                      <Button
-                        size="small"
-                        variant={
-                          entry.runtimeStatus === 'active'
-                            ? 'contained'
-                            : 'outlined'
-                        }
-                        color={
-                          entry.runtimeStatus === 'active' ? 'error' : 'primary'
-                        }
-                        disabled={disabled}
-                        onClick={() => handleToggle(entry)}
-                        sx={{ minWidth: 72 }}
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          flex: 1,
+                          color: 'error.main',
+                          wordBreak: 'break-word',
+                        }}
                       >
-                        {isAttaching ? (
-                          <CircularProgress size={16} />
-                        ) : entry.runtimeStatus === 'active' ? (
-                          t('home.components.perAppProxy.actions.detach')
-                        ) : (
-                          t('home.components.perAppProxy.actions.attach')
-                        )}
-                      </Button>
-                    </span>
-                  </Tooltip>
-
-                  {reason && (
-                    <Tooltip title={reason}>
-                      <HelpOutlineRounded
-                        sx={{ fontSize: 16, color: 'text.disabled' }}
-                      />
-                    </Tooltip>
+                        {failure}
+                      </Typography>
+                      <Tooltip
+                        title={t('home.components.perAppProxy.actions.dismiss')}
+                      >
+                        <IconButton
+                          size="small"
+                          aria-label={t(
+                            'home.components.perAppProxy.actions.dismiss',
+                          )}
+                          onClick={() => clearFailure(key)}
+                          sx={{ p: 0.25, mt: '-2px' }}
+                        >
+                          <CloseRounded sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   )}
                 </Box>
               )

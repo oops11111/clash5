@@ -44,7 +44,8 @@
       "actions": {
         "attach": "开启",
         "detach": "关闭",
-        "refresh": "刷新"
+        "refresh": "刷新",
+        "dismiss": "清除提示"
       },
       "disabled": {
         "nonWindows": "本平台不支持分软件代理",

@@ -186,3 +186,20 @@ export const isChainMissing = (
   entry.chainId !== undefined &&
   entry.chainId !== '' &&
   !knownChainIds.has(entry.chainId)
+
+/**
+ * Overlay per-block failures on the derived rows. A failed attach/detach has to
+ * stay visible on its own block; a toast disappears and leaves no trace.
+ */
+export const applyFailures = (
+  entries: PerAppEntry[],
+  failures: Readonly<Record<string, string>>,
+): PerAppEntry[] => {
+  if (Object.keys(failures).length === 0) return entries
+
+  return entries.map((entry) => {
+    const detail = failures[entryKey(entry)]
+    if (detail === undefined) return entry
+    return { ...entry, runtimeStatus: 'failed', errorDetail: detail }
+  })
+}
