@@ -242,6 +242,8 @@ export const PerAppProxyCard = () => {
 
   const [settings, setSettings] = useState<PerAppProxySettings>({ mappings: [] })
   const [chains, setChains] = useState<ProxyChain[]>([])
+  // Distinguishes "chain was deleted" from "we could not read the chain list".
+  const [chainsLoaded, setChainsLoaded] = useState(false)
   const [proxyStatus, setProxyStatus] = useState<ProcessProxyStatus>({ status: 'idle' })
   const [loading, setLoading] = useState(true)
   const [attaching, setAttaching] = useState<string | null>(null)
@@ -254,21 +256,29 @@ export const PerAppProxyCard = () => {
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      try {
-        const [s, c, status] = await Promise.all([
+      // Each source is independent: a dead core must not hide the stored
+      // mappings, and a missing chain list must not hide the process rows.
+      const [settingsResult, chainsResult, statusResult] =
+        await Promise.allSettled([
           clash5GetPerAppProxySettings(),
           getClash5ChainWorkspace(),
-          clash5ProcessProxyStatus().catch(() => ({ status: 'unavailable' as const })),
+          clash5ProcessProxyStatus(),
         ])
-        if (cancelled) return
-        setSettings(s)
-        setChains(c.chains.filter((ch) => ch.enabled))
-        setProxyStatus(status)
-      } catch {
-        // Non-critical: the card will show empty state.
-      } finally {
-        if (!cancelled) setLoading(false)
+      if (cancelled) return
+
+      if (settingsResult.status === 'fulfilled') {
+        setSettings(settingsResult.value)
       }
+      if (chainsResult.status === 'fulfilled') {
+        setChains(chainsResult.value.chains.filter((ch) => ch.enabled))
+        setChainsLoaded(true)
+      }
+      setProxyStatus(
+        statusResult.status === 'fulfilled'
+          ? statusResult.value
+          : { status: 'unavailable' },
+      )
+      setLoading(false)
     }
     void load()
     return () => { cancelled = true }
@@ -427,20 +437,28 @@ export const PerAppProxyCard = () => {
 
   const handleRefresh = useLockFn(async () => {
     setLoading(true)
-    try {
-      const [s, c, status] = await Promise.all([
+    const [settingsResult, chainsResult, statusResult] =
+      await Promise.allSettled([
         clash5GetPerAppProxySettings(),
         getClash5ChainWorkspace(),
-        clash5ProcessProxyStatus().catch(() => ({ status: 'unavailable' as const })),
+        clash5ProcessProxyStatus(),
       ])
-      setSettings(s)
-      setChains(c.chains.filter((ch) => ch.enabled))
-      setProxyStatus(status)
-    } catch (err) {
-      showNotice.error(err)
-    } finally {
-      setLoading(false)
+
+    if (settingsResult.status === 'fulfilled') {
+      setSettings(settingsResult.value)
+    } else {
+      showNotice.error(settingsResult.reason)
     }
+    if (chainsResult.status === 'fulfilled') {
+      setChains(chainsResult.value.chains.filter((ch) => ch.enabled))
+      setChainsLoaded(true)
+    }
+    setProxyStatus(
+      statusResult.status === 'fulfilled'
+        ? statusResult.value
+        : { status: 'unavailable' },
+    )
+    setLoading(false)
   })
 
   const isDisabled = (entry: ProcessEntry): { disabled: boolean; reason?: string } => {
@@ -512,8 +530,10 @@ export const PerAppProxyCard = () => {
               const { disabled, reason } = isDisabled(entry)
               const isAttaching = attaching === key
               // A stored chain that no longer exists must be surfaced, not
-              // silently dropped.
+              // silently dropped. Only claim it is missing once the chain list
+              // actually loaded.
               const chainMissing =
+                chainsLoaded &&
                 entry.chainId !== undefined &&
                 entry.chainId !== '' &&
                 !chainNameById.has(entry.chainId)
