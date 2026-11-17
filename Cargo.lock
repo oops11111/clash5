@@ -1310,7 +1310,7 @@ dependencies = [
 [[package]]
 name = "clash_verge_service_ipc"
 version = "2.7.6"
-source = "git+https://github.com/oops11111/clash5-service-ipc.git?rev=b9974ae4ba37ecc7d774ce3c999cb1f37d28fa1f#b9974ae4ba37ecc7d774ce3c999cb1f37d28fa1f"
+source = "git+https://github.com/oops11111/clash5-service-ipc.git?rev=9f21d98120c402cdb4b8b7dd7529bec96ec28e3b#9f21d98120c402cdb4b8b7dd7529bec96ec28e3b"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
