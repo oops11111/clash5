@@ -63,6 +63,8 @@
       },
       "actions": {
         "openProfiles": "前往订阅",
+        "addNode": "添加节点",
+        "openPlugins": "打开插件",
         "restartCore": "重启内核",
         "openLogs": "打开日志目录"
       }
