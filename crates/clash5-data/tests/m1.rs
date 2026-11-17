@@ -127,7 +127,7 @@ fn v1_database_migrates_without_discarding_nodes() {
     let version: i64 = migrated
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 5);
+    assert_eq!(version, 10);
     let columns: Vec<String> = migrated
         .prepare("PRAGMA table_info(nodes)")
         .unwrap()
@@ -151,6 +151,46 @@ fn v1_database_migrates_without_discarding_nodes() {
         .pragma_query_value(None, "journal_mode", |row| row.get(0))
         .unwrap();
     assert_eq!(journal_mode.to_ascii_lowercase(), "wal");
+}
+
+#[test]
+fn schema_ten_database_keeps_newer_tables_and_manual_nodes() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("schema-ten.sqlite");
+    let mut store = BindingStore::open(&path).unwrap();
+    store.upsert_manual(&node("Existing")).unwrap();
+    drop(store);
+
+    let db = rusqlite::Connection::open(&path).unwrap();
+    db.execute(
+        "INSERT INTO app_routes(id, definition) VALUES(?1, ?2)",
+        ["route-1", r#"{"target":"DIRECT"}"#],
+    )
+    .unwrap();
+    drop(db);
+
+    let mut store = BindingStore::open(&path).unwrap();
+    assert_eq!(store.node_records(false).unwrap().len(), 1);
+    let mut added = node("Added");
+    added.server = "second.example.invalid".into();
+    store.upsert_manual(&added).unwrap();
+    assert_eq!(store.node_records(false).unwrap().len(), 2);
+    drop(store);
+
+    let db = rusqlite::Connection::open(&path).unwrap();
+    assert_eq!(
+        db.pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+            .unwrap(),
+        10
+    );
+    assert_eq!(
+        db.query_row("SELECT definition FROM app_routes WHERE id='route-1'", [], |row| row
+            .get::<_, String>(
+            0
+        ))
+        .unwrap(),
+        r#"{"target":"DIRECT"}"#
+    );
 }
 
 #[test]
