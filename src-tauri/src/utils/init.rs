@@ -337,7 +337,7 @@ fn default_dns_config() -> serde_yaml_ng::Mapping {
     let dns_config = serde_yaml_ng::Mapping::from_iter([
         ("enable".into(), Value::Bool(true)),
         ("ipv6".into(), Value::Bool(false)),
-        ("listen".into(), Value::String(":53".into())),
+        ("listen".into(), Value::String("127.0.0.1:53".into())),
         ("enhanced-mode".into(), Value::String("fake-ip".into())),
         ("fake-ip-range".into(), Value::String("198.18.0.1/16".into())),
         ("fake-ip-range6".into(), Value::String("fdfe:dcba:9876::1/64".into())),
@@ -364,18 +364,14 @@ fn default_dns_config() -> serde_yaml_ng::Mapping {
         (
             "default-nameserver".into(),
             Value::Sequence(vec![
-                Value::String("system".into()),
-                Value::String("223.6.6.6".into()),
-                Value::String("8.8.8.8".into()),
-                Value::String("2400:3200::1".into()),
-                Value::String("2001:4860:4860::8888".into()),
+                Value::String("tls://1.1.1.1".into()),
+                Value::String("tls://1.0.0.1".into()),
             ]),
         ),
         (
             "nameserver".into(),
             Value::Sequence(vec![
-                Value::String("8.8.8.8".into()),
-                Value::String("https://doh.pub/dns-query".into()),
+                Value::String("https://cloudflare-dns.com/dns-query".into()),
                 Value::String("https://dns.alidns.com/dns-query".into()),
             ]),
         ),
@@ -384,7 +380,10 @@ fn default_dns_config() -> serde_yaml_ng::Mapping {
             "nameserver-policy".into(),
             Value::Mapping(serde_yaml_ng::Mapping::new()),
         ),
-        ("proxy-server-nameserver".into(), Value::Sequence(vec![])),
+        (
+            "proxy-server-nameserver".into(),
+            Value::Sequence(vec![Value::String("tls://1.1.1.1".into())]),
+        ),
         ("direct-nameserver".into(), Value::Sequence(vec![])),
         ("direct-nameserver-follow-policy".into(), Value::Bool(false)),
         (
@@ -675,6 +674,30 @@ mod tests {
 
         assert_eq!(dns.get("ipv6"), Some(&Value::Bool(false)));
         assert_eq!(dns.get("respect-rules"), Some(&Value::Bool(true)));
+        Ok(())
+    }
+
+    #[test]
+    fn default_dns_uses_encrypted_upstreams_and_loopback_listener() -> anyhow::Result<()> {
+        let config = default_dns_config();
+        let dns = config
+            .get("dns")
+            .and_then(Value::as_mapping)
+            .ok_or_else(|| anyhow::anyhow!("default DNS config is missing its dns mapping"))?;
+
+        assert_eq!(dns.get("listen"), Some(&Value::String("127.0.0.1:53".into())));
+        for field in ["default-nameserver", "nameserver", "proxy-server-nameserver"] {
+            let upstreams = dns
+                .get(field)
+                .and_then(Value::as_sequence)
+                .ok_or_else(|| anyhow::anyhow!("default DNS config is missing {field}"))?;
+            assert!(!upstreams.is_empty());
+            assert!(upstreams.iter().all(|value| {
+                value
+                    .as_str()
+                    .is_some_and(|address| address.starts_with("tls://") || address.starts_with("https://"))
+            }));
+        }
         Ok(())
     }
 
