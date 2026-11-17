@@ -23,7 +23,7 @@ const recovery = spawnSync(
 if (recovery.error) throw recovery.error
 if (recovery.status !== 0) process.exit(recovery.status ?? 1)
 const read = (file) => readFile(path.join(root, file), 'utf8')
-const serviceRevision = '6cc9a8aee1dcc4e40fdd22469a42b31cc4cc77b4'
+const serviceRevision = '9f21d98120c402cdb4b8b7dd7529bec96ec28e3b'
 const [proxy, state, budget, tests, gates, cargoManifest, cargoLock] =
   await Promise.all([
     read('src-tauri/src/core/proxy_control.rs'),
