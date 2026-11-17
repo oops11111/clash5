@@ -140,6 +140,34 @@ export interface TranslationResources {
           }
           title: string
         }
+        dnsLeak: {
+          actions: {
+            refresh: string
+          }
+          checking: string
+          errors: {
+            hint: string
+            unavailable: string
+          }
+          fields: {
+            exitIp: string
+            exitRegion: string
+            resolverIp: string
+            resolverRegion: string
+            unknown: string
+          }
+          hints: {
+            mismatch: string
+            ok: string
+            unknown: string
+          }
+          title: string
+          verdict: {
+            mismatch: string
+            ok: string
+            unknown: string
+          }
+        }
         ipInfo: {
           errors: {
             load: string
@@ -261,26 +289,13 @@ export interface TranslationResources {
           proxyMode: string
           trafficStats: string
         }
-        settings: {
-          cards: {
-            clashInfo: string
-            currentProxy: string
-            ip: string
-            network: string
-            perAppProxy: string
-            profile: string
-            proxyMode: string
-            systemInfo: string
-            tests: string
-            traffic: string
-          }
-          title: string
+        tabs: {
+          details: string
         }
         title: string
         tooltips: {
           lightweightMode: string
           manual: string
-          settings: string
         }
       }
     }
