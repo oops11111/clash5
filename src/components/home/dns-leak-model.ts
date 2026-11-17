@@ -51,8 +51,9 @@ export const parseResolverIp = (payload: unknown): string => {
 }
 
 /**
- * `https://ipwho.is/<ip>` answers with `{ success, country_code, country, … }`.
- * A failed lookup carries `success: false` and must not be read as a location.
+ * `https://api.ip.sb/geoip/<ip>` answers with `{ country_code, country, … }`.
+ * Some providers answer a failure body instead; anything without a country code
+ * is treated as "unknown" rather than as a location.
  */
 export const parseResolverLocation = (payload: unknown): ResolverLocation => {
   const record = asRecord(payload)

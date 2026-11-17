@@ -7,6 +7,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import { fetch } from '@tauri-apps/plugin-http'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -20,19 +21,32 @@ import {
 } from './dns-leak-model'
 import { EnhancedCard } from './enhanced-card'
 
-const REQUEST_TIMEOUT_MS = 8_000
+const REQUEST_TIMEOUT_MS = 15_000
+const EXIT_LOOKUP_TIMEOUT_MS = 12_000
 // Echoes the resolver that reached the service, not the requester's address.
 const RESOLVER_ECHO_URL = 'https://edns.ip-api.com/json'
-const LOOKUP_URL = 'https://ipwho.is/'
+const LOOKUP_URL = 'https://api.ip.sb/geoip/'
+
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timed out')), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timer)
+        reject(error instanceof Error ? error : new Error(String(error)))
+      },
+    )
+  })
 
 interface DnsLeakSample {
   exitIp: string
-  exitCountry: string
   exitCountryCode: string
   resolverIp: string
-  resolverCountry: string
   resolverCountryCode: string
-  checkedAt: number
 }
 
 const fetchJson = async (url: string): Promise<unknown> => {
@@ -72,6 +86,7 @@ export const DnsLeakCard = () => {
   const [sample, setSample] = useState<DnsLeakSample | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [failureReason, setFailureReason] = useState('')
   // Guards against a slow check landing after unmount or after a newer one.
   const requestIdRef = useRef(0)
 
@@ -80,25 +95,43 @@ export const DnsLeakCard = () => {
     requestIdRef.current = id
     setLoading(true)
     setFailed(false)
+    setFailureReason('')
     try {
-      const exit = await getIpInfo()
+      // The resolver echo is the part that makes this a leak check, so it is
+      // required. The exit lookup is best effort: `getIpInfo` fans out over
+      // several providers with retries and can take a long time when the core
+      // is down, and a missing exit only downgrades the verdict to `unknown`.
       const resolverIp = parseResolverIp(await fetchJson(RESOLVER_ECHO_URL))
       if (!resolverIp) throw new Error('resolver echo carried no address')
       const resolver = parseResolverLocation(
         await fetchJson(`${LOOKUP_URL}${resolverIp}`),
       )
       if (requestIdRef.current !== id) return
+      // Show the resolver immediately; the exit lookup can still be running.
       setSample({
-        exitIp: exit.ip,
-        exitCountry: exit.country,
-        exitCountryCode: exit.country_code,
+        exitIp: '',
+        exitCountryCode: '',
         resolverIp,
-        resolverCountry: resolver.country,
         resolverCountryCode: resolver.countryCode,
-        checkedAt: Date.now(),
       })
-    } catch {
-      if (requestIdRef.current === id) setFailed(true)
+      const exit = await withTimeout(getIpInfo(), EXIT_LOOKUP_TIMEOUT_MS).catch(
+        () => null,
+      )
+      if (requestIdRef.current !== id || !exit) return
+      setSample((current) =>
+        current
+          ? {
+              ...current,
+              exitIp: exit.ip,
+              exitCountryCode: exit.country_code,
+            }
+          : current,
+      )
+    } catch (error) {
+      if (requestIdRef.current === id) {
+        setFailed(true)
+        setFailureReason(error instanceof Error ? error.message : String(error))
+      }
     } finally {
       if (requestIdRef.current === id) setLoading(false)
     }
@@ -159,6 +192,15 @@ export const DnsLeakCard = () => {
           <Typography variant="caption" color="text.secondary">
             {t('home.components.dnsLeak.errors.hint')}
           </Typography>
+          {failureReason !== '' && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block', mt: 0.5, wordBreak: 'break-word' }}
+            >
+              {failureReason}
+            </Typography>
+          )}
         </Box>
       ) : sample ? (
         <Box sx={{ py: 0.5 }}>
@@ -169,7 +211,8 @@ export const DnsLeakCard = () => {
           <Row
             label={t('home.components.dnsLeak.fields.exitRegion')}
             value={
-              sample.exitCountry || t('home.components.dnsLeak.fields.unknown')
+              sample.exitCountryCode ||
+              t('home.components.dnsLeak.fields.unknown')
             }
           />
           <Row
@@ -179,7 +222,7 @@ export const DnsLeakCard = () => {
           <Row
             label={t('home.components.dnsLeak.fields.resolverRegion')}
             value={
-              sample.resolverCountry ||
+              sample.resolverCountryCode ||
               t('home.components.dnsLeak.fields.unknown')
             }
           />
