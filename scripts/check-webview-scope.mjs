@@ -26,6 +26,10 @@ const HTTP_ALLOW_LIST = new Set([
   'https://ipwho.is/*',
   'https://ip.api.skk.moe/*',
   'https://get.geojs.io/*',
+  // Resolver echo used by the DNS leak card: reports which resolver reached it.
+  'https://edns.ip-api.com/*',
+  // The echo answers 302 to a per-request subdomain, so the wildcard is needed.
+  'https://*.edns.ip-api.com/*',
 ])
 
 const failures = []
