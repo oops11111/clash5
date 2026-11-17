@@ -687,11 +687,11 @@
         "coreAlreadyRunning": "Não é possível iniciar o núcleo: já há um processo do núcleo em execução. Feche o aplicativo correspondente ou encerre o processo remanescente e tente novamente. Se o problema persistir, reinicie o computador."
       },
       "sysproxy": {
-        "privilegeRequired": "Não é possível definir o proxy do sistema: o macOS recusou a alteração por falta de privilégios. Instale o serviço do Clash Verge; um administrador também pode desativar a exigência de senha de administrador para configurações do sistema, nas opções avançadas em Ajustes do Sistema → Privacidade e Segurança.",
+        "privilegeRequired": "Não é possível definir o proxy do sistema: o macOS recusou a alteração por falta de privilégios. Instale o serviço do clash5; um administrador também pode desativar a exigência de senha de administrador para configurações do sistema, nas opções avançadas em Ajustes do Sistema → Privacidade e Segurança.",
         "directFallback": "Falha ao definir o proxy do sistema; o tráfego foi revertido para conexão direta.",
         "guardStopped": "A proteção do proxy do sistema parou após falhar várias vezes ao executar. O proxy do sistema não está mais sendo mantido.",
-        "sidecarWhileServiceReady": "Não foi possível definir o proxy do sistema porque o núcleo ainda está em execução como Sidecar, embora o serviço do Clash Verge esteja pronto. Reinicie o núcleo para mudar para o modo serviço.",
-        "coreNotReady": "Não foi possível ativar o proxy do sistema porque o núcleo não está em execução. Inicie o núcleo (ou instale/repare o serviço do Clash Verge) e tente novamente.",
+        "sidecarWhileServiceReady": "Não foi possível definir o proxy do sistema porque o núcleo ainda está em execução como Sidecar, embora o serviço do clash5 esteja pronto. Reinicie o núcleo para mudar para o modo serviço.",
+        "coreNotReady": "Não foi possível ativar o proxy do sistema porque o núcleo não está em execução. Inicie o núcleo (ou instale/repare o serviço do clash5) e tente novamente.",
         "systemCallFailed": "Não foi possível gravar o proxy do sistema porque uma chamada de sistema do Windows falhou. Geralmente é temporário, então tente novamente."
       }
     },
