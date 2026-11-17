@@ -602,7 +602,16 @@ async function resolveServiceBundle() {
     )
   }
 
-  const targetDirectory = path.join(cwd, 'target', 'bundled-service')
+  // The bundled service is pinned by git rev and CI restores target/ from cache
+  // between runs. Sharing a single target directory let cargo keep the rlib that
+  // was built from the previous rev while recompiling the bins from the new
+  // checkout, so the bins linked against a library that predates
+  // LEGACY_WINDOWS_SERVICE_NAME and failed with E0425. Scoping the directory by
+  // the pinned rev keeps the dependency cache but guarantees the library and the
+  // bins always come from the same source.
+  const pinnedRev = dependencyLine?.match(/\brev\s*=\s*"([^"]+)"/)?.[1]
+  const sourceKey = pinnedRev ? pinnedRev.slice(0, 12) : 'local'
+  const targetDirectory = path.join(cwd, 'target', 'bundled-service', sourceKey)
   execFileSync(
     'cargo',
     [
