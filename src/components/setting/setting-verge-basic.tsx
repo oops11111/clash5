@@ -29,6 +29,16 @@ interface Props {
 
 const OS = getSystem()
 
+const legacyStartPages: Record<string, string> = {
+  '/profile': '/subscriptions',
+  '/nodes': '/subscriptions',
+  '/chains': '/',
+  '/rules': '/proxies',
+  '/connections': '/settings',
+  '/logs': '/settings',
+  '/unlock': '/settings',
+}
+
 const languageOptions = supportedLanguages.map((code) => {
   const labels: { [key: string]: string } = {
     en: 'English',
@@ -219,7 +229,7 @@ const SettingVergeBasic = ({ onError }: Props) => {
         label={t('settings.components.verge.basic.fields.startPage')}
       >
         <GuardState
-          value={start_page ?? '/'}
+          value={legacyStartPages[start_page ?? '/'] ?? start_page ?? '/'}
           onCatch={onError}
           onFormat={(e: any) => e.target.value}
           onChange={(e) => onChangeData({ start_page: e })}
@@ -233,16 +243,6 @@ const SettingVergeBasic = ({ onError }: Props) => {
                 </MenuItem>
               )
             })}
-            {start_page === '/proxies' && (
-              <MenuItem value="/proxies">
-                {t('layout.components.navigation.tabs.proxies')}
-              </MenuItem>
-            )}
-            {start_page === '/unlock' && (
-              <MenuItem value="/unlock">
-                {t('layout.components.navigation.tabs.unlock')}
-              </MenuItem>
-            )}
           </Select>
         </GuardState>
       </SettingItem>

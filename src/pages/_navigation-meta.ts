@@ -12,11 +12,6 @@ export const navigationItems = {
     label: 'layout.components.navigation.tabs.plugins',
     path: '/plugins',
   },
-  connections: {
-    label: 'layout.components.navigation.tabs.connections',
-    path: '/connections',
-  },
-  logs: { label: 'layout.components.navigation.tabs.logs', path: '/logs' },
   settings: {
     label: 'layout.components.navigation.tabs.settings',
     path: '/settings',
