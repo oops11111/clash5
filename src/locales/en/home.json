@@ -68,12 +68,12 @@
         "unknown": "Unknown"
       },
       "verdict": {
-        "ok": "No leak",
+        "ok": "Same region",
         "mismatch": "Possible leak",
         "unknown": "Undetermined"
       },
       "hints": {
-        "ok": "The resolver and the exit share a region",
+        "ok": "A matching region does not rule out a DNS leak",
         "mismatch": "The resolver is in a different region from the exit",
         "unknown": "Not enough information to judge"
       },
