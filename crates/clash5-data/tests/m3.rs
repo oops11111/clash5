@@ -157,7 +157,7 @@ fn plugin_audit_records_metadata_without_binding_settings() {
 }
 
 #[test]
-fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
+fn schema_v2_migrates_transactionally_to_schema_v10() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("m2.sqlite");
     {
@@ -179,7 +179,7 @@ fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(version, 5);
+    assert_eq!(version, 10);
     assert!(table_exists);
 
     let rollback_directory = tempfile::tempdir().unwrap();
@@ -205,7 +205,7 @@ fn schema_v2_migrates_transactionally_to_unified_schema_v5() {
 }
 
 #[test]
-fn prior_m3_and_m2_schemas_upgrade_to_v5() {
+fn prior_m3_and_m2_schemas_upgrade_to_v10() {
     for version in [3, 4] {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join(format!("v{version}.sqlite"));
@@ -241,7 +241,7 @@ fn prior_m3_and_m2_schemas_upgrade_to_v5() {
         drop(store);
         let db = rusqlite::Connection::open(&path).unwrap();
         let migrated_version: i64 = db.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
-        assert_eq!(migrated_version, 5);
+        assert_eq!(migrated_version, 10);
         let plugin_table_exists: bool = db
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='plugin_bindings')",
