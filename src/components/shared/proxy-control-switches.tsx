@@ -21,6 +21,10 @@ import { showNotice } from '@/services/notice-service'
 import { requestService } from '@/services/service-request'
 
 interface ProxySwitchProps {
+  /** Explicitly select which control row to render instead of comparing
+   * translated label strings. */
+  kind?: 'systemProxy' | 'tunMode'
+  /** Kept for backward compatibility; ignored when `kind` is set. */
   label?: string
   onError?: (err: Error) => void
   noRightPadding?: boolean
@@ -128,6 +132,7 @@ const SwitchRow = ({
 }
 
 const ProxyControlSwitches = ({
+  kind,
   label,
   onError,
   noRightPadding = false,
@@ -175,9 +180,15 @@ const ProxyControlSwitches = ({
     }
   })
 
+  // Use explicit `kind` when provided; fall back to label comparison only
+  // for callers that have not migrated yet.
   const isSystemProxyMode =
-    label === t('settings.sections.system.toggles.systemProxy') || !label
-  const isTunMode = label === t('settings.sections.system.toggles.tunMode')
+    kind === 'systemProxy' ||
+    (!kind &&
+      (label === t('settings.sections.system.toggles.systemProxy') || !label))
+  const isTunMode =
+    kind === 'tunMode' ||
+    (!kind && label === t('settings.sections.system.toggles.tunMode'))
 
   return (
     <Box sx={{ width: '100%', pr: noRightPadding ? 1 : 2 }}>

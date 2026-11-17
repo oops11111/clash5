@@ -98,6 +98,7 @@ export function vergeFromWire(value: IVerge_Serialize): IVergeConfig {
     ),
     auto_log_clean: choice(config.auto_log_clean, [0, 1, 2, 3, 4] as const),
     home_cards: config.home_cards == null ? undefined : homeCards,
+    per_app_proxy: config.per_app_proxy ?? undefined,
     test_list: config.test_list?.flatMap((item) =>
       item.uid && item.url ? [{ ...item, uid: item.uid, url: item.url }] : [],
     ),

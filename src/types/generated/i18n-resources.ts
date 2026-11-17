@@ -158,6 +158,44 @@ export interface TranslationResources {
           }
           title: string
         }
+        perAppProxy: {
+          actions: {
+            attach: string
+            detach: string
+            dismiss: string
+            refresh: string
+          }
+          chainInvalid: string
+          chainLabel: string
+          confirm: {
+            body: string
+            title: string
+            warning: string
+          }
+          disabled: {
+            attaching: string
+            nonWindows: string
+            noService: string
+            singleSession: string
+            tunActive: string
+            unavailable: string
+          }
+          emptyState: string
+          feedback: {
+            attached: string
+            detached: string
+            noChainSelected: string
+            processNotRunning: string
+          }
+          noChain: string
+          status: {
+            active: string
+            failed: string
+            idle: string
+            recoveryRequired: string
+            unavailable: string
+          }
+        }
         proxyTun: {
           status: {
             systemProxyDisabled: string
@@ -219,6 +257,7 @@ export interface TranslationResources {
       page: {
         cards: {
           networkSettings: string
+          perAppProxy: string
           proxyMode: string
           trafficStats: string
         }
@@ -228,6 +267,7 @@ export interface TranslationResources {
             currentProxy: string
             ip: string
             network: string
+            perAppProxy: string
             profile: string
             proxyMode: string
             systemInfo: string

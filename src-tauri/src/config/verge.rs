@@ -163,6 +163,12 @@ pub struct IVerge {
     #[specta(type = Option<specta_typescript::Unknown>)]
     pub home_cards: Option<serde_json::Value>,
 
+    /// Typed per-app proxy settings: maps a process identity to a chain id.
+    /// Stored separately from `home_cards` (which is untyped JSON) to keep
+    /// the per-app mapping validated and queryable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub per_app_proxy: Option<PerAppProxySettings>,
+
     pub auto_close_connection: Option<bool>,
 
     /// Keep the sing-box sidecar alive after its relay becomes idle.
@@ -467,6 +473,7 @@ impl IVerge {
             auto_light_weight_minutes: Some(10),
             enable_dns_settings: Some(false),
             home_cards: None,
+            per_app_proxy: None,
             enable_external_controller: Some(false),
             ..Self::default()
         }
@@ -571,6 +578,7 @@ impl IVerge {
         patch!(auto_light_weight_minutes);
         patch!(enable_dns_settings);
         patch!(home_cards);
+        patch!(per_app_proxy);
         patch!(enable_external_controller);
     }
 
@@ -591,6 +599,42 @@ impl IVerge {
     }
 }
 
+/// A single per-app proxy mapping: a process identity to a chain.
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PerAppProxyMapping {
+    /// Process executable name (e.g. "chrome.exe").
+    #[specta(type = std::string::String)]
+    pub process_name: String,
+    /// Full canonical path, used to disambiguate same-name processes.
+    #[serde(default)]
+    #[specta(type = std::string::String)]
+    pub process_path: String,
+    /// Chain identifier from `chains::definitions()`.
+    #[specta(type = std::string::String)]
+    pub chain_id: String,
+    /// Whether this mapping is currently enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Sort order within the per-app proxy list.
+    #[serde(default)]
+    pub order: u32,
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+/// Typed per-app proxy configuration, stored in `verge.yaml` under
+/// `per_app_proxy`. Replaces the untyped `home_cards` JSON blob for this
+/// feature so the mapping is validated at the config layer.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PerAppProxySettings {
+    #[serde(default)]
+    pub mappings: Vec<PerAppProxyMapping>,
+}
+
 #[cfg(test)]
 mod performance_preset_tests {
     use super::*;
@@ -606,6 +650,86 @@ mod performance_preset_tests {
         let yaml = serde_yaml_ng::to_string(&config)?;
         let restored: IVerge = serde_yaml_ng::from_str(&yaml)?;
         assert_eq!(restored.performance_preset, Some(PerformancePreset::PowerSaving));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, reason = "tests assert by panicking")]
+mod per_app_proxy_tests {
+    use super::*;
+
+    fn mapping(process: &str, path: &str, chain: &str) -> PerAppProxyMapping {
+        PerAppProxyMapping {
+            process_name: process.into(),
+            process_path: path.into(),
+            chain_id: chain.into(),
+            enabled: true,
+            order: 0,
+        }
+    }
+
+    #[test]
+    fn mappings_survive_a_verge_yaml_round_trip() -> Result<(), serde_yaml_ng::Error> {
+        let mut config = IVerge::template();
+        config.patch_config(&IVerge {
+            per_app_proxy: Some(PerAppProxySettings {
+                mappings: vec![
+                    mapping("chrome.exe", r"C:\Program Files\Google\Chrome\chrome.exe", "chain-a"),
+                    mapping("code.exe", r"C:\Apps\Code\code.exe", "chain-b"),
+                ],
+            }),
+            ..IVerge::default()
+        });
+
+        let yaml = serde_yaml_ng::to_string(&config)?;
+        let restored: IVerge = serde_yaml_ng::from_str(&yaml)?;
+        let restored = restored.per_app_proxy.expect("per_app_proxy persisted");
+        assert_eq!(restored.mappings.len(), 2);
+        assert_eq!(restored.mappings[0].process_name, "chrome.exe");
+        assert_eq!(restored.mappings[0].chain_id, "chain-a");
+        assert_eq!(restored.mappings[1].order, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_patch_without_per_app_proxy_keeps_the_existing_mappings() {
+        let mut config = IVerge::template();
+        config.patch_config(&IVerge {
+            per_app_proxy: Some(PerAppProxySettings {
+                mappings: vec![mapping("chrome.exe", "", "chain-a")],
+            }),
+            ..IVerge::default()
+        });
+
+        // An unrelated patch must not clear the stored mapping.
+        config.patch_config(&IVerge {
+            language: Some("en".into()),
+            ..IVerge::default()
+        });
+
+        let kept = config.per_app_proxy.expect("mapping kept");
+        assert_eq!(kept.mappings.len(), 1);
+        assert_eq!(kept.mappings[0].chain_id, "chain-a");
+    }
+
+    #[test]
+    fn defaults_fill_in_when_older_configs_omit_optional_fields() -> Result<(), serde_yaml_ng::Error> {
+        // A mapping written by an earlier build may only carry name + chain.
+        let yaml = "per_app_proxy:\n  mappings:\n    - processName: chrome.exe\n      chainId: chain-a\n";
+        let restored: IVerge = serde_yaml_ng::from_str(yaml)?;
+        let settings = restored.per_app_proxy.expect("settings parsed");
+        assert_eq!(settings.mappings.len(), 1);
+        assert_eq!(settings.mappings[0].process_path, "");
+        assert!(settings.mappings[0].enabled, "enabled defaults to true");
+        assert_eq!(settings.mappings[0].order, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn an_empty_section_parses_as_no_mappings() -> Result<(), serde_yaml_ng::Error> {
+        let restored: IVerge = serde_yaml_ng::from_str("per_app_proxy: {}\n")?;
+        assert!(restored.per_app_proxy.expect("settings parsed").mappings.is_empty());
         Ok(())
     }
 }

@@ -11,6 +11,7 @@ import {
 } from '@/services/command-wire'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
+import { commands } from '@/services/tauri-commands.generated'
 import type {
   Binding as GeneratedBinding,
   ChainWorkspace as GeneratedChainWorkspace,
@@ -23,6 +24,7 @@ import type {
   NetworkInterfaceWire,
   NodeRecord,
   PendingIdentityRebind as GeneratedPendingIdentityRebind,
+  PerAppProxySettings,
   PluginAuditEvent as GeneratedPluginAuditEvent,
   PluginEffectiveConfig as GeneratedPluginEffectiveConfig,
   ProxyViewV1_Serialize,
@@ -831,3 +833,36 @@ export async function checkMediaUnlock(onComplete: Channel<UnlockItem>) {
 export async function checkMediaUnlockItem(name: string) {
   return invoke<UnlockItem>('check_media_unlock_item', { name })
 }
+
+// ---------------------------------------------------------------------------
+// Per-App Proxy commands
+// ---------------------------------------------------------------------------
+
+/** Unwrap the generated command envelope, rethrowing the structured failure. */
+async function unwrapCommand<T>(
+  result: Promise<
+    { status: 'ok'; data: T } | { status: 'error'; error: unknown }
+  >,
+): Promise<T> {
+  const settled = await result
+  if (settled.status === 'error') throw settled.error
+  return settled.data
+}
+
+export const clash5ProcessProxyStatus = () =>
+  unwrapCommand(commands.clash5ProcessProxyStatus())
+
+export const clash5AttachProcessProxy = (chainId: string, pid: number) =>
+  unwrapCommand(commands.clash5AttachProcessProxy(chainId, pid))
+
+export const clash5DetachProcessProxy = () =>
+  unwrapCommand(commands.clash5DetachProcessProxy())
+
+export const clash5ListProcessCandidates = () =>
+  unwrapCommand(commands.clash5ListProcessCandidates())
+
+export const clash5GetPerAppProxySettings = () =>
+  unwrapCommand(commands.clash5GetPerAppProxySettings())
+
+export const clash5SetPerAppProxySettings = (settings: PerAppProxySettings) =>
+  unwrapCommand(commands.clash5SetPerAppProxySettings(settings))
