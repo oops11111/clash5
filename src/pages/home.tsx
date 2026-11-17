@@ -38,6 +38,7 @@ import { useVerge } from '@/hooks/use-verge'
 import { entry_lightweight_mode } from '@/services/cmds'
 import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
+import { resolveHomeCards, type HomeCardsSettings } from '@/utils/home-cards'
 import { openExternalUrl } from '@/utils/open-external-url'
 
 const preloadTestCard = () =>
@@ -73,33 +74,6 @@ export const preloadHomePageCards = () =>
   ])
 
 // 定义首页卡片设置接口
-interface HomeCardsSettings {
-  profile: boolean
-  proxy: boolean
-  network: boolean
-  mode: boolean
-  traffic: boolean
-  perAppProxy: boolean
-  clashinfo: boolean
-  systeminfo: boolean
-  test: boolean
-  ip: boolean
-  [key: string]: boolean
-}
-
-const DEFAULT_HOME_CARDS: HomeCardsSettings = {
-  profile: true,
-  proxy: true,
-  network: true,
-  mode: true,
-  traffic: true,
-  perAppProxy: true,
-  clashinfo: true,
-  systeminfo: true,
-  test: true,
-  ip: true,
-}
-
 const serializeCardFlags = (cards: HomeCardsSettings) =>
   Object.keys(cards)
     .sort()
@@ -253,8 +227,12 @@ const HomePage = () => {
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // 卡片显示状态
-  const homeCards =
-    (verge?.home_cards as HomeCardsSettings | undefined) ?? DEFAULT_HOME_CARDS
+  // Merge per key: a stored object predates cards added since, and replacing it
+  // wholesale would hide every new card for existing users.
+  const homeCards = useMemo(
+    () => resolveHomeCards(verge?.home_cards),
+    [verge?.home_cards],
+  )
 
   // 文档链接函数 - point to clash5's own docs, not upstream
   const toGithubDoc = useLockFn(() =>
