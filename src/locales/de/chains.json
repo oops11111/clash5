@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "Richtliniengruppe",
+  "appSingleNode": "Knoten",
+  "appMultiHop": "Kette",
+  "appMissingTarget": "Ziel fehlt",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",

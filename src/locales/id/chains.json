@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "Grup kebijakan",
+  "appSingleNode": "Simpul",
+  "appMultiHop": "Rantai",
+  "appMissingTarget": "Tujuan tidak ditemukan",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",

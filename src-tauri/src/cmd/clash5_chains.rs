@@ -31,6 +31,7 @@ pub struct ChainWorkspace {
     chains: Vec<ProxyChain>,
     nodes: Vec<ChainNodeOption>,
     policy_groups: Vec<String>,
+    route_groups: Vec<String>,
 }
 
 #[tauri::command]
@@ -103,6 +104,15 @@ pub async fn clash5_chain_workspace() -> CmdResult<ChainWorkspace> {
             .into_iter()
             .flatten()
             .filter(|group| group.get("type").and_then(Value::as_str) == Some("select"))
+            .filter_map(|group| group.get("name").and_then(Value::as_str))
+            .filter(|name| !name.starts_with("clash5-chain-"))
+            .map(str::to_owned)
+            .collect(),
+        route_groups: config
+            .get("proxy-groups")
+            .and_then(Value::as_sequence)
+            .into_iter()
+            .flatten()
             .filter_map(|group| group.get("name").and_then(Value::as_str))
             .filter(|name| !name.starts_with("clash5-chain-"))
             .map(str::to_owned)
@@ -187,6 +197,13 @@ pub async fn clash5_save_chain(chain: ProxyChain) -> CmdResult {
 pub async fn clash5_delete_chain(id: String) -> CmdResult {
     let _guard = PROFILE_WRITE_LOCK.lock().await;
     let definitions = chains::definitions().await.map_err(|_| storage_failure())?;
+    if clash5_list_app_routes()
+        .await?
+        .iter()
+        .any(|route| matches!(&route.target, clash5_data::RouteTarget::Chain { chain_id } if chain_id == &id))
+    {
+        return Err(coded_error("C5-CHAIN-017", "an app route still uses this chain"));
+    }
     let previous = definitions
         .iter()
         .find(|chain| chain.id == id)
@@ -213,6 +230,66 @@ pub async fn clash5_delete_chain(id: String) -> CmdResult {
         .map_err(|_| storage_failure())?;
     if let Err(failure) = apply_saved_chains().await {
         restore_definition(id, Some(previous)).await?;
+        return Err(failure);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_list_app_routes() -> CmdResult<Vec<clash5_data::AppRoute>> {
+    with_clash5_binding_store(|store| store.app_routes())
+        .await
+        .map_err(|_| storage_failure())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_save_app_route(route: clash5_data::AppRoute) -> CmdResult {
+    let _guard = PROFILE_WRITE_LOCK.lock().await;
+    route
+        .validate()
+        .map_err(|_| coded_error("C5-ROUTE-002", "app route definition is invalid"))?;
+    let previous = clash5_list_app_routes()
+        .await?
+        .into_iter()
+        .find(|saved| saved.id == route.id);
+    let saved = route.clone();
+    with_clash5_binding_store(move |store| store.save_app_route(&saved))
+        .await
+        .map_err(|_| storage_failure())?;
+    if let Err(failure) = apply_saved_chains().await {
+        let id = route.id;
+        with_clash5_binding_store(move |store| match previous {
+            Some(previous) => store.save_app_route(&previous),
+            None => store.delete_app_route(&id),
+        })
+        .await
+        .map_err(|_| coded_error("C5-ROUTE-004", "previous route could not be restored"))?;
+        apply_saved_chains().await?;
+        return Err(failure);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn clash5_delete_app_route(id: String) -> CmdResult {
+    let _guard = PROFILE_WRITE_LOCK.lock().await;
+    let previous = clash5_list_app_routes()
+        .await?
+        .into_iter()
+        .find(|saved| saved.id == id)
+        .ok_or_else(|| coded_error("C5-ROUTE-002", "app route was not found"))?;
+    let deleted = id.clone();
+    with_clash5_binding_store(move |store| store.delete_app_route(&deleted))
+        .await
+        .map_err(|_| storage_failure())?;
+    if let Err(failure) = apply_saved_chains().await {
+        with_clash5_binding_store(move |store| store.save_app_route(&previous))
+            .await
+            .map_err(|_| coded_error("C5-ROUTE-004", "previous route could not be restored"))?;
+        apply_saved_chains().await?;
         return Err(failure);
     }
     Ok(())
@@ -440,8 +517,9 @@ mod tests {
                 chains: vec![],
                 nodes: vec![],
                 policy_groups: vec!["PROXY".into()],
+                route_groups: vec!["PROXY".into()],
             })?,
-            json!({"profile_id":null,"chains":[],"nodes":[],"policy_groups":["PROXY"]})
+            json!({"profile_id":null,"chains":[],"nodes":[],"policy_groups":["PROXY"],"route_groups":["PROXY"]})
         );
         assert_eq!(
             serde_json::to_value(ChainTestResult {

@@ -1,3 +1,5 @@
+import { AppRoutesPanel } from '@/components/proxy/app-routes-panel'
+
 import ProxyPage from './proxies'
 import RulesPage from './rules'
 import { WorkspaceTabs } from './workspace-tabs'
@@ -15,6 +17,11 @@ const ProxyWorkspace = () => (
         id: 'rules',
         label: 'layout.components.navigation.tabs.rules',
         Component: RulesPage,
+      },
+      {
+        id: 'apps',
+        label: 'proxies.apps.title',
+        Component: AppRoutesPanel,
       },
     ]}
   />

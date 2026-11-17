@@ -1,3 +1,5 @@
+import type { AppRoute as GeneratedAppRoute } from '@/services/tauri-commands.generated'
+
 import type { Clash5NodeRecord } from './clash5-node'
 
 export interface ChainNodeRef {
@@ -30,7 +32,11 @@ export interface ChainWorkspace {
   chains: Clash5Chain[]
   nodes: ChainNodeOption[]
   policy_groups: string[]
+  route_groups: string[]
 }
+
+export type AppRouteDef = GeneratedAppRoute
+export type RouteTargetRef = AppRouteDef['target']
 
 interface ExitObservation {
   ip: string

@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "Сәясәт төркеме",
+  "appSingleNode": "Төен",
+  "appMultiHop": "Чылбыр",
+  "appMissingTarget": "Максат табылмады",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",

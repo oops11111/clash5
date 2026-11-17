@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "Grupo de políticas",
+  "appSingleNode": "Nodo",
+  "appMultiHop": "Cadena",
+  "appMissingTarget": "Falta el destino",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",

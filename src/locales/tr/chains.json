@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "İlke grubu",
+  "appSingleNode": "Düğüm",
+  "appMultiHop": "Zincir",
+  "appMissingTarget": "Hedef bulunamadı",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",

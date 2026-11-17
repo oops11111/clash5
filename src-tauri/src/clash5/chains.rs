@@ -2,8 +2,8 @@ use super::manual;
 use crate::{config::profiles::with_clash5_binding_store, utils::dirs};
 use anyhow::{Result, anyhow};
 use clash5_data::{
-    CompiledChain, IdentityKey, Node, NodeRecord, NodeRef, ProxyChain, ScopedProxy, Source, compile_chains,
-    parse_proxy_node,
+    CompiledChain, IdentityKey, Node, NodeRecord, NodeRef, ProxyChain, RouteTarget, ScopedProxy, Source,
+    compile_app_routes, compile_chains, parse_proxy_node,
 };
 use serde_yaml_ng::{Mapping, Value};
 use std::path::Path;
@@ -78,6 +78,13 @@ pub(crate) async fn catalog(config: &Mapping, profile_id: Option<&str>) -> Resul
     };
     if let Some(proxies) = config.get("proxies").and_then(Value::as_sequence) {
         for proxy in proxies {
+            if proxy
+                .get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|name| name.starts_with("clash5-app-node-"))
+            {
+                continue;
+            }
             let Ok(node) = parse_proxy_node(proxy) else {
                 continue;
             };
@@ -161,16 +168,56 @@ pub(crate) async fn definitions() -> Result<Vec<ProxyChain>> {
 }
 
 pub(crate) async fn generate(config: &mut Mapping, profile_id: Option<&str>) -> Result<Vec<CompiledChain>> {
-    let chains: Vec<_> = definitions()
-        .await?
-        .into_iter()
+    let definitions = definitions().await?;
+    let chains: Vec<_> = definitions
+        .iter()
         .filter(|chain| chain.profile_id.as_deref() == profile_id && chain.enabled)
+        .cloned()
         .collect();
-    if chains.is_empty() {
-        return Ok(vec![]);
+    let routes: Vec<_> = with_clash5_binding_store(|store| store.app_routes())
+        .await
+        .map_err(|_| anyhow!("C5-ROUTE-001"))?
+        .into_iter()
+        .filter(|route| match &route.target {
+            RouteTarget::Chain { chain_id } => !definitions
+                .iter()
+                .any(|chain| chain.id == *chain_id && chain.profile_id.as_deref() != profile_id),
+            _ => true,
+        })
+        .collect();
+    let nodes = catalog(config, profile_id).await?;
+    for route in routes.iter().filter(|route| route.enabled) {
+        if let RouteTarget::Node { node } = &route.target {
+            let mut proxy = nodes
+                .iter()
+                .find(|entry| entry.reference == *node)
+                .ok_or_else(|| anyhow!("C5-ROUTE-003"))?
+                .proxy
+                .clone();
+            let name = format!("clash5-app-node-{}", route.id);
+            proxy.insert("name".into(), name.clone().into());
+            let proxies = config
+                .entry(Value::from("proxies"))
+                .or_insert_with(|| Value::Sequence(vec![]))
+                .as_sequence_mut()
+                .ok_or_else(|| anyhow!("C5-ROUTE-003"))?;
+            if proxies
+                .iter()
+                .any(|existing| existing.get("name").and_then(Value::as_str) == Some(name.as_str()))
+            {
+                return Err(anyhow!("C5-ROUTE-003"));
+            }
+            proxies.push(Value::Mapping(proxy));
+        }
     }
-    let catalog = catalog(config, profile_id).await?;
-    compile_chains(config, &chains, &catalog).map_err(anyhow::Error::from)
+    let compiled = if chains.is_empty() {
+        vec![]
+    } else {
+        let catalog = catalog(config, profile_id).await?;
+        compile_chains(config, &chains, &catalog).map_err(anyhow::Error::from)?
+    };
+    compile_app_routes(config, &routes, &chains).map_err(anyhow::Error::from)?;
+    Ok(compiled)
 }
 
 #[cfg(test)]

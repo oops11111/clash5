@@ -1,9 +1,11 @@
+mod app_route;
 mod chain;
 mod identity;
 mod plugin_patch;
 mod profile;
 mod store;
 
+pub use app_route::{AppMatcher, AppRoute, RouteTarget, compile_app_routes};
 pub use chain::{ChainError, CompiledChain, ExitPolicy, NodeRef, ProxyChain, ScopedProxy, compile_chains};
 pub use identity::{DataError, IdentityKey, Node, StableId};
 pub use plugin_patch::{

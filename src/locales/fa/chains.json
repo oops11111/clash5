@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "گروه سیاست",
+  "appSingleNode": "گره",
+  "appMultiHop": "زنجیره",
+  "appMissingTarget": "مقصد موجود نیست",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",

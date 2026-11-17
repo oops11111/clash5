@@ -37,6 +37,7 @@ import type {
   WebDavBackupEntry,
 } from '@/services/tauri-commands.generated'
 import type {
+  AppRouteDef,
   ChainWorkspace,
   Clash5Chain,
   ExitIpResult,
@@ -68,6 +69,12 @@ export const getClash5ChainWorkspace = () =>
   invoke<GeneratedChainWorkspace>(
     'clash5_chain_workspace',
   ) as Promise<ChainWorkspace>
+export const listClash5AppRoutes = () =>
+  unwrapCommand(commands.clash5ListAppRoutes())
+export const saveClash5AppRoute = (route: AppRouteDef) =>
+  unwrapCommand(commands.clash5SaveAppRoute(route))
+export const deleteClash5AppRoute = (id: string) =>
+  unwrapCommand(commands.clash5DeleteAppRoute(id))
 export const saveClash5Chain = (chain: Clash5Chain) =>
   invoke<null>('clash5_save_chain', { chain })
 export const deleteClash5Chain = (id: string) =>
