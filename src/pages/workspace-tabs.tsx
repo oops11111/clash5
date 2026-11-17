@@ -1,4 +1,5 @@
 import { Box, Tab, Tabs } from '@mui/material'
+import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 
@@ -17,15 +18,12 @@ export const WorkspaceTabs = ({
 }) => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const tabsId = useId()
   const [searchParams] = useSearchParams()
   const requested = searchParams.get('section') ?? defaultSection
   const section = sections.some(({ id }) => id === requested)
     ? requested
     : defaultSection
-  const ActivePage =
-    sections.find(({ id }) => id === section)?.Component ??
-    sections[0].Component
-
   return (
     <Box className="workspace-tabs">
       <Tabs
@@ -40,12 +38,27 @@ export const WorkspaceTabs = ({
         scrollButtons="auto"
       >
         {sections.map(({ id, label }) => (
-          <Tab key={id} value={id} label={t(label)} />
+          <Tab
+            key={id}
+            id={`${tabsId}-tab-${id}`}
+            aria-controls={`${tabsId}-panel-${id}`}
+            value={id}
+            label={t(label)}
+          />
         ))}
       </Tabs>
-      <Box className="workspace-tabs__page">
-        <ActivePage />
-      </Box>
+      {sections.map(({ id, Component }) => (
+        <Box
+          key={id}
+          className="workspace-tabs__page"
+          role="tabpanel"
+          id={`${tabsId}-panel-${id}`}
+          aria-labelledby={`${tabsId}-tab-${id}`}
+          hidden={section !== id}
+        >
+          {section === id && <Component />}
+        </Box>
+      ))}
     </Box>
   )
 }
