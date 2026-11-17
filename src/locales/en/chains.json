@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "Policy group",
+  "appSingleNode": "Node",
+  "appMultiHop": "Chain",
+  "appMissingTarget": "Missing target",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",

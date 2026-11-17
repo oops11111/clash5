@@ -401,6 +401,18 @@ export const commands = {
     typedError<ChainWorkspace, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_chain_workspace'),
     ),
+  clash5ListAppRoutes: () =>
+    typedError<AppRoute[], CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_list_app_routes'),
+    ),
+  clash5SaveAppRoute: (route: AppRoute) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_save_app_route', { route }),
+    ),
+  clash5DeleteAppRoute: (id: string) =>
+    typedError<null, CommandFailure_Serialize>(
+      __TAURI_INVOKE('clash5_delete_app_route', { id }),
+    ),
   clash5SaveChain: (chain: ProxyChain) =>
     typedError<null, CommandFailure_Serialize>(
       __TAURI_INVOKE('clash5_save_chain', { chain }),
@@ -623,6 +635,33 @@ export const commands = {
 }
 
 /* Types */
+/**
+ *  What a route matches. Process matchers use the executable name or full path. The domain matcher
+ *  matches a domain and its subdomains for every application, so it cannot separate applications.
+ */
+export type AppMatcher =
+  | { kind: 'process_name'; name: string }
+  | { kind: 'process_path'; path: string }
+  | { kind: 'domain_suffix'; suffix: string }
+
+/**
+ *  An application or subsystem route. Routes are independent objects; each one lists what it covers
+ *  and where that traffic goes.
+ */
+export type AppRoute = {
+  schema_version: number
+  id: string
+  name: string
+  matchers: AppMatcher[]
+  target: RouteTarget
+  enabled: boolean
+  /**
+   *  Resolver for this route's domain matchers, as a DoH URL or an IP address. It is only valid with
+   *  domain matchers, and it applies to every application that resolves those domains.
+   */
+  nameserver?: string | null
+}
+
 export type AutoProxyWire = {
   enable: boolean
   url: string
@@ -663,6 +702,7 @@ export type ChainWorkspace = {
   chains: ProxyChain[]
   nodes: ChainNodeOption[]
   policy_groups: string[]
+  route_groups: string[]
 }
 
 export type Clash5IdentityStatus = {
@@ -1537,6 +1577,13 @@ export type ProxyViewV1_Serialize = {
 }
 
 export type QualityStatus = 'healthy' | 'slow' | 'failed'
+
+export type RouteTarget =
+  | { kind: 'chain'; chain_id: string }
+  | { kind: 'group'; name: string }
+  | { kind: 'node'; node: NodeRef }
+  | { kind: 'direct' }
+  | { kind: 'reject' }
 
 export type RunStateView = {
   mode: RunningMode

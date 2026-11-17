@@ -7,6 +7,10 @@ export interface TranslationResources {
       activate: string
       activated: string
       activatedSession: string
+      appMissingTarget: string
+      appMultiHop: string
+      appPolicyGroup: string
+      appSingleNode: string
       create: string
       delete: string
       deleted: string
@@ -721,6 +725,17 @@ export interface TranslationResources {
       }
     }
     proxies: {
+      apps: {
+        add: string
+        direct: string
+        empty: string
+        hint: string
+        placeholder: string
+        reject: string
+        remove: string
+        target: string
+        title: string
+      }
       components: {
         enums: {
           policies: {
