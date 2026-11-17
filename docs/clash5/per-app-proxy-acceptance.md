@@ -2,7 +2,7 @@
 
 本文列出「attach / 改链 / TUN 互斥 / 杀进程恢复」这四项验收所依赖的环境条件，以及当前代码侧仍缺的东西。目的是让验收从"装不装得上"变成可执行的清单，而不是反复试。
 
-结论先说：**这台机器目前不满足条件，且即使补齐环境，驱动侧仍有代码缺口。**
+结论先说：**这台机器目前不满足条件。服务身份冲突已通过改名消除，剩下的唯一硬缺口是 WFP 驱动（构建、签名、打包、安装均未完成）。**
 
 ## 一、attach 需要两层门槛，缺一不可
 
@@ -23,7 +23,11 @@ attach(chain_id, pid)
 - 若回落到 sidecar（用户模式），该会话永远为空，`attach` 直接返回 `C5-PROXY-005: service owner session is not active`。
 
 **这台机器的实际情况**：`clash_verge_service` 已注册并在运行，但 `ImagePath` 指向
-`C:\Program Files\Clash Verge\resources\clash-verge-service.exe` —— 那是**上游 Clash Verge 的服务**，不是 clash5 的。服务名相同（`clash_verge_service`），所以 `Get-Service` 看起来"有服务"，实际握手对不上，应用只能走 sidecar。
+`C:\Program Files\Clash Verge\resources\clash-verge-service.exe` —— 那是**上游 Clash Verge 的服务**，不是 clash5 的。
+
+改名之前两边都叫 `clash_verge_service`，`Get-Service` 看起来"有服务"，实际握手对不上。现在 clash5 注册为 `clash5_service`，两个产品可以共存，不再抢同一个名字；但这台机器上只有上游的服务，clash5 自己的服务还没装，所以仍然回落到 sidecar。
+
+判定方法：`Get-Service clash5_service` 存在且 `ImagePath` 指向 clash5 安装目录下的 `clash5-service.exe`，才算通过门槛 1。
 
 ### 门槛 2：WFP 驱动
 
@@ -35,9 +39,11 @@ attach(chain_id, pid)
 
 本机 `C:\Windows\System32\drivers\` 下无 `clash5wfp.sys`，也无 `clash5wfp` 内核服务。
 
+服务侧的策略下发**已经实现**：`clash5-service-ipc` 的 `src/core/process_proxy/wfp.rs` 会创建 provider、sublayer、callout 与 filter，并在会话结束时回收。所以缺的不是策略代码，而是驱动本身能不能被签名、打包、装上。
+
 ## 二、前置条件清单（按顺序，均需管理员）
 
-> 以下命令**未在本机执行**。第 3 步会破坏已安装的 Clash Verge 的服务，务必在专用验收机上做。
+> 以下命令**未在本机执行**。全部需要管理员权限；建议在专用验收机上做，因为第 2、4 步会改动系统启动配置并装载内核驱动。
 
 ### 1. 准备驱动构建工具链
 
@@ -68,20 +74,19 @@ bcdedit /set testsigning on
 
 预期：重启后 `bcdedit /enum {current}` 显示 `testsigning Yes`，桌面右下角出现"测试模式"水印。
 
-### 3. 换成 clash5 自己的服务（会替换上游服务）
+### 3. 安装 clash5 自己的服务（不需要动上游服务）
+
+改名后 clash5 注册为 `clash5_service`，与上游 Clash Verge 的 `clash_verge_service` 互不冲突，两者可以共存。
 
 ```powershell
-# 停止并删除上游 Clash Verge 服务（同一服务名）
-sc.exe stop clash_verge_service
-sc.exe delete clash_verge_service
-
-# 安装 clash5 服务（用应用 resources 目录里的安装器）
+# 以管理员运行
 & "<应用目录>\resources\clash5-service-install.exe"
+sc.exe qc clash5_service
 ```
 
-预期：`sc.exe qc clash_verge_service` 的 `BINARY_PATH_NAME` 指向 `clash5-service.exe`。
+预期：`SERVICE_NAME: clash5_service`，`BINARY_PATH_NAME` 指向安装目录下的 `clash5-service.exe`。
 
-> 风险：已安装的 Clash Verge 会失去服务模式。验收后如需恢复，重装 Clash Verge 或用其自带安装器重新注册。
+> 安装器会顺带清理**旧命名**的注册，但只在旧服务的 `ImagePath` 指向 `<安装目录>\clash-verge-service.exe`（即确实是我们自己的旧安装）时才 stop + delete；指向别处的（例如上游 Clash Verge）一律不动。这一步不再需要手工 `sc.exe delete`。
 
 ### 4. 注册并启动驱动
 
@@ -94,7 +99,7 @@ sc.exe query clash5wfp
 
 预期：`STATE` 为 `RUNNING`。
 
-> 注意：README 说明驱动**只提供重定向能力**，WFP provider/callout/filter 的创建应由服务完成；若服务侧未实现 filter 生命周期，驱动起来也不会真正拦截流量。
+> 注意：驱动只提供重定向能力，WFP provider/callout/filter 由服务创建（已实现）。驱动起来但服务未建立会话时，不会拦截任何流量——这是预期行为，不要据此判定驱动失效。
 
 ### 5. 让应用以服务模式启动
 
