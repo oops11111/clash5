@@ -57,16 +57,25 @@ const resolveLanguage = (language?: string) => {
   return FALLBACK_LANGUAGE
 }
 
+const resolveSystemLanguage = (language?: string) => {
+  const normalized = normalizeLanguage(language)
+  if (normalized?.startsWith('zh')) {
+    return 'zh'
+  }
+
+  return FALLBACK_LANGUAGE
+}
+
 export const resolvePreferredLanguage = (
   preference?: string | null,
   systemLanguage?: string,
 ) =>
-  resolveLanguage(
-    !preference || preference === 'system'
-      ? (systemLanguage ??
-          (typeof navigator !== 'undefined' ? navigator.language : undefined))
-      : preference,
-  )
+  !preference || preference === 'system'
+    ? resolveSystemLanguage(
+        systemLanguage ??
+          (typeof navigator !== 'undefined' ? navigator.language : undefined),
+      )
+    : resolveLanguage(preference)
 
 const getLanguageStorage = () => {
   if (typeof window === 'undefined') return null

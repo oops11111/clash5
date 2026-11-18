@@ -11,10 +11,14 @@ describe('language preference', () => {
     expect(resolvePreferredLanguage('system', 'xx-XX')).toBe('en')
   })
 
-  it('resolves aliased tags through the shared alias table', () => {
-    expect(resolvePreferredLanguage('system', 'ja-JP')).toBe('jp')
-    expect(resolvePreferredLanguage('system', 'ja')).toBe('jp')
-    expect(resolvePreferredLanguage('system', 'zh-TW')).toBe('zhtw')
-    expect(resolvePreferredLanguage('system', 'zh-HK')).toBe('zhtw')
+  it('uses simplified Chinese for every Chinese system locale', () => {
+    expect(resolvePreferredLanguage('system', 'zh-TW')).toBe('zh')
+    expect(resolvePreferredLanguage('system', 'zh-HK')).toBe('zh')
+    expect(resolvePreferredLanguage('system', 'zh-Hans-CN')).toBe('zh')
+  })
+
+  it('keeps an explicit language choice authoritative', () => {
+    expect(resolvePreferredLanguage('zhtw', 'zh-CN')).toBe('zhtw')
+    expect(resolvePreferredLanguage('jp', 'zh-CN')).toBe('jp')
   })
 })

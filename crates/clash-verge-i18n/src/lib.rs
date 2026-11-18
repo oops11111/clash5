@@ -64,8 +64,17 @@ pub fn current_language(language: Option<&str>) -> Cow<'static, str> {
 pub fn system_language() -> Cow<'static, str> {
     sys_locale::get_locale()
         .as_deref()
-        .and_then(resolve_supported_language)
+        .map(resolve_system_language)
         .unwrap_or(Cow::Borrowed(DEFAULT_LANGUAGE))
+}
+
+#[inline]
+fn resolve_system_language(language: &str) -> Cow<'static, str> {
+    if language.to_lowercase().replace('_', "-").starts_with("zh") {
+        return Cow::Borrowed("zh");
+    }
+
+    Cow::Borrowed(DEFAULT_LANGUAGE)
 }
 
 #[inline]
@@ -118,5 +127,13 @@ mod tests {
         assert_eq!(resolve_supported_language("zh-CN").as_deref(), Some("zh"));
         assert_eq!(resolve_supported_language("xx"), None);
         assert_eq!(DEFAULT_LANGUAGE, "en");
+    }
+
+    #[test]
+    fn system_locale_falls_back_to_english_but_collapses_chinese_variants() {
+        assert_eq!(resolve_system_language("zh-TW"), "zh");
+        assert_eq!(resolve_system_language("zh-Hans-CN"), "zh");
+        assert_eq!(resolve_system_language("ja-JP"), "en");
+        assert_eq!(resolve_system_language("xx-XX"), "en");
     }
 }
