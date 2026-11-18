@@ -63,6 +63,8 @@
       },
       "actions": {
         "openProfiles": "Go to Profiles",
+        "addNode": "Add a node",
+        "openPlugins": "Open Plugins",
         "restartCore": "Restart Core",
         "openLogs": "Open Logs Folder"
       }
