@@ -726,6 +726,23 @@ mod tests {
     }
 
     #[test]
+    fn a_returning_service_clears_the_sidecar_allowance_for_tun_handoff() {
+        let store = with_env(FakeEnv::new());
+        store.observe(ServiceHealth::Unavailable("service stopped".to_owned()));
+        store
+            .allow_sidecar_for_session()
+            .expect("unavailable service permits Sidecar");
+        store.core_started(RunningMode::Sidecar);
+
+        store.observe(ServiceHealth::Ready);
+
+        let state = store.state();
+        assert_eq!(state.mode, RunningMode::Sidecar);
+        assert!(state.service_usable());
+        assert!(!state.sidecar_allowed);
+    }
+
+    #[test]
     fn sidecar_may_be_allowed_after_an_install_was_requested() {
         let store = with_env(FakeEnv::new());
         store.observe(ServiceHealth::NotInstalled);

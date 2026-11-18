@@ -69,4 +69,12 @@ The 11 isolated proxy lease and recovery tests passed, and the service cleanup-e
 
 - Local release gate verification (2026-11-14, UTC+08): `node scripts/check-proxy-recovery.mjs` passed all 11 isolated recovery tests and all seven supplemental checks. The release registry validator passed all 24 rows.
 
-G-09 remains OPEN.
+ G-09 remains OPEN.
+
+Live GNOME/KDE acceptance, macOS helper cleanup after app termination and actual Windows process-kill/startup recovery remain unverified.
+
+## P1-10 TUN session suspension
+
+| Backlog | Status | Evidence | Remaining evidence |
+| --- | --- | --- | --- |
+| [Issue #72](https://github.com/oops11111/clash5/issues/72) | OPEN | Run State suspension, Sidecar runtime config, and service-return handoff regression tests | Current-head CI; no live driver or network mutation is in scope |
