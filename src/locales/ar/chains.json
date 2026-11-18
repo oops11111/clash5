@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "مجموعة السياسات",
+  "appSingleNode": "عقدة",
+  "appMultiHop": "سلسلة",
+  "appMissingTarget": "الوجهة غير موجودة",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",

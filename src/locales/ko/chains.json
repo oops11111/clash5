@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "정책 그룹",
+  "appSingleNode": "노드",
+  "appMultiHop": "체인",
+  "appMissingTarget": "대상을 찾을 수 없음",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",

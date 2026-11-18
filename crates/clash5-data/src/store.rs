@@ -1,4 +1,4 @@
-use crate::{DataError, IdentityKey, Node, ProxyChain, StableId, identity::text};
+use crate::{AppRoute, DataError, IdentityKey, Node, ProxyChain, StableId, identity::text};
 use rusqlite::{Connection, DatabaseName, OpenFlags, OptionalExtension, Transaction, backup::Progress, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -1660,6 +1660,39 @@ PRAGMA user_version=10;
         }
         tx.execute("UPDATE plugin_bindings SET orphan=1,disappeared_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE target_type='chain' AND target_id=?1 AND orphan=0", [id])?;
         audit(&tx, "chain.delete", serde_json::json!({"chains":deleted}))?;
+        tx.commit()?;
+        Ok(())
+    }
+    pub fn save_app_route(&mut self, route: &AppRoute) -> Result<(), DataError> {
+        route.validate()?;
+        let definition = serde_json::to_string(route).map_err(|_| DataError::InvalidInput)?;
+        let tx = self.db.transaction()?;
+        tx.execute(
+            "INSERT INTO app_routes(id,definition) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET definition=excluded.definition",
+            params![route.id, definition],
+        )?;
+        audit(&tx, "route.upsert", serde_json::json!({"routes":1}))?;
+        tx.commit()?;
+        Ok(())
+    }
+    pub fn app_routes(&self) -> Result<Vec<AppRoute>, DataError> {
+        let mut statement = self.db.prepare("SELECT definition FROM app_routes ORDER BY id")?;
+        let raw = statement.query_map([], |row| row.get::<_, String>(0))?;
+        raw.map(|raw| {
+            let route: AppRoute = serde_json::from_str(&raw?).map_err(|_| DataError::Database)?;
+            route.validate()?;
+            Ok(route)
+        })
+        .collect()
+    }
+    pub fn delete_app_route(&mut self, id: &str) -> Result<(), DataError> {
+        text(id)?;
+        let tx = self.db.transaction()?;
+        let deleted = tx.execute("DELETE FROM app_routes WHERE id=?1", [id])?;
+        if deleted == 0 {
+            return Err(DataError::NotFound);
+        }
+        audit(&tx, "route.delete", serde_json::json!({"routes":deleted}))?;
         tx.commit()?;
         Ok(())
     }

@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "策略群組",
+  "appSingleNode": "節點",
+  "appMultiHop": "鏈路",
+  "appMissingTarget": "目標不存在",
   "visual": "視覺化編排",
   "list": "鏈路清單",
   "templates": "範本",

@@ -1,4 +1,8 @@
 {
+  "appPolicyGroup": "Группа политик",
+  "appSingleNode": "Узел",
+  "appMultiHop": "Цепочка",
+  "appMissingTarget": "Цель отсутствует",
   "visual": "Visual editor",
   "list": "Chain list",
   "templates": "Templates",
