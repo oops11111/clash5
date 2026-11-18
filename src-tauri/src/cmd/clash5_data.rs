@@ -33,7 +33,6 @@ use crate::{
 const SHORT_PROBE_MS: u32 = 1_500;
 const HANDSHAKE_PROBE_MS: u32 = 10_000;
 const PROBE_CONCURRENCY: usize = 16;
-const DEFAULT_PROBE_CONCURRENCY: usize = 10;
 const SHORT_PROBE_URL: &str = "http://cp.cloudflare.com/generate_204";
 const HANDSHAKE_PROBE_URL: &str = "https://cp.cloudflare.com/generate_204";
 const PLUGIN_CONFIG_BUSY_TIMEOUT: Duration = Duration::from_secs(15);
@@ -1457,7 +1456,7 @@ mod tests {
     fn performance_presets_stay_within_probe_limit() {
         assert_eq!(
             PerformancePreset::Balanced.probe_concurrency(),
-            DEFAULT_PROBE_CONCURRENCY
+            10
         );
         assert_eq!(PerformancePreset::Performance.probe_concurrency(), PROBE_CONCURRENCY);
         assert_eq!(PerformancePreset::PowerSaving.probe_concurrency(), 4);
