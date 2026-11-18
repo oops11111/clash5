@@ -1,5 +1,7 @@
 import { MihomoWebSocket, Traffic } from 'tauri-plugin-mihomo-api'
 
+import { TrafficSessionTotals } from '@/utils/traffic-session'
+
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 import { useTrafficMonitorEnhanced } from './use-traffic-monitor'
 
@@ -8,6 +10,7 @@ const DUPLICATE_TRAFFIC_WINDOW_MS = 50
 
 let lastTrafficSignature = ''
 let lastTrafficTimestamp = 0
+const trafficSession = new TrafficSessionTotals()
 
 const shouldSkipDuplicateTraffic = (traffic: Traffic) => {
   const now = Date.now()
@@ -51,7 +54,7 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
             return
           }
           appendData(parsed)
-          next(null, parsed)
+          next(null, trafficSession.normalize(parsed))
         } catch (error) {
           next(error, FALLBACK_TRAFFIC)
         }
