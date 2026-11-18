@@ -775,7 +775,9 @@ export interface TranslationResources {
         }
         empty: {
           actions: {
+            addNode: string
             openLogs: string
+            openPlugins: string
             openProfiles: string
             restartCore: string
           }

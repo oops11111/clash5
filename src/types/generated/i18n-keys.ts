@@ -530,6 +530,8 @@ export const translationKeys = [
   'proxies.page.empty.noProxyInfo.title',
   'proxies.page.empty.noProxyInfo.description',
   'proxies.page.empty.actions.openProfiles',
+  'proxies.page.empty.actions.addNode',
+  'proxies.page.empty.actions.openPlugins',
   'proxies.page.empty.actions.restartCore',
   'proxies.page.empty.actions.openLogs',
   'proxies.page.chain.header',
