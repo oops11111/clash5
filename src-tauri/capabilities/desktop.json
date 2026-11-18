@@ -15,12 +15,14 @@
     "core:window:allow-set-theme",
     "notification:default",
     {
-      "identifier": "http:allow-fetch",
+      "identifier": "http:default",
       "allow": [
         { "url": "https://api.ip.sb/*" },
         { "url": "https://ipapi.co/*" },
         { "url": "https://api.ipapi.is/*" },
         { "url": "https://ipwho.is/*" },
+        { "url": "https://edns.ip-api.com/*" },
+        { "url": "https://*.edns.ip-api.com/*" },
         { "url": "https://ip.api.skk.moe/*" },
         { "url": "https://get.geojs.io/*" }
       ]
