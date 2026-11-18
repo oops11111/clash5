@@ -770,7 +770,7 @@ impl BindingStore {
         db.pragma_update(None, "foreign_keys", true)?;
         db.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = db.pragma_query_value(None, "user_version", |r| r.get(0))?;
-        if !(0..=5).contains(&version) {
+        if !(0..=10).contains(&version) {
             return Err(DataError::SchemaVersion);
         }
         let mut version = version;
@@ -926,6 +926,70 @@ CREATE TABLE IF NOT EXISTS plugin_bindings(
 ) STRICT;
 CREATE INDEX IF NOT EXISTS plugin_bindings_target ON plugin_bindings(target_type,source_kind,provider_id,target_id,enabled,orphan);
 PRAGMA user_version=5;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 6 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS pools(id TEXT PRIMARY KEY, definition TEXT NOT NULL CHECK(json_valid(definition))) STRICT;
+PRAGMA user_version=6;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 7 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS app_routes(id TEXT PRIMARY KEY, definition TEXT NOT NULL CHECK(json_valid(definition))) STRICT;
+PRAGMA user_version=7;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 8 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS chain_samples(
+ id INTEGER PRIMARY KEY, chain_id TEXT NOT NULL, measured_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+ status TEXT NOT NULL CHECK(status IN ('healthy','drift','warning','failed','tested')),
+ exit_ip TEXT, delay_ms INTEGER
+) STRICT;
+CREATE INDEX IF NOT EXISTS chain_samples_chain ON chain_samples(chain_id,id);
+PRAGMA user_version=8;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 9 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS quality_samples(
+ id INTEGER PRIMARY KEY, chain_id TEXT NOT NULL, measured_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+ status TEXT NOT NULL CHECK(status IN ('healthy','warning','failed')),
+ throughput_median_bps INTEGER NOT NULL, throughput_p10_bps INTEGER NOT NULL, first_byte_ms INTEGER NOT NULL,
+ jitter_ms INTEGER NOT NULL, rtt_p95_ms INTEGER NOT NULL, disconnects INTEGER NOT NULL, bytes_used INTEGER NOT NULL
+) STRICT;
+CREATE INDEX IF NOT EXISTS quality_samples_chain ON quality_samples(chain_id,id);
+PRAGMA user_version=9;
+"#,
+            )?;
+            tx.commit()?;
+        }
+        if version < 10 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                r#"
+CREATE TABLE IF NOT EXISTS pool_switch_log(
+ id INTEGER PRIMARY KEY, pool_id TEXT NOT NULL, member TEXT NOT NULL,
+ reason TEXT NOT NULL CHECK(reason IN ('initial','failure','score')), at_ms INTEGER NOT NULL
+) STRICT;
+PRAGMA user_version=10;
 "#,
             )?;
             tx.commit()?;
