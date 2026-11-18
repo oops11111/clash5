@@ -7,7 +7,10 @@ vi.mock('tauri-plugin-mihomo-api', () => ({
 
 import type { ResolvedProxyMember } from '@/types/proxy-view'
 
-import delayManager from './delay'
+import delayManager, {
+  DEFAULT_DELAY_CONCURRENCY,
+  MAX_DELAY_CONCURRENCY,
+} from './delay'
 
 const node = (name: string) =>
   ({
@@ -95,6 +98,11 @@ test('latency URL validation rejects malformed hosts and ports and trims valid U
   }
   delayManager.setUrl('url-validation', ' HTTP://localhost:8080/ ')
   expect(delayManager.getUrl('url-validation')).toBe('HTTP://localhost:8080/')
+})
+
+test('latency concurrency defaults and caps match the reviewed cross-layer limits', () => {
+  expect(DEFAULT_DELAY_CONCURRENCY).toBe(10)
+  expect(MAX_DELAY_CONCURRENCY).toBe(16)
 })
 
 test('another URL cannot replace a group measurement, but a newer matching URL can', () => {
