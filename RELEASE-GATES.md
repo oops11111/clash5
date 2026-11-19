@@ -78,3 +78,9 @@ Live GNOME/KDE acceptance, macOS helper cleanup after app termination and actual
 | Backlog | Status | Evidence | Remaining evidence |
 | --- | --- | --- | --- |
 | [Issue #72](https://github.com/oops11111/clash5/issues/72) | OPEN | Run State suspension, Sidecar runtime config, and service-return handoff regression tests | Current-head CI; no live driver or network mutation is in scope |
+
+## P1-13 Traffic session totals
+
+| Backlog | Status | Evidence | Remaining evidence |
+| --- | --- | --- | --- |
+| [Issue #75](https://github.com/oops11111/clash5/issues/75) | OPEN | Frontend session-reset regression test; live rates and graph sampling remain unchanged | Current-head CI and desktop acceptance after a Mihomo stop/start |
