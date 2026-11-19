@@ -2,7 +2,8 @@ import type { Traffic } from 'tauri-plugin-mihomo-api'
 
 type Totals = Pick<Traffic, 'upTotal' | 'downTotal'>
 
-const total = (value: number) => (Number.isFinite(value) && value >= 0 ? value : 0)
+const total = (value: number) =>
+  Number.isFinite(value) && value >= 0 ? value : 0
 
 /**
  * Keeps cumulative traffic totals scoped to the current Mihomo process.
