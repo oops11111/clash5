@@ -1,4 +1,4 @@
-use crate::{AppRoute, DataError, IdentityKey, Node, ProxyChain, StableId, identity::text};
+use crate::{AppRoute, ChainSample, DataError, IdentityKey, Node, ProxyChain, StableId, identity::text};
 use rusqlite::{Connection, DatabaseName, OpenFlags, OptionalExtension, Transaction, backup::Progress, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -1599,6 +1599,45 @@ PRAGMA user_version=10;
         let value = serde_json::to_string(quality).map_err(|_| DataError::InvalidInput)?;
         self.db.execute("INSERT INTO quality_cache(source_kind,provider_id,stable_id,quality) VALUES(?1,?2,?3,?4) ON CONFLICT(source_kind,provider_id,stable_id) DO UPDATE SET quality=excluded.quality",params![kind,provider,stable_id,value])?;
         Ok(())
+    }
+    /// Record one chain detection or quality-test outcome.
+    pub fn record_chain_sample(&mut self, sample: &ChainSample) -> Result<(), DataError> {
+        self.ensure_writable()?;
+        text(&sample.chain_id)?;
+        if !matches!(
+            sample.status.as_str(),
+            "healthy" | "drift" | "warning" | "failed" | "tested"
+        ) {
+            return Err(DataError::InvalidInput);
+        }
+        if let Some(ip) = &sample.exit_ip {
+            ip.parse::<std::net::IpAddr>().map_err(|_| DataError::InvalidInput)?;
+        }
+        self.db.execute(
+            "INSERT INTO chain_samples(chain_id,status,exit_ip,delay_ms) VALUES(?1,?2,?3,?4)",
+            params![sample.chain_id, sample.status, sample.exit_ip, sample.delay_ms],
+        )?;
+        Ok(())
+    }
+    /// Return recent chain samples, newest first.
+    pub fn chain_samples(&self, chain_id: &str, limit: usize) -> Result<Vec<ChainSample>, DataError> {
+        text(chain_id)?;
+        if !(1..=200).contains(&limit) {
+            return Err(DataError::InvalidInput);
+        }
+        let mut statement = self.db.prepare(
+            "SELECT chain_id,measured_at,status,exit_ip,delay_ms FROM chain_samples WHERE chain_id=?1 ORDER BY id DESC LIMIT ?2",
+        )?;
+        let rows = statement.query_map(params![chain_id, limit as i64], |row| {
+            Ok(ChainSample {
+                chain_id: row.get(0)?,
+                measured_at: row.get(1)?,
+                status: row.get(2)?,
+                exit_ip: row.get(3)?,
+                delay_ms: row.get(4)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(DataError::from)
     }
     pub fn save_chain(&mut self, id: &str, definition: &Value) -> Result<(), DataError> {
         self.ensure_writable()?;

@@ -1,5 +1,6 @@
 use clash5_data::{
-    BindingStore, ExitPolicy, Node, PluginBinding, PluginBindingTarget, ProxyChain, Source, parse_proxy_node,
+    BindingStore, ChainSample, ExitPolicy, Node, PluginBinding, PluginBindingTarget, ProxyChain, Source,
+    parse_proxy_node,
 };
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -251,4 +252,36 @@ fn prior_m3_and_m2_schemas_upgrade_to_v10() {
             .unwrap();
         assert!(plugin_table_exists);
     }
+}
+
+#[test]
+fn chain_samples_round_trip_in_newest_first_order() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("chain-samples.sqlite");
+    let mut store = BindingStore::open(&path).unwrap();
+    let chain_id = "18dc0b8a-7485-49bc-8a91-f48bdc736846";
+    store
+        .record_chain_sample(&ChainSample {
+            chain_id: chain_id.into(),
+            measured_at: String::new(),
+            status: "healthy".into(),
+            exit_ip: Some("192.0.2.10".into()),
+            delay_ms: Some(42),
+        })
+        .unwrap();
+    store
+        .record_chain_sample(&ChainSample {
+            chain_id: chain_id.into(),
+            measured_at: String::new(),
+            status: "failed".into(),
+            exit_ip: None,
+            delay_ms: None,
+        })
+        .unwrap();
+
+    let samples = store.chain_samples(chain_id, 10).unwrap();
+    assert_eq!(samples.len(), 2);
+    assert_eq!(samples[0].status, "failed");
+    assert_eq!(samples[1].status, "healthy");
+    assert_eq!(samples[1].exit_ip.as_deref(), Some("192.0.2.10"));
 }
