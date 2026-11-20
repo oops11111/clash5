@@ -7,12 +7,23 @@ use crate::{
     },
     core::{CoreManager, handle::Handle},
 };
-use clash5_data::{NodeRef, ProxyChain, parse_proxy_node};
+use clash5_data::{ChainSample, NodeRef, ProxyChain, parse_proxy_node};
 use serde::Serialize;
 use serde_yaml_ng::Value;
 
 fn storage_failure() -> CommandFailure {
     coded_error("C5-CHAIN-006", "chain storage is unavailable")
+}
+
+async fn record_chain_sample(chain_id: &str, status: &str, exit_ip: Option<String>, delay_ms: Option<u32>) {
+    let sample = ChainSample {
+        chain_id: chain_id.to_owned(),
+        measured_at: String::new(),
+        status: status.to_owned(),
+        exit_ip,
+        delay_ms,
+    };
+    let _ = crate::config::profiles::with_clash5_binding_store(move |store| store.record_chain_sample(&sample)).await;
 }
 
 #[derive(Serialize, specta::Type)]
@@ -470,6 +481,7 @@ pub async fn clash5_detect_exit_ip(id: String, service_url: Option<String>) -> C
     let Some(fallback) = definitions.iter().find(|candidate| {
         candidate.id == *fallback_chain_id && candidate.enabled && candidate.profile_id == profile_id
     }) else {
+        record_chain_sample(&chain.id, "failed", None, None).await;
         return Ok(ExitIpResult::Warning {
             code: "C5-CHAIN-002".into(),
         });
@@ -483,15 +495,23 @@ pub async fn clash5_detect_exit_ip(id: String, service_url: Option<String>) -> C
             ));
         }
         Err(_) => {
+            record_chain_sample(&chain.id, "failed", None, None).await;
             return Ok(ExitIpResult::Warning {
                 code: "C5-EXIT-003".into(),
             });
         }
     };
-    Handle::mihomo()
+    if Handle::mihomo()
         .select_node_for_group(&chain.group_name(), &fallback.group_name())
         .await
-        .map_err(|_| coded_error("C5-CHAIN-012", "the verified fallback could not be selected"))?;
+        .is_err()
+    {
+        record_chain_sample(&chain.id, "failed", None, None).await;
+        return Err(coded_error(
+            "C5-CHAIN-012",
+            "the verified fallback could not be selected",
+        ));
+    }
     let selection_persisted =
         crate::config::profiles::record_selected_node(&chain.group_name(), &fallback.group_name())
             .await
