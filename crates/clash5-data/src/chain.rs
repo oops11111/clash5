@@ -17,6 +17,17 @@ pub enum ExitPolicy {
     Switch { fallback_chain_id: String },
 }
 
+/// One persisted chain detection or quality-test outcome.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(deny_unknown_fields)]
+pub struct ChainSample {
+    pub chain_id: String,
+    pub measured_at: String,
+    pub status: String,
+    pub exit_ip: Option<String>,
+    pub delay_ms: Option<u32>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(deny_unknown_fields)]
 pub struct ProxyChain {

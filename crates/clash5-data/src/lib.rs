@@ -6,7 +6,7 @@ mod profile;
 mod store;
 
 pub use app_route::{AppMatcher, AppRoute, RouteTarget, compile_app_routes};
-pub use chain::{ChainError, CompiledChain, ExitPolicy, NodeRef, ProxyChain, ScopedProxy, compile_chains};
+pub use chain::{ChainError, ChainSample, CompiledChain, ExitPolicy, NodeRef, ProxyChain, ScopedProxy, compile_chains};
 pub use identity::{DataError, IdentityKey, Node, StableId};
 pub use plugin_patch::{
     ConfigProvenance, EffectiveConfig, PluginConflict, PluginPatch, merge_plugin_patches, validate_plugin_patch,
