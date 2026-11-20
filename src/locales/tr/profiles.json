@@ -11,7 +11,8 @@
       "chooseSource": "Choose the Clash Verge Rev data directory",
       "backupReminder": "Back up this source directory before importing. clash5 reads it without changing its files. Continue?",
       "success": "Imported {{imported}} profile(s); skipped {{skipped}} unsupported item(s); node-index sync failures: {{syncFailures}}. Source SHA-256 manifest: {{manifest}}",
-      "failure": "Import failed; clash5 could not verify or preserve the selected source directory."
+      "failure": "Import failed; clash5 could not verify or preserve the selected source directory.",
+      "skippedDetails": "Atlanan öğeler ({{count}})"
     },
     "batch": {
       "actions": {
