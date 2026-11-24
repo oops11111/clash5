@@ -4,7 +4,7 @@ use smartstring::alias::String;
 pub type CmdResult<T = ()> = Result<T, CommandFailure>;
 
 /// Structured command failure returned to the frontend.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
 pub struct CommandFailure {
     /// Stable frontend identifier, when classified.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -21,7 +21,7 @@ impl CommandFailure {
     pub fn coded(code: &str, detail: impl std::fmt::Display) -> Self {
         Self {
             code: Some(code.to_owned()),
-            detail: detail.to_string(),
+            detail: clash_verge_logging::redact(&detail.to_string()),
             operation: None,
         }
     }
@@ -30,7 +30,7 @@ impl CommandFailure {
     pub fn plain(detail: impl std::fmt::Display) -> Self {
         Self {
             code: None,
-            detail: detail.to_string(),
+            detail: clash_verge_logging::redact(&detail.to_string()),
             operation: None,
         }
     }
@@ -54,7 +54,7 @@ impl From<std::string::String> for CommandFailure {
     fn from(detail: std::string::String) -> Self {
         Self {
             code: None,
-            detail,
+            detail: clash_verge_logging::redact(&detail),
             operation: None,
         }
     }
@@ -95,6 +95,10 @@ pub fn proxy_aware_error(error: &anyhow::Error) -> CommandFailure {
 pub mod app;
 pub mod backup;
 pub mod clash;
+pub mod clash5_chains;
+pub mod clash5_data;
+pub mod clash5_per_app_proxy;
+pub mod clash5_process_proxy;
 pub mod lightweight;
 pub mod listener;
 pub mod media_unlock_checker;
@@ -109,11 +113,16 @@ pub mod uwp;
 pub mod validate;
 pub mod verge;
 pub mod webdav;
+pub mod wire;
 
 // Re-export all command functions for backwards compatibility
 pub use app::*;
 pub use backup::*;
 pub use clash::*;
+pub use clash5_chains::*;
+pub use clash5_data::*;
+pub use clash5_per_app_proxy::*;
+pub use clash5_process_proxy::*;
 pub use lightweight::*;
 pub use listener::*;
 pub use media_unlock_checker::*;

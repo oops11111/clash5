@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import {
   changeLanguage,
-  resolveLanguage,
+  resolvePreferredLanguage,
   supportedLanguages,
 } from '@/services/i18n'
 
@@ -13,7 +13,7 @@ export const useI18n = () => {
 
   const switchLanguage = useCallback(
     async (language: string) => {
-      const targetLanguage = resolveLanguage(language)
+      const targetLanguage = resolvePreferredLanguage(language)
 
       if (!supportedLanguages.includes(targetLanguage)) {
         console.warn(`Unsupported language: ${language}`)

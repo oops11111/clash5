@@ -85,7 +85,10 @@
       "trafficUnavailable": "Trafik verileri kullanılamıyor",
       "operationFailed": "İşlem başarısız oldu",
       "trafficStats": "Trafik İstatistikleri Hatası",
-      "trafficStatsDescription": "Trafik istatistikleri bileşeni bir hatayla karşılaştı ve çökmeleri önlemek için devre dışı bırakıldı."
+      "trafficStatsDescription": "Trafik istatistikleri bileşeni bir hatayla karşılaştı ve çökmeleri önlemek için devre dışı bırakıldı.",
+      "backendDisconnected": "Backend disconnected, reconnecting…",
+      "pageNotFound": "Page not found",
+      "pageNotFoundDescription": "The page you are looking for does not exist or has moved."
     },
     "notices": {
       "raw": "{{message}}",

@@ -5,24 +5,27 @@
   "windows": ["main"],
   "permissions": [
     "global-shortcut:default",
-    "updater:default",
     "dialog:default",
     "dialog:allow-ask",
     "dialog:allow-message",
-    "updater:default",
-    "updater:allow-check",
-    "updater:allow-download-and-install",
     "deep-link:default",
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
     "core:window:allow-set-theme",
     "notification:default",
-    "http:default",
-    "http:allow-fetch",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://*/*" }, { "url": "http://*/*" }]
+      "allow": [
+        { "url": "https://api.ip.sb/*" },
+        { "url": "https://ipapi.co/*" },
+        { "url": "https://api.ipapi.is/*" },
+        { "url": "https://ipwho.is/*" },
+        { "url": "https://edns.ip-api.com/*" },
+        { "url": "https://*.edns.ip-api.com/*" },
+        { "url": "https://ip.api.skk.moe/*" },
+        { "url": "https://get.geojs.io/*" }
+      ]
     },
     "mihomo:default"
   ]

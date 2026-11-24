@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "identifier": "io.github.clash-verge-rev.clash-verge-rev",
-  "productName": "Clash Verge",
+  "identifier": "io.github.oops11111.clash5",
+  "productName": "clash5",
   "bundle": {
     "targets": ["app", "dmg"],
     "macOS": {

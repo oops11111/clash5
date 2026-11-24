@@ -247,6 +247,7 @@ interface IProfileOption {
   update_interval?: number
   timeout_seconds?: number
   danger_accept_invalid_certs?: boolean
+  allow_insecure_http?: boolean
   allow_auto_update?: boolean
   merge?: string
   script?: string
@@ -928,7 +929,9 @@ interface IVergeConfig {
     background_opacity?: number
   }
   auto_close_connection?: boolean
+  singbox_persistent?: boolean
   auto_check_update?: boolean
+  performance_preset?: 'balanced' | 'performance' | 'power_saving'
   default_latency_test?: string
   default_latency_timeout?: number
   enable_auto_delay_detection?: boolean
@@ -944,6 +947,7 @@ interface IVergeConfig {
   webdav_username?: string
   webdav_password?: string
   home_cards?: Record<string, boolean>
+  per_app_proxy?: import('@/services/tauri-commands.generated').PerAppProxySettings
   enable_hover_jump_navigator?: boolean
   hover_jump_navigator_delay?: number
   enable_external_controller?: boolean

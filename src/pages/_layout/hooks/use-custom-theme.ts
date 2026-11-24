@@ -68,7 +68,7 @@ ${css}
 export const useCustomTheme = () => {
   const appWindow: WebviewWindow = useMemo(() => getCurrentWebviewWindow(), [])
   const { verge } = useVerge()
-  const { theme_mode, theme_setting } = verge ?? {}
+  const { theme_mode, theme_setting, performance_preset } = verge ?? {}
   const mode = useThemeMode()
   const setMode = useSetThemeMode()
   const userBackgroundImage = theme_setting?.background_image || ''
@@ -144,6 +144,9 @@ export const useCustomTheme = () => {
   const theme = useMemo(() => {
     const setting = theme_setting || {}
     const dt = mode === 'light' ? defaultTheme : defaultDarkTheme
+    const paperColor = dt.background_color
+    const canvasColor = mode === 'light' ? '#F0F4FA' : dt.background_color
+    const glassEnabled = performance_preset !== 'power_saving'
     let muiTheme: MuiTheme
 
     try {
@@ -163,9 +166,10 @@ export const useCustomTheme = () => {
             primary: setting.primary_text || dt.primary_text,
             secondary: setting.secondary_text || dt.secondary_text,
           },
+          divider: mode === 'light' ? '#E2E8F2' : 'rgba(255, 255, 255, 0.12)',
           background: {
-            paper: dt.background_color,
-            default: dt.background_color,
+            paper: paperColor,
+            default: canvasColor,
           },
         },
         shadows: Array(25).fill('none') as Shadows,
@@ -190,9 +194,10 @@ export const useCustomTheme = () => {
           warning: { main: dt.warning_color },
           success: { main: dt.success_color },
           text: { primary: dt.primary_text, secondary: dt.secondary_text },
+          divider: mode === 'light' ? '#E2E8F2' : 'rgba(255, 255, 255, 0.12)',
           background: {
             paper: dt.background_color,
-            default: dt.background_color,
+            default: mode === 'light' ? '#F0F4FA' : dt.background_color,
           },
         },
         typography: { fontFamily: dt.font_family },
@@ -201,13 +206,40 @@ export const useCustomTheme = () => {
 
     const rootEle = document.documentElement
     if (rootEle) {
-      const backgroundColor = mode === 'light' ? '#ECECEC' : dt.background_color
-      const selectColor = mode === 'light' ? '#f5f5f5' : '#3E3E3E'
+      const backgroundColor = canvasColor
+      const selectColor = mode === 'light' ? '#E8F0FF' : '#3E3E3E'
       const scrollColor = mode === 'light' ? '#90939980' : '#555555'
-      const dividerColor =
-        mode === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)'
+      const dividerColor = muiTheme.palette.divider
       rootEle.style.setProperty('--divider-color', dividerColor)
       rootEle.style.setProperty('--background-color', backgroundColor)
+      rootEle.style.setProperty(
+        '--sidebar-background',
+        mode === 'light'
+          ? glassEnabled
+            ? 'rgba(247, 249, 252, 0.88)'
+            : '#F7F9FC'
+          : glassEnabled
+            ? 'rgba(37, 40, 51, 0.88)'
+            : '#252833',
+      )
+      rootEle.style.setProperty(
+        '--header-background',
+        mode === 'light'
+          ? glassEnabled
+            ? 'rgba(255, 255, 255, 0.72)'
+            : '#FFFFFF'
+          : glassEnabled
+            ? 'rgba(46, 48, 61, 0.82)'
+            : '#2E303D',
+      )
+      rootEle.style.setProperty(
+        '--glass-filter',
+        !glassEnabled
+          ? 'none'
+          : performance_preset === 'performance'
+            ? 'blur(12px)'
+            : 'blur(8px)',
+      )
       rootEle.style.setProperty('--selection-color', selectColor)
       rootEle.style.setProperty('--scroller-color', scrollColor)
       rootEle.style.setProperty('--primary-main', muiTheme.palette.primary.main)
@@ -217,7 +249,7 @@ export const useCustomTheme = () => {
       )
       rootEle.style.setProperty(
         '--window-border-color',
-        mode === 'light' ? '#cccccc' : '#1E1E1E',
+        muiTheme.palette.divider,
       )
       rootEle.style.setProperty(
         '--scrollbar-bg',
@@ -290,20 +322,14 @@ export const useCustomTheme = () => {
           }
         }
 
-        /* 修复可能的白色边框 */
-        .MuiPaper-root {
-          border-color: var(--window-border-color) !important;
-        }
-
         /* 确保模态框和对话框也使用暗色主题 */
         .MuiDialog-paper {
-          background-color: ${mode === 'light' ? '#ffffff' : '#2E303D'} !important;
+          background-color: ${paperColor} !important;
         }
 
-        /* 移除可能的白色点或线条 */
-        * {
-          outline: none !important;
-          box-shadow: none !important;
+        :focus-visible {
+          outline: 2px solid var(--primary-main);
+          outline-offset: 2px;
         }
       `
 
@@ -311,7 +337,13 @@ export const useCustomTheme = () => {
     }
 
     return muiTheme
-  }, [mode, theme_setting, userBackgroundImage, hasUserBackground])
+  }, [
+    mode,
+    theme_setting,
+    userBackgroundImage,
+    hasUserBackground,
+    performance_preset,
+  ])
 
   useEffect(() => {
     const id = setTimeout(() => {

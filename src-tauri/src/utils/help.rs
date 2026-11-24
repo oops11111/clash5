@@ -152,79 +152,14 @@ pub fn parse_str<T: FromStr>(target: &str, key: &str) -> Option<T> {
     })
 }
 
-/// Masks query values and token-like path segments for logging.
+/// Redacts URLs and credential-like fields for logs and user-facing diagnostics.
 pub fn mask_url(url: &str) -> String {
-    let (path_part, query_part) = match url.find('?') {
-        Some(pos) => (&url[..pos], Some(&url[pos + 1..])),
-        None => (url, None),
-    };
-
-    let host_end = path_part
-        .find("://")
-        .and_then(|scheme_end| {
-            path_part[scheme_end + 3..]
-                .find('/')
-                .map(|slash| scheme_end + 3 + slash)
-        })
-        .unwrap_or(path_part.len());
-
-    let scheme_and_host = &path_part[..host_end];
-    let path = &path_part[host_end..]; // starts with '/' or empty
-
-    let mut result = scheme_and_host.to_owned();
-
-    if !path.is_empty() {
-        let masked: Vec<&str> = path
-            .split('/')
-            .map(|seg| if seg.len() > 16 { "***" } else { seg })
-            .collect();
-        result.push_str(&masked.join("/"));
-    }
-
-    if let Some(query) = query_part {
-        result.push('?');
-        let masked_query: Vec<String> = query
-            .split('&')
-            .map(|param| match param.find('=') {
-                Some(eq) => format!("{}=***", &param[..eq]),
-                None => param.to_owned(),
-            })
-            .collect();
-        result.push_str(&masked_query.join("&"));
-    }
-
-    result
+    clash_verge_logging::redact(url)
 }
 
-/// Masks every HTTP(S) URL embedded in a log string while preserving surrounding text.
+/// Redacts every HTTP(S) URL and sensitive key/value embedded in a log string.
 pub fn mask_err(err: &str) -> String {
-    let mut result = String::with_capacity(err.len());
-    let mut remaining = err;
-
-    loop {
-        let http = remaining.find("http://");
-        let https = remaining.find("https://");
-        let start = match (http, https) {
-            (None, None) => {
-                result.push_str(remaining);
-                break;
-            }
-            (Some(a), None) | (None, Some(a)) => a,
-            (Some(a), Some(b)) => a.min(b),
-        };
-
-        result.push_str(&remaining[..start]);
-        remaining = &remaining[start..];
-
-        let url_end = remaining
-            .find(|c: char| c.is_whitespace() || matches!(c, ')' | ']' | '"' | '\''))
-            .unwrap_or(remaining.len());
-
-        result.push_str(&mask_url(&remaining[..url_end]));
-        remaining = &remaining[url_end..];
-    }
-
-    result
+    clash_verge_logging::redact(err)
 }
 
 pub fn get_last_part_and_decode(url: &str) -> Option<String> {

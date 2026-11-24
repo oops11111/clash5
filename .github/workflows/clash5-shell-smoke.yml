@@ -1,0 +1,249 @@
+name: clash5 shell smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/clash5-shell-smoke.yml'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'crates/clash5-data/**'
+      - 'src-tauri/**'
+      - 'src/**'
+      - 'scripts/m1-*.mjs'
+      - 'scripts/m2-*.mjs'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-shell:
+    # WebView2 WebDriver sessions currently fail on the Server 2025 image.
+    # Run native desktop acceptance for every PR on Server 2022 so the key
+    # recovery and rebind UI remains an enforced review gate:
+    # https://github.com/actions/runner-images/issues/14738
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: 'v1-rust'
+          key: 'm1-shell-x86_64-pc-windows-msvc'
+          workspaces: |
+            . -> target
+          cache-all-crates: true
+          cache-workspace-crates: true
+          save-if: true
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.21.0'
+          cache: pnpm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install locked frontend dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Provision real desktop resources
+        run: pnpm prebuild x86_64-pc-windows-msvc
+      - name: Provision pinned sing-box test binary
+        shell: pwsh
+        run: |
+          $version = '1.14.2'
+          $archiveName = "sing-box-$version-windows-amd64.zip"
+          $archive = Join-Path $env:RUNNER_TEMP $archiveName
+          $destination = Join-Path $env:RUNNER_TEMP "clash5-sing-box-$version"
+          $url = "https://github.com/SagerNet/sing-box/releases/download/v$version/$archiveName"
+          $expectedSha256 = 'c2d8bfff918755808781dfdeeb8581b6c91eb3a243d9a7b55483cfc0c0684d32'
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $actualSha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $expectedSha256) {
+            throw "Official sing-box test archive SHA-256 mismatch: $actualSha256"
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force
+          $binary = Get-ChildItem -LiteralPath $destination -Filter 'sing-box.exe' -File -Recurse | Select-Object -First 1
+          if (-not $binary) { throw 'Pinned sing-box archive did not contain sing-box.exe' }
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $binary.DirectoryName
+      - name: Probe through Mihomo and the local rate-limit fixture
+        run: pnpm m1:mihomo-smoke src-tauri/sidecar/verge-mihomo-x86_64-pc-windows-msvc.exe
+      - name: Verify generated two-hop routing and exit IP through local proxies
+        run: node scripts/m2-mihomo-smoke.mjs src-tauri/sidecar/verge-mihomo-x86_64-pc-windows-msvc.exe
+      - name: Build frontend
+        run: pnpm web:build
+      - name: Build desktop shell without an installer
+        run: cargo build --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --release --locked
+      - name: Assemble portable desktop test shell
+        shell: pwsh
+        run: |
+          $release = 'target/x86_64-pc-windows-msvc/release'
+          Copy-Item -LiteralPath 'src-tauri/resources' -Destination $release -Recurse -Force
+          foreach ($core in @('verge-mihomo', 'verge-mihomo-alpha')) {
+            $source = "src-tauri/sidecar/${core}-x86_64-pc-windows-msvc.exe"
+            Copy-Item -LiteralPath $source -Destination (Join-Path $release "$core.exe") -Force
+          }
+      - name: Provision matching msedgedriver for WebView2
+        if: github.event_name != 'schedule'
+        shell: pwsh
+        run: |
+          # @wdio/tauri-service downloads msedgedriver with Windows PowerShell 5.1,
+          # whose Expand-Archive fails on this image ("Cannot find an overload for
+          # ExtractToDirectory"), so the smoke test falls back to a mismatched
+          # preinstalled driver and cannot create a WebDriver session. Provision the
+          # matching driver here with pwsh (whose Expand-Archive works) and put it
+          # first on PATH, so tauri-service finds it and skips its own download.
+          # Download the driver for the detected runtime version directly: the
+          # LATEST_RELEASE_<major> endpoint returns UTF-16LE as application/octet-stream,
+          # which Invoke-WebRequest decodes with NUL bytes between characters, so the
+          # version regex never matches.
+          $clientId = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $edgeVersion = $null
+          foreach ($key in @(
+            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$clientId",
+            "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$clientId",
+            "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$clientId")) {
+            $value = (Get-ItemProperty -LiteralPath $key -Name pv -ErrorAction SilentlyContinue).pv
+            if ($value -match '^\d+\.\d+\.\d+\.\d+$') { $edgeVersion = $value; break }
+          }
+          if (-not $edgeVersion) { throw 'Could not detect the WebView2 runtime version from the registry' }
+          $major = $edgeVersion.Split('.')[0]
+          $existing = Get-Command msedgedriver.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($existing) {
+            $existingOutput = & $existing.Source --version
+            if ($existingOutput -match '(\d+\.\d+\.\d+\.\d+)') { $existingVersion = $Matches[1] } else { throw "Could not parse msedgedriver version from: $existingOutput" }
+            if ($existingVersion.Split('.')[0] -eq $major) {
+              Write-Output "msedgedriver $existingVersion already matches WebView2 $edgeVersion"
+              return
+            }
+          }
+          # The driver version matches the WebView2 runtime version exactly.
+          $driverVersion = $edgeVersion
+          $driverDir = Join-Path $env:RUNNER_TEMP "clash5-msedgedriver-$driverVersion"
+          $archive = Join-Path $driverDir 'edgedriver_win64.zip'
+          New-Item -ItemType Directory -Force -Path $driverDir | Out-Null
+          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$driverVersion/edgedriver_win64.zip" -OutFile $archive -UseBasicParsing -TimeoutSec 120
+          Expand-Archive -LiteralPath $archive -DestinationPath $driverDir -Force
+          $driver = Join-Path $driverDir 'msedgedriver.exe'
+          if (-not (Test-Path -LiteralPath $driver)) { throw 'Downloaded msedgedriver archive did not contain msedgedriver.exe' }
+          $driverOutput = & $driver --version
+          if ($driverOutput -match '(\d+\.\d+\.\d+\.\d+)') { $actualVersion = $Matches[1] } else { throw "Could not parse msedgedriver version from: $driverOutput" }
+          if ($actualVersion.Split('.')[0] -ne $major) { throw "Provisioned msedgedriver $actualVersion does not match WebView2 major version $major" }
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $driverDir
+          Write-Output "Provisioned msedgedriver $actualVersion for WebView2 $edgeVersion"
+      - name: Verify native Tauri bridge and node workspace
+        if: github.event_name != 'schedule'
+        run: pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash5.exe --full
+      - name: Verify reset cancellation in identity recovery mode
+        if: github.event_name != 'schedule'
+        shell: pwsh
+        run: |
+          $appData = Join-Path $env:APPDATA 'io.github.oops11111.clash5'
+          $database = Join-Path $appData 'clash5-nodes.sqlite'
+          $backup = Join-Path $env:RUNNER_TEMP 'clash5-nodes.sqlite'
+          $prepareDatabase = @'
+          import sqlite3, sys
+
+          database, backup = sys.argv[1:]
+          with sqlite3.connect(database) as live:
+              with sqlite3.connect(backup) as snapshot:
+                  live.backup(snapshot)
+              changed = live.execute(
+                  "UPDATE identity_keys SET key_id='desktop-smoke-mismatch' WHERE active=1"
+              ).rowcount
+              if changed != 1:
+                  raise RuntimeError(f'Expected one active identity key, got {changed}')
+              live.commit()
+          '@
+          try {
+            $prepareDatabase | python - $database $backup
+            if ($LASTEXITCODE -ne 0) { throw 'Could not prepare identity recovery fixture' }
+            pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash5.exe --recovery-cancel
+            if ($LASTEXITCODE -ne 0) { throw 'Identity recovery reset-cancellation smoke failed' }
+          } finally {
+            Get-Process -Name clash5 -ErrorAction SilentlyContinue | Stop-Process -Force
+            Start-Sleep -Seconds 2
+            foreach ($suffix in @('-wal', '-shm')) {
+              Remove-Item -LiteralPath "$database$suffix" -Force -ErrorAction SilentlyContinue
+            }
+            if (Test-Path -LiteralPath $backup) {
+              Copy-Item -LiteralPath $backup -Destination $database -Force
+            }
+            Remove-Item -LiteralPath $backup -Force
+          }
+      - name: Verify manual node persistence after desktop restart
+        if: github.event_name != 'schedule'
+        shell: pwsh
+        run: |
+          if (Get-Process -Name clash5 -ErrorAction SilentlyContinue) {
+            throw 'The first desktop session did not exit before the persistence check'
+          }
+          pnpm m1:desktop-smoke target/x86_64-pc-windows-msvc/release/clash5.exe --persisted
+      - name: Report desktop process state on failure
+        if: failure() && github.event_name != 'schedule'
+        shell: pwsh
+        run: |
+          Get-Process -Name clash5,msedgewebview2,msedgedriver,tauri-driver -ErrorAction SilentlyContinue |
+            Select-Object ProcessName,Id,Path | Format-Table
+          $appData = Join-Path $env:APPDATA 'io.github.oops11111.clash5'
+          Write-Output "clash5 app data exists: $(Test-Path -LiteralPath $appData)"
+          $startupLog = Join-Path $appData 'logs/startup.log'
+          if (Test-Path -LiteralPath $startupLog) {
+            Write-Output 'Recent startup log (URLs and credential fields redacted):'
+            Get-Content -LiteralPath $startupLog -Tail 80 | ForEach-Object {
+              ($_ -replace '(?i)\b(?:https?|ss|vmess|vless|trojan|hy2|hysteria2)://[^\s''"<>]+', '[redacted-uri]') -replace '(?i)(\b(?:secret|token|password|authorization|api-key)\b\s*[=:]\s*)[^,\s;]+', '$1[redacted]'
+            }
+          } else {
+            Write-Output 'clash5 startup log was not created'
+          }
+      - name: Launch shell briefly
+        if: github.event_name == 'schedule'
+        shell: pwsh
+        run: |
+          $binary = 'target/x86_64-pc-windows-msvc/release/clash5.exe'
+          $process = Start-Process -FilePath $binary -WindowStyle Hidden -PassThru
+          try {
+            Start-Sleep -Seconds 15
+            $process.Refresh()
+            if ($process.HasExited) {
+              throw "Desktop shell exited during smoke test with code $($process.ExitCode)"
+            }
+          } finally {
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+            }
+          }
+      - name: Upload desktop screenshot
+        if: always() && github.event_name != 'schedule'
+        uses: actions/upload-artifact@v7
+        with:
+          name: clash5-m1-desktop-smoke
+          path: |
+            target/m1-desktop-smoke.png
+            target/m1-recovery-cancel.png
+            target/m1-desktop-persisted.png
+            target/nav-plugins-binding.png
+            target/m2-desktop-chains.png
+            target/m4-desktop-route.png
+            target/m6-settings-light.png
+            target/m6-settings-dark.png
+          if-no-files-found: warn
+      - name: Upload test shell
+        if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@v7
+        with:
+          name: clash5-windows-shell
+          path: |
+            target/x86_64-pc-windows-msvc/release/clash5.exe
+            target/x86_64-pc-windows-msvc/release/resources/**
+            target/x86_64-pc-windows-msvc/release/verge-mihomo.exe
+            target/x86_64-pc-windows-msvc/release/verge-mihomo-alpha.exe
+          if-no-files-found: warn

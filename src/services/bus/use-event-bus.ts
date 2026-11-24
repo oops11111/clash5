@@ -24,7 +24,13 @@ export const useEventBus = (
     }
     const { readPendingFailures } = reads
     const readRunState = () => {
-      void reads.readRunState().catch(() => {})
+      void reads.readRunState().catch((error) => {
+        dispatch({
+          type: 'connection/failed',
+          source: 'backend',
+          message: error instanceof Error ? error.message : String(error),
+        })
+      })
     }
 
     const bus = createEventBus({

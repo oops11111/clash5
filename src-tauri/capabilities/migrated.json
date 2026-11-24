@@ -9,12 +9,12 @@
     "fs:allow-exists",
     {
       "identifier": "fs:scope",
-      "allow": ["$APPDATA/**", "$RESOURCE/../**", "**"]
+      "allow": ["$APPDATA/**", "$RESOURCE/**"]
     },
     "fs:allow-write-file",
     {
       "identifier": "fs:scope",
-      "allow": ["$APPDATA/**", "$RESOURCE/../**", "**"]
+      "allow": ["$APPDATA/**", "$RESOURCE/**"]
     },
     "fs:allow-app-read",
     "fs:allow-app-read-recursive",

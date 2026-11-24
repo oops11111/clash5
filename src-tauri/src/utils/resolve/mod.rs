@@ -65,7 +65,6 @@ async fn resolve_setup() {
     init_service_manager().await;
     let config_initialized = init_verge_config_before_window().await;
     init_window().await;
-    feat::reconcile_startup_tun_availability().await;
     init_resources().await;
     if let Err(e) = init::init_dns_config().await {
         logging!(warn, Type::Setup, "DNS config initialization failed: {}", e);
@@ -170,6 +169,12 @@ async fn init_auto_backup() {
 async fn init_silent_updater() {
     use crate::core::SilentUpdater;
     use crate::core::handle::Handle;
+
+    if !crate::core::updater::FIRST_RELEASE_UPDATER_ENABLED {
+        logging!(info, Type::Setup, "In-app updater disabled for the first release");
+        SilentUpdater::global().discard_pending();
+        return;
+    }
 
     logging!(debug, Type::Setup, "Initializing silent updater...");
 

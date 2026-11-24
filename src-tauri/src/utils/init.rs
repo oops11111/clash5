@@ -12,9 +12,10 @@ use crate::{
 use anyhow::{Context as _, Result};
 use chrono::{Local, TimeZone as _};
 use clash_verge_logging::Type;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use std::path::Path;
-use std::{path::PathBuf, str::FromStr as _};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr as _,
+};
 use tauri_plugin_shell::ShellExt as _;
 use tokio::fs;
 use tokio::fs::DirEntry;
@@ -330,20 +331,19 @@ async fn migrate_legacy_macos_logs() -> Result<()> {
     Ok(())
 }
 
-pub(super) async fn init_dns_config() -> Result<()> {
+fn default_dns_config() -> serde_yaml_ng::Mapping {
     use serde_yaml_ng::Value;
 
     let dns_config = serde_yaml_ng::Mapping::from_iter([
         ("enable".into(), Value::Bool(true)),
-        // Must match the frontend default used for authoritative `dns.ipv6`.
-        ("ipv6".into(), Value::Bool(true)),
-        ("listen".into(), Value::String(":53".into())),
+        ("ipv6".into(), Value::Bool(false)),
+        ("listen".into(), Value::String("127.0.0.1:53".into())),
         ("enhanced-mode".into(), Value::String("fake-ip".into())),
         ("fake-ip-range".into(), Value::String("198.18.0.1/16".into())),
         ("fake-ip-range6".into(), Value::String("fdfe:dcba:9876::1/64".into())),
         ("fake-ip-filter-mode".into(), Value::String("blacklist".into())),
         ("prefer-h3".into(), Value::Bool(false)),
-        ("respect-rules".into(), Value::Bool(false)),
+        ("respect-rules".into(), Value::Bool(true)),
         ("use-hosts".into(), Value::Bool(false)),
         ("use-system-hosts".into(), Value::Bool(false)),
         (
@@ -364,18 +364,14 @@ pub(super) async fn init_dns_config() -> Result<()> {
         (
             "default-nameserver".into(),
             Value::Sequence(vec![
-                Value::String("system".into()),
-                Value::String("223.6.6.6".into()),
-                Value::String("8.8.8.8".into()),
-                Value::String("2400:3200::1".into()),
-                Value::String("2001:4860:4860::8888".into()),
+                Value::String("tls://1.1.1.1".into()),
+                Value::String("tls://1.0.0.1".into()),
             ]),
         ),
         (
             "nameserver".into(),
             Value::Sequence(vec![
-                Value::String("8.8.8.8".into()),
-                Value::String("https://doh.pub/dns-query".into()),
+                Value::String("https://cloudflare-dns.com/dns-query".into()),
                 Value::String("https://dns.alidns.com/dns-query".into()),
             ]),
         ),
@@ -384,7 +380,10 @@ pub(super) async fn init_dns_config() -> Result<()> {
             "nameserver-policy".into(),
             Value::Mapping(serde_yaml_ng::Mapping::new()),
         ),
-        ("proxy-server-nameserver".into(), Value::Sequence(vec![])),
+        (
+            "proxy-server-nameserver".into(),
+            Value::Sequence(vec![Value::String("tls://1.1.1.1".into())]),
+        ),
         ("direct-nameserver".into(), Value::Sequence(vec![])),
         ("direct-nameserver-follow-policy".into(), Value::Bool(false)),
         (
@@ -411,17 +410,24 @@ pub(super) async fn init_dns_config() -> Result<()> {
         ),
     ]);
 
-    let default_dns_config = serde_yaml_ng::Mapping::from_iter([
+    serde_yaml_ng::Mapping::from_iter([
         ("dns".into(), Value::Mapping(dns_config)),
         ("hosts".into(), Value::Mapping(serde_yaml_ng::Mapping::new())),
-    ]);
+    ])
+}
 
+pub(super) async fn init_dns_config() -> Result<()> {
+    let default_dns_config = default_dns_config();
     let app_dir = dirs::app_home_dir()?;
     let dns_path = app_dir.join(constants::files::DNS_CONFIG);
 
+    initialize_dns_config_file(&dns_path, &default_dns_config).await
+}
+
+async fn initialize_dns_config_file(dns_path: &Path, default_dns_config: &serde_yaml_ng::Mapping) -> Result<()> {
     if !dns_path.exists() {
         logging!(info, Type::Setup, "Creating default DNS config file");
-        help::save_yaml(&dns_path, &default_dns_config, Some("# Clash Verge DNS Config")).await?;
+        help::save_yaml(dns_path, default_dns_config, Some("# clash5 DNS Config")).await?;
     }
 
     Ok(())
@@ -452,7 +458,7 @@ async fn initialize_config_files() -> Result<()> {
         && !path.exists()
     {
         let template = IClashTemp::template().0;
-        help::save_yaml(&path, &template, Some("# Clash Verge"))
+        help::save_yaml(&path, &template, Some("# clash5"))
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create clash config: {}", e))?;
         logging!(info, Type::Setup, "Created clash config at {:?}", path);
@@ -462,7 +468,7 @@ async fn initialize_config_files() -> Result<()> {
         && !path.exists()
     {
         let template = IVerge::template();
-        help::save_yaml(&path, &template, Some("# Clash Verge"))
+        help::save_yaml(&path, &template, Some("# clash5"))
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create verge config: {}", e))?;
         logging!(info, Type::Setup, "Created verge config at {:?}", path);
@@ -472,7 +478,7 @@ async fn initialize_config_files() -> Result<()> {
         && !path.exists()
     {
         let template = IProfiles::default();
-        help::save_yaml(&path, &template, Some("# Clash Verge"))
+        help::save_yaml(&path, &template, Some("# clash5"))
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create profiles config: {}", e))?;
         logging!(info, Type::Setup, "Created profiles config at {:?}", path);
@@ -557,8 +563,8 @@ pub fn init_scheme() -> Result<()> {
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let (clash, _) = hkcu.create_subkey("Software\\Classes\\Clash")?;
-    clash.set_value("", &"Clash Verge")?;
-    clash.set_value("URL Protocol", &"Clash Verge URL Scheme Protocol")?;
+    clash.set_value("", &"clash5")?;
+    clash.set_value("URL Protocol", &"clash5 URL Scheme Protocol")?;
     let (default_icon, _) = hkcu.create_subkey("Software\\Classes\\Clash\\DefaultIcon")?;
     default_icon.set_value("", &app_exe)?;
     let (command, _) = hkcu.create_subkey("Software\\Classes\\Clash\\Shell\\Open\\Command")?;
@@ -568,7 +574,7 @@ pub fn init_scheme() -> Result<()> {
 }
 #[cfg(target_os = "linux")]
 pub fn init_scheme() -> Result<()> {
-    const DESKTOP_FILE: &str = "clash-verge.desktop";
+    const DESKTOP_FILE: &str = "clash5.desktop";
 
     for scheme in DEEP_LINK_SCHEMES {
         let handler = format!("x-scheme-handler/{scheme}");
@@ -650,4 +656,64 @@ async fn handle_copy(src: &PathBuf, dest: &PathBuf, file: &str) {
             );
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{default_dns_config, initialize_dns_config_file};
+    use serde_yaml_ng::Value;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn dns_defaults_disable_ipv6_and_respect_rules() -> anyhow::Result<()> {
+        let config = default_dns_config();
+        let dns = config
+            .get("dns")
+            .and_then(Value::as_mapping)
+            .ok_or_else(|| anyhow::anyhow!("default DNS config is missing its dns mapping"))?;
+
+        assert_eq!(dns.get("ipv6"), Some(&Value::Bool(false)));
+        assert_eq!(dns.get("respect-rules"), Some(&Value::Bool(true)));
+        Ok(())
+    }
+
+    #[test]
+    fn default_dns_uses_encrypted_upstreams_and_loopback_listener() -> anyhow::Result<()> {
+        let config = default_dns_config();
+        let dns = config
+            .get("dns")
+            .and_then(Value::as_mapping)
+            .ok_or_else(|| anyhow::anyhow!("default DNS config is missing its dns mapping"))?;
+
+        assert_eq!(dns.get("listen"), Some(&Value::String("127.0.0.1:53".into())));
+        for field in ["default-nameserver", "nameserver", "proxy-server-nameserver"] {
+            let upstreams = dns
+                .get(field)
+                .and_then(Value::as_sequence)
+                .ok_or_else(|| anyhow::anyhow!("default DNS config is missing {field}"))?;
+            assert!(!upstreams.is_empty());
+            assert!(upstreams.iter().all(|value| {
+                value
+                    .as_str()
+                    .is_some_and(|address| address.starts_with("tls://") || address.starts_with("https://"))
+            }));
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn existing_dns_config_is_preserved() -> anyhow::Result<()> {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let dir = std::env::temp_dir().join(format!("clash5-dns-defaults-{nonce}"));
+        tokio::fs::create_dir_all(&dir).await?;
+        let path = dir.join("dns_config.yaml");
+        let explicit = "dns:\n  ipv6: true\n  respect-rules: false\n";
+        tokio::fs::write(&path, explicit).await?;
+
+        initialize_dns_config_file(&path, &default_dns_config()).await?;
+
+        assert_eq!(tokio::fs::read_to_string(&path).await?, explicit);
+        tokio::fs::remove_dir_all(dir).await?;
+        Ok(())
+    }
 }

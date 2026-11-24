@@ -1,11 +1,11 @@
 [package]
-name = "clash-verge"
-version = "2.5.8"
-description = "clash verge"
+name = "clash5"
+version = "2.5.9"
+description = "clash5"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
-repository = "https://github.com/clash-verge-rev/clash-verge-rev.git"
-default-run = "clash-verge"
+repository = "https://github.com/oops11111/clash5.git"
+default-run = "clash5"
 build = "build.rs"
 edition = "2024"
 rust-version = "1.99"
@@ -26,12 +26,19 @@ clippy = ["tauri/test"]
 perf-harness = ["dep:tauri-plugin-wdio-webdriver"]
 
 [package.metadata.bundle]
-identifier = "io.github.clash-verge-rev.clash-verge-rev"
+identifier = "io.github.oops11111.clash5"
 
 [build-dependencies]
 tauri-build = { version = "2.7.1", features = [] }
 
 [dependencies]
+clash5-data = { path = "../crates/clash5-data" }
+keyring = { version = "=3.6.3", features = [
+  "apple-native",
+  "crypto-rust",
+  "linux-native-sync-persistent",
+  "windows-native",
+] }
 clash-verge-draft = { workspace = true }
 clash-verge-media-unlock = { workspace = true }
 clash-verge-logging = { workspace = true }
@@ -48,9 +55,12 @@ tauri = { workspace = true, features = [
   "image-ico",
   "image-png",
 ] }
+specta = { version = "=2.0.0-rc.25", features = ["derive", "chrono"] }
+specta-typescript = "=0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 parking_lot = { workspace = true }
 anyhow = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["process"] }
 log = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -80,12 +90,13 @@ tauri-plugin-fs = "2.6.0"
 tauri-plugin-process = "2.4.0"
 tauri-plugin-deep-link = "2.6.1"
 tauri-plugin-window-state = "2.5.0"
-zip = "8.6.0"
+zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 flate2 = "1.1.10"
 reqwest_dav = "0.3.3"
 aes-gcm = { version = "0.11.1" }
 base64 = "0.23.1"
 minisign-verify = "0.3.0"
+wasmtime = { version = "=49.0.1", default-features = false, features = ["cranelift", "runtime", "std"] }
 sha2 = "0.11"
 getrandom = "0.4.3"
 futures = "0.3.34"
@@ -99,8 +110,9 @@ tracing = { workspace = true }
 tauri-plugin-devtools = { version = "2.2.2", optional = true }
 tauri-plugin-mihomo = { git = "https://github.com/clash-verge-rev/tauri-plugin-mihomo", branch = "main" }
 async-trait = "0.1.92"
-clash_verge_service_ipc = { git = "https://github.com/clash-verge-rev/clash-verge-service-ipc.git", tag = "v2.7.6", version = "2.7.6", features = [
+clash_verge_service_ipc = { git = "https://github.com/oops11111/clash5-service-ipc.git", rev = "9f21d98120c402cdb4b8b7dd7529bec96ec28e3b", version = "2.7.6", features = [
   "client",
+  "development-channel",
 ] }
 arc-swap = "1.9.2"
 tokio-rustls = "0.26.6"

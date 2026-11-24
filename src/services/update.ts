@@ -68,10 +68,12 @@ const resolveRemoteVersion = (update: Update): string | null => {
 }
 
 const localVersionNormalized = normalizeVersion(appVersion)
+export const FIRST_RELEASE_UPDATER_ENABLED = false
 
 export const checkUpdateSafe = async (
   options?: CheckOptions,
 ): Promise<Update | null> => {
+  if (!FIRST_RELEASE_UPDATER_ENABLED) return null
   const result = await check(options ?? {})
   if (!result) return null
 

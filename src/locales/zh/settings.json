@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "语言设置",
+          "followSystemLanguage": "语言跟随系统",
+          "followSystemLanguageDescription": "关闭后可手动选择界面语言",
           "themeMode": "主题模式",
           "trayClickEvent": "托盘点击事件",
           "copyEnvType": "复制环境变量类型",
@@ -178,6 +180,18 @@
           "misc": "杂项设置",
           "hotkeySetting": "热键设置"
         }
+      },
+      "performance": {
+        "title": "性能预设",
+        "balanced": "均衡",
+        "balancedDescription": "最多 12 个并发探测，缓存 10 分钟；启用自动检测时每 5 分钟检查当前节点",
+        "performance": "性能优先",
+        "performanceDescription": "最多 16 个并发探测，缓存 5 分钟；启用自动检测时每 2 分钟检查当前节点",
+        "power_saving": "省电",
+        "power_savingDescription": "最多 4 个并发探测，缓存 20 分钟；启用自动检测时每 15 分钟检查当前节点",
+        "manualInterval": "启用自动检测时，当前节点按高级设置中的 {{minutes}} 分钟间隔检查",
+        "memoryProtectionActive": "内存压力保护已启用。探测任务暂时减少，已保存的性能预设不变。",
+        "memoryTelemetryUnavailable": "无法获取系统内存信息；自动保护暂时无法更新。"
       },
       "advanced": {
         "title": "Verge 高级设置",
@@ -203,7 +217,7 @@
           "openDevTools": "开发者工具",
           "liteModeSettings": "轻量模式设置",
           "exit": "退出",
-          "exportDiagnostics": "导出诊断信息",
+          "exportDiagnostics": "复制已脱敏诊断信息",
           "vergeVersion": "Verge 版本"
         }
       },
@@ -411,6 +425,8 @@
         "appLogMaxSize": "应用日志最大大小",
         "appLogMaxCount": "应用日志最大数量",
         "autoCloseConnections": "自动关闭连接",
+        "singboxPersistent": "保持 sing-box 常驻",
+        "singboxDegraded": "sing-box 多次启动失败，已停止运行并回退到 Mihomo。",
         "autoCheckUpdate": "自动检查更新",
         "enableBuiltinEnhanced": "内置增强功能",
         "proxyLayoutColumns": "代理页布局列数",
@@ -422,6 +438,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "当代理组选中节点或代理模式变动时，关闭已建立的连接",
+        "singboxPersistent": "中转链路空闲后仍保持 sing-box 运行",
         "enableBuiltinEnhanced": "配置文件的兼容性处理",
         "autoDelayDetection": "后台定时检测当前节点延迟",
         "defaultLatencyTest": "仅用于 HTTP 客户端请求测试，不会对配置文件产生影响"
@@ -670,11 +687,11 @@
         "coreAlreadyRunning": "无法启动内核：已有内核进程正在运行。请退出相关应用或清理残留进程后重试。若仍无法解决，请重启电脑。"
       },
       "sysproxy": {
-        "privilegeRequired": "无法设置系统代理：macOS 以权限不足为由拒绝了这次修改。请安装 Clash Verge 服务；管理员也可以在系统设置 → 隐私与安全性的高级选项中，关闭访问系统范围设置需要管理员密码的要求。",
+        "privilegeRequired": "无法设置系统代理：macOS 以权限不足为由拒绝了这次修改。请安装 clash5 服务；管理员也可以在系统设置 → 隐私与安全性的高级选项中，关闭访问系统范围设置需要管理员密码的要求。",
         "directFallback": "系统代理设置失败，已回退为直连。",
         "guardStopped": "系统代理守卫连续多次失败后已停止，系统代理不再被自动维持。",
-        "sidecarWhileServiceReady": "系统代理设置失败：Clash Verge 服务已就绪，但内核仍以 Sidecar 运行。重启内核即可切换到服务模式。",
-        "coreNotReady": "无法开启系统代理：内核尚未运行。请先启动内核（或安装/修复 Clash Verge 服务）后重试。",
+        "sidecarWhileServiceReady": "系统代理设置失败：clash5 服务已就绪，但内核仍以 Sidecar 运行。重启内核即可切换到服务模式。",
+        "coreNotReady": "无法开启系统代理：内核尚未运行。请先启动内核（或安装/修复 clash5 服务）后重试。",
         "systemCallFailed": "系统代理写入失败：Windows 系统调用未成功，通常是瞬时故障。请稍后重试。"
       }
     },

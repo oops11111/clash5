@@ -50,9 +50,9 @@ body:
       required: true
 
   - type: input
-    id: verge-version
+    id: clash5-version
     attributes:
-      label: 软件版本 / CVR Version
-      description: 请提供你使用的 CVR 具体版本 / Please provide the specific version of CVR you are using
+      label: 软件版本 / clash5 Version
+      description: 请提供你使用的 clash5 具体版本 / Please provide the exact clash5 version you are using
     validations:
       required: true

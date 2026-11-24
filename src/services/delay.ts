@@ -14,6 +14,9 @@ import { debugLog } from '@/utils/debug'
 import { classifyDelay, DEFAULT_DELAY_TIMEOUT } from '@/utils/delay'
 import { isValidLatencyTestUrl } from '@/utils/network'
 
+export const DEFAULT_DELAY_CONCURRENCY = 10
+export const MAX_DELAY_CONCURRENCY = 16
+
 export type DelaySnapshot = {
   of: (member: ResolvedProxyMember) => number
 }
@@ -360,7 +363,7 @@ class DelayManager {
     proxies: InteractableProxyMember[],
     group: string,
     timeout: number,
-    concurrency = 36,
+    concurrency = DEFAULT_DELAY_CONCURRENCY,
   ) {
     debugLog(
       `[DelayManager] 批量测试延迟开始，组: ${group}, 数量: ${proxies.length}, 并发数: ${concurrency}`,
@@ -401,7 +404,13 @@ class DelayManager {
       return help()
     }
 
-    const actualConcurrency = Math.min(concurrency, proxies.length, 10)
+    // Keep the default conservative while allowing the performance preset's
+    // explicit cap (16) to flow through from callers.
+    const actualConcurrency = Math.min(
+      concurrency,
+      proxies.length,
+      MAX_DELAY_CONCURRENCY,
+    )
     debugLog(`[DelayManager] 实际并发数: ${actualConcurrency}`)
 
     const promiseList: Promise<void>[] = []

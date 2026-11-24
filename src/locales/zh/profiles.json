@@ -6,6 +6,14 @@
       "reactivate": "重新激活订阅",
       "import": "导入"
     },
+    "vergeImport": {
+      "action": "导入 Clash Verge Rev 数据",
+      "chooseSource": "选择 Clash Verge Rev 数据目录",
+      "backupReminder": "导入前请备份此源目录。clash5 只读取文件，不会修改源数据。是否继续？",
+      "success": "已导入 {{imported}} 个配置；跳过 {{skipped}} 个不支持的项目；节点索引同步失败 {{syncFailures}} 项。源目录 SHA-256 清单：{{manifest}}",
+      "failure": "导入失败；clash5 无法验证或保证所选源目录未被更改。",
+      "skippedDetails": "已跳过的项目（{{count}}）"
+    },
     "batch": {
       "actions": {
         "delete": "删除选中订阅",
@@ -124,7 +132,8 @@
         "useSystemProxy": "使用系统代理更新",
         "useClashProxy": "使用内核代理更新",
         "acceptInvalidCerts": "允许无效证书（危险）",
-        "allowAutoUpdate": "允许自动更新"
+        "allowAutoUpdate": "允许自动更新",
+        "allowInsecureHttp": "允许明文 HTTP（不推荐）"
       },
       "types": {
         "remote": "远程",
@@ -137,7 +146,8 @@
         "saveFailed": "保存订阅失败"
       },
       "warnings": {
-        "frequentUpdate": "间隔过短会频繁触发内核重载并中断现有连接，建议使用默认值 {{minutes}} 分钟（24 小时）"
+        "frequentUpdate": "间隔过短会频繁触发内核重载并中断现有连接，建议使用默认值 {{minutes}} 分钟（24 小时）",
+        "insecureHttp": "明文 HTTP 会以明文传输订阅 token 与整份配置，只对受信任的订阅开启。"
       },
       "feedback": {
         "notifications": {

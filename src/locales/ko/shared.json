@@ -85,7 +85,10 @@
       "trafficUnavailable": "트래픽 데이터를 사용할 수 없습니다",
       "operationFailed": "작업에 실패했습니다",
       "trafficStats": "트래픽 통계 오류",
-      "trafficStatsDescription": "트래픽 통계 구성 요소에서 오류가 발생하여 충돌을 방지하기 위해 비활성화되었습니다."
+      "trafficStatsDescription": "트래픽 통계 구성 요소에서 오류가 발생하여 충돌을 방지하기 위해 비활성화되었습니다.",
+      "backendDisconnected": "Backend disconnected, reconnecting…",
+      "pageNotFound": "Page not found",
+      "pageNotFoundDescription": "The page you are looking for does not exist or has moved."
     },
     "notices": {
       "raw": "{{message}}",

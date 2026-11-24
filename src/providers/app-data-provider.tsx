@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import {
   getBaseConfig,
   getRuleProviders,
@@ -9,7 +9,7 @@ import { useClashInfo, useRuntimeConfig } from '@/hooks/use-clash'
 import { useVerge } from '@/hooks/use-verge'
 import { getProxyView, getSystemProxy } from '@/services/cmds'
 import { useQuery } from '@/services/query-client'
-import { useRunState } from '@/store/app-store-context'
+import { useAppDispatch, useRunState } from '@/store/app-store-context'
 import { resolveDisplayedMixedPort } from '@/utils/mixed-port'
 
 import {
@@ -67,6 +67,7 @@ export const AppDataProvider = ({
 
   const {
     data: clashConfig,
+    error: clashConfigError,
     isPending: isClashConfigPending,
     refetch: _refetchClashConfig,
   } = useQuery({
@@ -75,24 +76,70 @@ export const AppDataProvider = ({
     ...TQ_MIHOMO,
   })
 
-  const { data: ruleProviders, refetch: _refetchRuleProviders } = useQuery({
+  const {
+    data: ruleProviders,
+    error: ruleProvidersError,
+    refetch: _refetchRuleProviders,
+  } = useQuery({
     queryKey: ['getRuleProviders'],
     queryFn: getRuleProviders,
     ...TQ_MIHOMO,
     revalidateOnMount: false,
   })
 
-  const { data: rulesData, refetch: _refetchRules } = useQuery({
+  const {
+    data: rulesData,
+    error: rulesError,
+    refetch: _refetchRules,
+  } = useQuery({
     queryKey: ['getRules'],
     queryFn: getRules,
     ...TQ_MIHOMO,
   })
 
-  const { data: sysproxy, refetch: _refetchSysproxy } = useQuery({
+  const {
+    data: sysproxy,
+    error: sysproxyError,
+    refetch: _refetchSysproxy,
+  } = useQuery({
     queryKey: ['getSystemProxy'],
     queryFn: getSystemProxy,
     ...TQ_DEFAULTS,
   })
+
+  // Backend query failures land in the unified connection state instead of
+  // being folded into booleans or ignored; a successful revalidation clears
+  // them. The message is derived as a string so the effect only runs when
+  // the failure itself changes, not when SWR hands back a new error object.
+  const dispatch = useAppDispatch()
+  const backendErrorMessage = useMemo(() => {
+    const firstError =
+      proxyViewError ??
+      clashConfigError ??
+      ruleProvidersError ??
+      rulesError ??
+      sysproxyError
+    if (!firstError) return null
+    return firstError instanceof Error ? firstError.message : String(firstError)
+  }, [
+    proxyViewError,
+    clashConfigError,
+    ruleProvidersError,
+    rulesError,
+    sysproxyError,
+  ])
+
+  useEffect(() => {
+    if (backendErrorMessage) {
+      dispatch({
+        type: 'connection/failed',
+        source: 'backend',
+        message: backendErrorMessage,
+      })
+    } else {
+      dispatch({ type: 'connection/recovered', source: 'backend' })
+    }
+  }, [backendErrorMessage, dispatch])
 
   // Store-owned run state; the event bus and the store's safety net write it.
   const runState = useRunState()

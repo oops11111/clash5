@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "言語設定",
+          "followSystemLanguage": "システムの言語に合わせる",
+          "followSystemLanguageDescription": "オフにすると表示言語を手動で選択できます",
           "themeMode": "テーマモード",
           "trayClickEvent": "トレイアイコンクリックイベント",
           "copyEnvType": "環境変数タイプをコピー",
@@ -178,6 +180,18 @@
           "misc": "その他の設定",
           "hotkeySetting": "ホットキー設定"
         }
+      },
+      "performance": {
+        "title": "Performance preset",
+        "balanced": "Balanced",
+        "balancedDescription": "12 parallel checks, 10-minute reuse; current-node checks every 5 minutes when enabled",
+        "performance": "Performance",
+        "performanceDescription": "16 parallel checks, 5-minute reuse; current-node checks every 2 minutes when enabled",
+        "power_saving": "Power saving",
+        "power_savingDescription": "4 parallel checks, 20-minute reuse; current-node checks every 15 minutes when enabled",
+        "manualInterval": "When enabled, current-node checks use the advanced interval of {{minutes}} minutes",
+        "memoryProtectionActive": "Memory pressure protection is active. Probe work is temporarily reduced; your saved preset is unchanged.",
+        "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
         "title": "Verge詳細設定",
@@ -411,6 +425,8 @@
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
         "autoCloseConnections": "接続を自動的に閉じる",
+        "singboxPersistent": "sing-box を常駐させる",
+        "singboxDegraded": "sing-box は複数回の起動失敗後に停止しました。通信は Mihomo に戻りました。",
         "autoCheckUpdate": "自動更新チェック",
         "enableBuiltinEnhanced": "組み込み拡張機能を有効にする",
         "proxyLayoutColumns": "プロキシページのレイアウト列数",
@@ -422,6 +438,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "プロキシグループで選択されたノードまたはプロキシモードが変更されたときに、既存の接続を閉じます。",
+        "singboxPersistent": "リレーがアイドル状態でもサイドカープロセスを実行し続けます",
         "enableBuiltinEnhanced": "設定ファイルの互換性処理",
         "autoDelayDetection": "バックグラウンドで現在のノードのレイテンシーを定期的にテストします",
         "defaultLatencyTest": "HTTPクライアントリクエストテストにのみ使用され、設定ファイルには影響しません。"
@@ -670,11 +687,11 @@
         "coreAlreadyRunning": "コアを起動できません：コアプロセスが実行中です。関連アプリまたは残存プロセスを終了して再試行してください。解決しない場合は、コンピューターを再起動してください。"
       },
       "sysproxy": {
-        "privilegeRequired": "システムプロキシを設定できません: 権限が不足しているため macOS が変更を拒否しました。Clash Verge サービスをインストールしてください。管理者であれば、システム設定 → プライバシーとセキュリティの詳細オプションで、システム全体の設定に管理者パスワードを要求する設定をオフにすることもできます。",
+        "privilegeRequired": "システムプロキシを設定できません: 権限が不足しているため macOS が変更を拒否しました。clash5 サービスをインストールしてください。管理者であれば、システム設定 → プライバシーとセキュリティの詳細オプションで、システム全体の設定に管理者パスワードを要求する設定をオフにすることもできます。",
         "directFallback": "システムプロキシの設定に失敗したため、直接接続に戻しました。",
         "guardStopped": "システムプロキシガードが連続して失敗したため停止しました。システムプロキシは自動的に維持されなくなりました。",
-        "sidecarWhileServiceReady": "システムプロキシを設定できませんでした: Clash Verge サービスは準備できていますが、コアはまだ Sidecar で動作しています。コアを再起動するとサービスモードに切り替わります。",
-        "coreNotReady": "コアが実行されていないため、システムプロキシを有効にできませんでした。コアを起動する（または Clash Verge サービスをインストール／修復する）してから再試行してください。",
+        "sidecarWhileServiceReady": "システムプロキシを設定できませんでした: clash5 サービスは準備できていますが、コアはまだ Sidecar で動作しています。コアを再起動するとサービスモードに切り替わります。",
+        "coreNotReady": "コアが実行されていないため、システムプロキシを有効にできませんでした。コアを起動する（または clash5 サービスをインストール／修復する）してから再試行してください。",
         "systemCallFailed": "Windows のシステムコールが失敗したため、システムプロキシを書き込めませんでした。多くは一時的な問題です。再試行してください。"
       }
     },

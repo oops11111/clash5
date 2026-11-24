@@ -65,8 +65,8 @@ test('pending edits survive a reload and older save acknowledgements', async () 
   let finish!: () => void
   vi.mocked(patchProfile).mockImplementationOnce(
     () =>
-      new Promise<void>((resolve) => {
-        finish = resolve
+      new Promise<null>((resolve) => {
+        finish = () => resolve(null)
       }),
   )
   const first = commitProfileTestUrl(profile.uid, 'A', 'http://localhost/new')

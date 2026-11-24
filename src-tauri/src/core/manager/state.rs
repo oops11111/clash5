@@ -26,7 +26,6 @@ pub(super) fn explain_core_occupancy(error: anyhow::Error) -> anyhow::Error {
     }
 }
 
-#[cfg(target_os = "windows")]
 fn sidecar_config_without_tun(yaml: &str) -> Result<std::string::String> {
     use serde_yaml_ng::{Mapping, Value};
 
@@ -44,6 +43,28 @@ fn sidecar_config_without_tun(yaml: &str) -> Result<std::string::String> {
 }
 
 const SIDECAR_READINESS_ATTEMPTS: usize = 30;
+
+#[cfg(test)]
+mod sidecar_tun_tests {
+    use super::sidecar_config_without_tun;
+    use anyhow::Result;
+
+    #[test]
+    fn suspending_sidecar_tun_changes_only_the_runtime_config() -> Result<()> {
+        let runtime_yaml = "tun:\n  enable: true\n  stack: system\nmode: rule\n";
+        let suspended_yaml = sidecar_config_without_tun(runtime_yaml)?;
+        let value: serde_yaml_ng::Value = serde_yaml_ng::from_str(&suspended_yaml)?;
+
+        assert_eq!(value["tun"]["enable"], false);
+        assert_eq!(value["tun"]["stack"], "system");
+        assert_eq!(value["mode"], "rule");
+        assert!(
+            runtime_yaml.contains("enable: true"),
+            "the stored source remains untouched"
+        );
+        Ok(())
+    }
+}
 
 #[cfg(target_os = "windows")]
 async fn retry_service_start<Start, StartFuture>(
@@ -171,16 +192,20 @@ impl CoreManager {
         handle::Handle::app_handle()
             .mihomo()
             .update_socket_path(dirs::path_to_str(&sidecar_ipc)?.to_owned())?;
-        #[cfg(target_os = "windows")]
-        let config_file = if crate::core::runstate::RUN_STATE.state().is_admin {
-            Config::generate_file().await?
-        } else {
-            // Reconciliation persists the preference later; the first spawn must already have TUN off.
+        let tun_enabled = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
+        let state = crate::core::runstate::RUN_STATE.state();
+        let tun_suspended = tun_enabled
+            && if cfg!(windows) {
+                !state.is_admin
+            } else {
+                state.tun_should_be_disabled(tun_enabled)
+            };
+        let config_file = if tun_suspended {
             let yaml = sidecar_config_without_tun(&Config::runtime_config_yaml().await?)?;
             Config::write_runtime_file(&yaml).await?
+        } else {
+            Config::generate_file().await?
         };
-        #[cfg(not(target_os = "windows"))]
-        let config_file = Config::generate_file().await?;
         let app_handle = handle::Handle::app_handle();
         let clash_core = Config::verge().await.latest_arc().get_valid_clash_core();
         let config_dir = dirs::app_home_dir()?;
@@ -264,7 +289,7 @@ impl CoreManager {
                     tauri_plugin_shell::process::CommandEvent::Terminated(term) => {
                         let _ = terminated.send(());
                         let manager = Self::global();
-                        let _ = manager.invalidate_core_readiness_if(core_readiness_generation);
+                        let claimed_exit = manager.invalidate_core_readiness_if(core_readiness_generation);
                         let message = if let Some(code) = term.code {
                             format!("Process terminated with code: {}", code)
                         } else if let Some(signal) = term.signal {
@@ -274,7 +299,9 @@ impl CoreManager {
                         };
                         Logger::global().writer_sidecar_log(Level::Info, &message);
                         CLASH_LOGGER.clear_logs();
-                        manager.clear_terminated_sidecar(pid).await;
+                        if claimed_exit {
+                            manager.clear_terminated_sidecar(pid, core_readiness_generation).await;
+                        }
                         break;
                     }
                     _ => {}
@@ -392,9 +419,16 @@ impl CoreManager {
         Ok(())
     }
 
-    async fn clear_terminated_sidecar(&self, terminated_pid: u32) {
+    async fn clear_terminated_sidecar(&self, terminated_pid: u32, generation: u64) {
         let _life = self.lifecycle_lock.lock().await;
-        if !should_clear_terminated_sidecar(&self.get_running_mode(), self.get_running_sidecar_pid(), terminated_pid) {
+        if self.core_readiness_state.load(std::sync::atomic::Ordering::Acquire)
+            != super::inactive_core_readiness_state(generation)
+            || !should_clear_terminated_sidecar(
+                &self.get_running_mode(),
+                self.get_running_sidecar_pid(),
+                terminated_pid,
+            )
+        {
             return;
         }
 
@@ -402,9 +436,43 @@ impl CoreManager {
         #[cfg(target_os = "windows")]
         self.set_job_handle(None);
         proxy_control::stop_guard().await;
+        let cleanup = proxy_control::clear_after_unexpected_exit().await;
         self.core_stopped();
+        let resources = {
+            let mut active = self.singbox_route.lock().await;
+            let result = if let Some(route) = active.as_mut() {
+                route.stop_resources().await
+            } else {
+                Ok(())
+            };
+            if active.as_ref().is_some_and(|route| route.is_stopped()) {
+                *active = None;
+            }
+            drop(active);
+            self.singbox_degraded
+                .store(result.is_err(), std::sync::atomic::Ordering::Release);
+            result
+        };
+        let cleanup = match (cleanup, resources) {
+            (Err(error), Err(resources)) => Err(error.context(format!("Sing-box cleanup also failed: {resources:#}"))),
+            (Err(error), _) | (_, Err(error)) => Err(error),
+            _ => Ok(()),
+        };
+        if let Err(error) = cleanup {
+            logging!(
+                error,
+                Type::Core,
+                "Failed to clear the system proxy after core exit: {error:#}"
+            );
+            self.record_startup_error(super::CoreFailure::StartFailed(format!(
+                "Core exited; system proxy cleanup failed: {error:#}"
+            )));
+            handle::Handle::notice(crate::core::notify::NoticeStatus::CoreStartError, "");
+            return;
+        }
         #[cfg(target_os = "macos")]
         crate::utils::resolve::dns::sync_public_dns().await;
+        self.request_sidecar_recovery();
     }
 }
 

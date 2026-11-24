@@ -2,7 +2,10 @@ use crate::core::notify::NoticeStatus;
 use crate::core::notify::{Refresh, announce};
 use crate::{
     cmd,
-    config::{Config, PrfItem, PrfOption, profiles::profiles_update_item_safe},
+    config::{
+        Config, PrfItem, PrfOption,
+        profiles::{BindingSync, profiles_update_item_safe},
+    },
     core::{CoreManager, handle, tray, validate::ValidationOutcome},
     utils::help::{mask_err, mask_url},
 };
@@ -180,7 +183,11 @@ async fn perform_profile_update(
     let last_err = match result {
         Ok((strategy, mut item)) => {
             // A persistence error must not replay a successful download with another transport.
-            profiles_update_item_safe(uid, &mut item).await?;
+            if let BindingSync::Failed(error) = profiles_update_item_safe(uid, &mut item).await? {
+                let message = format!("Subscription saved, but clash5 node bindings were not synchronized: {error}");
+                logging!(warn, Type::Config, "{message}");
+                handle::Handle::notice(NoticeStatus::UpdateFailed, message.as_str());
+            }
             if !matches!(strategy, Strategy::Configured) {
                 handle::Handle::notice(NoticeStatus::UpdateWithClashProxy, profile_name.as_str());
             }

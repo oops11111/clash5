@@ -14,10 +14,11 @@ use std::{
     sync::{Arc, OnceLock},
     time::Duration,
 };
-use tokio::{fs, time::timeout};
+use tokio::{fs, io::AsyncWriteExt as _, time::timeout};
 use zip::write::SimpleFileOptions;
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const BACKUP_FORMAT_VERSION: u32 = 2;
 
 const TIMEOUT_UPLOAD: u64 = 300;
 const TIMEOUT_DOWNLOAD: u64 = 300;
@@ -29,6 +30,21 @@ struct WebDavConfig {
     url: String,
     username: String,
     password: String,
+}
+
+fn validate_webdav_url(value: &str) -> Result<reqwest::Url, Error> {
+    let url = reqwest::Url::parse(value).map_err(|_| anyhow::anyhow!("Invalid WebDAV server URL"))?;
+    anyhow::ensure!(url.scheme() == "https", "WebDAV server must use HTTPS");
+    anyhow::ensure!(url.host_str().is_some(), "WebDAV server URL must include a host");
+    anyhow::ensure!(
+        url.username().is_empty() && url.password().is_none(),
+        "Set WebDAV credentials in the username and password fields"
+    );
+    Ok(url)
+}
+
+fn is_allowed_webdav_redirect(from: &reqwest::Url, to: &reqwest::Url) -> bool {
+    to.scheme() == "https" && to.username().is_empty() && to.password().is_none() && from.origin() == to.origin()
 }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
@@ -86,11 +102,8 @@ impl WebDavClient {
                 }
 
                 let config = WebDavConfig {
-                    url: verge
-                        .webdav_url
-                        .clone()
-                        .unwrap_or_default()
-                        .trim_end_matches('/')
+                    url: validate_webdav_url(verge.webdav_url.as_deref().unwrap_or_default().trim_end_matches('/'))?
+                        .to_string()
                         .into(),
                     username: verge.webdav_username.clone().unwrap_or_default(),
                     password: verge.webdav_password.clone().unwrap_or_default(),
@@ -105,14 +118,19 @@ impl WebDavClient {
             .set_agent(
                 reqwest::Client::builder()
                     .use_rustls_tls()
-                    .danger_accept_invalid_certs(true)
                     .timeout(Duration::from_secs(op.timeout()))
                     .user_agent(format!("clash-verge/{APP_VERSION} ({OS} WebDAV-Client)"))
                     .redirect(reqwest::redirect::Policy::custom(|attempt| {
                         if attempt.previous().len() >= 5 {
                             attempt.error("重定向次数过多")
-                        } else {
+                        } else if attempt
+                            .previous()
+                            .last()
+                            .is_some_and(|previous| is_allowed_webdav_redirect(previous, attempt.url()))
+                        {
                             attempt.follow()
+                        } else {
+                            attempt.error("WebDAV redirect must stay on the same HTTPS origin")
                         }
                     }))
                     .build()?,
@@ -211,9 +229,28 @@ impl WebDavClient {
         let path = format!("{}/{}", dirs::BACKUP_DIR, filename);
 
         let fut = async {
-            let response = client.get(path.as_str()).await?;
-            let content = response.bytes().await?;
-            fs::write(&storage_path, &content).await?;
+            let response = client.get(path.as_str()).await?.error_for_status()?;
+            if response
+                .content_length()
+                .is_some_and(|length| length > 512 * 1024 * 1024)
+            {
+                return Err(anyhow::anyhow!("Backup archive exceeds the 512 MiB limit"));
+            }
+            let mut response = response;
+            let mut output = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&storage_path)
+                .await?;
+            let mut total = 0u64;
+            while let Some(chunk) = response.chunk().await? {
+                total = total.saturating_add(chunk.len() as u64);
+                if total > 512 * 1024 * 1024 {
+                    return Err(anyhow::anyhow!("Backup archive exceeds the 512 MiB limit"));
+                }
+                output.write_all(&chunk).await?;
+            }
+            output.flush().await?;
             Ok::<(), Error>(())
         };
 
@@ -278,6 +315,26 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
     let mut zip = zip::ZipWriter::new(file);
     zip.add_directory("profiles/", SimpleFileOptions::default())?;
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    let data_db_path = dirs::app_home_dir()?.join(dirs::CLASH5_DATA_DB);
+    let mut includes = vec![
+        "profiles/",
+        dirs::CLASH_CONFIG,
+        dirs::VERGE_CONFIG,
+        dirs::PROFILE_YAML,
+        DNS_CONFIG,
+    ];
+    if data_db_path.is_file() {
+        includes.push(dirs::CLASH5_DATA_DB);
+    }
+
+    let manifest = serde_json::json!({
+        "format_version": BACKUP_FORMAT_VERSION,
+        "product": "clash5",
+        "includes": includes,
+        "identity_key": "excluded",
+    });
+    zip.start_file(dirs::BACKUP_MANIFEST, options)?;
+    zip.write_all(serde_json::to_vec_pretty(&manifest)?.as_slice())?;
 
     if let Ok(mut entries) = fs::read_dir(dirs::app_profiles_dir()?).await {
         while let Some(entry) = entries.next_entry().await? {
@@ -315,6 +372,57 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
 
     zip.start_file(dirs::PROFILE_YAML, options)?;
     zip.write_all(fs::read(dirs::profiles_path()?).await?.as_slice())?;
+
+    if data_db_path.is_file() {
+        let snapshot_path = temp_dir().join(format!("clash5-snapshot-{}.sqlite", nanoid::nanoid!()));
+        let source = data_db_path.clone();
+        let destination = snapshot_path.clone();
+        AsyncHandler::spawn_blocking(move || clash5_data::BindingStore::open(source)?.snapshot_to(destination))
+            .await??;
+        let snapshot = fs::read(&snapshot_path).await;
+        let _ = fs::remove_file(&snapshot_path).await;
+        zip.start_file(dirs::CLASH5_DATA_DB, options)?;
+        zip.write_all(snapshot?.as_slice())?;
+    }
     zip.finish()?;
     Ok((zip_file_name, zip_path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BACKUP_FORMAT_VERSION, dirs, is_allowed_webdav_redirect, validate_webdav_url};
+
+    #[test]
+    fn webdav_url_requires_https_and_separate_credentials() {
+        assert!(validate_webdav_url("https://example.com/dav").is_ok());
+        assert!(validate_webdav_url("http://example.com/dav").is_err());
+        assert!(validate_webdav_url("https://user:password@example.com/dav").is_err());
+    }
+
+    #[test]
+    #[allow(clippy::unwrap_used)]
+    fn webdav_redirect_stays_on_same_https_origin() {
+        let source = reqwest::Url::parse("https://example.com/dav").unwrap();
+        let same_origin = reqwest::Url::parse("https://example.com/dav/archive").unwrap();
+        let other_host = reqwest::Url::parse("https://attacker.example/dav").unwrap();
+        let http = reqwest::Url::parse("http://example.com/dav").unwrap();
+
+        assert!(is_allowed_webdav_redirect(&source, &same_origin));
+        assert!(!is_allowed_webdav_redirect(&source, &other_host));
+        assert!(!is_allowed_webdav_redirect(&source, &http));
+    }
+
+    #[test]
+    fn portable_backup_contract_excludes_identity_key() {
+        let manifest = serde_json::json!({
+            "format_version": BACKUP_FORMAT_VERSION,
+            "product": "clash5",
+            "identity_key": "excluded",
+            "includes": [dirs::CLASH5_DATA_DB],
+        });
+        assert_eq!(manifest["format_version"], BACKUP_FORMAT_VERSION);
+        assert_eq!(manifest["identity_key"], "excluded");
+        assert_eq!(manifest["includes"][0], dirs::CLASH5_DATA_DB);
+        assert!(serde_json::to_string(&manifest).is_ok_and(|serialized| !serialized.contains("hmac_key")));
+    }
 }

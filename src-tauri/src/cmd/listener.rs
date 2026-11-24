@@ -4,11 +4,13 @@ use crate::{
     feat,
 };
 
+#[specta::specta]
 #[tauri::command]
 pub async fn probe_listener(request: ListenerProbe) -> CmdResult<ListenerProbeOutcome> {
     feat::probe_listener(request).await.stringify_err()
 }
 
+#[specta::specta]
 #[tauri::command]
 pub async fn save_proxy_ports(settings: ProxyPortSettings) -> CmdResult<SaveProxyPortsOutcome> {
     feat::save_proxy_ports(settings)

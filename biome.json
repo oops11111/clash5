@@ -36,6 +36,8 @@
       "!dist",
       "!node_modules",
       "!src-tauri/target",
+      "!crates/clash5-data/target",
+      "!scripts/release-gate/target",
       "!src-tauri/gen",
       "!target",
       "!Cargo.lock",

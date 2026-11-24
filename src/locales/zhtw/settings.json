@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "語言設定",
+          "followSystemLanguage": "語言跟隨系統",
+          "followSystemLanguageDescription": "關閉後可手動選擇介面語言",
           "themeMode": "主題模式",
           "trayClickEvent": "系統匣點擊事件",
           "copyEnvType": "複製環境變數類型",
@@ -178,6 +180,18 @@
           "misc": "雜項設定",
           "hotkeySetting": "快速鍵設定"
         }
+      },
+      "performance": {
+        "title": "Performance preset",
+        "balanced": "Balanced",
+        "balancedDescription": "12 parallel checks, 10-minute reuse; current-node checks every 5 minutes when enabled",
+        "performance": "Performance",
+        "performanceDescription": "16 parallel checks, 5-minute reuse; current-node checks every 2 minutes when enabled",
+        "power_saving": "Power saving",
+        "power_savingDescription": "4 parallel checks, 20-minute reuse; current-node checks every 15 minutes when enabled",
+        "manualInterval": "When enabled, current-node checks use the advanced interval of {{minutes}} minutes",
+        "memoryProtectionActive": "記憶體壓力保護已啟用。探測工作暫時減少，已儲存的性能預設不變。",
+        "memoryTelemetryUnavailable": "無法取得系統記憶體資訊；自動保護暫時無法更新。"
       },
       "advanced": {
         "title": "Verge 進階設定",
@@ -203,7 +217,7 @@
           "openDevTools": "開發人員工具",
           "liteModeSettings": "輕量模式設定",
           "exit": "離開",
-          "exportDiagnostics": "匯出診斷資訊",
+          "exportDiagnostics": "複製已脫敏診斷資訊",
           "vergeVersion": "Verge 版本"
         }
       },
@@ -411,6 +425,8 @@
         "appLogMaxSize": "應用程式日誌最大大小",
         "appLogMaxCount": "應用程式日誌最大數量",
         "autoCloseConnections": "自動關閉連線",
+        "singboxPersistent": "保持 sing-box 常駐",
+        "singboxDegraded": "sing-box 多次啟動失敗，已停止執行並回復到 Mihomo。",
         "autoCheckUpdate": "自動檢查更新",
         "enableBuiltinEnhanced": "內建增強功能",
         "proxyLayoutColumns": "代理頁面欄數",
@@ -422,6 +438,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "當代理組選中節點或代理模式變動時，關閉已建立的連線",
+        "singboxPersistent": "中轉鏈路閒置後仍保持 sing-box 執行",
         "enableBuiltinEnhanced": "配置檔案的相容性處理",
         "autoDelayDetection": "在背景定時偵測目前節點延遲",
         "defaultLatencyTest": "僅用於 HTTP 客戶端請求測試，不會對配置檔案產生影響"
@@ -670,11 +687,11 @@
         "coreAlreadyRunning": "無法啟動核心：已有核心程序正在執行。請結束相關應用程式或清理殘留程序後重試。若仍無法解決，請重新啟動電腦。"
       },
       "sysproxy": {
-        "privilegeRequired": "無法設定系統代理：macOS 以權限不足為由拒絕了這次修改。請安裝 Clash Verge 服務；管理者也可以在系統設定 → 隱私權與安全性的進階選項中，關閉存取系統層級設定需要管理者密碼的要求。",
+        "privilegeRequired": "無法設定系統代理：macOS 以權限不足為由拒絕了這次修改。請安裝 clash5 服務；管理者也可以在系統設定 → 隱私權與安全性的進階選項中，關閉存取系統層級設定需要管理者密碼的要求。",
         "directFallback": "系統代理設定失敗，已回退為直連。",
         "guardStopped": "系統代理守衛連續多次失敗後已停止，系統代理不再被自動維持。",
-        "sidecarWhileServiceReady": "系統代理設定失敗：Clash Verge 服務已就緒，但內核仍以 Sidecar 執行。重新啟動內核即可切換到服務模式。",
-        "coreNotReady": "無法開啟系統代理：內核尚未執行。請先啟動內核（或安裝/修復 Clash Verge 服務）後重試。",
+        "sidecarWhileServiceReady": "系統代理設定失敗：clash5 服務已就緒，但內核仍以 Sidecar 執行。重新啟動內核即可切換到服務模式。",
+        "coreNotReady": "無法開啟系統代理：內核尚未執行。請先啟動內核（或安裝/修復 clash5 服務）後重試。",
         "systemCallFailed": "系統代理寫入失敗：Windows 系統呼叫未成功，通常是瞬時故障。請稍後重試。"
       }
     },

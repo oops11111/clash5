@@ -6,4 +6,5 @@ linker = "arm-linux-gnueabihf-gcc"
 
 [alias]
 clippy-all = "clippy --all-targets --all-features -- -D warnings"
+clippy-workspace = "clippy --workspace --all-targets --all-features -- -D warnings"
 clippy-only = "clippy --all-targets  --features clippy -- -D warnings"

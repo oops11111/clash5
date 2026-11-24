@@ -1,6 +1,7 @@
 import { Typography } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import React, { ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 
 import { BaseErrorBoundary } from './base-error-boundary'
 
@@ -10,17 +11,18 @@ interface Props {
   contentStyle?: React.CSSProperties
   children?: ReactNode
   full?: boolean
+  compact?: boolean
 }
 
 export const BasePage: React.FC<Props> = (props) => {
-  const { title, header, contentStyle, full, children } = props
+  const { title, header, contentStyle, full, compact, children } = props
   const theme = useTheme()
-
-  const isDark = theme.palette.mode === 'dark'
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
 
   return (
-    <BaseErrorBoundary>
-      <div className="base-page">
+    <BaseErrorBoundary resetKeys={[pathname]} onGoHome={() => navigate('/')}>
+      <div className={`base-page${compact ? ' base-page--compact' : ''}`}>
         <header data-tauri-drag-region="true" style={{ userSelect: 'none' }}>
           <Typography
             sx={{ fontSize: '20px', fontWeight: '700 ' }}
@@ -34,11 +36,11 @@ export const BasePage: React.FC<Props> = (props) => {
 
         <div
           className={full ? 'base-container no-padding' : 'base-container'}
-          style={{ backgroundColor: isDark ? '#1e1f27' : '#ffffff' }}
+          style={{ backgroundColor: theme.palette.background.default }}
         >
           <section
             style={{
-              backgroundColor: isDark ? '#1e1f27' : 'var(--background-color)',
+              backgroundColor: theme.palette.background.default,
             }}
           >
             <div className="base-content" style={contentStyle}>

@@ -3,6 +3,55 @@
 
 export interface TranslationResources {
   translation: {
+    chains: {
+      activate: string
+      activated: string
+      activatedSession: string
+      appMissingTarget: string
+      appMultiHop: string
+      appPolicyGroup: string
+      appSingleNode: string
+      create: string
+      delete: string
+      deleted: string
+      detectExit: string
+      disabled: string
+      effectiveChain: string
+      empty: string
+      enabled: string
+      exitEnabled: string
+      exitPrivacy: string
+      exitService: string
+      exitSwitched: string
+      exitWarning: string
+      failed: string
+      failurePolicy: string
+      fallback: string
+      front: string
+      inspector: string
+      landing: string
+      list: string
+      manual: string
+      missingNode: string
+      name: string
+      needNodes: string
+      pluginPending: string
+      policyGroup: string
+      routeName: string
+      save: string
+      saveBeforeTest: string
+      saved: string
+      subscription: string
+      switchVerified: string
+      templates: string
+      test: string
+      testSuccess: string
+      twoHopHint: string
+      twoHopTemplate: string
+      useTemplate: string
+      visual: string
+      warnOnly: string
+    }
     connections: {
       components: {
         actions: {
@@ -35,6 +84,12 @@ export interface TranslationResources {
       }
       page: {
         title: string
+      }
+      processProxy: {
+        off: string
+        title: string
+        toggle: string
+        unavailable: string
       }
     }
     home: {
@@ -89,6 +144,34 @@ export interface TranslationResources {
           }
           title: string
         }
+        dnsLeak: {
+          actions: {
+            refresh: string
+          }
+          checking: string
+          errors: {
+            hint: string
+            unavailable: string
+          }
+          fields: {
+            exitIp: string
+            exitRegion: string
+            resolverIp: string
+            resolverRegion: string
+            unknown: string
+          }
+          hints: {
+            mismatch: string
+            ok: string
+            unknown: string
+          }
+          title: string
+          verdict: {
+            mismatch: string
+            ok: string
+            unknown: string
+          }
+        }
         ipInfo: {
           errors: {
             load: string
@@ -106,6 +189,44 @@ export interface TranslationResources {
             unknown: string
           }
           title: string
+        }
+        perAppProxy: {
+          actions: {
+            attach: string
+            detach: string
+            dismiss: string
+            refresh: string
+          }
+          chainInvalid: string
+          chainLabel: string
+          confirm: {
+            body: string
+            title: string
+            warning: string
+          }
+          disabled: {
+            attaching: string
+            nonWindows: string
+            noService: string
+            singleSession: string
+            tunActive: string
+            unavailable: string
+          }
+          emptyState: string
+          feedback: {
+            attached: string
+            detached: string
+            noChainSelected: string
+            processNotRunning: string
+          }
+          noChain: string
+          status: {
+            active: string
+            failed: string
+            idle: string
+            recoveryRequired: string
+            unavailable: string
+          }
         }
         proxyTun: {
           status: {
@@ -168,34 +289,50 @@ export interface TranslationResources {
       page: {
         cards: {
           networkSettings: string
+          perAppProxy: string
           proxyMode: string
           trafficStats: string
         }
-        settings: {
-          cards: {
-            clashInfo: string
-            currentProxy: string
-            ip: string
-            network: string
-            profile: string
-            proxyMode: string
-            systemInfo: string
-            tests: string
-            traffic: string
-          }
-          title: string
+        tabs: {
+          details: string
         }
         title: string
         tooltips: {
           lightweightMode: string
           manual: string
-          settings: string
         }
       }
     }
     layout: {
       components: {
         navigation: {
+          cancel: string
+          chooseCandidate: string
+          diagnostics: string
+          empty: {
+            bindingDescription: string
+            bindingDisabled: string
+            bindingEnabled: string
+            bindingError: string
+            bindingLoading: string
+            bindingOrphan: string
+            bindingPriority: string
+            bindingTargetChain: string
+            bindingTargetNode: string
+            bindingTitle: string
+            chainsDescription: string
+            chainsTitle: string
+            installedDescription: string
+            installedTitle: string
+            marketDescription: string
+            marketTitle: string
+            pluginError: string
+            pluginLoading: string
+            settingsDescription: string
+            settingsTitle: string
+          }
+          identityError: string
+          identityRecovery: string
           menu: {
             collapseNavBar: string
             expandNavBar: string
@@ -204,10 +341,67 @@ export interface TranslationResources {
             restoreDefaultOrder: string
             unlock: string
           }
+          orphanBinding: string
+          orphanRetentionDays: string
+          orphanRetentionSummary: string
+          pendingRebind: string
+          pluginAddBinding: string
+          pluginAuditEmpty: string
+          pluginAuditError: string
+          pluginAuditTitle: string
+          pluginBindingSaveError: string
+          pluginCancel: string
+          pluginConfig: string
+          pluginConflictTitle: string
+          pluginDisableBinding: string
+          pluginEditBinding: string
+          pluginEffectiveValue: string
+          pluginEnableBinding: string
+          pluginInstall: string
+          pluginInstallTitle: string
+          pluginPriority: string
+          pluginProvenanceProfile: string
+          pluginProvenanceTitle: string
+          pluginRemoveBinding: string
+          pluginSaveBinding: string
+          pluginSelect: string
+          pluginSensitivePaths: string
+          pluginSettingsHint: string
+          pluginSigner: string
+          pluginSignerTrusted: string
+          pluginTabs: {
+            binding: string
+            installed: string
+            market: string
+            settings: string
+          }
+          pluginTarget: string
+          pluginTrustInstall: string
+          pluginTrustSigner: string
+          pluginTrustWarning: string
+          pluginWritablePaths: string
+          proxyGroups: string
+          purgeExpiredOrphans: string
+          purgeExpiredOrphansConfirm: string
+          purgeExpiredOrphansTitle: string
+          rebind: string
+          resetIdentity: string
+          resetIdentityConfirm: string
+          resetIdentityTitle: string
+          reviewOrphanCleanup: string
+          rotateIdentity: string
+          rotateIdentityConfirm: string
+          rotateIdentityDescription: string
+          rotateIdentityTitle: string
+          rotationRuntimePending: string
+          saveOrphanRetention: string
           tabs: {
+            chains: string
             connections: string
             home: string
             logs: string
+            nodePool: string
+            plugins: string
             profiles: string
             proxies: string
             rules: string
@@ -262,6 +456,58 @@ export interface TranslationResources {
       page: {
         title: string
       }
+    }
+    nodePool: {
+      active: string
+      all: string
+      details: string
+      duplicateCount: string
+      duplicates: string
+      empty: string
+      error: string
+      failed: string
+      handshakeDelay: string
+      healthy: string
+      highQuality: string
+      importClipboard: string
+      importError: string
+      importInvalid: string
+      importSuccess: string
+      inactive: string
+      key: string
+      manual: string
+      manualImportSuccess: string
+      milliseconds: string
+      nodeCount: string
+      notTested: string
+      oneSelected: string
+      port: string
+      probe: string
+      probeError: string
+      probeSummary: string
+      probing: string
+      protocol: string
+      proxyProvider: string
+      quality: string
+      refresh: string
+      removed: string
+      search: string
+      select: string
+      server: string
+      shortDelay: string
+      slow: string
+      sortName: string
+      sortQuality: string
+      sortSource: string
+      source: string
+      sourceConfig: string
+      sourceCount: string
+      stableId: string
+      subscription: string
+      subtitle: string
+      title: string
+      unknown: string
+      value: string
     }
     profiles: {
       components: {
@@ -387,6 +633,7 @@ export interface TranslationResources {
           fields: {
             acceptInvalidCerts: string
             allowAutoUpdate: string
+            allowInsecureHttp: string
             description: string
             httpTimeout: string
             subscriptionUrl: string
@@ -406,6 +653,7 @@ export interface TranslationResources {
           }
           warnings: {
             frequentUpdate: string
+            insecureHttp: string
           }
         }
         proxiesEditor: {
@@ -482,9 +730,28 @@ export interface TranslationResources {
           placeholder: string
         }
         title: string
+        vergeImport: {
+          action: string
+          backupReminder: string
+          chooseSource: string
+          failure: string
+          skippedDetails: string
+          success: string
+        }
       }
     }
     proxies: {
+      apps: {
+        add: string
+        direct: string
+        empty: string
+        hint: string
+        placeholder: string
+        reject: string
+        remove: string
+        target: string
+        title: string
+      }
       components: {
         enums: {
           policies: {
@@ -539,7 +806,9 @@ export interface TranslationResources {
         }
         empty: {
           actions: {
+            addNode: string
             openLogs: string
+            openPlugins: string
             openProfiles: string
             restartCore: string
           }
@@ -725,6 +994,8 @@ export interface TranslationResources {
             }
             fields: {
               copyEnvType: string
+              followSystemLanguage: string
+              followSystemLanguageDescription: string
               hotkeySetting: string
               language: string
               layoutSetting: string
@@ -786,6 +1057,18 @@ export interface TranslationResources {
               hoverNavigator: string
               hoverNavigatorDelay: string
             }
+          }
+          performance: {
+            balanced: string
+            balancedDescription: string
+            manualInterval: string
+            memoryProtectionActive: string
+            memoryTelemetryUnavailable: string
+            performance: string
+            performanceDescription: string
+            power_saving: string
+            power_savingDescription: string
+            title: string
           }
           theme: {
             actions: {
@@ -1125,6 +1408,8 @@ export interface TranslationResources {
             defaultLatencyTimeout: string
             enableBuiltinEnhanced: string
             proxyLayoutColumns: string
+            singboxDegraded: string
+            singboxPersistent: string
           }
           options: {
             autoLogClean: {
@@ -1141,6 +1426,7 @@ export interface TranslationResources {
             autoDelayDetection: string
             defaultLatencyTest: string
             enableBuiltinEnhanced: string
+            singboxPersistent: string
           }
         }
         networkInterface: {
@@ -1432,16 +1718,29 @@ export interface TranslationResources {
         tableView: string
         upgrade: string
       }
+      confirmations: {
+        enableLan: {
+          message: string
+          title: string
+        }
+        lanController: {
+          message: string
+          title: string
+        }
+      }
       editorModes: {
         advanced: string
         visualization: string
       }
       feedback: {
         errors: {
+          backendDisconnected: string
           componentStack: string
           details: string
           label: string
           operationFailed: string
+          pageNotFound: string
+          pageNotFoundDescription: string
           stack: string
           trafficStats: string
           trafficStatsDescription: string
@@ -1537,6 +1836,9 @@ export interface TranslationResources {
       }
       validation: {
         invalidRegex: string
+      }
+      warnings: {
+        lanProxyExposed: string
       }
       window: {
         maximize: string

@@ -7,6 +7,7 @@ import {
   Select,
   styled,
   TextField,
+  Typography,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import type { Ref } from 'react'
@@ -441,6 +442,29 @@ export function ProfileViewer({ onChange, ref }: ProfileViewerProps) {
                 </InputLabel>
                 <Switch checked={field.value} {...field} color="primary" />
               </StyledBox>
+            )}
+          />
+
+          <Controller
+            name="option.allow_insecure_http"
+            control={control}
+            render={({ field }) => (
+              <>
+                <StyledBox>
+                  <InputLabel>
+                    {t('profiles.modals.profileForm.fields.allowInsecureHttp')}
+                  </InputLabel>
+                  <Switch checked={field.value} {...field} color="primary" />
+                </StyledBox>
+                {field.value && (
+                  <Typography
+                    variant="body2"
+                    sx={{ color: 'warning.main', mb: 1 }}
+                  >
+                    {t('profiles.modals.profileForm.warnings.insecureHttp')}
+                  </Typography>
+                )}
+              </>
             )}
           />
 

@@ -27,62 +27,82 @@ pub(super) fn normalize_profile_home_url(raw: &str) -> Option<String> {
     Some(url.to_string().into())
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, specta::Type)]
+#[serde(default)]
 pub struct PrfItem {
+    #[specta(type = Option<std::string::String>)]
     pub uid: Option<String>,
 
     /// enum value: remote | local | script | merge
     #[serde(rename = "type")]
+    #[specta(type = Option<std::string::String>)]
     pub itype: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub name: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub file: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub desc: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub url: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub selected: Option<Vec<PrfSelected>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::collections::BTreeMap<std::string::String, std::string::String>>)]
     pub latency_test_urls: Option<std::collections::BTreeMap<String, String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra: Option<PrfExtra>,
 
+    #[specta(type = Option<specta_typescript::Number>)]
     pub updated: Option<usize>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub option: Option<PrfOption>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub home: Option<String>,
 
     #[serde(skip)]
+    #[specta(skip)]
     pub file_data: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq, specta::Type)]
+#[serde(default)]
 pub struct PrfSelected {
+    #[specta(type = Option<std::string::String>)]
     pub name: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub now: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Copy, Deserialize, Serialize, specta::Type)]
 pub struct PrfExtra {
+    #[specta(type = specta_typescript::Number)]
     pub upload: u64,
+    #[specta(type = specta_typescript::Number)]
     pub download: u64,
+    #[specta(type = specta_typescript::Number)]
     pub total: u64,
+    #[specta(type = specta_typescript::Number)]
     pub expire: u64,
 }
 
-#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq, specta::Type)]
+#[serde(default)]
 pub struct PrfOption {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub user_agent: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -92,28 +112,41 @@ pub struct PrfOption {
     pub self_proxy: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<specta_typescript::Number>)]
     pub update_interval: Option<u64>,
 
     /// HTTP request timeout in seconds
     /// default is 60 seconds
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<specta_typescript::Number>)]
     pub timeout_seconds: Option<u64>,
 
     /// default is `false`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub danger_accept_invalid_certs: Option<bool>,
 
+    /// Allow plain HTTP subscription URLs.
+    /// Default is `false`: subscriptions are fetched over HTTPS only
+    /// unless the user opts in per subscription.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_insecure_http: Option<bool>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub allow_auto_update: Option<bool>,
 
+    #[specta(type = Option<std::string::String>)]
     pub merge: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub script: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub rules: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub proxies: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub groups: Option<String>,
 }
 
@@ -127,6 +160,7 @@ impl PrfOption {
                 result.self_proxy = b_ref.self_proxy.or(result.self_proxy);
                 result.danger_accept_invalid_certs =
                     b_ref.danger_accept_invalid_certs.or(result.danger_accept_invalid_certs);
+                result.allow_insecure_http = b_ref.allow_insecure_http.or(result.allow_insecure_http);
                 result.allow_auto_update = b_ref.allow_auto_update.or(result.allow_auto_update);
                 result.update_interval = b_ref.update_interval.or(result.update_interval);
                 result.merge = b_ref.merge.clone().or(result.merge);
@@ -190,27 +224,27 @@ impl PrfItem {
 
         if merge.is_none() {
             let merge_item = &mut Self::from_merge(None);
-            profiles::profiles_append_item_safe(merge_item).await?;
+            profiles::profiles_append_item_safe(merge_item, true).await?;
             merge = merge_item.uid.clone();
         }
         if script.is_none() {
             let script_item = &mut Self::from_script(None);
-            profiles::profiles_append_item_safe(script_item).await?;
+            profiles::profiles_append_item_safe(script_item, true).await?;
             script = script_item.uid.clone();
         }
         if rules.is_none() {
             let rules_item = &mut Self::from_rules();
-            profiles::profiles_append_item_safe(rules_item).await?;
+            profiles::profiles_append_item_safe(rules_item, true).await?;
             rules = rules_item.uid.clone();
         }
         if proxies.is_none() {
             let proxies_item = &mut Self::from_proxies();
-            profiles::profiles_append_item_safe(proxies_item).await?;
+            profiles::profiles_append_item_safe(proxies_item, true).await?;
             proxies = proxies_item.uid.clone();
         }
         if groups.is_none() {
             let groups_item = &mut Self::from_groups();
-            profiles::profiles_append_item_safe(groups_item).await?;
+            profiles::profiles_append_item_safe(groups_item, true).await?;
             groups = groups_item.uid.clone();
         }
         Ok(Self {
@@ -266,6 +300,27 @@ impl PrfItem {
         };
 
         let url = fix_dirty_url(url)?;
+
+        // Plain HTTP exposes the subscription token and the whole config to
+        // anyone on the path. Only fetch it when the user opted in for this
+        // subscription. Loopback URLs never leave the machine, so they are
+        // exempt (same treatment as a browser secure context).
+        let host_is_loopback = url
+            .host_str()
+            .map(|host| {
+                host.eq_ignore_ascii_case("localhost")
+                    || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
+            })
+            .unwrap_or(false);
+        if url.scheme() == "http"
+            && !host_is_loopback
+            && !option.is_some_and(|o| o.allow_insecure_http.unwrap_or(false))
+        {
+            bail!(
+                "plain HTTP subscription URLs are blocked by default; enable \"Allow plain HTTP\" for this subscription to fetch {}",
+                help::mask_url(url.as_str())
+            );
+        }
 
         let resp = match NetworkManager::new()
             .get(
@@ -369,27 +424,27 @@ impl PrfItem {
 
         if merge.is_none() {
             let merge_item = &mut Self::from_merge(None);
-            profiles::profiles_append_item_safe(merge_item).await?;
+            profiles::profiles_append_item_safe(merge_item, true).await?;
             merge = merge_item.uid.clone();
         }
         if script.is_none() {
             let script_item = &mut Self::from_script(None);
-            profiles::profiles_append_item_safe(script_item).await?;
+            profiles::profiles_append_item_safe(script_item, true).await?;
             script = script_item.uid.clone();
         }
         if rules.is_none() {
             let rules_item = &mut Self::from_rules();
-            profiles::profiles_append_item_safe(rules_item).await?;
+            profiles::profiles_append_item_safe(rules_item, true).await?;
             rules = rules_item.uid.clone();
         }
         if proxies.is_none() {
             let proxies_item = &mut Self::from_proxies();
-            profiles::profiles_append_item_safe(proxies_item).await?;
+            profiles::profiles_append_item_safe(proxies_item, true).await?;
             proxies = proxies_item.uid.clone();
         }
         if groups.is_none() {
             let groups_item = &mut Self::from_groups();
-            profiles::profiles_append_item_safe(groups_item).await?;
+            profiles::profiles_append_item_safe(groups_item, true).await?;
             groups = groups_item.uid.clone();
         }
 

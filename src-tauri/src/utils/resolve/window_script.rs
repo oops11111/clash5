@@ -35,7 +35,7 @@ pub const WINDOW_INITIAL_SCRIPT: &str = r##"
         } catch (error) {
             console.warn("[Tauri] 读取初始主题颜色失败:", error);
         }
-        return { darkBg: "#2E303D", lightBg: "#F5F5F5" };
+        return { darkBg: "#2E303D", lightBg: "#F0F4FA" };
     })();
 
     const prefersDark = (() => {

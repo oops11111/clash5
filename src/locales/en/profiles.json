@@ -6,6 +6,14 @@
       "reactivate": "Reactivate Profiles",
       "import": "Import"
     },
+    "vergeImport": {
+      "action": "Import Clash Verge Rev data",
+      "chooseSource": "Choose the Clash Verge Rev data directory",
+      "backupReminder": "Back up this source directory before importing. clash5 reads it without changing its files. Continue?",
+      "success": "Imported {{imported}} profile(s); skipped {{skipped}} unsupported item(s); node-index sync failures: {{syncFailures}}. Source SHA-256 manifest: {{manifest}}",
+      "failure": "Import failed; clash5 could not verify or preserve the selected source directory.",
+      "skippedDetails": "Skipped items ({{count}})"
+    },
     "batch": {
       "actions": {
         "delete": "Delete Selected Profiles",
@@ -124,7 +132,8 @@
         "useSystemProxy": "Use System Proxy",
         "useClashProxy": "Use Clash Proxy",
         "acceptInvalidCerts": "Allows Invalid Certificates (Danger)",
-        "allowAutoUpdate": "Allow Auto Update"
+        "allowAutoUpdate": "Allow Auto Update",
+        "allowInsecureHttp": "Allow Plain HTTP (Not Recommended)"
       },
       "types": {
         "remote": "Remote",
@@ -137,7 +146,8 @@
         "saveFailed": "Failed to save profile"
       },
       "warnings": {
-        "frequentUpdate": "A short interval reloads the core that often and drops existing connections. {{minutes}} minutes (24 hours) is recommended."
+        "frequentUpdate": "A short interval reloads the core that often and drops existing connections. {{minutes}} minutes (24 hours) is recommended.",
+        "insecureHttp": "Plain HTTP sends the subscription token and the whole configuration in cleartext. Only enable this for subscriptions you trust."
       },
       "feedback": {
         "notifications": {

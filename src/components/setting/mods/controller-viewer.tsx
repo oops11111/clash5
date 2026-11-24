@@ -10,6 +10,7 @@ import {
   Snackbar,
   TextField,
   Tooltip,
+  Typography,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import { useImperativeHandle, useState, type Ref } from 'react'
@@ -19,6 +20,26 @@ import { BaseDialog, DialogRef, Switch } from '@/components/base'
 import { useClashInfo } from '@/hooks/use-clash'
 import { useVerge } from '@/hooks/use-verge'
 import { showNotice } from '@/services/notice-service'
+import { generateRandomSecret } from '@/utils/random-secret'
+
+// A controller address that other devices on the LAN can reach. Wildcard
+// addresses (0.0.0.0, [::]) are forced back to loopback by the backend, so
+// they do not count as LAN exposure here.
+const isLanControllerAddress = (address: string) => {
+  const trimmed = address.trim()
+  if (!trimmed) return false
+  if (trimmed.startsWith('[')) {
+    const host = trimmed.slice(1, trimmed.indexOf(']'))
+    return host !== '' && host !== '::1' && host !== '::'
+  }
+  const host = trimmed.split(':')[0]
+  return (
+    host !== '' &&
+    host !== 'localhost' &&
+    host !== '0.0.0.0' &&
+    !/^127\./.test(host)
+  )
+}
 
 export function ControllerViewer({ ref }: { ref?: Ref<DialogRef> }) {
   const { t } = useTranslation()
@@ -33,6 +54,7 @@ export function ControllerViewer({ ref }: { ref?: Ref<DialogRef> }) {
   const [enableController, setEnableController] = useState(
     verge?.enable_external_controller ?? false,
   )
+  const [lanConfirmation, setLanConfirmation] = useState(false)
 
   // 对话框打开时初始化配置
   useImperativeHandle(ref, () => ({
@@ -46,7 +68,7 @@ export function ControllerViewer({ ref }: { ref?: Ref<DialogRef> }) {
   }))
 
   // 保存配置
-  const onSave = useLockFn(async () => {
+  const runSave = async (secretToSave: string) => {
     try {
       setIsSaving(true)
 
@@ -62,14 +84,17 @@ export function ControllerViewer({ ref }: { ref?: Ref<DialogRef> }) {
           return
         }
 
-        if (!secret.trim()) {
+        if (!secretToSave.trim()) {
           showNotice.error(
             'settings.sections.externalController.messages.secretRequired',
           )
           return
         }
 
-        await patchInfo({ 'external-controller': controller, secret })
+        await patchInfo({
+          'external-controller': controller,
+          secret: secretToSave,
+        })
       } else {
         // 如果禁用了外部控制器，则清空控制器地址
         await patchInfo({ 'external-controller': '' })
@@ -86,6 +111,23 @@ export function ControllerViewer({ ref }: { ref?: Ref<DialogRef> }) {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const onSave = useLockFn(async () => {
+    // A LAN-reachable controller address needs an explicit confirmation
+    // first; the secret is rotated before it is saved.
+    if (enableController && isLanControllerAddress(controller)) {
+      setLanConfirmation(true)
+      return
+    }
+    await runSave(secret)
+  })
+
+  const onConfirmLan = useLockFn(async () => {
+    const rotated = generateRandomSecret()
+    setSecret(rotated)
+    setLanConfirmation(false)
+    await runSave(rotated)
   })
 
   // 复制到剪贴板
@@ -105,138 +147,156 @@ export function ControllerViewer({ ref }: { ref?: Ref<DialogRef> }) {
   )
 
   return (
-    <BaseDialog
-      open={open}
-      title={t('settings.sections.externalController.title')}
-      contentSx={{ width: 400 }}
-      okBtn={
-        isSaving ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CircularProgress size={16} color="inherit" />
-            {t('shared.statuses.saving')}
-          </Box>
-        ) : (
-          t('shared.actions.save')
-        )
-      }
-      cancelBtn={t('shared.actions.cancel')}
-      onClose={() => setOpen(false)}
-      onCancel={() => setOpen(false)}
-      onOk={onSave}
-    >
-      <List>
-        <ListItem
-          sx={{
-            padding: '5px 2px',
-            display: 'flex',
-            justifyContent: 'space-between',
-          }}
-        >
-          <ListItemText
-            primary={t('settings.sections.externalController.fields.enable')}
-          />
-          <Switch
-            edge="end"
-            checked={enableController}
-            onChange={(e) => setEnableController(e.target.checked)}
-            disabled={isSaving}
-          />
-        </ListItem>
-
-        <ListItem
-          sx={{
-            padding: '5px 2px',
-            display: 'flex',
-            justifyContent: 'space-between',
-          }}
-        >
-          <ListItemText
-            primary={t('settings.sections.externalController.fields.address')}
-          />
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TextField
-              size="small"
-              sx={{
-                width: 175,
-                opacity: enableController ? 1 : 0.5,
-                pointerEvents: enableController ? 'auto' : 'none',
-              }}
-              value={controller}
-              placeholder={t(
-                'settings.sections.externalController.placeholders.address',
-              )}
-              onChange={(e) => setController(e.target.value)}
-              disabled={isSaving || !enableController}
-            />
-            <Tooltip
-              title={t('settings.sections.externalController.tooltips.copy')}
-            >
-              <IconButton
-                size="small"
-                onClick={() => handleCopyToClipboard(controller, 'controller')}
-                color="primary"
-                disabled={isSaving || !enableController}
-              >
-                <ContentCopy fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </ListItem>
-
-        <ListItem
-          sx={{
-            padding: '5px 2px',
-            display: 'flex',
-            justifyContent: 'space-between',
-          }}
-        >
-          <ListItemText
-            primary={t('settings.sections.externalController.fields.secret')}
-          />
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TextField
-              size="small"
-              sx={{
-                width: 175,
-                opacity: enableController ? 1 : 0.5,
-                pointerEvents: enableController ? 'auto' : 'none',
-              }}
-              value={secret}
-              placeholder={t(
-                'settings.sections.externalController.placeholders.secret',
-              )}
-              onChange={(e) => setSecret(e.target.value)}
-              disabled={isSaving || !enableController}
-            />
-            <Tooltip
-              title={t('settings.sections.externalController.tooltips.copy')}
-            >
-              <IconButton
-                size="small"
-                onClick={() => handleCopyToClipboard(secret, 'secret')}
-                color="primary"
-                disabled={isSaving || !enableController}
-              >
-                <ContentCopy fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        </ListItem>
-      </List>
-
-      <Snackbar
-        open={copySuccess !== null}
-        autoHideDuration={2000}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+    <>
+      <BaseDialog
+        open={open}
+        title={t('settings.sections.externalController.title')}
+        contentSx={{ width: 400 }}
+        okBtn={
+          isSaving ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={16} color="inherit" />
+              {t('shared.statuses.saving')}
+            </Box>
+          ) : (
+            t('shared.actions.save')
+          )
+        }
+        cancelBtn={t('shared.actions.cancel')}
+        onClose={() => setOpen(false)}
+        onCancel={() => setOpen(false)}
+        onOk={onSave}
       >
-        <Alert severity="success">
-          {copySuccess === 'controller'
-            ? t(
-                'settings.sections.externalController.messages.controllerCopied',
-              )
-            : t('settings.sections.externalController.messages.secretCopied')}
-        </Alert>
-      </Snackbar>
-    </BaseDialog>
+        <List>
+          <ListItem
+            sx={{
+              padding: '5px 2px',
+              display: 'flex',
+              justifyContent: 'space-between',
+            }}
+          >
+            <ListItemText
+              primary={t('settings.sections.externalController.fields.enable')}
+            />
+            <Switch
+              edge="end"
+              checked={enableController}
+              onChange={(e) => setEnableController(e.target.checked)}
+              disabled={isSaving}
+            />
+          </ListItem>
+
+          <ListItem
+            sx={{
+              padding: '5px 2px',
+              display: 'flex',
+              justifyContent: 'space-between',
+            }}
+          >
+            <ListItemText
+              primary={t('settings.sections.externalController.fields.address')}
+            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TextField
+                size="small"
+                sx={{
+                  width: 175,
+                  opacity: enableController ? 1 : 0.5,
+                  pointerEvents: enableController ? 'auto' : 'none',
+                }}
+                value={controller}
+                placeholder={t(
+                  'settings.sections.externalController.placeholders.address',
+                )}
+                onChange={(e) => setController(e.target.value)}
+                disabled={isSaving || !enableController}
+              />
+              <Tooltip
+                title={t('settings.sections.externalController.tooltips.copy')}
+              >
+                <IconButton
+                  size="small"
+                  onClick={() =>
+                    handleCopyToClipboard(controller, 'controller')
+                  }
+                  color="primary"
+                  disabled={isSaving || !enableController}
+                >
+                  <ContentCopy fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </ListItem>
+
+          <ListItem
+            sx={{
+              padding: '5px 2px',
+              display: 'flex',
+              justifyContent: 'space-between',
+            }}
+          >
+            <ListItemText
+              primary={t('settings.sections.externalController.fields.secret')}
+            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TextField
+                size="small"
+                sx={{
+                  width: 175,
+                  opacity: enableController ? 1 : 0.5,
+                  pointerEvents: enableController ? 'auto' : 'none',
+                }}
+                value={secret}
+                placeholder={t(
+                  'settings.sections.externalController.placeholders.secret',
+                )}
+                onChange={(e) => setSecret(e.target.value)}
+                disabled={isSaving || !enableController}
+              />
+              <Tooltip
+                title={t('settings.sections.externalController.tooltips.copy')}
+              >
+                <IconButton
+                  size="small"
+                  onClick={() => handleCopyToClipboard(secret, 'secret')}
+                  color="primary"
+                  disabled={isSaving || !enableController}
+                >
+                  <ContentCopy fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </ListItem>
+        </List>
+
+        <Snackbar
+          open={copySuccess !== null}
+          autoHideDuration={2000}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert severity="success">
+            {copySuccess === 'controller'
+              ? t(
+                  'settings.sections.externalController.messages.controllerCopied',
+                )
+              : t('settings.sections.externalController.messages.secretCopied')}
+          </Alert>
+        </Snackbar>
+      </BaseDialog>
+      <BaseDialog
+        open={lanConfirmation}
+        title={t('shared.confirmations.lanController.title')}
+        okBtn={t('shared.actions.confirm')}
+        cancelBtn={t('shared.actions.cancel')}
+        contentSx={{ width: 400 }}
+        onCancel={() => setLanConfirmation(false)}
+        onClose={() => setLanConfirmation(false)}
+        onOk={onConfirmLan}
+      >
+        <Typography variant="body2">
+          {t('shared.confirmations.lanController.message')}
+        </Typography>
+      </BaseDialog>
+    </>
   )
 }

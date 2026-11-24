@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 #![recursion_limit = "512"]
 
+mod clash5;
 mod cmd;
 pub mod config;
 mod constants;
@@ -29,6 +30,157 @@ pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 // Re-exported for src/bin/frontend-contract.rs; the wire contract stays owned
 // by core::notify.
 pub use crate::core::notify::frontend_wire_contract;
+
+/// Exports TypeScript bindings for every app-owned Tauri command.
+pub fn export_frontend_command_contract() -> Result<(), Box<dyn std::error::Error>> {
+    let builder = tauri_specta::Builder::<tauri::Wry>::new()
+        .error_handling(tauri_specta::ErrorHandlingMode::Result)
+        .commands(tauri_specta::collect_commands![
+            cmd::probe_listener,
+            cmd::save_proxy_ports,
+            cmd::get_sys_proxy,
+            cmd::get_auto_proxy,
+            cmd::get_embedded_server_port,
+            cmd::open_app_dir,
+            cmd::open_logs_dir,
+            cmd::open_core_dir,
+            cmd::get_network_interfaces,
+            cmd::get_system_hostname,
+            cmd::restart_app,
+            cmd::install_update,
+            cmd::cancel_update_download,
+            cmd::restart_core,
+            cmd::get_runtime_state,
+            cmd::clash5_memory_mitigation_status,
+            cmd::get_pending_failures,
+            cmd::get_sidecar_failure,
+            cmd::entry_lightweight_mode,
+            cmd::install_service,
+            cmd::uninstall_service,
+            cmd::reinstall_service,
+            cmd::repair_service,
+            cmd::continue_with_sidecar,
+            cmd::sync_runtime_providers,
+            cmd::get_clash_info,
+            cmd::patch_clash_config,
+            cmd::patch_clash_mode,
+            cmd::get_clash_mode,
+            cmd::change_clash_core,
+            cmd::get_runtime_config,
+            cmd::get_proxy_view,
+            cmd::get_runtime_yaml,
+            cmd::get_runtime_logs,
+            cmd::get_runtime_proxy_chain_config,
+            cmd::update_proxy_chain_config_in_runtime,
+            cmd::invoke_uwp_tool,
+            cmd::copy_clash_env,
+            cmd::sync_tray_proxy_selection,
+            cmd::record_selected_node,
+            cmd::forget_selected_node,
+            cmd::save_dns_config,
+            cmd::apply_dns_config,
+            cmd::set_dns_override,
+            cmd::take_dns_override_notice,
+            cmd::take_service_fallback_notice,
+            cmd::get_core_startup_error,
+            cmd::take_service_repair_notice,
+            cmd::take_service_owner_notice,
+            cmd::take_discarded_keys_notice,
+            cmd::get_dns_config_content,
+            cmd::validate_dns_config,
+            cmd::get_clash_logs,
+            cmd::get_verge_config,
+            cmd::patch_verge_config,
+            cmd::test_delay,
+            cmd::get_app_dir,
+            cmd::copy_icon_file,
+            cmd::download_icon_cache,
+            cmd::open_devtools,
+            cmd::exit_app,
+            cmd::get_network_interfaces_info,
+            cmd::get_profiles,
+            cmd::clash5_list_bindings,
+            cmd::clash5_list_plugin_bindings,
+            cmd::clash5_get_plugin_binding_config,
+            cmd::clash5_get_plugin_effective_config,
+            cmd::clash5_save_plugin_binding,
+            cmd::clash5_save_plugin_bindings,
+            cmd::clash5_delete_plugin_binding,
+            cmd::clash5_set_plugin_binding_enabled,
+            cmd::clash5_stage_plugin_package,
+            cmd::clash5_install_staged_plugin,
+            cmd::clash5_list_plugin_audit_events,
+            cmd::clash5_list_plugins,
+            cmd::clash5_list_trusted_plugin_signers,
+            cmd::clash5_list_pending_identity_rebinds,
+            cmd::clash5_resolve_identity_rebind,
+            cmd::clash5_identity_status,
+            cmd::clash5_reset_identity,
+            cmd::clash5_rotate_identity,
+            cmd::clash5_list_nodes,
+            cmd::clash5_probe_nodes,
+            cmd::clash5_import_manual_proxies,
+            cmd::clash5_bind_node,
+            cmd::clash5_purge_orphans,
+            cmd::clash5_orphan_cleanup_preview,
+            cmd::clash5_set_orphan_retention_days,
+            cmd::clash5_purge_expired_orphans,
+            cmd::clash5_register_manual_node,
+            cmd::clash5_import_verge_data,
+            cmd::clash5_chain_workspace,
+            cmd::clash5_list_app_routes,
+            cmd::clash5_save_app_route,
+            cmd::clash5_delete_app_route,
+            cmd::clash5_save_chain,
+            cmd::clash5_delete_chain,
+            cmd::clash5_test_chain,
+            cmd::clash5_activate_chain,
+            cmd::clash5_singbox_degraded,
+            cmd::clash5_singbox_route_status,
+            cmd::clash5_detect_exit_ip,
+            cmd::clash5_process_proxy_status,
+            cmd::clash5_attach_process_proxy,
+            cmd::clash5_detach_process_proxy,
+            cmd::clash5_list_process_candidates,
+            cmd::clash5_get_per_app_proxy_settings,
+            cmd::clash5_set_per_app_proxy_settings,
+            cmd::enhance_profiles,
+            cmd::patch_profiles_config,
+            cmd::view_profile,
+            cmd::patch_profile,
+            cmd::create_profile,
+            cmd::import_profile,
+            cmd::reorder_profile,
+            cmd::update_profile,
+            cmd::delete_profile,
+            cmd::read_profile_file,
+            cmd::save_profile_file,
+            cmd::get_next_update_time,
+            cmd::create_local_backup,
+            cmd::list_local_backup,
+            cmd::delete_local_backup,
+            cmd::restore_local_backup,
+            cmd::import_local_backup,
+            cmd::export_local_backup,
+            cmd::create_webdav_backup,
+            cmd::save_webdav_config,
+            cmd::list_webdav_backup,
+            cmd::delete_webdav_backup,
+            cmd::restore_webdav_backup,
+            cmd::get_unlock_items,
+            cmd::check_media_unlock,
+            cmd::check_media_unlock_item,
+            tauri_plugin_clash_verge_sysinfo::commands::get_system_info,
+            tauri_plugin_clash_verge_sysinfo::commands::get_app_uptime,
+            tauri_plugin_clash_verge_sysinfo::commands::export_diagnostic_info::<tauri::Wry>,
+        ]);
+
+    builder.export(
+        specta_typescript::Typescript::default(),
+        "../src/services/tauri-commands.generated.ts",
+    )?;
+    Ok(())
+}
 /// Application initialization helper functions
 mod app_init {
     use super::*;
@@ -47,14 +199,6 @@ mod app_init {
         let mut builder = builder
             .plugin(tauri_plugin_clash_verge_sysinfo::init())
             .plugin(tauri_plugin_notification::init())
-            .plugin(
-                tauri_plugin_updater::Builder::new()
-                    .default_version_comparator(|current, release| {
-                        release.version > current
-                            || core::updater::is_build_to_stable(&current.to_string(), &release.version.to_string())
-                    })
-                    .build(),
-            )
             .plugin(tauri_plugin_clipboard_manager::init())
             .plugin(tauri_plugin_process::init())
             .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -145,8 +289,8 @@ mod app_init {
             cmd::install_update,
             cmd::cancel_update_download,
             cmd::restart_core,
-            cmd::upgrade_clash_core,
             cmd::get_runtime_state,
+            cmd::clash5_memory_mitigation_status,
             cmd::get_pending_failures,
             cmd::get_sidecar_failure,
             cmd::entry_lightweight_mode,
@@ -194,6 +338,51 @@ mod app_init {
             cmd::exit_app,
             cmd::get_network_interfaces_info,
             cmd::get_profiles,
+            cmd::clash5_list_bindings,
+            cmd::clash5_list_plugin_bindings,
+            cmd::clash5_get_plugin_binding_config,
+            cmd::clash5_get_plugin_effective_config,
+            cmd::clash5_save_plugin_binding,
+            cmd::clash5_save_plugin_bindings,
+            cmd::clash5_delete_plugin_binding,
+            cmd::clash5_set_plugin_binding_enabled,
+            cmd::clash5_stage_plugin_package,
+            cmd::clash5_install_staged_plugin,
+            cmd::clash5_list_plugin_audit_events,
+            cmd::clash5_list_plugins,
+            cmd::clash5_list_trusted_plugin_signers,
+            cmd::clash5_list_pending_identity_rebinds,
+            cmd::clash5_resolve_identity_rebind,
+            cmd::clash5_identity_status,
+            cmd::clash5_reset_identity,
+            cmd::clash5_rotate_identity,
+            cmd::clash5_chain_workspace,
+            cmd::clash5_list_app_routes,
+            cmd::clash5_save_app_route,
+            cmd::clash5_delete_app_route,
+            cmd::clash5_save_chain,
+            cmd::clash5_delete_chain,
+            cmd::clash5_test_chain,
+            cmd::clash5_activate_chain,
+            cmd::clash5_singbox_degraded,
+            cmd::clash5_singbox_route_status,
+            cmd::clash5_detect_exit_ip,
+            cmd::clash5_process_proxy_status,
+            cmd::clash5_attach_process_proxy,
+            cmd::clash5_detach_process_proxy,
+            cmd::clash5_list_process_candidates,
+            cmd::clash5_get_per_app_proxy_settings,
+            cmd::clash5_set_per_app_proxy_settings,
+            cmd::clash5_list_nodes,
+            cmd::clash5_probe_nodes,
+            cmd::clash5_import_manual_proxies,
+            cmd::clash5_bind_node,
+            cmd::clash5_purge_orphans,
+            cmd::clash5_orphan_cleanup_preview,
+            cmd::clash5_set_orphan_retention_days,
+            cmd::clash5_purge_expired_orphans,
+            cmd::clash5_register_manual_node,
+            cmd::clash5_import_verge_data,
             cmd::enhance_profiles,
             cmd::patch_profiles_config,
             cmd::view_profile,
@@ -304,6 +493,10 @@ pub fn run() -> std::process::ExitCode {
                     logging!(error, Type::Setup, "Failed to init work dir/logger: {e:#}");
                 }
 
+                // Pre-migration encryption keys still sit in a plain file; tighten
+                // it at startup until the keyring migration in dirs picks it up.
+                utils::dirs::restrict_legacy_encryption_key_file();
+
                 logging!(debug, Type::Setup, "开始应用初始化...");
                 if let Err(e) = app_init::setup_autostart(app) {
                     logging!(error, Type::Setup, "Failed to setup autostart: {}", e);
@@ -323,6 +516,7 @@ pub fn run() -> std::process::ExitCode {
                 resolve::resolve_setup_async();
                 resolve::resolve_setup_sync();
                 resolve::init_signal();
+                core::memory_mitigation::start_monitor();
             })) {
                 log_setup_panic("window-core", panic);
             }
@@ -362,7 +556,7 @@ pub fn run() -> std::process::ExitCode {
 
             #[cfg(target_os = "macos")]
             if let Some(window) = _app_handle.get_webview_window("main") {
-                let _ = window.set_title("Clash Verge");
+                let _ = window.set_title("clash5");
             }
         }
 

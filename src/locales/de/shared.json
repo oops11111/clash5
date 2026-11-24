@@ -85,7 +85,10 @@
       "trafficUnavailable": "Traffic-Daten nicht verfügbar",
       "operationFailed": "Der Vorgang ist fehlgeschlagen",
       "trafficStats": "Fehler in der Datenverkehrsstatistik",
-      "trafficStatsDescription": "In der Datenverkehrsstatistik ist ein Fehler aufgetreten; sie wurde deaktiviert, um Abstürze zu vermeiden."
+      "trafficStatsDescription": "In der Datenverkehrsstatistik ist ein Fehler aufgetreten; sie wurde deaktiviert, um Abstürze zu vermeiden.",
+      "backendDisconnected": "Backend disconnected, reconnecting…",
+      "pageNotFound": "Page not found",
+      "pageNotFoundDescription": "The page you are looking for does not exist or has moved."
     },
     "notices": {
       "raw": "{{message}}",

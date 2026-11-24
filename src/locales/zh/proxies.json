@@ -1,4 +1,15 @@
 {
+  "apps": {
+    "title": "应用分流",
+    "hint": "为每个程序选择流量出口。",
+    "empty": "暂无应用分流规则",
+    "direct": "直连",
+    "reject": "拒绝",
+    "target": "分流目标",
+    "remove": "移除",
+    "placeholder": "程序名称，例如 browser.exe",
+    "add": "添加规则"
+  },
   "page": {
     "modes": {
       "rule": "规则",
@@ -63,6 +74,8 @@
       },
       "actions": {
         "openProfiles": "前往订阅",
+        "addNode": "添加节点",
+        "openPlugins": "打开插件",
         "restartCore": "重启内核",
         "openLogs": "打开日志目录"
       }

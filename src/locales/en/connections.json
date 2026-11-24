@@ -2,6 +2,12 @@
   "page": {
     "title": "Connections"
   },
+  "processProxy": {
+    "title": "Per-process routing",
+    "toggle": "Enable per-process routing",
+    "unavailable": "This build does not provide process-based routing. No selected app traffic is being redirected.",
+    "off": "Unavailable"
+  },
   "components": {
     "fields": {
       "host": "Host",

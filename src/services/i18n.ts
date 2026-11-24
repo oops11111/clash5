@@ -1,6 +1,8 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
+import languageAliasData from '@root/i18n-language-aliases.json'
+
 export const supportedLanguages = [
   'en',
   'ru',
@@ -18,32 +20,62 @@ export const supportedLanguages = [
   'pt',
 ]
 
-export const FALLBACK_LANGUAGE = 'zh'
+// The fallback is 'en' on both sides (see DEFAULT_LANGUAGE in
+// crates/clash-verge-i18n/src/lib.rs); the key baseline is en too.
+export const FALLBACK_LANGUAGE = 'en'
 const LANGUAGE_STORAGE_KEY = 'verge-language'
+
+// Language aliases shared with the backend (crates/clash-verge-i18n reads
+// the same file): the only place where tags are remapped. Identity tags
+// ('jp', 'zh', ...) are not listed; the supported list covers them.
+const LANGUAGE_ALIASES: Record<string, string> = languageAliasData.aliases
 
 const normalizeLanguage = (language?: string) =>
   language?.toLowerCase().replace(/_/g, '-')
 
-export const resolveLanguage = (language?: string) => {
+const resolveLanguage = (language?: string) => {
   const normalized = normalizeLanguage(language)
   if (!normalized) {
     return FALLBACK_LANGUAGE
   }
 
-  if (normalized === 'zh-tw') return 'zhtw'
-  if (normalized === 'zh-cn') return 'zh'
-
-  if (supportedLanguages.includes(normalized)) {
-    return normalized
-  }
-
-  const baseLanguage = normalized.split('-')[0]
-  if (supportedLanguages.includes(baseLanguage)) {
-    return baseLanguage
+  // Try the full tag, then progressively shorter prefixes, against the
+  // shared alias table first and then the supported list, mirroring the
+  // backend resolver; 'ja-JP' resolves to 'jp', 'zh-TW' to 'zhtw'.
+  const segments = normalized.split('-')
+  for (let i = segments.length; i >= 1; i -= 1) {
+    const prefix = segments.slice(0, i).join('-')
+    const aliased = LANGUAGE_ALIASES[prefix]
+    if (aliased && supportedLanguages.includes(aliased)) {
+      return aliased
+    }
+    if (supportedLanguages.includes(prefix)) {
+      return prefix
+    }
   }
 
   return FALLBACK_LANGUAGE
 }
+
+const resolveSystemLanguage = (language?: string) => {
+  const normalized = normalizeLanguage(language)
+  if (normalized?.startsWith('zh')) {
+    return 'zh'
+  }
+
+  return FALLBACK_LANGUAGE
+}
+
+export const resolvePreferredLanguage = (
+  preference?: string | null,
+  systemLanguage?: string,
+) =>
+  !preference || preference === 'system'
+    ? resolveSystemLanguage(
+        systemLanguage ??
+          (typeof navigator !== 'undefined' ? navigator.language : undefined),
+      )
+    : resolveLanguage(preference)
 
 const getLanguageStorage = () => {
   if (typeof window === 'undefined') return null
@@ -89,6 +121,8 @@ const STARTUP_LANGUAGE_SECTIONS = [
   'settings',
   'profiles',
   'proxies',
+  'nodePool',
+  'chains',
   'tests',
   'rules',
   'connections',

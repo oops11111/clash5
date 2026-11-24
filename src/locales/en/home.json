@@ -2,31 +2,86 @@
   "page": {
     "tooltips": {
       "lightweightMode": "Lightweight Mode",
-      "manual": "Manual",
-      "settings": "Home Settings"
+      "manual": "Manual"
     },
     "cards": {
       "trafficStats": "Traffic Stats",
       "networkSettings": "Network Settings",
-      "proxyMode": "Proxy Mode"
+      "proxyMode": "Proxy Mode",
+      "perAppProxy": "Per-App Proxy"
     },
-    "settings": {
-      "cards": {
-        "profile": "Profile Card",
-        "currentProxy": "Current Proxy Card",
-        "network": "Network Settings Card",
-        "proxyMode": "Proxy Mode Card",
-        "traffic": "Traffic Stats Card",
-        "tests": "Website Tests Card",
-        "ip": "IP Information Card",
-        "clashInfo": "Clash Info Cards",
-        "systemInfo": "System Info Cards"
-      },
-      "title": "Home Settings"
-    },
-    "title": "Home"
+    "title": "Home",
+    "tabs": {
+      "details": "Details"
+    }
   },
   "components": {
+    "perAppProxy": {
+      "emptyState": "No processes have routed traffic through the core",
+      "chainLabel": "Chain",
+      "noChain": "No chain selected",
+      "chainInvalid": "Chain invalid",
+      "status": {
+        "idle": "Idle",
+        "active": "Active",
+        "failed": "Failed",
+        "recoveryRequired": "Recovery required",
+        "unavailable": "Unavailable"
+      },
+      "actions": {
+        "attach": "Enable",
+        "detach": "Disable",
+        "refresh": "Refresh",
+        "dismiss": "Dismiss"
+      },
+      "disabled": {
+        "nonWindows": "Per-app proxy is not supported on this platform",
+        "noService": "Service mode is required",
+        "tunActive": "Disable TUN mode first",
+        "singleSession": "Another app is already being proxied. Disable it first.",
+        "unavailable": "Currently unavailable",
+        "attaching": "Processing..."
+      },
+      "feedback": {
+        "attached": "Per-app proxy enabled",
+        "detached": "Per-app proxy disabled",
+        "noChainSelected": "Select a chain for this app first",
+        "processNotRunning": "This app is not running"
+      },
+      "confirm": {
+        "title": "Enable Per-App Proxy",
+        "body": "Enable proxy for {{processName}} using chain: {{chainName}}",
+        "warning": "All traffic from this app will be routed through the selected chain. Continue?"
+      }
+    },
+    "dnsLeak": {
+      "title": "DNS Leak Check",
+      "checking": "Checking…",
+      "actions": {
+        "refresh": "Check again"
+      },
+      "fields": {
+        "exitIp": "Exit IP",
+        "exitRegion": "Exit region",
+        "resolverIp": "DNS resolver",
+        "resolverRegion": "Resolver region",
+        "unknown": "Unknown"
+      },
+      "verdict": {
+        "ok": "Same region",
+        "mismatch": "Possible leak",
+        "unknown": "Undetermined"
+      },
+      "hints": {
+        "ok": "A matching region does not rule out a DNS leak",
+        "mismatch": "The resolver is in a different region from the exit",
+        "unknown": "Not enough information to judge"
+      },
+      "errors": {
+        "unavailable": "DNS leak check failed",
+        "hint": "Needs a running core and a reachable echo service"
+      }
+    },
     "proxyTun": {
       "status": {
         "systemProxyEnabled": "System Proxy Enabled",

@@ -45,6 +45,10 @@ import { mutate } from '@/services/mutate'
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
 import type { MonacoEditorInstance } from '@/types/monaco'
+import {
+  DNS_PRIVACY_DEFAULTS,
+  resolveDnsPrivacySettings,
+} from '@/utils/dns-privacy-defaults'
 import { MONACO_FONT_FAMILY } from '@/utils/font-family'
 
 const Item = styled(ListItem)(() => ({
@@ -149,10 +153,10 @@ const DEFAULT_DNS_CONFIG = {
   'fake-ip-range6': 'fdfe:dcba:9876::1/64',
   'fake-ip-filter-mode': 'blacklist' as 'blacklist' | 'whitelist',
   'prefer-h3': false,
-  'respect-rules': false,
+  'respect-rules': DNS_PRIVACY_DEFAULTS['respect-rules'],
   'use-hosts': false,
   'use-system-hosts': false,
-  ipv6: true,
+  ipv6: DNS_PRIVACY_DEFAULTS.ipv6,
   'fake-ip-filter': [
     '*.lan',
     '*.local',
@@ -273,6 +277,7 @@ export function DnsViewer({ ref }: { ref?: Ref<DialogRef> }) {
 
     const dnsConfig = config.dns || {}
     const hostsConfig = config.hosts || {}
+    const privacySettings = resolveDnsPrivacySettings(dnsConfig)
 
     const enhancedMode =
       dnsConfig['enhanced-mode'] || DEFAULT_DNS_CONFIG['enhanced-mode']
@@ -299,12 +304,11 @@ export function DnsViewer({ ref }: { ref?: Ref<DialogRef> }) {
         dnsConfig['fake-ip-range6'] ?? DEFAULT_DNS_CONFIG['fake-ip-range6'],
       fakeIpFilterMode: validFakeIpFilterMode,
       preferH3: dnsConfig['prefer-h3'] ?? DEFAULT_DNS_CONFIG['prefer-h3'],
-      respectRules:
-        dnsConfig['respect-rules'] ?? DEFAULT_DNS_CONFIG['respect-rules'],
+      respectRules: privacySettings.respectRules,
       useHosts: dnsConfig['use-hosts'] ?? DEFAULT_DNS_CONFIG['use-hosts'],
       useSystemHosts:
         dnsConfig['use-system-hosts'] ?? DEFAULT_DNS_CONFIG['use-system-hosts'],
-      ipv6: dnsConfig.ipv6 ?? DEFAULT_DNS_CONFIG.ipv6,
+      ipv6: privacySettings.ipv6,
       fakeIpFilter:
         dnsConfig['fake-ip-filter']?.join(', ') ??
         DEFAULT_DNS_CONFIG['fake-ip-filter'].join(', '),

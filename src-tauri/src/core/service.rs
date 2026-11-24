@@ -44,7 +44,7 @@ static PENDING_SERVICE_REPAIR_NOTICE: AtomicBool = AtomicBool::new(false);
 static PENDING_SERVICE_OWNER_NOTICE: Mutex<Option<String>> = Mutex::new(None);
 
 /// Why the Service was unavailable when the core fell back to Sidecar.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(tag = "kind", content = "reason", rename_all = "camelCase")]
 pub enum ServiceFallbackNotice {
     Unavailable,
@@ -572,6 +572,54 @@ fn shell_single_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', r"'\''"))
 }
 
+struct StagedServiceTools {
+    directory: PathBuf,
+}
+
+impl StagedServiceTools {
+    fn create(installer_source: &Path, service_source: &Path) -> Result<Self> {
+        #[cfg(unix)]
+        use std::os::unix::fs::PermissionsExt as _;
+
+        for attempt in 0..32 {
+            let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+            let directory =
+                std::env::temp_dir().join(format!("clash5-service-tools-{}-{nonce}-{attempt}", std::process::id()));
+            match std::fs::create_dir(&directory) {
+                Ok(()) => {
+                    let staging = Self { directory };
+                    #[cfg(unix)]
+                    std::fs::set_permissions(&staging.directory, std::fs::Permissions::from_mode(0o700))?;
+                    let suffix = std::env::consts::EXE_SUFFIX;
+                    let installer = staging.directory.join(format!("clash5-service-install{suffix}"));
+                    let service = staging.directory.join(format!("clash5-service{suffix}"));
+                    std::fs::copy(installer_source, &installer)?;
+                    std::fs::copy(service_source, &service)?;
+                    #[cfg(unix)]
+                    for executable in [&installer, &service] {
+                        std::fs::set_permissions(executable, std::fs::Permissions::from_mode(0o700))?;
+                    }
+                    return Ok(staging);
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        bail!("could not allocate an isolated clash5 service-tools directory")
+    }
+
+    fn installer_path(&self) -> PathBuf {
+        self.directory
+            .join(format!("clash5-service-install{}", std::env::consts::EXE_SUFFIX))
+    }
+}
+
+impl Drop for StagedServiceTools {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.directory);
+    }
+}
+
 fn packaged_service_tool_path(file_name: &str, packaged_path: impl FnOnce() -> Result<PathBuf>) -> Result<PathBuf> {
     #[cfg(feature = "verge-dev")]
     {
@@ -600,8 +648,8 @@ fn uninstall_service() -> Result<()> {
     use runas::Command as RunasCommand;
     use std::os::windows::process::CommandExt as _;
 
-    let uninstall_path = packaged_service_tool_path("clash-verge-service-uninstall.exe", || {
-        Ok(dirs::service_path()?.with_file_name("clash-verge-service-uninstall.exe"))
+    let uninstall_path = packaged_service_tool_path("clash5-service-uninstall.exe", || {
+        Ok(dirs::service_path()?.with_file_name("clash5-service-uninstall.exe"))
     })?;
 
     if !uninstall_path.exists() {
@@ -629,8 +677,8 @@ fn uninstall_service() -> Result<()> {
 fn uninstall_service() -> Result<()> {
     logging!(info, Type::Service, "uninstall service");
 
-    let uninstall_path = packaged_service_tool_path("clash-verge-service-uninstall", || {
-        Ok(tauri::utils::platform::current_exe()?.with_file_name("clash-verge-service-uninstall"))
+    let uninstall_path = packaged_service_tool_path("clash5-service-uninstall", || {
+        Ok(tauri::utils::platform::current_exe()?.with_file_name("clash5-service-uninstall"))
     })?;
 
     if !uninstall_path.exists() {
@@ -688,8 +736,8 @@ fn linux_running_as_root() -> bool {
 fn uninstall_service() -> Result<()> {
     logging!(info, Type::Service, "uninstall service");
 
-    let uninstall_path = packaged_service_tool_path("clash-verge-service-uninstall", || {
-        Ok(dirs::service_path()?.with_file_name("clash-verge-service-uninstall"))
+    let uninstall_path = packaged_service_tool_path("clash5-service-uninstall", || {
+        Ok(dirs::service_path()?.with_file_name("clash5-service-uninstall"))
     })?;
 
     if !uninstall_path.exists() {
@@ -721,14 +769,30 @@ fn uninstall_service() -> Result<()> {
     Ok(())
 }
 
+const fn bundled_core_name(core: &str) -> &str {
+    #[cfg(target_os = "linux")]
+    {
+        match core.as_bytes() {
+            b"verge-mihomo" => "clash5-mihomo",
+            b"verge-mihomo-alpha" => "clash5-mihomo-alpha",
+            _ => core,
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        core
+    }
+}
+
 fn install_service() -> Result<()> {
     let executable = current_exe()?;
     let cores = crate::config::IVerge::VALID_CLASH_CORES
         .iter()
         .map(|core| {
             let name = format!("{core}{}", std::env::consts::EXE_SUFFIX);
+            let bundled_name = bundled_core_name(core);
             clash_verge_service_ipc::management::CoreSource {
-                path: executable.with_file_name(&name),
+                path: executable.with_file_name(format!("{bundled_name}{}", std::env::consts::EXE_SUFFIX)),
                 name,
             }
         })
@@ -737,7 +801,7 @@ fn install_service() -> Result<()> {
 }
 
 fn invoke_service_install(cores: &[clash_verge_service_ipc::management::CoreSource], core_only: bool) -> Result<()> {
-    let name = format!("clash-verge-service-install{}", std::env::consts::EXE_SUFFIX);
+    let name = format!("clash5-service-install{}", std::env::consts::EXE_SUFFIX);
     let installer = packaged_service_tool_path(&name, || {
         #[cfg(target_os = "linux")]
         let executable = tauri::utils::platform::current_exe()?;
@@ -749,6 +813,11 @@ fn invoke_service_install(cores: &[clash_verge_service_ipc::management::CoreSour
     let gid = Some(tauri_plugin_clash_verge_sysinfo::current_gid());
     #[cfg(windows)]
     let gid = None;
+    let staged_tools = StagedServiceTools::create(
+        &installer,
+        &installer.with_file_name(format!("clash5-service{}", std::env::consts::EXE_SUFFIX)),
+    )?;
+    let installer = staged_tools.installer_path();
     clash_verge_service_ipc::management::install(
         &installer,
         cores,
@@ -770,29 +839,6 @@ fn force_reinstall_service() -> Result<()> {
     install_service().map_err(|err| {
         logging!(error, Type::Service, "强制重装服务失败: {}", err);
         err
-    })
-}
-
-/// Publishes a core into the Service's approved directory through the elevated installer.
-///
-/// The Service only executes administrator-approved copies from its own directory, never the file
-/// beside the app, so a freshly replaced core has to be handed over before a service-mode restart
-/// asks for it. The digest pins the exact bytes being attested: it rides the elevated process's
-/// command line, which no other local account can alter, so a file swapped on disk after this
-/// hash was computed is refused by the installer instead of published.
-pub fn stage_approved_core(core_path: &Path) -> Result<()> {
-    tokio::task::block_in_place(|| {
-        invoke_service_install(
-            &[clash_verge_service_ipc::management::CoreSource {
-                name: core_path
-                    .file_name()
-                    .context("core has no filename")?
-                    .to_string_lossy()
-                    .into_owned(),
-                path: core_path.to_path_buf(),
-            }],
-            true,
-        )
     })
 }
 
@@ -839,7 +885,7 @@ pub(super) async fn stage_runtime_by_service(config_file: &Path) -> Result<Stage
 
     let response = clash_verge_service_ipc::stage_runtime(&credentials, &session, &runtime)
         .await
-        .context("无法连接到Clash Verge Service")?;
+        .context("无法连接到 clash5 服务")?;
     if response.code > 0 {
         return Ok(StageRequest::Refused {
             code: response.code,
@@ -849,7 +895,7 @@ pub(super) async fn stage_runtime_by_service(config_file: &Path) -> Result<Stage
     response
         .data
         .map(StageRequest::Answered)
-        .context("Clash Verge Service 未返回运行时暂存结果")
+        .context("clash5 服务未返回运行时暂存结果")
 }
 
 #[derive(Debug)]
@@ -910,7 +956,7 @@ pub(super) async fn start_with_existing_service(config_file: &Path) -> Result<()
         Err(error) => {
             tracing::Span::current().record("outcome", "ipc-unreachable");
             start_owner_monitor();
-            return Err(error).context("无法连接到Clash Verge Service");
+            return Err(error).context("无法连接到 clash5 服务");
         }
     };
 
@@ -945,7 +991,7 @@ pub(super) async fn start_with_existing_service(config_file: &Path) -> Result<()
         ));
     }
 
-    let result = response.data.context("Clash Verge Service 未返回会话信息")?;
+    let result = response.data.context("clash5 服务未返回会话信息")?;
     tracing::Span::current().record("generation", result.session.generation);
     let capabilities = probe_service_capabilities().await;
     tracing::Span::current().record("staging", capabilities.runtime_staging);
@@ -1002,7 +1048,7 @@ pub(super) async fn get_clash_logs_by_service() -> Result<Vec<String>> {
         clash_verge_service_ipc::get_clash_logs(&credentials)
     })
     .await;
-    let response = response.context("无法连接到Clash Verge Service")?;
+    let response = response.context("无法连接到 clash5 服务")?;
 
     if response.code > 0 {
         if response.code == clash_verge_service_ipc::ServiceErrorCode::NotActive as u16 {
@@ -1021,7 +1067,7 @@ pub(crate) async fn get_clash_log_snapshot_by_service() -> Result<String> {
         clash_verge_service_ipc::get_clash_log_snapshot(&credentials)
     })
     .await;
-    let response = response.context("无法连接到Clash Verge Service")?;
+    let response = response.context("无法连接到 clash5 服务")?;
     if response.code > 0 {
         if response.code == clash_verge_service_ipc::ServiceErrorCode::NotActive as u16 {
             recover_after_owner_loss(generation, OwnerRecoveryReason::Displaced, None).await;
@@ -1333,7 +1379,7 @@ async fn read_chunk(
     };
     let response = clash_verge_service_ipc::read_runtime_file(credentials, session, &request)
         .await
-        .context("无法连接到Clash Verge Service")?;
+        .context("无法连接到 clash5 服务")?;
     if response.code == ServiceErrorCode::NotActive as u16
         || response.code == ServiceErrorCode::StaleOwnerSession as u16
     {
@@ -1492,7 +1538,7 @@ pub(super) async fn stop_core_by_service() -> Result<()> {
         Ok(response) => response,
         Err(error) => {
             start_owner_monitor();
-            return Err(error).context("无法连接到Clash Verge Service");
+            return Err(error).context("无法连接到 clash5 服务");
         }
     };
 
@@ -1502,7 +1548,9 @@ pub(super) async fn stop_core_by_service() -> Result<()> {
             code if code == clash_verge_service_ipc::ServiceErrorCode::NotActive as u16
                 || code == clash_verge_service_ipc::ServiceErrorCode::StaleOwnerSession as u16
         ) {
-            recover_after_owner_loss_while_locked(OwnerRecoveryReason::Displaced).await;
+            if let Err(cleanup_error) = recover_after_owner_loss_while_locked(OwnerRecoveryReason::Displaced).await {
+                report_owner_recovery_failure(None, Some(cleanup_error));
+            }
         } else {
             start_owner_monitor();
         }
@@ -1530,7 +1578,7 @@ pub(crate) async fn update_writer_by_service(writer: &WriterConfig) -> Result<()
     let session = active_service_session()?;
     let response = clash_verge_service_ipc::update_writer(&credentials, &session, writer)
         .await
-        .context("无法连接到Clash Verge Service")?;
+        .context("无法连接到 clash5 服务")?;
     if response.code > 0 {
         logging!(
             warn,
@@ -1556,7 +1604,7 @@ pub(super) async fn set_system_proxy_by_service_with_session(
     let credentials = current_owner_credentials()?;
     let response = clash_verge_service_ipc::set_system_proxy(&credentials, session, proxy)
         .await
-        .context("无法连接到Clash Verge Service")?;
+        .context("无法连接到 clash5 服务")?;
     if response.code > 0 {
         logging!(
             warn,
@@ -1567,7 +1615,7 @@ pub(super) async fn set_system_proxy_by_service_with_session(
         );
         bail!(response.message);
     }
-    response.data.context("Clash Verge Service 未返回系统代理结果")
+    response.data.context("clash5 服务未返回系统代理结果")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1661,15 +1709,37 @@ fn log_core_restarts(seen: &mut Option<u32>, status: &ServiceStatusSnapshot) {
     *seen = Some(status.restart_count);
 }
 
-fn report_service_core_stopped(status: &ServiceStatusSnapshot) {
-    let detail = format!(
+fn service_core_stopped_detail(status: &ServiceStatusSnapshot) -> String {
+    format!(
         "service state {:?}, {} restarts, last exit: {}",
         status.service_state,
         status.restart_count,
         status.last_core_exit_reason.as_deref().unwrap_or("none reported")
-    );
-    logging!(error, Type::Service, "service core stopped: {detail}");
-    CoreManager::global().record_startup_error(CoreFailure::ServiceCoreStopped(detail));
+    )
+}
+
+fn owner_recovery_failure(service_detail: Option<String>, cleanup_detail: Option<String>) -> Option<CoreFailure> {
+    match (service_detail, cleanup_detail) {
+        (Some(mut service), Some(cleanup)) => {
+            service.push_str(&format!("; proxy cleanup failed: {cleanup}"));
+            Some(CoreFailure::ServiceCoreStopped(service))
+        }
+        (Some(service), None) => Some(CoreFailure::ServiceCoreStopped(service)),
+        (None, Some(cleanup)) => Some(CoreFailure::StartFailed(format!(
+            "Proxy cleanup after service owner loss failed: {cleanup}"
+        ))),
+        (None, None) => None,
+    }
+}
+
+fn report_owner_recovery_failure(status: Option<&ServiceStatusSnapshot>, cleanup_error: Option<anyhow::Error>) {
+    let service_detail = status.map(service_core_stopped_detail);
+    let cleanup_detail = cleanup_error.map(|error| format!("{error:#}"));
+    let Some(failure) = owner_recovery_failure(service_detail, cleanup_detail) else {
+        return;
+    };
+    logging!(error, Type::Service, "service owner recovery failed: {failure:?}");
+    CoreManager::global().record_startup_error(failure);
     Handle::notice(NoticeStatus::CoreStartError, "");
 }
 
@@ -1755,11 +1825,12 @@ async fn recover_after_owner_loss(
     {
         return;
     }
-    recover_after_owner_loss_while_locked(reason).await;
+    let cleanup_error = recover_after_owner_loss_while_locked(reason).await.err();
     // Still under the lifecycle lock, so a later start is the one that clears it.
-    if let (OwnerRecoveryReason::SameOwnerFailure, Some(status)) = (reason, status) {
-        report_service_core_stopped(status);
-    }
+    let status = matches!(reason, OwnerRecoveryReason::SameOwnerFailure)
+        .then_some(status)
+        .flatten();
+    report_owner_recovery_failure(status, cleanup_error);
 }
 
 fn claim_owner_recovery_generation(generation: &AtomicU64, captured_generation: u64) -> Option<u64> {
@@ -1776,7 +1847,7 @@ fn claim_owner_recovery_generation(generation: &AtomicU64, captured_generation: 
 }
 
 #[tracing::instrument(skip_all, level = "info", fields(reason = ?reason))]
-async fn recover_after_owner_loss_while_locked(reason: OwnerRecoveryReason) {
+async fn recover_after_owner_loss_while_locked(reason: OwnerRecoveryReason) -> Result<()> {
     logging!(
         warn,
         Type::Service,
@@ -1786,9 +1857,11 @@ async fn recover_after_owner_loss_while_locked(reason: OwnerRecoveryReason) {
     proxy_control::stop_guard().await;
     let policy = owner_recovery_policy(reason, cfg!(target_os = "macos"));
     // Clear while still in Service mode with the session: on macOS it routes through the helper.
-    if policy.reset_system_proxy {
-        clear_proxy_after_owner_loss().await;
-    }
+    let cleanup = if policy.reset_system_proxy {
+        clear_proxy_after_owner_loss().await
+    } else {
+        Ok(())
+    };
     clear_active_service_session();
     CoreManager::global().core_stopped();
     // A displaced Service may still run TUN for its new owner, and DNS settings are system-wide.
@@ -1796,9 +1869,10 @@ async fn recover_after_owner_loss_while_locked(reason: OwnerRecoveryReason) {
     if policy.reset_system_proxy {
         crate::utils::resolve::dns::sync_public_dns().await;
     }
+    cleanup
 }
 
-async fn clear_proxy_after_owner_loss() {
+async fn clear_proxy_after_owner_loss() -> Result<()> {
     use crate::utils::retry::{RetryError, RetryPolicy, retry};
     let result = retry(
         RetryPolicy::fixed(
@@ -1818,15 +1892,17 @@ async fn clear_proxy_after_owner_loss() {
         },
     )
     .await;
-    if let Err(error) = result {
-        // The existing recovery path also waits after its final failed clear.
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        logging!(
-            error,
-            Type::Service,
-            "failed to clear local proxy after owner loss: {error:#}"
-        );
-    }
+    let Err(error) = result else {
+        return Ok(());
+    };
+    // The existing recovery path also waits after its final failed clear.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    logging!(
+        error,
+        Type::Service,
+        "failed to clear local proxy after owner loss: {error:#}"
+    );
+    Err(error.context("failed to clear local proxy after service owner loss"))
 }
 
 /// Waits for a repaired service, preserving readable rejection details but classifying sustained
@@ -2056,9 +2132,11 @@ pub static SERVICE_MANAGER: ServiceManager = ServiceManager;
 mod tests {
     use super::{
         ServiceHealth, ServiceStatus, capture_generation_before, claim_owner_recovery_generation,
-        generate_service_session_token, mark_service_unavailable_after_owner_loss, owner_recovery_policy,
-        service_core_path_for, session_matches_status,
+        generate_service_session_token, mark_service_unavailable_after_owner_loss, owner_recovery_failure,
+        owner_recovery_policy, service_core_path_for, session_matches_status,
     };
+    #[cfg(target_os = "linux")]
+    use super::{StagedServiceTools, bundled_core_name};
     #[cfg(unix)]
     use super::{service_core_path_for_with_publisher, service_tool_path_for};
     use crate::core::runstate::{FakeEnv, OwnerRecoveryReason, PendingAction, RunStateStore};
@@ -2118,6 +2196,53 @@ mod tests {
     #[cfg(unix)]
     fn service_tools_staging_directory(home: &Path) -> PathBuf {
         home.join("Applications/.clash-verge-rev-dev/service-tools")
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_core_sources_use_clash5_sidecar_names_and_upstream_install_names() {
+        let executable = Path::new("/usr/bin/clash5");
+
+        for (core, sidecar) in [
+            ("verge-mihomo", "clash5-mihomo"),
+            ("verge-mihomo-alpha", "clash5-mihomo-alpha"),
+        ] {
+            let name = format!("{core}{}", std::env::consts::EXE_SUFFIX);
+            let bundled_name = bundled_core_name(core);
+            let source = executable.with_file_name(format!("{bundled_name}{}", std::env::consts::EXE_SUFFIX));
+            assert_eq!(source.file_stem().and_then(|value| value.to_str()), Some(sidecar));
+            assert_eq!(name, format!("{core}{}", std::env::consts::EXE_SUFFIX));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_service_tools_use_upstream_internal_names_in_a_private_directory() -> anyhow::Result<()> {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let root = TestDirectory::new("linux-service-tools")?;
+        let installer_source = root.path().join("clash5-service-install");
+        let service_source = root.path().join("clash5-service");
+        std::fs::write(&installer_source, b"clash5 installer")?;
+        std::fs::write(&service_source, b"clash5 service")?;
+
+        let staged = StagedServiceTools::create(&installer_source, &service_source)?;
+        let directory = staged.directory.clone();
+        let installer = staged.installer_path();
+        let service = directory.join("clash5-service");
+
+        assert_eq!(
+            installer.file_name().and_then(|name| name.to_str()),
+            Some("clash5-service-install")
+        );
+        assert_eq!(std::fs::read(&installer)?, b"clash5 installer");
+        assert_eq!(std::fs::read(&service)?, b"clash5 service");
+        assert_eq!(std::fs::metadata(&directory)?.permissions().mode() & 0o777, 0o700);
+        assert_ne!(std::fs::metadata(&installer)?.permissions().mode() & 0o111, 0);
+
+        drop(staged);
+        assert!(!directory.exists());
+        Ok(())
     }
 
     #[cfg(unix)]
@@ -2180,14 +2305,14 @@ mod tests {
 
         let root = TestDirectory::new("development-service-tool")?;
         let home = root.path().join("home");
-        let source = root.path().join("clash-verge-service-install");
+        let source = root.path().join("clash5-service-install");
         std::fs::write(&source, b"development installer")?;
 
         let selected = service_tool_path_for(&source, Some(&home), true)?;
 
         assert_eq!(
             selected,
-            service_tools_staging_directory(&home).join("clash-verge-service-install")
+            service_tools_staging_directory(&home).join("clash5-service-install")
         );
         assert_eq!(std::fs::read(&selected)?, b"development installer");
         assert_ne!(std::fs::metadata(&selected)?.permissions().mode() & 0o111, 0);
@@ -2337,6 +2462,27 @@ mod tests {
         assert_eq!(claim_owner_recovery_generation(&generation, 7), Some(8));
         assert_eq!(generation.load(Ordering::Acquire), 8);
         assert_eq!(claim_owner_recovery_generation(&generation, 7), None);
+    }
+
+    #[test]
+    fn owner_recovery_keeps_proxy_cleanup_errors_in_the_unresolved_failure() {
+        use crate::core::manager::CoreFailure;
+
+        assert_eq!(
+            owner_recovery_failure(
+                Some("service core stopped after three restarts".into()),
+                Some("OS proxy write failed".into()),
+            ),
+            Some(CoreFailure::ServiceCoreStopped(
+                "service core stopped after three restarts; proxy cleanup failed: OS proxy write failed".into()
+            ))
+        );
+        assert_eq!(
+            owner_recovery_failure(None, Some("OS proxy write failed".into())),
+            Some(CoreFailure::StartFailed(
+                "Proxy cleanup after service owner loss failed: OS proxy write failed".into()
+            ))
+        );
     }
 
     #[test]

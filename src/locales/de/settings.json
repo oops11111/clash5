@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "Spracheinstellungen",
+          "followSystemLanguage": "Systemsprache verwenden",
+          "followSystemLanguageDescription": "Deaktivieren, um die Sprache der Oberfläche selbst zu wählen",
           "themeMode": "Thema",
           "trayClickEvent": "Tray-Klickereignis",
           "copyEnvType": "Umgebungsvariablentyp kopieren",
@@ -178,6 +180,18 @@
           "misc": "Sonstige Einstellungen",
           "hotkeySetting": "Tastenkombinationseinstellungen"
         }
+      },
+      "performance": {
+        "title": "Performance preset",
+        "balanced": "Balanced",
+        "balancedDescription": "12 parallel checks, 10-minute reuse; current-node checks every 5 minutes when enabled",
+        "performance": "Performance",
+        "performanceDescription": "16 parallel checks, 5-minute reuse; current-node checks every 2 minutes when enabled",
+        "power_saving": "Power saving",
+        "power_savingDescription": "4 parallel checks, 20-minute reuse; current-node checks every 15 minutes when enabled",
+        "manualInterval": "When enabled, current-node checks use the advanced interval of {{minutes}} minutes",
+        "memoryProtectionActive": "Memory pressure protection is active. Probe work is temporarily reduced; your saved preset is unchanged.",
+        "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
         "title": "Verge-Erweiterte Einstellungen",
@@ -411,6 +425,8 @@
         "appLogMaxSize": "Maximale Größe des Anwendungsprotokolls",
         "appLogMaxCount": "Maximale Anzahl der Anwendungsprotokolle",
         "autoCloseConnections": "Verbindungen automatisch schließen",
+        "singboxPersistent": "sing-box dauerhaft ausführen",
+        "singboxDegraded": "sing-box wurde nach wiederholten Fehlern beendet; der Datenverkehr läuft wieder über Mihomo.",
         "autoCheckUpdate": "Automatisch auf Updates prüfen",
         "enableBuiltinEnhanced": "Eingebaute Verbesserungen aktivieren",
         "proxyLayoutColumns": "Anzahl der Spalten im Proxy-Layout",
@@ -422,6 +438,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "Wenn der ausgewählte Knoten in der Proxy-Gruppe oder der Proxy-Modus geändert wird, werden die bestehenden Verbindungen geschlossen.",
+        "singboxPersistent": "Die Hilfsanwendung nach Inaktivität des Relays weiter ausführen",
         "enableBuiltinEnhanced": "Kompatibilitätsbehandlung der Konfigurationsdatei",
         "autoDelayDetection": "Überprüft regelmäßig im Hintergrund die Latenz des aktuellen Knotens",
         "defaultLatencyTest": "Dies wird nur für HTTP-Client-Anfragentests verwendet und hat keine Auswirkungen auf die Konfigurationsdatei."

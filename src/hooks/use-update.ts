@@ -1,18 +1,21 @@
 import { fetchCacheData, setCacheData, useQuery } from '@/services/query-client'
-import { checkUpdateSafe } from '@/services/update'
+import {
+  checkUpdateSafe,
+  FIRST_RELEASE_UPDATER_ENABLED,
+} from '@/services/update'
 
 import { useVerge } from './use-verge'
 
 const LAST_CHECK_KEY = 'last_check_update'
 
-export const readLastCheckTime = (): number | null => {
+const readLastCheckTime = (): number | null => {
   const stored = localStorage.getItem(LAST_CHECK_KEY)
   if (!stored) return null
   const ts = parseInt(stored, 10)
   return isNaN(ts) ? null : ts
 }
 
-export const updateLastCheckTime = (timestamp?: number): number => {
+const updateLastCheckTime = (timestamp?: number): number => {
   const now = timestamp ?? Date.now()
   localStorage.setItem(LAST_CHECK_KEY, now.toString())
   setCacheData([LAST_CHECK_KEY], now)
@@ -23,10 +26,11 @@ export const useUpdate = (enabled: boolean = true) => {
   const { verge } = useVerge()
   const { auto_check_update } = verge || {}
 
-  const shouldCheck = enabled && auto_check_update !== false
+  const shouldCheck =
+    FIRST_RELEASE_UPDATER_ENABLED && enabled && auto_check_update === true
 
   const fetchUpdate = async () => {
-    const result = await checkUpdateSafe()
+    const result = shouldCheck ? await checkUpdateSafe() : null
     updateLastCheckTime()
     return result
   }

@@ -7,8 +7,13 @@ import {
   setCacheData,
   useQuery,
 } from '@/services/query-client'
+import { useAppDispatch } from '@/store/app-store-context'
 
 const RECONNECT_DELAY_MS = 1000
+
+/** Stringify a subscription error for the unified connection state. */
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
 
 interface SharedSubscriptionOwner {
   handleMessage: (data: string) => void
@@ -65,6 +70,7 @@ const closeSharedSocket = async (entry: SharedSubscriptionEntry) => {
 
 const createSharedSubscriptionEntry = (
   connect: () => Promise<MihomoWebSocket>,
+  onConnectError?: (error: unknown) => void,
 ): SharedSubscriptionEntry => {
   const entry: SharedSubscriptionEntry = {
     refs: 0,
@@ -113,7 +119,8 @@ const createSharedSubscriptionEntry = (
 
       entry.ws = ws
       clearReconnectTimer()
-    } catch (ignoreError) {
+    } catch (error) {
+      onConnectError?.(error)
       if (!entry.closed && !entry.ws) {
         clearReconnectTimer()
         entry.reconnectTimer = setTimeout(entry.connectWs, RECONNECT_DELAY_MS)
@@ -187,6 +194,8 @@ export const useMihomoWsSubscription = <T>(
     setupHandlers,
   } = options
 
+  const dispatch = useAppDispatch()
+
   const [date, setDate] = useLocalStorage(storageKey, initialSubscriptionDate)
   const subscriptKey = buildSubscriptKey(date)
   const subscriptionCacheKey = subscriptKey ? `$sub$${subscriptKey}` : null
@@ -229,7 +238,13 @@ export const useMihomoWsSubscription = <T>(
     let isMounted = true
     let entry = sharedSubscriptions.get(subscriptionCacheKey)
     if (!entry) {
-      entry = createSharedSubscriptionEntry(connect)
+      entry = createSharedSubscriptionEntry(connect, (error) => {
+        dispatch({
+          type: 'connection/failed',
+          source: 'websocket',
+          message: errorMessage(error),
+        })
+      })
       sharedSubscriptions.set(subscriptionCacheKey, entry)
     }
 
@@ -240,11 +255,17 @@ export const useMihomoWsSubscription = <T>(
 
     const baseNext: NextFn<T> = (error, data) => {
       if (error !== undefined && error !== null) {
+        dispatch({
+          type: 'connection/failed',
+          source: 'websocket',
+          message: errorMessage(error),
+        })
         return
       }
       if (data === undefined) return
       const resolved = resolveNextData(data, subscriptionCacheKey)
       writeSubscriptionSnapshot(subscriptionCacheKey, resolved)
+      dispatch({ type: 'connection/recovered', source: 'websocket' })
     }
 
     if (throttleMs && throttleMs > 0) {

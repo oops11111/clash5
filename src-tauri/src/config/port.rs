@@ -3,6 +3,7 @@ use crate::core::notify::NoticeStatus;
 use crate::{
     constants::timing,
     core::{
+        CoreManager,
         handle::Handle,
         listener::{ListenerBindScope, ListenerProbeOutcome, MIXED_PORT_KEY, proxy_listener_keys},
         owner_identity::current_owner_credentials,
@@ -119,9 +120,21 @@ impl Config {
     }
 
     async fn stage_fallback_runtime() -> Result<()> {
-        Self::generate()
-            .await
-            .context("failed to materialize runtime configuration with fallback port")?;
+        if let Err(error) = Self::generate().await {
+            // The profile-driven generation failed; start the core on the default
+            // configuration with the fallback port instead of blocking startup.
+            logging!(
+                warn,
+                Type::Config,
+                "failed to generate runtime configuration with fallback port, using default configuration: {error:#}"
+            );
+            let error_message = error.to_string();
+            CoreManager::global()
+                .use_default_config(NoticeStatus::ConfigValidateBootError, &error_message)
+                .await
+                .context("failed to fall back to default runtime configuration")?;
+            return Ok(());
+        }
 
         let yaml = Self::runtime_config_yaml()
             .await
@@ -142,7 +155,7 @@ impl Config {
 
     pub(crate) fn block_startup_core(error: &anyhow::Error) {
         *STARTUP_CORE_BLOCK_REASON.lock() = Some(error.to_string());
-        report_fallback_error(error.to_string());
+        report_fallback_error(error);
     }
 
     pub(crate) fn startup_core_block_reason() -> Option<String> {
@@ -176,13 +189,14 @@ fn record_fallback(old_port: u16, new_port: u16) {
     }
 }
 
-fn report_fallback_error(message: String) {
+fn report_fallback_error(error: &anyhow::Error) {
+    // Log the full chain: the outermost message alone hid which step failed.
     logging!(
         error,
         Type::Config,
-        "Automatic mixed proxy port fallback failed: {}",
-        message
+        "Automatic mixed proxy port fallback failed: {error:#}"
     );
+    let message = error.to_string();
     AsyncHandler::spawn(move || async move {
         tokio::time::sleep(timing::STARTUP_ERROR_DELAY).await;
         Handle::notice(NoticeStatus::MixedPortFallbackError, message);

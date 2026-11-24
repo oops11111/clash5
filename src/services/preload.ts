@@ -3,7 +3,7 @@ import {
   cacheLanguage,
   getCachedLanguage,
   initializeLanguage,
-  resolveLanguage,
+  resolvePreferredLanguage,
 } from './i18n'
 
 let vergeConfigCache: IVergeConfig | null | undefined
@@ -61,11 +61,6 @@ const preloadLanguage = async (
   vergeConfig?: IVergeConfig | null,
   loadConfig: () => Promise<IVergeConfig | null> = preloadConfig,
 ) => {
-  const cachedLanguage = getCachedLanguage()
-  if (cachedLanguage) {
-    return cachedLanguage
-  }
-
   let resolvedConfig = vergeConfig
 
   if (resolvedConfig === undefined) {
@@ -80,16 +75,13 @@ const preloadLanguage = async (
     }
   }
 
-  const languageFromConfig = resolvedConfig?.language
-  if (languageFromConfig) {
-    const resolved = resolveLanguage(languageFromConfig)
+  if (resolvedConfig) {
+    const resolved = resolvePreferredLanguage(resolvedConfig.language)
     cacheLanguage(resolved)
     return resolved
   }
 
-  const browserLanguage = resolveLanguage(
-    typeof navigator !== 'undefined' ? navigator.language : undefined,
-  )
+  const browserLanguage = getCachedLanguage() ?? resolvePreferredLanguage()
   cacheLanguage(browserLanguage)
   return browserLanguage
 }

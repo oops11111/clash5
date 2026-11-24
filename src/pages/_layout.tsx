@@ -3,9 +3,10 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Outlet, useNavigate } from 'react-router'
+import { Outlet, useLocation, useNavigate } from 'react-router'
 
 import { BaseErrorBoundary } from '@/components/base'
+import { ConnectionBanner } from '@/components/layout/connection-banner'
 import { LayoutSidebar } from '@/components/layout/layout-sidebar'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { ServiceMigrationDialog } from '@/components/layout/service-migration-dialog'
@@ -18,6 +19,7 @@ import { useI18n } from '@/hooks/use-i18n'
 import { useVerge } from '@/hooks/use-verge'
 import { useWindowDecorations } from '@/hooks/use-window'
 import { useEventBus } from '@/services/bus'
+import { resolvePreferredLanguage } from '@/services/i18n'
 import { handleNoticeMessage } from '@/services/notice-handlers'
 import { useThemeMode } from '@/services/states'
 import getSystem from '@/utils/get-system'
@@ -42,9 +44,9 @@ const Layout = () => {
   const { theme } = useCustomTheme()
   const { verge } = useVerge()
   const { language } = verge ?? {}
-  const navCollapsed = verge?.collapse_navbar ?? false
   const { switchLanguage } = useI18n()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const themeReady = useMemo(() => Boolean(theme), [theme])
   const windowControlsRef = useRef<any>(null)
   const { decorated } = useWindowDecorations()
@@ -81,9 +83,16 @@ const Layout = () => {
   usePendingFailures()
 
   useEffect(() => {
-    if (language) {
-      dayjs.locale(language === 'zh' ? 'zh-cn' : language)
-      switchLanguage(language)
+    const syncLanguage = () => {
+      const active = resolvePreferredLanguage(language)
+      dayjs.locale(active === 'zh' ? 'zh-cn' : active)
+      void switchLanguage(language ?? 'system')
+    }
+
+    syncLanguage()
+    if (!language || language === 'system') {
+      window.addEventListener('languagechange', syncLanguage)
+      return () => window.removeEventListener('languagechange', syncLanguage)
     }
   }, [language, switchLanguage])
 
@@ -127,7 +136,7 @@ const Layout = () => {
       <Paper
         square
         elevation={0}
-        className={`${OS} layout${navCollapsed ? ' layout--nav-collapsed' : ''}`}
+        className={`${OS} layout`}
         style={{
           borderTopLeftRadius: '0px',
           borderTopRightRadius: '0px',
@@ -160,12 +169,16 @@ const Layout = () => {
         {customTitlebar}
 
         <div className="layout-content">
-          <LayoutSidebar isDark={isDark} isCollapsed={navCollapsed} />
+          <LayoutSidebar isDark={isDark} />
 
           <div className="layout-content__right">
             <div className="the-bar"></div>
             <div className="the-content">
-              <BaseErrorBoundary>
+              <ConnectionBanner />
+              <BaseErrorBoundary
+                resetKeys={[pathname]}
+                onGoHome={() => navigate('/')}
+              >
                 <Outlet />
               </BaseErrorBoundary>
             </div>

@@ -2,7 +2,7 @@ import { useSortable } from '@dnd-kit/react/sortable'
 import { useTheme } from '@mui/material'
 import { type CSSProperties, type ReactNode, useCallback } from 'react'
 
-export interface SortableItemRenderProps {
+interface SortableItemRenderProps {
   ref: (element: HTMLElement | null) => void
   handleRef: (element: HTMLElement | null) => void
   style: CSSProperties

@@ -92,6 +92,25 @@ export const ProxyEmptyState = ({ reason }: Props) => {
             </Button>
           )}
 
+          {reason === 'no-subscriptions' && (
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => navigate('/subscriptions?section=nodes')}
+              >
+                {t('proxies.page.empty.actions.addNode')}
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => navigate('/plugins')}
+              >
+                {t('proxies.page.empty.actions.openPlugins')}
+              </Button>
+            </>
+          )}
+
           {showCoreActions && (
             <>
               <Button

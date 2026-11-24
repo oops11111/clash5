@@ -1,0 +1,365 @@
+use crate::core::CoreManager;
+use anyhow::{Result, anyhow};
+use reqwest::{Client, Proxy, Url};
+use serde::Serialize;
+use serde_yaml_ng::{Mapping, Value};
+use std::{
+    collections::BTreeMap,
+    net::{IpAddr, Ipv4Addr, TcpListener},
+    time::{Duration, Instant},
+};
+use tokio::sync::oneshot;
+
+#[derive(Clone, Debug, Serialize, specta::Type)]
+pub struct ExitObservation {
+    pub ip: IpAddr,
+    #[specta(type = specta_typescript::Number)]
+    pub elapsed_ms: u64,
+}
+
+pub(crate) fn service_url(raw: &str) -> Result<Url> {
+    let url = Url::parse(raw).map_err(|_| anyhow!("C5-EXIT-001"))?;
+    let loopback = url.host_str().is_some_and(|host| {
+        host == "localhost"
+            || host
+                .trim_matches(['[', ']'])
+                .parse::<IpAddr>()
+                .is_ok_and(|ip| ip.is_loopback())
+    });
+    if !(url.scheme() == "https" || url.scheme() == "http" && loopback)
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(anyhow!("C5-EXIT-001"));
+    }
+    Ok(url)
+}
+
+pub(crate) fn parse_ip(bytes: &[u8]) -> Result<IpAddr> {
+    let raw = std::str::from_utf8(bytes).map_err(|_| anyhow!("C5-EXIT-003"))?;
+    if let Ok(ip) = raw.trim().parse() {
+        return Ok(ip);
+    }
+    let value: serde_json::Value = serde_json::from_str(raw).map_err(|_| anyhow!("C5-EXIT-003"))?;
+    value
+        .get("ip")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|value| value.parse().ok())
+        .ok_or_else(|| anyhow!("C5-EXIT-003"))
+}
+
+async fn request(url: Url, port: u16, token: &str) -> Result<ExitObservation> {
+    let proxy = Proxy::all(format!("http://127.0.0.1:{port}"))?.basic_auth("clash5", token);
+    let client = Client::builder()
+        .no_proxy()
+        .proxy(proxy)
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(12))
+        .connect_timeout(Duration::from_secs(5))
+        .user_agent("clash5/exit-ip")
+        .build()?;
+    let started = Instant::now();
+    let mut response = client.get(url).send().await?.error_for_status()?;
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await? {
+        if body.len() + chunk.len() > 4_096 {
+            return Err(anyhow!("C5-EXIT-003"));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(ExitObservation {
+        ip: parse_ip(&body)?,
+        elapsed_ms: started.elapsed().as_millis() as u64,
+    })
+}
+
+fn session_token() -> Result<String> {
+    let mut secret = [0_u8; 32];
+    getrandom::fill(&mut secret)?;
+    Ok(secret.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn probe_listener(name: &str, port: u16, proxy_name: &str, password: &str) -> Value {
+    let mut user = Mapping::new();
+    user.insert("username".into(), "clash5".into());
+    user.insert("password".into(), password.into());
+    let mut listener = Mapping::new();
+    listener.insert("name".into(), name.into());
+    listener.insert("type".into(), "http".into());
+    listener.insert("listen".into(), "127.0.0.1".into());
+    listener.insert("port".into(), port.into());
+    listener.insert("proxy".into(), proxy_name.into());
+    listener.insert("users".into(), Value::Sequence(vec![Value::Mapping(user)]));
+    Value::Mapping(listener)
+}
+
+fn insert_listener(config: &mut Mapping, listener: Value) -> Result<()> {
+    let listeners = config
+        .entry(Value::from("listeners"))
+        .or_insert_with(|| Value::Sequence(vec![]))
+        .as_sequence_mut()
+        .ok_or_else(|| anyhow!("C5-EXIT-002"))?;
+    if listeners
+        .iter()
+        .any(|existing| existing.get("name") == listener.get("name"))
+    {
+        return Err(anyhow!("C5-EXIT-002"));
+    }
+    listeners.push(listener);
+    Ok(())
+}
+
+fn remove_listener(config: &mut Mapping, owned: &Value) -> Result<()> {
+    let Some(value) = config.get_mut("listeners") else {
+        return Ok(());
+    };
+    let listeners = value.as_sequence_mut().ok_or_else(|| anyhow!("C5-EXIT-004"))?;
+    if listeners
+        .iter()
+        .any(|listener| listener.get("name") == owned.get("name") && listener != owned)
+    {
+        return Err(anyhow!("C5-EXIT-004"));
+    }
+    listeners.retain(|listener| listener != owned);
+    Ok(())
+}
+
+pub(crate) fn apply_transient_listeners(config: &mut Mapping, listeners: &BTreeMap<String, Value>) -> Result<()> {
+    for (name, listener) in listeners {
+        if listener.get("name").and_then(Value::as_str) != Some(name.as_str()) {
+            return Err(anyhow!("C5-EXIT-002"));
+        }
+        insert_listener(config, listener.clone())?;
+    }
+    Ok(())
+}
+
+pub(crate) struct ChainListener {
+    name: String,
+    definition: Value,
+    port: u16,
+    token: String,
+    active: bool,
+}
+
+impl ChainListener {
+    pub(crate) fn new(proxy_name: &str, namespace: &str) -> Result<Self> {
+        let reservation = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
+        let port = reservation.local_addr()?.port();
+        let name = format!("{namespace}-{port}");
+        let token = session_token()?;
+        let definition = probe_listener(&name, port, proxy_name, &token);
+        drop(reservation);
+        Ok(Self {
+            name,
+            definition,
+            port,
+            token,
+            active: false,
+        })
+    }
+
+    /// Keep the lease after an error or cancellation until `close` succeeds.
+    pub(crate) async fn activate(&mut self) -> Result<()> {
+        if self.active {
+            return Err(anyhow!("C5-EXIT-002"));
+        }
+        let applied = CoreManager::global()
+            .update_runtime_config_checked(|runtime| {
+                let config = runtime.config.as_mut().ok_or_else(|| anyhow!("C5-EXIT-002"))?;
+                insert_listener(config, self.definition.clone())?;
+                runtime
+                    .transient_listeners
+                    .insert(self.name.clone(), self.definition.clone());
+                self.active = true;
+                Ok(())
+            })
+            .await;
+        if applied.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+            Ok(())
+        } else {
+            self.close().await?;
+            Err(anyhow!("C5-EXIT-002"))
+        }
+    }
+
+    pub(crate) const fn port(&self) -> u16 {
+        self.port
+    }
+
+    pub(crate) fn token(&self) -> &str {
+        &self.token
+    }
+
+    pub(crate) async fn close(&mut self) -> Result<()> {
+        if !self.active {
+            return Ok(());
+        }
+        let removed = CoreManager::global()
+            .update_runtime_config_checked(|runtime| {
+                let config = runtime.config.as_mut().ok_or_else(|| anyhow!("C5-EXIT-004"))?;
+                remove_listener(config, &self.definition)?;
+                if runtime
+                    .transient_listeners
+                    .get(&self.name)
+                    .is_some_and(|current| current != &self.definition)
+                {
+                    return Err(anyhow!("C5-EXIT-004"));
+                }
+                runtime.transient_listeners.remove(&self.name);
+                Ok(())
+            })
+            .await;
+        if removed.as_ref().is_ok_and(|outcome| outcome.is_valid()) {
+            self.active = false;
+            Ok(())
+        } else {
+            Err(anyhow!("C5-EXIT-004"))
+        }
+    }
+}
+
+/// Probe through a temporary loopback inbound pinned to one chain, then remove only that inbound.
+pub(crate) async fn detect(proxy_name: &str, url: Url) -> Result<ExitObservation> {
+    let mut listener = ChainListener::new(proxy_name, "clash5-exit-probe")?;
+    let (send, receive) = oneshot::channel();
+    tokio::spawn(async move {
+        let observed = match listener.activate().await {
+            Ok(()) => request(url, listener.port(), listener.token())
+                .await
+                .map_err(|_| anyhow!("C5-EXIT-003")),
+            Err(error) => Err(error),
+        };
+        let result = if listener.active && listener.close().await.is_err() {
+            Err(anyhow!("C5-EXIT-004"))
+        } else {
+            observed
+        };
+        let _ = send.send(result);
+        while listener.active {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            let _ = listener.close().await;
+        }
+    });
+    receive.await.map_err(|_| anyhow!("C5-EXIT-004"))?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+    #[test]
+    fn probe_listener_requires_its_ephemeral_credentials() {
+        let value = probe_listener("probe", 12345, "chain", "ephemeral-secret");
+        assert_eq!(value["listen"], "127.0.0.1");
+        assert_eq!(value["users"][0]["username"], "clash5");
+        assert_eq!(value["users"][0]["password"], "ephemeral-secret");
+    }
+
+    #[test]
+    fn listener_lease_rejects_collisions_and_preserves_replacements() -> Result<()> {
+        let owned = probe_listener("session", 12345, "chain", "secret");
+        let other = probe_listener("other", 12346, "chain", "other-secret");
+        let mut config = Mapping::new();
+        insert_listener(&mut config, owned.clone())?;
+        insert_listener(&mut config, other.clone())?;
+        assert!(insert_listener(&mut config, owned.clone()).is_err());
+        remove_listener(&mut config, &owned)?;
+        remove_listener(&mut config, &owned)?;
+        assert_eq!(config["listeners"], Value::Sequence(vec![other.clone()]));
+
+        let replacement = probe_listener("session", 12345, "different-chain", "new-secret");
+        insert_listener(&mut config, replacement.clone())?;
+        assert!(remove_listener(&mut config, &owned).is_err());
+        assert_eq!(config["listeners"], Value::Sequence(vec![other, replacement]));
+
+        config.insert("listeners".into(), "invalid".into());
+        assert!(insert_listener(&mut config, owned.clone()).is_err());
+        assert!(remove_listener(&mut config, &owned).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn regenerated_config_keeps_owned_listener_and_rejects_a_collision() -> Result<()> {
+        let listener = probe_listener("session", 12345, "chain", "secret");
+        let mut active = BTreeMap::new();
+        active.insert("session".to_owned(), listener.clone());
+
+        let mut regenerated = Mapping::new();
+        apply_transient_listeners(&mut regenerated, &active)?;
+        assert_eq!(regenerated["listeners"], Value::Sequence(vec![listener]));
+
+        let conflicting = probe_listener("session", 12345, "other-chain", "other-secret");
+        let mut regenerated = Mapping::new();
+        regenerated.insert("listeners".into(), Value::Sequence(vec![conflicting.clone()]));
+        assert!(apply_transient_listeners(&mut regenerated, &active).is_err());
+        assert_eq!(regenerated["listeners"], Value::Sequence(vec![conflicting]));
+        Ok(())
+    }
+
+    #[test]
+    fn service_accepts_https_and_loopback_fixtures_without_url_credentials() {
+        assert!(service_url("https://api64.ipify.org").is_ok());
+        assert!(service_url("http://127.0.0.1:18080/ip").is_ok());
+        assert!(service_url("http://[::1]:18080/ip").is_ok());
+        for url in [
+            "http://example.com",
+            "https://user:secret@example.com",
+            "file:///secret",
+            "https://example.com/#secret",
+        ] {
+            assert!(service_url(url).is_err());
+        }
+    }
+
+    #[test]
+    fn responses_require_an_ip_address_and_do_not_return_server_error_text() {
+        assert_eq!(parse_ip(b"203.0.113.8\n").ok(), Some(IpAddr::from([203, 0, 113, 8])));
+        assert_eq!(parse_ip(br#"{"ip":"2001:db8::1"}"#).ok(), "2001:db8::1".parse().ok());
+        assert!(parse_ip(b"secret or upstream error").is_err());
+        assert!(parse_ip(br#"{"ip":"not-an-ip"}"#).is_err());
+    }
+
+    #[tokio::test]
+    async fn https_detection_uses_connect_through_the_pinned_local_proxy() -> Result<()> {
+        let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+        let port = listener.local_addr()?.port();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(5), listener.accept()).await??;
+            let mut bytes = [0_u8; 2_048];
+            let count = tokio::time::timeout(Duration::from_secs(5), socket.read(&mut bytes)).await??;
+            socket
+                .write_all(b"HTTP/1.1 502 Fixture termination\r\nContent-Length: 0\r\n\r\n")
+                .await?;
+            Ok::<_, anyhow::Error>(String::from_utf8_lossy(&bytes[..count]).into_owned())
+        });
+        let result = request(service_url("https://exit.example.invalid/ip")?, port, "test-secret").await;
+        let headers = server.await??;
+        assert!(headers.starts_with("CONNECT exit.example.invalid:443 HTTP/1.1"));
+        assert!(headers.to_lowercase().contains("proxy-authorization: basic "));
+        assert!(!headers.contains("test-secret"));
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn http_detection_reads_the_exit_ip_from_the_pinned_proxy_response() -> Result<()> {
+        let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+        let port = listener.local_addr()?.port();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(5), listener.accept()).await??;
+            let mut bytes = [0_u8; 2_048];
+            let count = tokio::time::timeout(Duration::from_secs(5), socket.read(&mut bytes)).await??;
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 12\r\nConnection: close\r\n\r\n203.0.113.27")
+                .await?;
+            Ok::<_, anyhow::Error>(String::from_utf8_lossy(&bytes[..count]).into_owned())
+        });
+        let result = request(service_url("http://127.0.0.1:1/ip")?, port, "test-secret").await?;
+        assert_eq!(result.ip, IpAddr::from([203, 0, 113, 27]));
+        assert!(server.await??.starts_with("GET http://127.0.0.1:1/ip HTTP/1.1"));
+        Ok(())
+    }
+}

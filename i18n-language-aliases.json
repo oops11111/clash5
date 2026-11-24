@@ -1,0 +1,16 @@
+{
+  "aliases": {
+    "ja": "jp",
+    "ja-jp": "jp",
+    "zh-chs": "zh",
+    "zh-cht": "zhtw",
+    "zh-cn": "zh",
+    "zh-hans": "zh",
+    "zh-hant": "zhtw",
+    "zh-hk": "zhtw",
+    "zh-mo": "zhtw",
+    "zh-my": "zh",
+    "zh-sg": "zh",
+    "zh-tw": "zhtw"
+  }
+}

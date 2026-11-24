@@ -1,4 +1,15 @@
 {
+  "apps": {
+    "title": "App routes",
+    "hint": "Choose where each program's traffic goes.",
+    "empty": "No app routes yet",
+    "direct": "Direct",
+    "reject": "Reject",
+    "target": "Route target",
+    "remove": "Remove",
+    "placeholder": "Program name, for example browser.exe",
+    "add": "Add route"
+  },
   "page": {
     "modes": {
       "rule": "Rule",
@@ -63,6 +74,8 @@
       },
       "actions": {
         "openProfiles": "Go to Profiles",
+        "addNode": "Add a node",
+        "openPlugins": "Open Plugins",
         "restartCore": "Restart Core",
         "openLogs": "Open Logs Folder"
       }

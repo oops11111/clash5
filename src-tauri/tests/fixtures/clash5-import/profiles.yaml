@@ -1,0 +1,15 @@
+current: fixture-remote
+items:
+  - uid: fixture-remote
+    type: remote
+    name: Fixture subscription
+    url: https://example.invalid/secret-token
+    file: demo.yaml
+  - uid: fixture-merge
+    type: merge
+    name: Unsupported merge profile
+  - uid: fixture-provider
+    type: remote
+    name: External provider profile
+    url: https://example.invalid/provider-token
+    file: external.yaml

@@ -1,24 +1,23 @@
 {
-  "version": "2.5.8",
+  "version": "2.5.9",
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "active": true,
-    "longDescription": "Clash Verge Rev",
+    "longDescription": "clash5",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
-      "icons/icon.ico",
-      "icons/Assets.car"
+      "icons/icon.ico"
     ],
     "resources": ["resources"],
-    "publisher": "Clash Verge Rev",
+    "publisher": "oops11111",
     "externalBin": ["sidecar/verge-mihomo", "sidecar/verge-mihomo-alpha"],
     "copyright": "GNU General Public License v3.0",
     "category": "DeveloperTool",
-    "shortDescription": "Clash Verge Rev",
-    "createUpdaterArtifacts": true
+    "shortDescription": "clash5",
+    "createUpdaterArtifacts": false
   },
   "build": {
     "beforeBuildCommand": "pnpm run web:build",
@@ -27,23 +26,21 @@
     "devUrl": "http://localhost:3000/",
     "removeUnusedCommands": true
   },
-  "productName": "Clash Verge",
-  "identifier": "io.github.clash-verge-rev.clash-verge-rev",
+  "productName": "clash5",
+  "identifier": "io.github.oops11111.clash5",
   "plugins": {
     "updater": {
+      "active": false,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyOEMyRjBCQkVGOUJEREYKUldUZnZmbStDeStNMHU5Mmo1N24xQXZwSVRYbXA2NUpzZE5oVzlqeS9Bc0t6RVV4MmtwVjBZaHgK",
-      "endpoints": [
-        "https://update.hwdns.net/https://github.com/clash-verge-rev/clash-verge-rev/releases/download/updater/update-proxy.json",
-        "https://gh-proxy.org/https://github.com/clash-verge-rev/clash-verge-rev/releases/download/updater/update-proxy.json",
-        "https://github.com/clash-verge-rev/clash-verge-rev/releases/download/updater/update.json"
-      ],
+      "endpoints": [],
+      "requireSignedVersion": true,
       "windows": {
         "installMode": "passive"
       }
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["clash", "clash-verge"]
+        "schemes": ["clash5"]
       }
     }
   },
@@ -53,11 +50,30 @@
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["**"],
+          "allow": ["$APPDATA/**", "$RESOURCE/**"],
           "requireLiteralLeadingDot": false
         }
       },
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "ipc: http://ipc.localhost",
+        "img-src": "'self' asset: http://asset.localhost data: blob: http: https:",
+        "font-src": "'self' asset: http://asset.localhost data:",
+        "style-src": "'self' 'unsafe-inline'",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "connect-src": "ipc: http://ipc.localhost ws://localhost:3000",
+        "img-src": "'self' asset: http://asset.localhost data: blob: http: https:",
+        "font-src": "'self' asset: http://asset.localhost data:",
+        "style-src": "'self' 'unsafe-inline'",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'"
+      }
     }
   }
 }

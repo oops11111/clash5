@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "Bahasa",
+          "followSystemLanguage": "Ikuti bahasa sistem",
+          "followSystemLanguageDescription": "Nonaktifkan untuk memilih bahasa antarmuka secara manual",
           "themeMode": "Mode Tema",
           "trayClickEvent": "Acara Klik Tray",
           "copyEnvType": "Salin Jenis Env",
@@ -178,6 +180,18 @@
           "misc": "Lain-lain",
           "hotkeySetting": "Pengaturan Pintasan"
         }
+      },
+      "performance": {
+        "title": "Performance preset",
+        "balanced": "Balanced",
+        "balancedDescription": "12 parallel checks, 10-minute reuse; current-node checks every 5 minutes when enabled",
+        "performance": "Performance",
+        "performanceDescription": "16 parallel checks, 5-minute reuse; current-node checks every 2 minutes when enabled",
+        "power_saving": "Power saving",
+        "power_savingDescription": "4 parallel checks, 20-minute reuse; current-node checks every 15 minutes when enabled",
+        "manualInterval": "When enabled, current-node checks use the advanced interval of {{minutes}} minutes",
+        "memoryProtectionActive": "Memory pressure protection is active. Probe work is temporarily reduced; your saved preset is unchanged.",
+        "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
         "title": "Pengaturan Lanjutan Verge",
@@ -411,6 +425,8 @@
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
         "autoCloseConnections": "Tutup Koneksi Otomatis",
+        "singboxPersistent": "Biarkan sing-box tetap berjalan",
+        "singboxDegraded": "sing-box dihentikan setelah beberapa kali gagal; lalu lintas kembali ke Mihomo.",
         "autoCheckUpdate": "Periksa Pembaruan Otomatis",
         "enableBuiltinEnhanced": "Aktifkan Peningkatan Bawaan",
         "proxyLayoutColumns": "Kolom Tata Letak Proksi",
@@ -422,6 +438,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "Hentikan koneksi yang sudah ada saat pemilihan grup proksi atau mode proksi berubah",
+        "singboxPersistent": "Biarkan proses pendamping berjalan saat relay tidak aktif",
         "enableBuiltinEnhanced": "Penanganan kompatibilitas untuk file konfigurasi",
         "autoDelayDetection": "Secara berkala menguji latensi node saat ini di latar belakang",
         "defaultLatencyTest": "Digunakan hanya untuk pengujian permintaan klien HTTP dan tidak akan mempengaruhi file konfigurasi"
@@ -670,11 +687,11 @@
         "coreAlreadyRunning": "Tidak dapat memulai inti: proses inti sudah berjalan. Tutup aplikasi terkait atau hentikan proses yang tersisa, lalu coba lagi. Jika masalah berlanjut, mulai ulang komputer."
       },
       "sysproxy": {
-        "privilegeRequired": "Tidak dapat mengatur proxy sistem: macOS menolak perubahan ini karena hak akses tidak mencukupi. Pasang layanan Clash Verge; jika Anda administrator, Anda juga dapat mematikan keharusan kata sandi administrator untuk pengaturan seluruh sistem di opsi lanjutan Pengaturan Sistem → Privasi & Keamanan.",
+        "privilegeRequired": "Tidak dapat mengatur proxy sistem: macOS menolak perubahan ini karena hak akses tidak mencukupi. Pasang layanan clash5; jika Anda administrator, Anda juga dapat mematikan keharusan kata sandi administrator untuk pengaturan seluruh sistem di opsi lanjutan Pengaturan Sistem → Privasi & Keamanan.",
         "directFallback": "Gagal mengatur proxy sistem; lalu lintas dikembalikan ke koneksi langsung.",
         "guardStopped": "Penjaga proxy sistem berhenti setelah gagal beberapa kali berturut-turut. Proxy sistem tidak lagi dipertahankan secara otomatis.",
-        "sidecarWhileServiceReady": "Proxy sistem tidak dapat diatur: layanan Clash Verge sudah siap, tetapi inti masih berjalan sebagai Sidecar. Mulai ulang inti untuk beralih ke mode layanan.",
-        "coreNotReady": "Proxy sistem tidak dapat diaktifkan karena inti tidak berjalan. Jalankan inti (atau pasang/perbaiki layanan Clash Verge) lalu coba lagi.",
+        "sidecarWhileServiceReady": "Proxy sistem tidak dapat diatur: layanan clash5 sudah siap, tetapi inti masih berjalan sebagai Sidecar. Mulai ulang inti untuk beralih ke mode layanan.",
+        "coreNotReady": "Proxy sistem tidak dapat diaktifkan karena inti tidak berjalan. Jalankan inti (atau pasang/perbaiki layanan clash5) lalu coba lagi.",
         "systemCallFailed": "Proxy sistem gagal ditulis karena panggilan sistem Windows gagal. Ini biasanya sementara, coba lagi."
       }
     },

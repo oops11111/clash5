@@ -6,6 +6,7 @@ import {
 import { Box, Button, IconButton, MenuItem } from '@mui/material'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router'
 
 import {
   BaseEmpty,
@@ -22,6 +23,7 @@ import { useLogData } from '@/hooks/use-log-data'
 
 const LogPage = () => {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [clashLog, setClashLog] = useClashLog()
   const enableLog = clashLog.enable
   const logState = clashLog.logFilter
@@ -99,6 +101,9 @@ const LogPage = () => {
       }}
       header={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Button size="small" onClick={() => navigate('/unlock')}>
+            {t('layout.components.navigation.diagnostics')}
+          </Button>
           <IconButton
             title={t(
               enableLog ? 'shared.actions.pause' : 'shared.actions.resume',

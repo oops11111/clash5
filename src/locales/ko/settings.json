@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "언어",
+          "followSystemLanguage": "시스템 언어 따르기",
+          "followSystemLanguageDescription": "끄면 인터페이스 언어를 직접 선택할 수 있습니다",
           "themeMode": "테마 모드",
           "trayClickEvent": "트레이 클릭 이벤트",
           "copyEnvType": "환경 유형 복사",
@@ -178,6 +180,18 @@
           "misc": "기타",
           "hotkeySetting": "단축키 설정"
         }
+      },
+      "performance": {
+        "title": "Performance preset",
+        "balanced": "Balanced",
+        "balancedDescription": "12 parallel checks, 10-minute reuse; current-node checks every 5 minutes when enabled",
+        "performance": "Performance",
+        "performanceDescription": "16 parallel checks, 5-minute reuse; current-node checks every 2 minutes when enabled",
+        "power_saving": "Power saving",
+        "power_savingDescription": "4 parallel checks, 20-minute reuse; current-node checks every 15 minutes when enabled",
+        "manualInterval": "When enabled, current-node checks use the advanced interval of {{minutes}} minutes",
+        "memoryProtectionActive": "Memory pressure protection is active. Probe work is temporarily reduced; your saved preset is unchanged.",
+        "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
         "title": "Verge 고급 설정",
@@ -411,6 +425,8 @@
         "appLogMaxSize": "앱 로그 최대 크기",
         "appLogMaxCount": "앱 로그 최대 개수",
         "autoCloseConnections": "연결 자동 종료",
+        "singboxPersistent": "sing-box 계속 실행",
+        "singboxDegraded": "sing-box가 여러 번 실패해 중지되었으며 트래픽은 Mihomo로 돌아갔습니다.",
         "autoCheckUpdate": "업데이트 자동 확인",
         "enableBuiltinEnhanced": "내장 향상 기능 사용",
         "proxyLayoutColumns": "프록시 레이아웃 열 수",
@@ -422,6 +438,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "프록시 그룹 선택 또는 프록시 모드 변경 시 기존 연결을 종료합니다",
+        "singboxPersistent": "릴레이가 유휴 상태여도 보조 프로세스를 계속 실행합니다",
         "enableBuiltinEnhanced": "구성 파일에 대한 호환성 처리를 수행합니다",
         "autoDelayDetection": "백그라운드에서 현재 노드의 지연을 주기적으로 검사합니다",
         "defaultLatencyTest": "HTTP 클라이언트 요청 테스트에만 사용되며 구성 파일에는 영향을 주지 않습니다"
@@ -670,11 +687,11 @@
         "coreAlreadyRunning": "코어를 시작할 수 없습니다. 이미 실행 중인 코어 프로세스가 있습니다. 관련 앱이나 남아 있는 프로세스를 종료한 뒤 다시 시도하세요. 문제가 계속되면 컴퓨터를 다시 시작하세요."
       },
       "sysproxy": {
-        "privilegeRequired": "시스템 프록시를 설정할 수 없습니다: 권한이 부족하여 macOS가 변경을 거부했습니다. Clash Verge 서비스를 설치하십시오. 관리자라면 시스템 설정 → 개인 정보 보호 및 보안의 고급 옵션에서, 시스템 전체 설정에 관리자 암호를 요구하는 설정을 끌 수도 있습니다.",
+        "privilegeRequired": "시스템 프록시를 설정할 수 없습니다: 권한이 부족하여 macOS가 변경을 거부했습니다. clash5 서비스를 설치하십시오. 관리자라면 시스템 설정 → 개인 정보 보호 및 보안의 고급 옵션에서, 시스템 전체 설정에 관리자 암호를 요구하는 설정을 끌 수도 있습니다.",
         "directFallback": "시스템 프록시 설정에 실패하여 직접 연결로 되돌렸습니다.",
         "guardStopped": "시스템 프록시 가드가 연속으로 실패하여 중지되었습니다. 시스템 프록시가 더 이상 자동으로 유지되지 않습니다.",
-        "sidecarWhileServiceReady": "시스템 프록시를 설정하지 못했습니다: Clash Verge 서비스는 준비되었지만 코어가 아직 Sidecar로 실행 중입니다. 코어를 재시작하면 서비스 모드로 전환됩니다.",
-        "coreNotReady": "코어가 실행 중이 아니어서 시스템 프록시를 켤 수 없습니다. 코어를 시작한 뒤(또는 Clash Verge 서비스를 설치/복구한 뒤) 다시 시도하세요.",
+        "sidecarWhileServiceReady": "시스템 프록시를 설정하지 못했습니다: clash5 서비스는 준비되었지만 코어가 아직 Sidecar로 실행 중입니다. 코어를 재시작하면 서비스 모드로 전환됩니다.",
+        "coreNotReady": "코어가 실행 중이 아니어서 시스템 프록시를 켤 수 없습니다. 코어를 시작한 뒤(또는 clash5 서비스를 설치/복구한 뒤) 다시 시도하세요.",
         "systemCallFailed": "Windows 시스템 호출이 실패하여 시스템 프록시를 기록하지 못했습니다. 대개 일시적인 문제이니 다시 시도하세요."
       }
     },

@@ -85,7 +85,10 @@
       "trafficUnavailable": "流量数据暂不可用",
       "operationFailed": "操作失败",
       "trafficStats": "流量统计错误",
-      "trafficStatsDescription": "流量统计组件发生错误，为防止崩溃已暂时停用。"
+      "trafficStatsDescription": "流量统计组件发生错误，为防止崩溃已暂时停用。",
+      "backendDisconnected": "Backend disconnected, reconnecting…",
+      "pageNotFound": "Page not found",
+      "pageNotFoundDescription": "The page you are looking for does not exist or has moved."
     },
     "notices": {
       "raw": "{{message}}",
@@ -134,6 +137,19 @@
       "info": "INFO",
       "warn": "WARN",
       "error": "ERROR"
+    }
+  },
+  "warnings": {
+    "lanProxyExposed": "局域网已开启：代理端口没有任何认证，局域网内所有设备都可以访问。"
+  },
+  "confirmations": {
+    "enableLan": {
+      "title": "把代理暴露到局域网？",
+      "message": "开启局域网后，局域网内所有设备都能访问代理端口，且代理端口没有任何认证，局域网内任何人都可以使用。开启前会先轮换控制器密钥。"
+    },
+    "lanController": {
+      "title": "把控制器暴露到局域网？",
+      "message": "该控制器地址可被局域网内其他设备访问，拿到密钥的局域网设备可以控制核心。保存前会先轮换密钥。"
     }
   }
 }

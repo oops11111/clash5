@@ -6,15 +6,29 @@ pub mod lightweight;
 pub mod listener;
 pub mod logger;
 pub mod manager;
+pub mod memory_mitigation;
 #[cfg(target_os = "macos")]
 pub mod network_watch;
 pub mod notify;
 pub(crate) mod owner_identity;
 pub mod proxy_control;
+pub(crate) mod proxy_lease;
+pub(crate) mod proxy_snapshot;
 pub mod proxy_view;
+pub(crate) mod restart_budget;
 pub mod runstate;
 pub(crate) mod runtime_bundle;
 pub mod service;
+pub mod singbox_binary;
+// These M4 components are exercised independently while the runtime entrypoint is being wired.
+#[allow(dead_code)]
+pub mod singbox_config;
+#[allow(dead_code)]
+pub mod singbox_process;
+#[allow(dead_code)]
+pub mod singbox_relay;
+#[allow(dead_code)]
+pub mod singbox_runtime;
 pub mod sysopt;
 pub mod timer;
 pub mod tray;

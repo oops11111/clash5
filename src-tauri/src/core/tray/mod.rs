@@ -130,8 +130,12 @@ impl TrayState {
         }
 
         #[cfg(not(target_os = "macos"))]
-        let _ = verge;
+        {
+            let _ = (verge, kind);
+            (false, Cow::Borrowed(include_bytes!("../../../icons/tray-icon.ico")))
+        }
 
+        #[cfg(target_os = "macos")]
         (
             false,
             match kind {
@@ -441,7 +445,7 @@ impl Tray {
         );
 
         let tooltip = format!(
-            "Clash Verge {}\n{}: {}\n{}: {}\n{}: {}",
+            "clash5 {}\n{}: {}\n{}: {}\n{}: {}",
             reassembled_version,
             sys_proxy_text,
             switch_str(system_proxy),

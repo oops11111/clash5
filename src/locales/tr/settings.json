@@ -168,6 +168,8 @@
         },
         "fields": {
           "language": "Dil",
+          "followSystemLanguage": "Sistem dilini kullan",
+          "followSystemLanguageDescription": "Arayüz dilini elle seçmek için kapatın",
           "themeMode": "Tema Modu",
           "trayClickEvent": "Sistem Tepsisi Tıklama Olayı",
           "copyEnvType": "Env Tipini Kopyala",
@@ -178,6 +180,18 @@
           "misc": "Çeşitli",
           "hotkeySetting": "Kısayol Tuşu Ayarı"
         }
+      },
+      "performance": {
+        "title": "Performance preset",
+        "balanced": "Balanced",
+        "balancedDescription": "12 parallel checks, 10-minute reuse; current-node checks every 5 minutes when enabled",
+        "performance": "Performance",
+        "performanceDescription": "16 parallel checks, 5-minute reuse; current-node checks every 2 minutes when enabled",
+        "power_saving": "Power saving",
+        "power_savingDescription": "4 parallel checks, 20-minute reuse; current-node checks every 15 minutes when enabled",
+        "manualInterval": "When enabled, current-node checks use the advanced interval of {{minutes}} minutes",
+        "memoryProtectionActive": "Memory pressure protection is active. Probe work is temporarily reduced; your saved preset is unchanged.",
+        "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
         "title": "Verge Gelişmiş Ayarı",
@@ -411,6 +425,8 @@
         "appLogMaxSize": "Uygulama Günlüğü En Büyük Boyutu",
         "appLogMaxCount": "Uygulama Günlüğü En Fazla Dosya Sayısı",
         "autoCloseConnections": "Bağlantıları Otomatik Kapat",
+        "singboxPersistent": "sing-box çalışmaya devam etsin",
+        "singboxDegraded": "sing-box art arda başarısız olduktan sonra durduruldu; trafik Mihomo'ya döndü.",
         "autoCheckUpdate": "Otomatik Güncelleme Kontrolü",
         "enableBuiltinEnhanced": "Yerleşik Geliştirilmiş Modu Etkinleştir",
         "proxyLayoutColumns": "Vekil Düzeni Sütunları",
@@ -422,6 +438,7 @@
       },
       "tooltips": {
         "autoCloseConnections": "Vekil grup seçimi veya vekil modu değiştiğinde kurulan bağlantıları sonlandır",
+        "singboxPersistent": "Aktarma boşta olsa da yardımcı süreci çalışır durumda tut",
         "enableBuiltinEnhanced": "Yapılandırma dosyası için uyumluluk işleme",
         "autoDelayDetection": "Arka planda mevcut düğümün gecikmesini periyodik olarak test eder",
         "defaultLatencyTest": "Yalnızca HTTP istemci isteği testi için kullanılır ve yapılandırma dosyasında bir fark yaratmaz"
@@ -670,11 +687,11 @@
         "coreAlreadyRunning": "Çekirdek başlatılamıyor: bir çekirdek işlemi zaten çalışıyor. İlgili uygulamayı kapatın veya kalan işlemi sonlandırıp yeniden deneyin. Sorun devam ederse bilgisayarı yeniden başlatın."
       },
       "sysproxy": {
-        "privilegeRequired": "Sistem vekil sunucusu ayarlanamıyor: macOS yetki yetersizliği nedeniyle değişikliği reddetti. Clash Verge hizmetini kurun; yöneticiyseniz Sistem Ayarları → Gizlilik ve Güvenlik bölümündeki gelişmiş seçeneklerden, sistem genelindeki ayarlar için yönetici parolası zorunluluğunu da kapatabilirsiniz.",
+        "privilegeRequired": "Sistem vekil sunucusu ayarlanamıyor: macOS yetki yetersizliği nedeniyle değişikliği reddetti. clash5 hizmetini kurun; yöneticiyseniz Sistem Ayarları → Gizlilik ve Güvenlik bölümündeki gelişmiş seçeneklerden, sistem genelindeki ayarlar için yönetici parolası zorunluluğunu da kapatabilirsiniz.",
         "directFallback": "Sistem vekil sunucusu ayarlanamadı; trafik doğrudan bağlantıya geri döndürüldü.",
         "guardStopped": "Sistem vekil sunucusu koruması art arda birkaç başarısızlıktan sonra durdu. Sistem vekil sunucusu artık otomatik olarak korunmuyor.",
-        "sidecarWhileServiceReady": "Sistem vekil sunucusu ayarlanamadı: Clash Verge hizmeti hazır ancak çekirdek hâlâ Sidecar olarak çalışıyor. Hizmet moduna geçmek için çekirdeği yeniden başlatın.",
-        "coreNotReady": "Çekirdek çalışmadığı için sistem vekil sunucusu etkinleştirilemedi. Çekirdeği başlatın (veya Clash Verge hizmetini kurun/onarın) ve yeniden deneyin.",
+        "sidecarWhileServiceReady": "Sistem vekil sunucusu ayarlanamadı: clash5 hizmeti hazır ancak çekirdek hâlâ Sidecar olarak çalışıyor. Hizmet moduna geçmek için çekirdeği yeniden başlatın.",
+        "coreNotReady": "Çekirdek çalışmadığı için sistem vekil sunucusu etkinleştirilemedi. Çekirdeği başlatın (veya clash5 hizmetini kurun/onarın) ve yeniden deneyin.",
         "systemCallFailed": "Bir Windows sistem çağrısı başarısız olduğu için sistem vekil sunucusu yazılamadı. Bu genellikle geçicidir, yeniden deneyin."
       }
     },

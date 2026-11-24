@@ -9,9 +9,9 @@ use clash_verge_logging::logging;
 use clash_verge_logging::{Type, logging_error};
 
 const DARK_BACKGROUND_COLOR: Color = Color(46, 48, 61, 255); // #2E303D
-const LIGHT_BACKGROUND_COLOR: Color = Color(245, 245, 245, 255); // #F5F5F5
+const LIGHT_BACKGROUND_COLOR: Color = Color(240, 244, 250, 255); // #F0F4FA
 const DARK_BACKGROUND_HEX: &str = "#2E303D";
-const LIGHT_BACKGROUND_HEX: &str = "#F5F5F5";
+const LIGHT_BACKGROUND_HEX: &str = "#F0F4FA";
 
 const DEFAULT_WIDTH: f64 = 940.0;
 const DEFAULT_HEIGHT: f64 = 700.0;
@@ -81,7 +81,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title("Clash Verge")
+    .title("clash5")
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)

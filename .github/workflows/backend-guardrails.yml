@@ -24,3 +24,8 @@ jobs:
 
       - name: No manual update-flag chains
         run: '! grep -rnE "determine_update_flags|UpdateFlags" src-tauri/src'
+
+      - name: Guard WebView policy and filesystem scopes
+        run: |
+          jq -e '.app.security.csp != null and .app.security.csp["worker-src"] != null and ([.app.security.assetProtocol.scope.allow[]?] | length > 0) and all(.app.security.assetProtocol.scope.allow[]?; . != "**")' src-tauri/tauri.conf.json
+          jq -e '[.permissions[]? | select(type == "object" and .identifier == "fs:scope") | .allow[]? | select(. == "**")] | length == 0' src-tauri/capabilities/migrated.json

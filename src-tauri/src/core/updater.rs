@@ -9,8 +9,13 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Duration,
 };
+#[cfg(test)]
+use tauri_plugin_updater::{ReleaseManifestPlatform, RemoteRelease, RemoteReleaseInner};
 use tauri_plugin_updater::{Update, UpdaterExt as _};
 use tokio_util::sync::CancellationToken;
+
+/// The first clash5 release is updated only through its installer.
+pub const FIRST_RELEASE_UPDATER_ENABLED: bool = false;
 
 pub struct SilentUpdater {
     update_ready: AtomicBool,
@@ -174,6 +179,43 @@ pub fn is_build_to_stable(current: &str, remote: &str) -> bool {
     !build.is_empty() && !base.contains('-') && base == remote.trim_start_matches('v')
 }
 
+/// The updater accepts only signed stable artifacts owned by this repository.
+#[cfg(test)]
+pub fn is_official_stable_release(release: &RemoteRelease) -> bool {
+    if !release.version.pre.is_empty() || !release.version.build.is_empty() {
+        return false;
+    }
+
+    let expected_version = release.version.to_string();
+    let expected_tag = format!("v{expected_version}");
+    let valid_platform = |platform: &tauri_plugin_updater::ReleaseManifestPlatform| {
+        let url = &platform.url;
+        if platform.signature.is_empty()
+            || url.scheme() != "https"
+            || url.host_str() != Some("github.com")
+            || url.port().is_some()
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.query().is_some()
+            || url.fragment().is_some()
+        {
+            return false;
+        }
+        let Some(parts) = url.path_segments() else {
+            return false;
+        };
+        let parts: Vec<_> = parts.collect();
+        matches!(parts.as_slice(), ["oops11111", "clash5", "releases", "download", tag, asset]
+            if *tag == expected_tag.as_str() && asset.contains(expected_version.as_str())
+                && (asset.starts_with("clash5_") || asset.starts_with("clash5-")))
+    };
+
+    match &release.data {
+        RemoteReleaseInner::Dynamic(platform) => valid_platform(platform),
+        RemoteReleaseInner::Static { platforms } => !platforms.is_empty() && platforms.values().all(valid_platform),
+    }
+}
+
 /// Compares numeric version components after stripping version suffixes.
 fn version_lte(a: &str, b: &str) -> bool {
     let parse = |v: &str| -> Vec<u64> {
@@ -214,15 +256,17 @@ fn nsis_language_id(app_language: &str) -> &'static str {
 }
 
 /// Same wire shape as the updater plugin's JS `DownloadEvent`.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, specta::Type)]
 #[serde(tag = "event", content = "data")]
 pub enum DownloadEvent {
     #[serde(rename_all = "camelCase")]
     Started {
+        #[specta(type = Option<specta_typescript::Number>)]
         content_length: Option<u64>,
     },
     #[serde(rename_all = "camelCase")]
     Progress {
+        #[specta(type = specta_typescript::Number)]
         chunk_length: usize,
     },
     Finished,
@@ -330,7 +374,7 @@ impl SilentUpdater {
 
     /// Installs a newer cached update before normal startup, if the user confirms.
     pub async fn try_install_on_startup(&self, app_handle: &tauri::AppHandle) -> bool {
-        if !Config::verge().await.latest_arc().auto_check_update.unwrap_or(true) {
+        if !FIRST_RELEASE_UPDATER_ENABLED || !Config::verge().await.latest_arc().auto_check_update.unwrap_or(false) {
             Self::delete_cache();
             return false;
         }
@@ -431,6 +475,10 @@ impl SilentUpdater {
         version: &str,
         on_event: impl Fn(DownloadEvent) + Sync,
     ) -> Result<bool> {
+        anyhow::ensure!(
+            FIRST_RELEASE_UPDATER_ENABLED,
+            "in-app updates are disabled for the first release"
+        );
         let cancel = CancellationToken::new();
         *self.manual_cancel.lock() = Some(cancel.clone());
         let prepared = tokio::select! {
@@ -516,7 +564,7 @@ impl SilentUpdater {
         use tauri::{WebviewUrl, WebviewWindowBuilder};
 
         let window = match WebviewWindowBuilder::new(app_handle, "update-splash", WebviewUrl::App("index.html".into()))
-            .title("Clash Verge - Updating")
+            .title("clash5 - Updating")
             .inner_size(300.0, 180.0)
             .resizable(false)
             .maximizable(false)
@@ -597,7 +645,8 @@ impl SilentUpdater {
         // Registered before reading the switch, so `discard_pending` either cancels it or ran first.
         let cancel = CancellationToken::new();
         *self.background_cancel.lock() = Some(cancel.clone());
-        let auto_check = Config::verge().await.latest_arc().auto_check_update.unwrap_or(true);
+        let auto_check =
+            FIRST_RELEASE_UPDATER_ENABLED && Config::verge().await.latest_arc().auto_check_update.unwrap_or(false);
         if !auto_check {
             logging!(debug, Type::System, "Silent update skipped: auto_check_update is false");
             return Ok(());
@@ -660,7 +709,10 @@ impl SilentUpdater {
 
         // Serialized with `discard_pending` in the verge patch, which holds the same lock.
         let _config_write = Config::lock_config_write().await;
-        if cancel.is_cancelled() || !Config::verge().await.latest_arc().auto_check_update.unwrap_or(true) {
+        if cancel.is_cancelled()
+            || !FIRST_RELEASE_UPDATER_ENABLED
+            || !Config::verge().await.latest_arc().auto_check_update.unwrap_or(false)
+        {
             logging!(
                 info,
                 Type::System,
@@ -693,5 +745,84 @@ impl SilentUpdater {
 
             tokio::time::sleep(std::time::Duration::from_secs(24 * 60 * 60)).await;
         }
+    }
+}
+
+#[cfg(test)]
+mod release_source_tests {
+    use super::*;
+
+    fn candidate(version: &str, url: &str) -> Result<RemoteRelease, Box<dyn std::error::Error>> {
+        Ok(RemoteRelease {
+            version: version.parse()?,
+            notes: None,
+            pub_date: None,
+            data: RemoteReleaseInner::Dynamic(ReleaseManifestPlatform {
+                url: url.parse()?,
+                signature: "signed-bundle".to_string(),
+            }),
+        })
+    }
+
+    #[test]
+    fn stable_updates_accept_only_clash5_release_assets() -> Result<(), Box<dyn std::error::Error>> {
+        let valid = candidate(
+            "2.5.10",
+            "https://github.com/oops11111/clash5/releases/download/v2.5.10/clash5_2.5.10_x64-setup.exe",
+        )?;
+        assert!(is_official_stable_release(&valid));
+
+        for (version, url) in [
+            (
+                "2.5.10-rc.1",
+                "https://github.com/oops11111/clash5/releases/download/v2.5.10-rc.1/clash5_2.5.10_x64-setup.exe",
+            ),
+            (
+                "2.5.10",
+                "https://github.com/clash-verge-rev/clash-verge-rev/releases/download/v2.5.10/clash5_2.5.10_x64-setup.exe",
+            ),
+            (
+                "2.5.10",
+                "https://github.com/oops11111/clash5/releases/download/v2.5.9/clash5_2.5.10_x64-setup.exe",
+            ),
+            (
+                "2.5.10",
+                "https://github.com/oops11111/clash5/releases/download/v2.5.10/clash5_2.5.9_x64-setup.exe",
+            ),
+            (
+                "2.5.10",
+                "https://github.com/oops11111/clash5/releases/download/v2.5.10/Clash.Verge_2.5.10_x64-setup.exe",
+            ),
+            (
+                "2.5.10",
+                "https://update.hwdns.net/https://github.com/oops11111/clash5/releases/download/v2.5.10/clash5_2.5.10_x64-setup.exe",
+            ),
+        ] {
+            assert!(!is_official_stable_release(&candidate(version, url)?), "{url}");
+        }
+
+        let mut missing_signature = valid.clone();
+        if let RemoteReleaseInner::Dynamic(platform) = &mut missing_signature.data {
+            platform.signature.clear();
+        }
+        assert!(!is_official_stable_release(&missing_signature));
+
+        let mut mixed = valid.clone();
+        let RemoteReleaseInner::Dynamic(valid_platform) = &valid.data else {
+            unreachable!()
+        };
+        let mut platforms = std::collections::HashMap::new();
+        platforms.insert("windows-x86_64".to_string(), valid_platform.clone());
+        platforms.insert(
+            "darwin-aarch64".to_string(),
+            ReleaseManifestPlatform {
+                url: "https://github.com/other/repo/releases/download/v2.5.10/clash5_2.5.10_aarch64.app.tar.gz"
+                    .parse()?,
+                signature: "signed-bundle".to_string(),
+            },
+        );
+        mixed.data = RemoteReleaseInner::Static { platforms };
+        assert!(!is_official_stable_release(&mixed));
+        Ok(())
     }
 }

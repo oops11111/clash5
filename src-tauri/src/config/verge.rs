@@ -10,27 +10,64 @@ use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, specta::Type, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PerformancePreset {
+    #[default]
+    Balanced,
+    Performance,
+    PowerSaving,
+}
+
+impl PerformancePreset {
+    pub const fn probe_concurrency(self) -> usize {
+        match self {
+            Self::Balanced => 10,
+            Self::Performance => 16,
+            Self::PowerSaving => 4,
+        }
+    }
+
+    pub const fn probe_interval_ms(self) -> u64 {
+        match self {
+            Self::Balanced => 600_000,
+            Self::Performance => 300_000,
+            Self::PowerSaving => 1_200_000,
+        }
+    }
+}
+
 /// ### `verge.yaml` schema
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(default)]
 pub struct IVerge {
     /// silent | error | warn | info | debug | trace
+    #[specta(type = Option<std::string::String>)]
     pub app_log_level: Option<String>,
 
     /// Maximum app log size in KiB.
+    #[specta(type = Option<specta_typescript::Number>)]
     pub app_log_max_size: Option<u64>,
 
+    #[specta(type = Option<specta_typescript::Number>)]
     pub app_log_max_count: Option<usize>,
 
+    #[specta(type = Option<std::string::String>)]
     pub language: Option<String>,
 
     /// `light` or `dark` or `system`
+    #[specta(type = Option<std::string::String>)]
     pub theme_mode: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub tray_event: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub env_type: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub start_page: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub startup_script: Option<String>,
 
     pub traffic_graph: Option<bool>,
@@ -46,20 +83,24 @@ pub struct IVerge {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub common_tray_icon: Option<bool>,
 
-    #[cfg(target_os = "macos")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub tray_icon: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub menu_icon: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<Vec<std::string::String>>)]
     pub menu_order: Option<Vec<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub proxy_group_tools_position: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub notice_position: Option<String>,
 
     pub collapse_navbar: Option<bool>,
@@ -84,39 +125,61 @@ pub struct IVerge {
     pub enable_dns_settings: Option<bool>,
 
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    #[specta(type = std::collections::BTreeMap<std::string::String, super::dns::ProfileDnsSettings>)]
     pub profile_dns_settings: std::collections::BTreeMap<String, super::dns::ProfileDnsSettings>,
 
     pub use_default_bypass: Option<bool>,
 
+    #[specta(type = Option<std::string::String>)]
     pub system_proxy_bypass: Option<String>,
 
+    #[specta(type = Option<specta_typescript::Number>)]
     pub proxy_guard_duration: Option<u64>,
 
     pub proxy_auto_config: Option<bool>,
 
+    #[specta(type = Option<std::string::String>)]
     pub pac_file_content: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub proxy_host: Option<String>,
 
     pub theme_setting: Option<IVergeTheme>,
 
+    #[specta(type = Option<Vec<std::string::String>>)]
     pub web_ui_list: Option<Vec<String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub clash_core: Option<String>,
 
     /// format: {func},{key}
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<Vec<std::string::String>>)]
     pub hotkeys: Option<Vec<String>>,
 
     pub enable_global_hotkey: Option<bool>,
 
+    #[specta(type = Option<specta_typescript::Unknown>)]
     pub home_cards: Option<serde_json::Value>,
+
+    /// Typed per-app proxy settings: maps a process identity to a chain id.
+    /// Stored separately from `home_cards` (which is untyped JSON) to keep
+    /// the per-app mapping validated and queryable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub per_app_proxy: Option<PerAppProxySettings>,
 
     pub auto_close_connection: Option<bool>,
 
+    /// Keep the sing-box sidecar alive after its relay becomes idle.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub singbox_persistent: Option<bool>,
+
     pub auto_check_update: Option<bool>,
 
+    pub performance_preset: Option<PerformancePreset>,
+
+    #[specta(type = Option<std::string::String>)]
     pub default_latency_test: Option<String>,
 
     pub default_latency_timeout: Option<i16>,
@@ -124,6 +187,7 @@ pub struct IVerge {
     pub enable_auto_delay_detection: Option<bool>,
 
     /// 自动检测当前节点延迟的间隔（分钟）
+    #[specta(type = Option<specta_typescript::Number>)]
     pub auto_delay_detection_interval_minutes: Option<u64>,
 
     pub enable_builtin_enhanced: Option<bool>,
@@ -138,21 +202,22 @@ pub struct IVerge {
     pub enable_auto_backup_schedule: Option<bool>,
 
     /// Automatic backup interval in hours
+    #[specta(type = Option<specta_typescript::Number>)]
     pub auto_backup_interval_hours: Option<u64>,
 
     pub auto_backup_on_change: Option<bool>,
 
     /// verge 的各种 port 用于覆盖 clash 的各种 port
-    #[cfg(not(target_os = "windows"))]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_redir_port: Option<u16>,
 
-    #[cfg(not(target_os = "windows"))]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_redir_enabled: Option<bool>,
 
-    #[cfg(target_os = "linux")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_tproxy_port: Option<u16>,
 
-    #[cfg(target_os = "linux")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verge_tproxy_enabled: Option<bool>,
 
     pub verge_mixed_port: Option<u16>,
@@ -171,6 +236,7 @@ pub struct IVerge {
         skip_serializing_if = "Option::is_none",
         default
     )]
+    #[specta(type = Option<std::string::String>)]
     pub webdav_url: Option<String>,
 
     #[serde(
@@ -179,6 +245,7 @@ pub struct IVerge {
         skip_serializing_if = "Option::is_none",
         default
     )]
+    #[specta(type = Option<std::string::String>)]
     pub webdav_username: Option<String>,
 
     #[serde(
@@ -187,49 +254,69 @@ pub struct IVerge {
         skip_serializing_if = "Option::is_none",
         default
     )]
+    #[specta(type = Option<std::string::String>)]
     pub webdav_password: Option<String>,
 
-    #[cfg(target_os = "macos")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_tray_speed: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(type = Option<std::string::String>)]
     pub tray_proxy_groups_display_mode: Option<String>,
     pub tray_inline_outbound_modes: Option<bool>,
 
     pub enable_auto_light_weight_mode: Option<bool>,
 
     /// 自动进入轻量模式的延迟（分钟）
+    #[specta(type = Option<specta_typescript::Number>)]
     pub auto_light_weight_minutes: Option<u64>,
 
     pub enable_hover_jump_navigator: Option<bool>,
 
     /// 代理页面自动滚动延迟（毫秒）
+    #[specta(type = Option<specta_typescript::Number>)]
     pub hover_jump_navigator_delay: Option<u64>,
 
     pub enable_external_controller: Option<bool>,
 }
 
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(default)]
 pub struct IVergeTestItem {
+    #[specta(type = Option<std::string::String>)]
     pub uid: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub name: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub icon: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub url: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
+#[serde(default)]
 pub struct IVergeTheme {
+    #[specta(type = Option<std::string::String>)]
     pub primary_color: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub secondary_color: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub primary_text: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub secondary_text: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub info_color: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub error_color: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub warning_color: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub success_color: Option<String>,
 
+    #[specta(type = Option<std::string::String>)]
     pub font_family: Option<String>,
+    #[specta(type = Option<std::string::String>)]
     pub css_injection: Option<String>,
 }
 
@@ -269,7 +356,7 @@ impl IVerge {
 
         if needs_fix {
             logging!(debug, Type::Config, "正在保存修正后的配置文件...");
-            help::save_yaml(&config_path, &config, Some("# Clash Verge Config")).await?;
+            help::save_yaml(&config_path, &config, Some("# clash5 Config")).await?;
             logging!(info, Type::Config, "配置文件修正完成，需要重新加载配置");
 
             Self::reload_config_after_fix(config).await;
@@ -327,7 +414,7 @@ impl IVerge {
             app_log_max_size: Some(128),
             app_log_max_count: Some(8),
             clash_core: Some("verge-mihomo".into()),
-            language: Some(clash_verge_i18n::system_language().into()),
+            language: Some("system".into()),
             theme_mode: Some("system".into()),
             #[cfg(not(target_os = "windows"))]
             env_type: Some("bash".into()),
@@ -338,8 +425,7 @@ impl IVerge {
             enable_memory_usage: Some(true),
             enable_group_icon: Some(true),
             pause_render_traffic_stats_on_blur: Some(true),
-            #[cfg(target_os = "macos")]
-            tray_icon: Some("monochrome".into()),
+            tray_icon: cfg!(target_os = "macos").then(|| "monochrome".into()),
             menu_icon: Some("monochrome".into()),
             notice_position: Some("top-right".into()),
             collapse_navbar: Some(false),
@@ -354,14 +440,10 @@ impl IVerge {
             proxy_auto_config: Some(false),
             pac_file_content: Some(DEFAULT_PAC.into()),
             proxy_host: Some("127.0.0.1".into()),
-            #[cfg(not(target_os = "windows"))]
-            verge_redir_port: Some(7895),
-            #[cfg(not(target_os = "windows"))]
-            verge_redir_enabled: Some(false),
-            #[cfg(target_os = "linux")]
-            verge_tproxy_port: Some(7896),
-            #[cfg(target_os = "linux")]
-            verge_tproxy_enabled: Some(false),
+            verge_redir_port: (!cfg!(target_os = "windows")).then_some(7895),
+            verge_redir_enabled: (!cfg!(target_os = "windows")).then_some(false),
+            verge_tproxy_port: cfg!(target_os = "linux").then_some(7896),
+            verge_tproxy_enabled: cfg!(target_os = "linux").then_some(false),
             verge_mixed_port: Some(network::ports::DEFAULT_MIXED),
             verge_socks_port: Some(7898),
             verge_socks_enabled: Some(false),
@@ -372,7 +454,9 @@ impl IVerge {
             use_default_bypass: Some(true),
             proxy_guard_duration: Some(30),
             auto_close_connection: Some(true),
-            auto_check_update: Some(true),
+            singbox_persistent: Some(false),
+            auto_check_update: Some(false),
+            performance_preset: Some(PerformancePreset::Balanced),
             enable_builtin_enhanced: Some(true),
             auto_log_clean: Some(2), // 1: 1天, 2: 7天, 3: 30天, 4: 90天
             enable_auto_backup_schedule: Some(false),
@@ -381,8 +465,7 @@ impl IVerge {
             webdav_url: None,
             webdav_username: None,
             webdav_password: None,
-            #[cfg(target_os = "macos")]
-            enable_tray_speed: Some(false),
+            enable_tray_speed: cfg!(target_os = "macos").then_some(false),
             tray_proxy_groups_display_mode: Some("default".into()),
             tray_inline_outbound_modes: Some(false),
             enable_global_hotkey: Some(true),
@@ -390,13 +473,14 @@ impl IVerge {
             auto_light_weight_minutes: Some(10),
             enable_dns_settings: Some(false),
             home_cards: None,
+            per_app_proxy: None,
             enable_external_controller: Some(false),
             ..Self::default()
         }
     }
 
     pub async fn save_file(&self) -> Result<()> {
-        help::save_yaml(&dirs::verge_path()?, &self, Some("# Clash Verge Config")).await
+        help::save_yaml(&dirs::verge_path()?, &self, Some("# clash5 Config")).await
     }
 
     #[allow(clippy::cognitive_complexity)]
@@ -468,7 +552,9 @@ impl IVerge {
         patch!(enable_global_hotkey);
 
         patch!(auto_close_connection);
+        patch!(singbox_persistent);
         patch!(auto_check_update);
+        patch!(performance_preset);
         patch!(default_latency_test);
         patch!(default_latency_timeout);
         patch!(enable_auto_delay_detection);
@@ -492,6 +578,7 @@ impl IVerge {
         patch!(auto_light_weight_minutes);
         patch!(enable_dns_settings);
         patch!(home_cards);
+        patch!(per_app_proxy);
         patch!(enable_external_controller);
     }
 
@@ -509,5 +596,140 @@ impl IVerge {
         } else {
             LevelFilter::Info
         }
+    }
+}
+
+/// A single per-app proxy mapping: a process identity to a chain.
+#[derive(Clone, Debug, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PerAppProxyMapping {
+    /// Process executable name (e.g. "chrome.exe").
+    #[specta(type = std::string::String)]
+    pub process_name: String,
+    /// Full canonical path, used to disambiguate same-name processes.
+    #[serde(default)]
+    #[specta(type = std::string::String)]
+    pub process_path: String,
+    /// Chain identifier from `chains::definitions()`.
+    #[specta(type = std::string::String)]
+    pub chain_id: String,
+    /// Whether this mapping is currently enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Sort order within the per-app proxy list.
+    #[serde(default)]
+    pub order: u32,
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+/// Typed per-app proxy configuration, stored in `verge.yaml` under
+/// `per_app_proxy`. Replaces the untyped `home_cards` JSON blob for this
+/// feature so the mapping is validated at the config layer.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PerAppProxySettings {
+    #[serde(default)]
+    pub mappings: Vec<PerAppProxyMapping>,
+}
+
+#[cfg(test)]
+mod performance_preset_tests {
+    use super::*;
+
+    #[test]
+    fn preset_persists_in_verge_config() -> Result<(), serde_yaml_ng::Error> {
+        let mut config = IVerge::template();
+        assert_eq!(config.performance_preset, Some(PerformancePreset::Balanced));
+        config.patch_config(&IVerge {
+            performance_preset: Some(PerformancePreset::PowerSaving),
+            ..IVerge::default()
+        });
+        let yaml = serde_yaml_ng::to_string(&config)?;
+        let restored: IVerge = serde_yaml_ng::from_str(&yaml)?;
+        assert_eq!(restored.performance_preset, Some(PerformancePreset::PowerSaving));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, reason = "tests assert by panicking")]
+mod per_app_proxy_tests {
+    use super::*;
+
+    fn mapping(process: &str, path: &str, chain: &str) -> PerAppProxyMapping {
+        PerAppProxyMapping {
+            process_name: process.into(),
+            process_path: path.into(),
+            chain_id: chain.into(),
+            enabled: true,
+            order: 0,
+        }
+    }
+
+    #[test]
+    fn mappings_survive_a_verge_yaml_round_trip() -> Result<(), serde_yaml_ng::Error> {
+        let mut config = IVerge::template();
+        config.patch_config(&IVerge {
+            per_app_proxy: Some(PerAppProxySettings {
+                mappings: vec![
+                    mapping("chrome.exe", r"C:\Program Files\Google\Chrome\chrome.exe", "chain-a"),
+                    mapping("code.exe", r"C:\Apps\Code\code.exe", "chain-b"),
+                ],
+            }),
+            ..IVerge::default()
+        });
+
+        let yaml = serde_yaml_ng::to_string(&config)?;
+        let restored: IVerge = serde_yaml_ng::from_str(&yaml)?;
+        let restored = restored.per_app_proxy.expect("per_app_proxy persisted");
+        assert_eq!(restored.mappings.len(), 2);
+        assert_eq!(restored.mappings[0].process_name, "chrome.exe");
+        assert_eq!(restored.mappings[0].chain_id, "chain-a");
+        assert_eq!(restored.mappings[1].order, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_patch_without_per_app_proxy_keeps_the_existing_mappings() {
+        let mut config = IVerge::template();
+        config.patch_config(&IVerge {
+            per_app_proxy: Some(PerAppProxySettings {
+                mappings: vec![mapping("chrome.exe", "", "chain-a")],
+            }),
+            ..IVerge::default()
+        });
+
+        // An unrelated patch must not clear the stored mapping.
+        config.patch_config(&IVerge {
+            language: Some("en".into()),
+            ..IVerge::default()
+        });
+
+        let kept = config.per_app_proxy.expect("mapping kept");
+        assert_eq!(kept.mappings.len(), 1);
+        assert_eq!(kept.mappings[0].chain_id, "chain-a");
+    }
+
+    #[test]
+    fn defaults_fill_in_when_older_configs_omit_optional_fields() -> Result<(), serde_yaml_ng::Error> {
+        // A mapping written by an earlier build may only carry name + chain.
+        let yaml = "per_app_proxy:\n  mappings:\n    - processName: chrome.exe\n      chainId: chain-a\n";
+        let restored: IVerge = serde_yaml_ng::from_str(yaml)?;
+        let settings = restored.per_app_proxy.expect("settings parsed");
+        assert_eq!(settings.mappings.len(), 1);
+        assert_eq!(settings.mappings[0].process_path, "");
+        assert!(settings.mappings[0].enabled, "enabled defaults to true");
+        assert_eq!(settings.mappings[0].order, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn an_empty_section_parses_as_no_mappings() -> Result<(), serde_yaml_ng::Error> {
+        let restored: IVerge = serde_yaml_ng::from_str("per_app_proxy: {}\n")?;
+        assert!(restored.per_app_proxy.expect("settings parsed").mappings.is_empty());
+        Ok(())
     }
 }

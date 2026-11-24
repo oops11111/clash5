@@ -14,13 +14,14 @@ pub async fn patch_clash(patch: &Mapping) -> Result<()> {
     .await
 }
 
-/// Apply a patch, then reconcile TUN when its setting changes.
-///
-/// TUN patches do not always produce a Run State transition, so reconciliation is explicit.
+/// Apply a patch to the user's requested settings.
 pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
     apply_verge_patch(patch, not_save_file).await?;
-    if patch.enable_tun_mode.is_some() {
-        super::reconcile_tun_availability().await;
+    #[cfg(windows)]
+    if patch.enable_tun_mode == Some(true) {
+        crate::core::manager::CoreManager::global()
+            .reconcile_tun_handoff()
+            .await;
     }
     Ok(())
 }
