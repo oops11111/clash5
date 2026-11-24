@@ -41,6 +41,23 @@
           "invalidRule": "Invalid Rule"
         }
       },
+      "paste": {
+        "title": "Paste Rules",
+        "placeholder": "DOMAIN-SUFFIX,example.com,DIRECT\nIP-CIDR,127.0.0.0/8,DIRECT,no-resolve",
+        "targetPrepend": "Prepend",
+        "targetAppend": "Append",
+        "addRules": "Add Pasted Rules",
+        "added": "{{added}} rules added, {{skipped}} duplicates skipped",
+        "errors": {
+          "line": "Line {{line}}: {{message}}",
+          "unknownType": "Unknown rule type",
+          "missingCondition": "Rule condition required",
+          "invalidCondition": "Invalid rule condition",
+          "missingPolicy": "Rule policy required",
+          "unknownPolicy": "Unknown proxy policy",
+          "unsupportedNoResolve": "This rule type does not support no-resolve"
+        }
+      },
       "ruleTypes": {
         "DOMAIN": "Match full domain (DOMAIN)",
         "DOMAIN-SUFFIX": "Match domain suffix (DOMAIN-SUFFIX)",

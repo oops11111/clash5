@@ -907,6 +907,23 @@ export interface TranslationResources {
               invalidRule: string
             }
           }
+          paste: {
+            added: string
+            addRules: string
+            errors: {
+              invalidCondition: string
+              line: string
+              missingCondition: string
+              missingPolicy: string
+              unknownPolicy: string
+              unknownType: string
+              unsupportedNoResolve: string
+            }
+            placeholder: string
+            targetAppend: string
+            targetPrepend: string
+            title: string
+          }
           ruleTypes: {
             AND: string
             DOMAIN: string

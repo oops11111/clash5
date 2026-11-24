@@ -236,6 +236,133 @@ const RULE_TYPE_LABEL_KEYS: Record<string, string> = Object.fromEntries(
 
 const builtinProxyPolicies = ['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS']
 
+// Synthesized at enhance time; keep in sync with DEFAULT_PROXY_GROUP in enhance/mod.rs.
+const DEFAULT_PROXY_GROUP = 'clash5-default'
+
+type PasteErrorCode =
+  | 'unknownType'
+  | 'missingCondition'
+  | 'invalidCondition'
+  | 'missingPolicy'
+  | 'unknownPolicy'
+  | 'unsupportedNoResolve'
+
+interface PasteParseError {
+  line: number
+  code: PasteErrorCode
+}
+
+interface PasteParseResult {
+  rules: string[]
+  skipped: number
+  errors: PasteParseError[]
+}
+
+const PASTE_ERROR_LABEL_KEYS: Record<PasteErrorCode, TranslationKey> = {
+  unknownType: 'rules.modals.editor.paste.errors.unknownType',
+  missingCondition: 'rules.modals.editor.paste.errors.missingCondition',
+  invalidCondition: 'rules.modals.editor.paste.errors.invalidCondition',
+  missingPolicy: 'rules.modals.editor.paste.errors.missingPolicy',
+  unknownPolicy: 'rules.modals.editor.paste.errors.unknownPolicy',
+  unsupportedNoResolve: 'rules.modals.editor.paste.errors.unsupportedNoResolve',
+}
+
+// Commas inside parentheses belong to the condition (AND/OR/SUB-RULE), so
+// split only on top-level commas.
+const splitRuleLine = (line: string): string[] => {
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+  for (const ch of line) {
+    if (ch === '(') depth += 1
+    if (ch === ')') depth = Math.max(0, depth - 1)
+    if (ch === ',' && depth === 0) {
+      parts.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  parts.push(current)
+  return parts.map((part) => part.trim())
+}
+
+const parsePastedRules = (
+  text: string,
+  validPolicies: ReadonlySet<string>,
+  existing: ReadonlySet<string>,
+): PasteParseResult => {
+  const parsed: string[] = []
+  const seen = new Set<string>(existing)
+  let skipped = 0
+  const errors: PasteParseError[] = []
+
+  text.split('\n').forEach((rawLine, index) => {
+    const lineNo = index + 1
+    const line = rawLine.trim()
+    if (line === '' || line.startsWith('#')) return
+
+    const segments = splitRuleLine(line)
+    const typeEntry = rules.find(
+      (rule) => rule.name === (segments[0] ?? '').toUpperCase(),
+    )
+    if (!typeEntry) {
+      errors.push({ line: lineNo, code: 'unknownType' })
+      return
+    }
+
+    let noResolve = false
+    if (
+      segments.length > 1 &&
+      (segments[segments.length - 1] ?? '').toLowerCase() === 'no-resolve'
+    ) {
+      segments.pop()
+      noResolve = true
+    }
+    if (noResolve && !typeEntry.noResolve) {
+      errors.push({ line: lineNo, code: 'unsupportedNoResolve' })
+      return
+    }
+
+    const required = typeEntry.required ?? true
+    if (segments.length === 1) {
+      errors.push({
+        line: lineNo,
+        code: required ? 'missingCondition' : 'missingPolicy',
+      })
+      return
+    }
+    if (required && segments.length === 2) {
+      errors.push({ line: lineNo, code: 'missingPolicy' })
+      return
+    }
+    const policy = segments[segments.length - 1] ?? ''
+    const condition = segments.slice(1, -1).join(',')
+    if (required && !condition) {
+      errors.push({ line: lineNo, code: 'missingCondition' })
+      return
+    }
+    if (condition && typeEntry.validator && !typeEntry.validator(condition)) {
+      errors.push({ line: lineNo, code: 'invalidCondition' })
+      return
+    }
+    if (!policy || !validPolicies.has(policy)) {
+      errors.push({ line: lineNo, code: 'unknownPolicy' })
+      return
+    }
+
+    const raw = `${typeEntry.name}${condition ? `,${condition}` : ''},${policy}${noResolve ? ',no-resolve' : ''}`
+    if (seen.has(raw)) {
+      skipped += 1
+      return
+    }
+    seen.add(raw)
+    parsed.push(raw)
+  })
+
+  return { rules: parsed, skipped, errors }
+}
+
 const PROXY_POLICY_LABEL_KEYS: Record<string, TranslationKey> =
   builtinProxyPolicies.reduce(
     (acc, policy) => {
@@ -281,6 +408,15 @@ export const RulesEditorViewer = (props: Props) => {
   const [prependSeq, setPrependSeq] = useState<string[]>([])
   const [appendSeq, setAppendSeq] = useState<string[]>([])
   const [deleteSeq, setDeleteSeq] = useState<string[]>([])
+  const [nodeNameList, setNodeNameList] = useState<string[]>([])
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteText, setPasteText] = useState('')
+  const [pasteTarget, setPasteTarget] = useState<'prepend' | 'append'>('append')
+  const [pasteErrors, setPasteErrors] = useState<PasteParseError[]>([])
+  const [pasteAdded, setPasteAdded] = useState<{
+    added: number
+    skipped: number
+  } | null>(null)
   const hasLoadedSeqConfigRef = useRef(false)
 
   const filteredPrependSeq = useMemo(
@@ -532,6 +668,17 @@ export const RulesEditorViewer = (props: Props) => {
     } | null
     const globalSubRule = globalSubRuleObj?.['sub-rules'] || {}
     const subRule = Object.assign({}, originSubRule, moreSubRule, globalSubRule)
+    const rawOriginProxies = (
+      parseYamlSafe(data) as { proxies?: unknown } | null
+    )?.proxies
+    const originProxies = Array.isArray(rawOriginProxies)
+      ? rawOriginProxies
+      : []
+    setNodeNameList(
+      originProxies
+        .map((proxy) => (proxy as { name?: unknown })?.name)
+        .filter((name): name is string => typeof name === 'string'),
+    )
     setProxyPolicyList(
       builtinProxyPolicies.concat(groups.map((group: any) => group.name)),
     )
@@ -567,6 +714,31 @@ export const RulesEditorViewer = (props: Props) => {
     return `${ruleType.name}${condition ? ',' + condition : ''},${proxyPolicy}${
       ruleType.noResolve && noResolve ? ',no-resolve' : ''
     }`
+  }
+
+  const validPolicies = useMemo(
+    () => new Set([...proxyPolicyList, ...nodeNameList, DEFAULT_PROXY_GROUP]),
+    [proxyPolicyList, nodeNameList],
+  )
+
+  const handlePasteAdd = () => {
+    const result = parsePastedRules(
+      pasteText,
+      validPolicies,
+      new Set([...prependSeq, ...appendSeq]),
+    )
+    setPasteErrors(result.errors)
+    if (result.errors.length > 0) {
+      setPasteAdded(null)
+      return
+    }
+    if (pasteTarget === 'prepend') {
+      setPrependSeq([...result.rules, ...prependSeq])
+    } else {
+      setAppendSeq([...appendSeq, ...result.rules])
+    }
+    setPasteAdded({ added: result.rules.length, skipped: result.skipped })
+    setPasteText('')
   }
 
   const handleSave = useLockFn(async () => {
@@ -624,6 +796,7 @@ export const RulesEditorViewer = (props: Props) => {
               sx={{
                 width: '50%',
                 padding: '0 10px',
+                overflowY: 'auto',
               }}
             >
               <Item>
@@ -776,6 +949,81 @@ export const RulesEditorViewer = (props: Props) => {
                   {t('rules.modals.editor.form.actions.appendRule')}
                 </Button>
               </Item>
+              <Item>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={() => setPasteOpen(!pasteOpen)}
+                >
+                  {t('rules.modals.editor.paste.title')}
+                </Button>
+              </Item>
+              {pasteOpen && (
+                <>
+                  <Item>
+                    <TextField
+                      fullWidth
+                      multiline
+                      minRows={6}
+                      value={pasteText}
+                      placeholder={t('rules.modals.editor.paste.placeholder')}
+                      onChange={(e) => setPasteText(e.target.value)}
+                    />
+                  </Item>
+                  <Item>
+                    <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
+                      <Button
+                        fullWidth
+                        variant={
+                          pasteTarget === 'prepend' ? 'contained' : 'outlined'
+                        }
+                        onClick={() => setPasteTarget('prepend')}
+                      >
+                        {t('rules.modals.editor.paste.targetPrepend')}
+                      </Button>
+                      <Button
+                        fullWidth
+                        variant={
+                          pasteTarget === 'append' ? 'contained' : 'outlined'
+                        }
+                        onClick={() => setPasteTarget('append')}
+                      >
+                        {t('rules.modals.editor.paste.targetAppend')}
+                      </Button>
+                    </Box>
+                  </Item>
+                  <Item>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      onClick={handlePasteAdd}
+                    >
+                      {t('rules.modals.editor.paste.addRules')}
+                    </Button>
+                  </Item>
+                  {pasteErrors.map((error) => (
+                    <Item key={`${error.line}-${error.code}`}>
+                      <ListItemText
+                        sx={{ color: 'error.main' }}
+                        primary={t('rules.modals.editor.paste.errors.line', {
+                          line: error.line,
+                          message: t(PASTE_ERROR_LABEL_KEYS[error.code]),
+                        })}
+                      />
+                    </Item>
+                  ))}
+                  {pasteAdded && (
+                    <Item>
+                      <ListItemText
+                        primary={t('rules.modals.editor.paste.added', {
+                          added: pasteAdded.added,
+                          skipped: pasteAdded.skipped,
+                        })}
+                      />
+                    </Item>
+                  )}
+                </>
+              )}
             </List>
 
             <List
