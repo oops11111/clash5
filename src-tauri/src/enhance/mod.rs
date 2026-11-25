@@ -783,20 +783,13 @@ fn cleanup_proxy_groups(mut config: Mapping) -> Mapping {
     config
 }
 
-/// Group synthesized at enhance time when the running config has no groups.
+/// Group synthesized at enhance time so rules and chains always have a
+/// default group to target, even when the subscription defines its own groups.
 /// Never persisted: subscriptions and chain items never see it, so it always
 /// tracks the current nodes and providers. Refs #140.
 const DEFAULT_PROXY_GROUP: &str = "clash5-default";
 
 fn synthesize_default_group(mut config: Mapping) -> Mapping {
-    let has_groups = config
-        .get("proxy-groups")
-        .and_then(Value::as_sequence)
-        .is_some_and(|groups| !groups.is_empty());
-    if has_groups {
-        return config;
-    }
-
     let mut proxy_names: Vec<String> = vec![];
     if let Some(Value::Sequence(proxies)) = config.get("proxies") {
         for proxy in proxies {
@@ -826,7 +819,20 @@ fn synthesize_default_group(mut config: Mapping) -> Mapping {
     if proxy_names.is_empty() && provider_names.is_empty() {
         return config;
     }
-    if proxy_names.iter().any(|name| name.as_str() == DEFAULT_PROXY_GROUP) {
+    let name_taken = proxy_names.iter().any(|name| name.as_str() == DEFAULT_PROXY_GROUP)
+        || config
+            .get("proxy-groups")
+            .and_then(Value::as_sequence)
+            .is_some_and(|groups| {
+                groups.iter().any(|group| {
+                    group
+                        .as_mapping()
+                        .and_then(|map| map.get("name"))
+                        .and_then(Value::as_str)
+                        .is_some_and(|name| name == DEFAULT_PROXY_GROUP)
+                })
+            });
+    if name_taken {
         return config;
     }
 
@@ -2061,7 +2067,7 @@ proxy-groups:
     }
 
     #[test]
-    fn synthesize_default_group_skipped_with_existing_groups() {
+    fn synthesize_default_group_appended_with_existing_groups() {
         let config = mapping(
             "proxies:\n  - {name: node-a, type: http, server: 127.0.0.1, port: 8080}\nproxy-groups:\n  - {name: mine, type: select, proxies: [node-a]}\n",
         );
@@ -2070,8 +2076,23 @@ proxy-groups:
             .get("proxy-groups")
             .and_then(|v| v.as_sequence())
             .expect("groups sequence");
-        assert_eq!(groups.len(), 1);
+        assert_eq!(groups.len(), 2);
         assert_eq!(groups[0].get("name").and_then(|v| v.as_str()), Some("mine"));
+        let group = groups[1].as_mapping().expect("default group mapping");
+        assert_eq!(group.get("name").and_then(|v| v.as_str()), Some("clash5-default"));
+    }
+
+    #[test]
+    fn synthesize_default_group_skipped_on_group_name_collision() {
+        let config = mapping(
+            "proxies:\n  - {name: node-a, type: http, server: 127.0.0.1, port: 8080}\nproxy-groups:\n  - {name: clash5-default, type: select, proxies: [node-a]}\n",
+        );
+        let config = synthesize_default_group(config);
+        let groups = config
+            .get("proxy-groups")
+            .and_then(|v| v.as_sequence())
+            .expect("groups sequence");
+        assert_eq!(groups.len(), 1);
     }
 
     #[test]
