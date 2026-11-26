@@ -56,6 +56,9 @@ interface Props {
   open: boolean
   onClose: () => void
   onSave?: (prev?: string, curr?: string) => void
+  // Open with the paste section expanded; the dialog and save chain are
+  // the same as the edit entry, only the starting section differs.
+  initialPasteOpen?: boolean
 }
 
 const portValidator = (value: string): boolean => {
@@ -384,8 +387,16 @@ const findRealIndex = (
 }
 
 export const RulesEditorViewer = (props: Props) => {
-  const { groupsUid, mergeUid, profileUid, property, open, onClose, onSave } =
-    props
+  const {
+    groupsUid,
+    mergeUid,
+    profileUid,
+    property,
+    open,
+    onClose,
+    onSave,
+    initialPasteOpen = false,
+  } = props
   const { t } = useTranslation()
   const themeMode = useThemeMode()
 
@@ -409,7 +420,7 @@ export const RulesEditorViewer = (props: Props) => {
   const [appendSeq, setAppendSeq] = useState<string[]>([])
   const [deleteSeq, setDeleteSeq] = useState<string[]>([])
   const [nodeNameList, setNodeNameList] = useState<string[]>([])
-  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(initialPasteOpen)
   const [pasteText, setPasteText] = useState('')
   const [pasteTarget, setPasteTarget] = useState<'prepend' | 'append'>('append')
   const [pasteErrors, setPasteErrors] = useState<PasteParseError[]>([])

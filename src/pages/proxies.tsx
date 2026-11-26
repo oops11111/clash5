@@ -69,7 +69,7 @@ const ProxyPage = () => {
           <Button
             size="small"
             variant="outlined"
-            onClick={() => navigate('/chains')}
+            onClick={() => navigate('/?section=chains')}
             sx={{ ml: 1 }}
             startIcon={<LanOutlined fontSize="small" />}
           >

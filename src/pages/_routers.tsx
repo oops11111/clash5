@@ -19,6 +19,9 @@ export const router = createBrowserRouter([
           }) as RouteObject,
       )
       .concat([
+        // Compatibility redirects for the old standalone routes (external
+        // links and saved history). Internal navigation uses the canonical
+        // `?section=` addresses below; do not navigate to these paths.
         {
           path: '/nodes',
           element: <Navigate replace to="/subscriptions?section=nodes" />,

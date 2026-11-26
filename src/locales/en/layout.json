@@ -11,11 +11,11 @@
         "connections": "Connections",
         "rules": "Rules",
         "logs": "Logs",
-        "unlock": "Diagnostics",
+        "unlock": "Unlock Detection",
         "settings": "Settings"
       },
       "proxyGroups": "Proxy groups",
-      "diagnostics": "Unlock tests",
+      "diagnostics": "Unlock Detection",
       "cancel": "Cancel",
       "identityError": "The identity service is unavailable. Try again after the system credential store is unlocked.",
       "rotationRuntimePending": "Identity rotation was saved, but the running configuration could not be refreshed. Refresh or restart the core before continuing.",

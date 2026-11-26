@@ -86,7 +86,7 @@ export const ProxyEmptyState = ({ reason }: Props) => {
             <Button
               size="small"
               variant="contained"
-              onClick={() => navigate('/profile')}
+              onClick={() => navigate('/subscriptions?section=sources')}
             >
               {t('proxies.page.empty.actions.openProfiles')}
             </Button>

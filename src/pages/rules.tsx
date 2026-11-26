@@ -1,4 +1,4 @@
-import { Box } from '@mui/material'
+import { Box, Button } from '@mui/material'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -10,19 +10,27 @@ import {
   type VirtualListHandle,
 } from '@/components/base'
 import { ScrollTopButton } from '@/components/layout/scroll-top-button'
+import { RulesEditorViewer } from '@/components/profile/rules-editor-viewer'
 import { ProviderButton } from '@/components/rule/provider-button'
 import RuleItem from '@/components/rule/rule-item'
+import { useProfiles } from '@/hooks/use-profiles'
 import { useVisibility } from '@/hooks/use-visibility'
 import { useAppRefreshers, useRulesData } from '@/providers/app-data-context'
+import { enhanceProfiles } from '@/services/cmds'
+import { mutate } from '@/services/mutate'
+import { showNotice } from '@/services/notice-service'
 
 const RulesPage = () => {
   const { t } = useTranslation()
   const { rules = [] } = useRulesData()
   const { refreshRules, refreshRuleProviders } = useAppRefreshers()
+  const { current } = useProfiles()
   const [match, setMatch] = useState(() => (_: string) => true)
   const virtuosoRef = useRef<VirtualListHandle>(null)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const pageVisible = useVisibility()
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editorPasteOpen, setEditorPasteOpen] = useState(false)
 
   // 在组件挂载时和页面获得焦点时刷新规则数据
   useEffect(() => {
@@ -53,6 +61,32 @@ const RulesPage = () => {
     virtuosoRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const rulesProperty = current?.option?.rules
+  const openEditor = (pasteOpen: boolean) => {
+    setEditorPasteOpen(pasteOpen)
+    setEditorOpen(true)
+  }
+
+  // Same save/enhance chain as the subscription-card menu entry: the dialog
+  // saves the chain file, then the current profile is re-enhanced.
+  const handleEditorSave = useCallback(
+    async (prev?: string, curr?: string) => {
+      if (prev === curr) return
+      try {
+        const result = await mutate(() => enhanceProfiles(), {
+          id: 'enhance-profiles',
+          errorNotice: false,
+        })
+        if (result.ok && result.value === true) {
+          await Promise.all([refreshRules(), refreshRuleProviders()])
+        }
+      } catch (error) {
+        showNotice.error(error)
+      }
+    },
+    [refreshRules, refreshRuleProviders],
+  )
+
   return (
     <BasePage
       full
@@ -66,6 +100,22 @@ const RulesPage = () => {
       header={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <ProviderButton />
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={!rulesProperty}
+            onClick={() => openEditor(false)}
+          >
+            {t('profiles.components.menu.editRules')}
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={!rulesProperty}
+            onClick={() => openEditor(true)}
+          >
+            {t('rules.modals.editor.paste.title')}
+          </Button>
         </Box>
       }
     >
@@ -96,6 +146,19 @@ const RulesPage = () => {
         </>
       ) : (
         <BaseEmpty />
+      )}
+
+      {editorOpen && current && rulesProperty && (
+        <RulesEditorViewer
+          groupsUid={current.option?.groups ?? ''}
+          mergeUid={current.option?.merge ?? ''}
+          profileUid={current.uid}
+          property={rulesProperty}
+          open={true}
+          initialPasteOpen={editorPasteOpen}
+          onSave={handleEditorSave}
+          onClose={() => setEditorOpen(false)}
+        />
       )}
     </BasePage>
   )

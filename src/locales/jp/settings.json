@@ -1,11 +1,5 @@
 {
   "page": {
-    "actions": {
-      "manual": "マニュアル",
-      "telegram": "Telegramチャンネル",
-      "github": "GitHubリポジトリ"
-    },
-    "actionsGroupLabel": "設定リンク",
     "title": "設定"
   },
   "sections": {
@@ -710,7 +704,6 @@
         "permissionFallback": "{{reason}} 通常モード（Sidecar）に切り替えました。TUN には管理者権限が必要です。手順に従って修復しサービスを再インストールするか、サービスをインストールせずにアプリを管理者として実行してください。",
         "permissionWritableReason": "一般アカウントがコアファイルまたは上位フォルダーを変更できるため、サービスは高い権限での実行を拒否しました。",
         "permissionRejectedReason": "コアファイルとフォルダーを高い権限で安全に実行できるか確認できませんでした。",
-        "permissionRepairGuide": "修復方法を見る",
         "sidecarFallback": "サービスでコアを起動できなかったため、Sidecar モードで動作を継続しています。サービスは引き続き利用できません。",
         "uninstallSuccess": "サービスのアンインストールに成功しました。"
       },

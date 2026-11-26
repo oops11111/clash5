@@ -220,6 +220,7 @@ export interface TranslationResources {
             processNotRunning: string
           }
           noChain: string
+          ruleRoutesNote: string
           status: {
             active: string
             failed: string
@@ -751,6 +752,7 @@ export interface TranslationResources {
         remove: string
         target: string
         title: string
+        wfpNote: string
       }
       components: {
         enums: {
@@ -832,6 +834,7 @@ export interface TranslationResources {
           }
         }
         labels: {
+          defaultGroup: string
           delayCheckReset: string
           nodeCount: string
           proxyCount: string
@@ -1151,7 +1154,6 @@ export interface TranslationResources {
             installSuccess: string
             permissionFallback: string
             permissionRejectedReason: string
-            permissionRepairGuide: string
             permissionWritableReason: string
             sidecarFallback: string
             uninstallSuccess: string
@@ -1542,12 +1544,6 @@ export interface TranslationResources {
         }
       }
       page: {
-        actions: {
-          github: string
-          manual: string
-          telegram: string
-        }
-        actionsGroupLabel: string
         title: string
       }
       sections: {

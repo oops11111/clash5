@@ -41,6 +41,23 @@
           "invalidRule": "无效规则"
         }
       },
+      "paste": {
+        "title": "粘贴规则",
+        "placeholder": "DOMAIN-SUFFIX,example.com,DIRECT\nIP-CIDR,127.0.0.0/8,DIRECT,no-resolve",
+        "targetPrepend": "前置",
+        "targetAppend": "后置",
+        "addRules": "添加粘贴的规则",
+        "added": "已添加 {{added}} 条规则，跳过 {{skipped}} 条重复规则",
+        "errors": {
+          "line": "第 {{line}} 行：{{message}}",
+          "unknownType": "未知规则类型",
+          "missingCondition": "缺少规则条件",
+          "invalidCondition": "规则条件无效",
+          "missingPolicy": "缺少代理策略",
+          "unknownPolicy": "未知代理策略",
+          "unsupportedNoResolve": "该规则类型不支持 no-resolve"
+        }
+      },
       "ruleTypes": {
         "DOMAIN": "匹配完整域名 (DOMAIN)",
         "DOMAIN-SUFFIX": "匹配域名后缀 (DOMAIN-SUFFIX)",

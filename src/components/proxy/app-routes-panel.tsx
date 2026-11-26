@@ -9,6 +9,7 @@ import {
 import { useLockFn } from 'ahooks'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router'
 
 import {
   deleteClash5AppRoute,
@@ -28,6 +29,7 @@ import type {
 
 export const AppRoutesPanel = () => {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [routes, setRoutes] = useState<AppRouteDef[]>([])
   const [chains, setChains] = useState<Clash5Chain[]>([])
   const [groups, setGroups] = useState<string[]>([])
@@ -146,6 +148,16 @@ export const AppRoutesPanel = () => {
         <Typography variant="body2" color="text.secondary">
           {t('proxies.apps.hint')}
         </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {t('proxies.apps.wfpNote')}
+        </Typography>
+        <Button
+          size="small"
+          sx={{ alignSelf: 'flex-start', px: 0 }}
+          onClick={() => navigate('/')}
+        >
+          {t('home.page.cards.perAppProxy')}
+        </Button>
 
         {programRoutes.length === 0 && (
           <Typography variant="body2" color="text.secondary">

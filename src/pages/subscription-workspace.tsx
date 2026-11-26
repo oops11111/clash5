@@ -1,31 +1,30 @@
-import { Box } from '@mui/material'
-import { useSearchParams } from 'react-router'
-
 import NodePoolPage from './node-pool'
 import ProfilePage from './profiles'
+import { WorkspaceTabs } from './workspace-tabs'
 
-const SubscriptionWorkspace = () => {
-  const [searchParams] = useSearchParams()
-  const focusedPane = searchParams.get('section') ?? 'sources'
+const SourcesPane = () => <ProfilePage compact />
+const NodesPane = () => <NodePoolPage compact />
 
-  return (
-    <Box className="subscription-workspace" data-focused-pane={focusedPane}>
-      <Box
-        className="subscription-workspace__source"
-        data-pane="sources"
-        data-testid="subscriptions-source-pane"
-      >
-        <ProfilePage compact />
-      </Box>
-      <Box
-        className="subscription-workspace__nodes"
-        data-pane="nodes"
-        data-testid="subscriptions-node-pane"
-      >
-        <NodePoolPage compact />
-      </Box>
-    </Box>
-  )
-}
+// `section` means the currently displayed content, like every other
+// workspace: the two panes are tabs, not a highlighted dual pane.
+const SubscriptionWorkspace = () => (
+  <WorkspaceTabs
+    defaultSection="sources"
+    sections={[
+      {
+        id: 'sources',
+        label: 'layout.components.navigation.tabs.profiles',
+        Component: SourcesPane,
+        testId: 'subscriptions-source-pane',
+      },
+      {
+        id: 'nodes',
+        label: 'layout.components.navigation.tabs.nodePool',
+        Component: NodesPane,
+        testId: 'subscriptions-node-pane',
+      },
+    ]}
+  />
+)
 
 export default SubscriptionWorkspace

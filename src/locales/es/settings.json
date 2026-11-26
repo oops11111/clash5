@@ -1,11 +1,5 @@
 {
   "page": {
-    "actions": {
-      "manual": "Manual de uso",
-      "telegram": "Canal de Telegram",
-      "github": "Dirección del proyecto en GitHub"
-    },
-    "actionsGroupLabel": "Enlaces de configuración",
     "title": "Ajustes"
   },
   "sections": {
@@ -710,7 +704,6 @@
         "permissionFallback": "{{reason}} Se ha cambiado al modo Sidecar; TUN requiere permisos de administrador. Siga la guía para reparar y reinstalar el servicio, o ejecute la aplicación como administrador sin instalar el servicio.",
         "permissionWritableReason": "Las cuentas normales pueden modificar los archivos del núcleo o una carpeta superior, por lo que el servicio rechazó ejecutarlo con privilegios elevados.",
         "permissionRejectedReason": "El servicio no pudo confirmar que los archivos y carpetas del núcleo sean seguros para ejecutarlos con privilegios elevados.",
-        "permissionRepairGuide": "Ver instrucciones de reparación",
         "sidecarFallback": "El servicio no pudo iniciar el núcleo. Se ha cambiado al modo Sidecar; el servicio sigue sin estar disponible.",
         "uninstallSuccess": "Servicio desinstalado con éxito"
       },

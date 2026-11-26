@@ -8,7 +8,7 @@
       "trafficStats": "流量统计",
       "networkSettings": "网络设置",
       "proxyMode": "代理模式",
-      "perAppProxy": "分软件代理"
+      "perAppProxy": "分软件 · WFP 附加"
     },
     "title": "首页",
     "tabs": {
@@ -52,7 +52,8 @@
         "title": "确认开启分软件代理",
         "body": "将为 {{processName}} 开启代理，使用链：{{chainName}}",
         "warning": "开启后该软件的所有流量将通过所选链路由。确定要继续吗？"
-      }
+      },
+      "ruleRoutesNote": "WFP 附加让单个软件经指定链路代理。按程序的规则分流在代理页中。"
     },
     "dnsLeak": {
       "title": "DNS 泄漏检测",

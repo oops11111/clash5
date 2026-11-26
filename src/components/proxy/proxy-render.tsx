@@ -29,6 +29,9 @@ import { ProxyItemMini } from './proxy-item-mini'
 import type { HeadState } from './use-head-state'
 import type { IRenderItem } from './use-render-list'
 
+// Synthesized at enhance time; keep in sync with DEFAULT_PROXY_GROUP in enhance/mod.rs.
+const DEFAULT_PROXY_GROUP = 'clash5-default'
+
 interface RenderProps {
   item: IRenderItem
   stickyed?: boolean
@@ -157,6 +160,14 @@ export const ProxyRender = memo(function ProxyRender(props: RenderProps) {
             },
           }}
         />
+        {group.name === DEFAULT_PROXY_GROUP && (
+          <Chip
+            size="small"
+            color="primary"
+            label={t('proxies.page.labels.defaultGroup')}
+            sx={{ ml: 1, flexShrink: 0 }}
+          />
+        )}
       </ProxyGroupHeaderBlock>
     )
 

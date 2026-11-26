@@ -8,6 +8,7 @@ import {
 import {
   Box,
   CircularProgress,
+  Divider,
   IconButton,
   keyframes,
   LinearProgress,
@@ -18,6 +19,7 @@ import {
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import {
+  Fragment,
   memo,
   useCallback,
   useEffect,
@@ -418,6 +420,9 @@ const ProfileItemBase = (props: ProfileItemProps) => {
     label: string
     handler: () => void
     disabled: boolean
+    // Visual grouping only; the menu stays flat, sections are separated
+    // by dividers in render order: view, edit, update, dangerous.
+    section: 'view' | 'edit' | 'update' | 'dangerous'
   }
 
   const menuLabels: Record<string, TranslationKey> = {
@@ -442,6 +447,7 @@ const ProfileItemBase = (props: ProfileItemProps) => {
       ? [
           {
             label: menuLabels.home,
+            section: 'view',
             handler: onOpenHome,
             disabled: false,
           } satisfies ContextMenuItem,
@@ -449,66 +455,79 @@ const ProfileItemBase = (props: ProfileItemProps) => {
       : []),
     {
       label: menuLabels.select,
+      section: 'view',
       handler: onForceSelect,
       disabled: false,
     },
     {
       label: menuLabels.shareQrCode,
+      section: 'view',
       handler: onShareQrCode,
       disabled: false,
     },
     {
       label: menuLabels.editInfo,
+      section: 'edit',
       handler: onEditInfo,
       disabled: false,
     },
     {
       label: menuLabels.editFile,
+      section: 'edit',
       handler: onEditFile,
       disabled: false,
     },
     {
       label: menuLabels.editRules,
+      section: 'edit',
       handler: onEditRules,
       disabled: !option?.rules,
     },
     {
       label: menuLabels.editProxies,
+      section: 'edit',
       handler: onEditProxies,
       disabled: !option?.proxies,
     },
     {
       label: menuLabels.editGroups,
+      section: 'edit',
       handler: onEditGroups,
       disabled: !option?.groups,
     },
     {
       label: menuLabels.extendConfig,
+      section: 'edit',
       handler: onEditMerge,
       disabled: !option?.merge,
     },
     {
       label: menuLabels.extendScript,
+      section: 'edit',
       handler: onEditScript,
       disabled: !option?.script,
     },
     {
       label: menuLabels.openFile,
+      section: 'view',
       handler: onOpenFile,
       disabled: false,
     },
     {
       label: menuLabels.update,
+      section: 'update',
       handler: () => onUpdate(0),
       disabled: false,
     },
     {
       label: menuLabels.updateViaProxy,
+      section: 'update',
       handler: () => onUpdate(2),
       disabled: false,
     },
     {
       label: menuLabels.delete,
+      section: 'dangerous',
       handler: () => {
         setAnchorEl(null)
         if (batchMode) {
@@ -525,51 +544,61 @@ const ProfileItemBase = (props: ProfileItemProps) => {
   const fileModeMenu: ContextMenuItem[] = [
     {
       label: menuLabels.select,
+      section: 'view',
       handler: onForceSelect,
       disabled: false,
     },
     {
       label: menuLabels.editInfo,
+      section: 'edit',
       handler: onEditInfo,
       disabled: false,
     },
     {
       label: menuLabels.editFile,
+      section: 'edit',
       handler: onEditFile,
       disabled: false,
     },
     {
       label: menuLabels.editRules,
+      section: 'edit',
       handler: onEditRules,
       disabled: !option?.rules,
     },
     {
       label: menuLabels.editProxies,
+      section: 'edit',
       handler: onEditProxies,
       disabled: !option?.proxies,
     },
     {
       label: menuLabels.editGroups,
+      section: 'edit',
       handler: onEditGroups,
       disabled: !option?.groups,
     },
     {
       label: menuLabels.extendConfig,
+      section: 'edit',
       handler: onEditMerge,
       disabled: !option?.merge,
     },
     {
       label: menuLabels.extendScript,
+      section: 'edit',
       handler: onEditScript,
       disabled: !option?.script,
     },
     {
       label: menuLabels.openFile,
+      section: 'view',
       handler: onOpenFile,
       disabled: false,
     },
     {
       label: menuLabels.delete,
+      section: 'dangerous',
       handler: () => {
         setAnchorEl(null)
         if (batchMode) {
@@ -855,28 +884,32 @@ const ProfileItemBase = (props: ProfileItemProps) => {
           e.preventDefault()
         }}
       >
-        {(hasUrl ? urlModeMenu : fileModeMenu).map((item) => (
-          <MenuItem
-            key={item.label}
-            onClick={item.handler}
-            disabled={item.disabled}
-            sx={[
-              {
-                minWidth: 120,
-              },
-              (theme) => {
-                return {
-                  color:
-                    item.label === menuLabels.delete
-                      ? theme.palette.error.main
-                      : undefined,
-                }
-              },
-            ]}
-            dense
-          >
-            {t(item.label)}
-          </MenuItem>
+        {(hasUrl ? urlModeMenu : fileModeMenu).map((item, index, menu) => (
+          <Fragment key={item.label}>
+            {index > 0 && menu[index - 1].section !== item.section && (
+              <Divider />
+            )}
+            <MenuItem
+              onClick={item.handler}
+              disabled={item.disabled}
+              sx={[
+                {
+                  minWidth: 120,
+                },
+                (theme) => {
+                  return {
+                    color:
+                      item.label === menuLabels.delete
+                        ? theme.palette.error.main
+                        : undefined,
+                  }
+                },
+              ]}
+              dense
+            >
+              {t(item.label)}
+            </MenuItem>
+          </Fragment>
         ))}
       </Menu>
       {fileOpen && (
