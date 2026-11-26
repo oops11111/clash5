@@ -12,10 +12,10 @@ notifications:
     'off': Системный прокси отключён.
   systemProxyFailed:
     title: Системный прокси
-    body: Не удалось настроить системный прокси. Откройте Clash Verge, чтобы узнать причину.
+    body: Не удалось настроить системный прокси. Откройте clash5, чтобы узнать причину.
   systemProxyGuardStopped:
     title: Страж системного прокси
-    body: Остановлен после нескольких неудач подряд. Откройте Clash Verge, чтобы узнать причину.
+    body: Остановлен после нескольких неудач подряд. Откройте clash5, чтобы узнать причину.
   tunModeToggled:
     title: Режим TUN
     'on': Режим TUN включён.
@@ -28,15 +28,15 @@ notifications:
     body: Профиль повторно активирован.
   appQuit:
     title: Скорый выход
-    body: Clash Verge скоро завершит работу.
+    body: clash5 скоро завершит работу.
   updateReady:
-    title: Обновление Clash Verge
+    title: Обновление clash5
     body: Новая версия (v{version}) скачана и готова к установке.
     installNow: Установить сейчас
     later: Позже
 service:
-  adminInstallPrompt: Для установки службы Clash Verge требуются права администратора.
-  adminUninstallPrompt: Для удаления службы Clash Verge требуются права администратора.
+  adminInstallPrompt: Для установки службы clash5 требуются права администратора.
+  adminUninstallPrompt: Для удаления службы clash5 требуются права администратора.
 core:
   alreadyRunning: 'Не удалось запустить ядро: процесс ядра уже работает. Закройте соответствующее приложение или завершите оставшийся процесс и повторите попытку. Если проблема сохраняется, перезагрузите компьютер.'
 launchGuard:
@@ -85,7 +85,7 @@ tray:
   coreLog: Журнал ядра
   restartClash: Перезапустить ядро Clash
   restartApp: Перезапустить приложение
-  vergeVersion: Версия Verge
+  vergeVersion: Версия clash5
   more: Еще
   exit: Выход
   tooltip:

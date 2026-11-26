@@ -157,7 +157,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Pengaturan Dasar Verge",
+        "title": "Pengaturan Dasar clash5",
         "actions": {
           "browse": "Jelajahi"
         },
@@ -194,7 +194,7 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
-        "title": "Pengaturan Lanjutan Verge",
+        "title": "Pengaturan Lanjutan clash5",
         "tooltips": {
           "backupInfo": "Mendukung file konfigurasi cadangan WebDAV",
           "openConfDir": "Jika perangkat lunak berjalan tidak normal, CADANGKAN dan hapus semua file di folder ini lalu mulai ulang perangkat lunak",
@@ -218,7 +218,7 @@
           "liteModeSettings": "LightWeight Mode Settings",
           "exit": "Keluar",
           "exportDiagnostics": "Export Diagnostic Info",
-          "vergeVersion": "Versi Verge"
+          "vergeVersion": "Versi clash5"
         }
       },
       "theme": {

@@ -157,7 +157,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "الإعدادات الأساسية  Verge",
+        "title": "الإعدادات الأساسية  clash5",
         "actions": {
           "browse": "استعراض"
         },
@@ -194,7 +194,7 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
-        "title": "الإعدادات الأساسية  Verge",
+        "title": "الإعدادات الأساسية  clash5",
         "tooltips": {
           "backupInfo": "Support local or WebDAV backup of configuration files",
           "openConfDir": "إذا عمل البرنامج بشكل غير طبيعي، قم بالنسخ الاحتياطي ثم حذف جميع الملفات في هذا المجلد ثم أعد تشغيل البرنامج",
@@ -218,7 +218,7 @@
           "liteModeSettings": "LightWeight Mode Settings",
           "exit": "خروج",
           "exportDiagnostics": "Export Diagnostic Info",
-          "vergeVersion": "إصدار Verge"
+          "vergeVersion": "إصدار clash5"
         }
       },
       "theme": {

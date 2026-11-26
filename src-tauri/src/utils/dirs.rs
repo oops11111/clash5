@@ -19,7 +19,13 @@ pub static APP_ID: &str = "io.github.oops11111.clash5.dev";
 pub static BACKUP_DIR: &str = "clash5-backup-dev";
 
 pub static CLASH_CONFIG: &str = "config.yaml";
-pub static VERGE_CONFIG: &str = "verge.yaml";
+/// App settings file. Named `clash5.yaml` rather than `clash-verge.yaml`:
+/// the latter is already the generated runtime config
+/// (`constants::files::RUNTIME_CONFIG`) in the same directory.
+pub static CLASH5_CONFIG: &str = "clash5.yaml";
+/// Pre-rename name of the app settings file. A leftover copy is never
+/// deleted; startup migrates it forward when the new file is absent.
+pub static LEGACY_VERGE_CONFIG: &str = "verge.yaml";
 pub static PROFILE_YAML: &str = "profiles.yaml";
 /// The clash5 data package is portable data only; the HMAC identity key never enters this archive.
 pub static CLASH5_DATA_DB: &str = "clash5-nodes.sqlite";
@@ -105,8 +111,27 @@ pub fn clash_path() -> Result<PathBuf> {
     Ok(app_home_dir()?.join(CLASH_CONFIG))
 }
 
-pub fn verge_path() -> Result<PathBuf> {
-    Ok(app_home_dir()?.join(VERGE_CONFIG))
+pub fn app_config_path() -> Result<PathBuf> {
+    Ok(app_home_dir()?.join(CLASH5_CONFIG))
+}
+
+/// Copies a pre-rename `verge.yaml` forward to `clash5.yaml`. Runs before
+/// any config load; the legacy file is left in place, so removing the new
+/// file still leaves the previous settings recoverable.
+pub fn migrate_legacy_config_file() -> Result<()> {
+    let home = app_home_dir()?;
+    migrate_legacy_config_file_at(&home.join(CLASH5_CONFIG), &home.join(LEGACY_VERGE_CONFIG))
+}
+
+fn migrate_legacy_config_file_at(new_path: &Path, legacy_path: &Path) -> Result<()> {
+    if new_path.exists() || !legacy_path.exists() {
+        return Ok(());
+    }
+    if let Some(parent) = new_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::copy(legacy_path, new_path)?;
+    Ok(())
 }
 
 pub fn profiles_path() -> Result<PathBuf> {
@@ -438,5 +463,75 @@ mod windows_pipe_name_tests {
             sidecar_pipe_name(&identity, true),
             format!(r"\\.\pipe\verge-mihomo-sidecar-dev-{owner_key}")
         );
+    }
+}
+
+#[cfg(test)]
+#[cfg(test)]
+mod legacy_config_migration_tests {
+    use super::migrate_legacy_config_file_at;
+    use std::path::PathBuf;
+
+    struct TempHome(PathBuf);
+
+    impl TempHome {
+        fn new(tag: &str) -> anyhow::Result<Self> {
+            let root = std::env::temp_dir().join(format!(
+                "clash5-legacy-migrate-{}-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_nanos(),
+                tag
+            ));
+            std::fs::create_dir_all(&root)?;
+            Ok(Self(root))
+        }
+    }
+
+    impl Drop for TempHome {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn copies_legacy_file_and_keeps_it() -> anyhow::Result<()> {
+        let home = TempHome::new("copy")?;
+        let legacy = home.0.join("verge.yaml");
+        let new = home.0.join("clash5.yaml");
+        std::fs::write(&legacy, "legacy-settings")?;
+
+        migrate_legacy_config_file_at(&new, &legacy)?;
+
+        assert_eq!(std::fs::read_to_string(&new)?, "legacy-settings");
+        assert!(legacy.exists(), "legacy file is left in place");
+        Ok(())
+    }
+
+    #[test]
+    fn keeps_existing_new_file_untouched() -> anyhow::Result<()> {
+        let home = TempHome::new("keep")?;
+        let legacy = home.0.join("verge.yaml");
+        let new = home.0.join("clash5.yaml");
+        std::fs::write(&legacy, "legacy-settings")?;
+        std::fs::write(&new, "current-settings")?;
+
+        migrate_legacy_config_file_at(&new, &legacy)?;
+
+        assert_eq!(std::fs::read_to_string(&new)?, "current-settings");
+        Ok(())
+    }
+
+    #[test]
+    fn does_nothing_when_neither_file_exists() -> anyhow::Result<()> {
+        let home = TempHome::new("absent")?;
+        let legacy = home.0.join("verge.yaml");
+        let new = home.0.join("clash5.yaml");
+
+        migrate_legacy_config_file_at(&new, &legacy)?;
+
+        assert!(!new.exists());
+        Ok(())
     }
 }

@@ -319,7 +319,7 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
     let mut includes = vec![
         "profiles/",
         dirs::CLASH_CONFIG,
-        dirs::VERGE_CONFIG,
+        dirs::CLASH5_CONFIG,
         dirs::PROFILE_YAML,
         DNS_CONFIG,
     ];
@@ -354,14 +354,14 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
     zip.start_file(dirs::CLASH_CONFIG, options)?;
     zip.write_all(fs::read(dirs::clash_path()?).await?.as_slice())?;
 
-    let verge_text = fs::read_to_string(dirs::verge_path()?).await?;
+    let verge_text = fs::read_to_string(dirs::app_config_path()?).await?;
     let mut verge_config: serde_json::Value = serde_yaml_ng::from_str(&verge_text)?;
     if let Some(obj) = verge_config.as_object_mut() {
         obj.remove("webdav_username");
         obj.remove("webdav_password");
         obj.remove("webdav_url");
     }
-    zip.start_file(dirs::VERGE_CONFIG, options)?;
+    zip.start_file(dirs::CLASH5_CONFIG, options)?;
     zip.write_all(serde_yaml_ng::to_string(&verge_config)?.as_bytes())?;
 
     let dns_config_path = dirs::app_home_dir()?.join(DNS_CONFIG);

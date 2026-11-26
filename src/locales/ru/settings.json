@@ -157,7 +157,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Основные настройки Verge",
+        "title": "Основные настройки clash5",
         "actions": {
           "browse": "Просмотреть"
         },
@@ -194,7 +194,7 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
-        "title": "Расширенные настройки Verge",
+        "title": "Расширенные настройки clash5",
         "tooltips": {
           "backupInfo": "Поддерживается резервное копирование файлов конфигурации через WebDAV",
           "openConfDir": "Если программа работает неправильно, сделайте резервную копию и удалите все файлы в этой папке, затем перезапустите приложение",
@@ -218,7 +218,7 @@
           "liteModeSettings": "Настройки режима LightWeight",
           "exit": "Выход",
           "exportDiagnostics": "Экспорт диагностической информации",
-          "vergeVersion": "Версия Clash Verge Rev"
+          "vergeVersion": "Версия clash5"
         }
       },
       "theme": {

@@ -27,7 +27,7 @@ async fn capture_files(paths: &[PathBuf]) -> Result<Vec<FileSnapshot>> {
 
 pub(crate) async fn capture_config_files() -> Result<Vec<FileSnapshot>> {
     let runtime_path = dirs::app_home_dir()?.join(crate::constants::files::RUNTIME_CONFIG);
-    capture_files(&[dirs::clash_path()?, dirs::verge_path()?, runtime_path]).await
+    capture_files(&[dirs::clash_path()?, dirs::app_config_path()?, runtime_path]).await
 }
 
 pub(crate) async fn restore_files(snapshots: &[FileSnapshot]) -> Result<()> {
