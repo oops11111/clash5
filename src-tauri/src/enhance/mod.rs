@@ -783,6 +783,88 @@ fn cleanup_proxy_groups(mut config: Mapping) -> Mapping {
     config
 }
 
+/// Group synthesized at enhance time so rules and chains always have a
+/// default group to target, even when the subscription defines its own groups.
+/// Never persisted: subscriptions and chain items never see it, so it always
+/// tracks the current nodes and providers. Refs #140.
+const DEFAULT_PROXY_GROUP: &str = "clash5-default";
+
+fn synthesize_default_group(mut config: Mapping) -> Mapping {
+    let mut proxy_names: Vec<String> = vec![];
+    if let Some(Value::Sequence(proxies)) = config.get("proxies") {
+        for proxy in proxies {
+            let name = match proxy {
+                Value::Mapping(map) => map.get("name").and_then(Value::as_str),
+                Value::String(name) => Some(name.as_str()),
+                _ => None,
+            };
+            if let Some(name) = name {
+                let name: String = name.into();
+                if !proxy_names.contains(&name) {
+                    proxy_names.push(name);
+                }
+            }
+        }
+    }
+
+    let mut provider_names: Vec<String> = vec![];
+    if let Some(Value::Mapping(providers)) = config.get("proxy-providers") {
+        for key in providers.keys() {
+            if let Some(name) = key.as_str() {
+                provider_names.push(name.into());
+            }
+        }
+    }
+
+    if proxy_names.is_empty() && provider_names.is_empty() {
+        return config;
+    }
+    let name_taken = proxy_names.iter().any(|name| name.as_str() == DEFAULT_PROXY_GROUP)
+        || config
+            .get("proxy-groups")
+            .and_then(Value::as_sequence)
+            .is_some_and(|groups| {
+                groups.iter().any(|group| {
+                    group
+                        .as_mapping()
+                        .and_then(|map| map.get("name"))
+                        .and_then(Value::as_str)
+                        .is_some_and(|name| name == DEFAULT_PROXY_GROUP)
+                })
+            });
+    if name_taken {
+        return config;
+    }
+
+    let mut group = Mapping::new();
+    group.insert(Value::from("name"), Value::from(DEFAULT_PROXY_GROUP));
+    group.insert(Value::from("type"), Value::from("select"));
+    if !proxy_names.is_empty() {
+        group.insert(
+            Value::from("proxies"),
+            Value::Sequence(proxy_names.iter().map(|name| Value::from(name.as_str())).collect()),
+        );
+    }
+    if !provider_names.is_empty() {
+        group.insert(
+            Value::from("use"),
+            Value::Sequence(provider_names.iter().map(|name| Value::from(name.as_str())).collect()),
+        );
+    }
+
+    if let Some(Value::Sequence(groups)) = config.get_mut("proxy-groups") {
+        groups.push(Value::Mapping(group));
+        return config;
+    }
+    if config.get("proxy-groups").is_none() {
+        config.insert(
+            Value::from("proxy-groups"),
+            Value::Sequence(vec![Value::Mapping(group)]),
+        );
+    }
+    config
+}
+
 /// fake-ip + IPv6 缺少 `fake-ip-range6` 时补默认值，否则 AAAA 无法解析（#7373）。
 fn ensure_fake_ip_range6(dns: &mut Mapping) {
     use serde_yaml_ng::Value;
@@ -997,6 +1079,7 @@ pub async fn enhance(
     let config = ensure_lan_bind_address(config);
 
     let config = cleanup_proxy_groups(config);
+    let config = synthesize_default_group(config);
     let config = use_sort(config);
 
     let mut exists_keys_set = HashSet::new();
@@ -1463,7 +1546,7 @@ mod authoritative_field_tests {
 mod tests {
     use super::{
         AuthoritativeFields, ChainItem, ChainType, Mapping, cleanup_proxy_groups, ensure_lan_bind_address,
-        process_global_items, process_profile_items, use_keys,
+        process_global_items, process_profile_items, synthesize_default_group, use_keys,
     };
     use std::collections::HashMap;
 
@@ -1944,5 +2027,85 @@ proxy-groups:
             .expect("proxies should be a sequence");
         assert_eq!(proxies.len(), 1);
         assert_eq!(proxies[0].as_str(), Some("DIRECT"));
+    }
+
+    fn default_group(config: &Mapping) -> Option<Mapping> {
+        config
+            .get("proxy-groups")
+            .and_then(|v| v.as_sequence())
+            .and_then(|groups| groups.iter().find_map(|group| group.as_mapping().cloned()))
+    }
+
+    #[test]
+    fn synthesize_default_group_from_nodes() {
+        let config = mapping(
+            "proxies:\n  - {name: node-a, type: http, server: 127.0.0.1, port: 8080}\n  - {name: node-b, type: http, server: 127.0.0.1, port: 8081}\n  - {name: node-a, type: http, server: 127.0.0.1, port: 8080}\n",
+        );
+        let config = synthesize_default_group(config);
+        let group = default_group(&config).expect("default group should exist");
+        assert_eq!(group.get("name").and_then(|v| v.as_str()), Some("clash5-default"));
+        assert_eq!(group.get("type").and_then(|v| v.as_str()), Some("select"));
+        let proxies = group
+            .get("proxies")
+            .and_then(|v| v.as_sequence())
+            .expect("proxies sequence");
+        assert_eq!(proxies.len(), 2);
+        assert_eq!(proxies[0].as_str(), Some("node-a"));
+        assert_eq!(proxies[1].as_str(), Some("node-b"));
+        assert!(group.get("use").is_none());
+    }
+
+    #[test]
+    fn synthesize_default_group_from_providers_only() {
+        let config = mapping("proxy-providers:\n  providerA: {type: http}\n");
+        let config = synthesize_default_group(config);
+        let group = default_group(&config).expect("default group should exist");
+        let uses = group.get("use").and_then(|v| v.as_sequence()).expect("use sequence");
+        assert_eq!(uses.len(), 1);
+        assert_eq!(uses[0].as_str(), Some("providerA"));
+        assert!(group.get("proxies").is_none());
+    }
+
+    #[test]
+    fn synthesize_default_group_appended_with_existing_groups() {
+        let config = mapping(
+            "proxies:\n  - {name: node-a, type: http, server: 127.0.0.1, port: 8080}\nproxy-groups:\n  - {name: mine, type: select, proxies: [node-a]}\n",
+        );
+        let config = synthesize_default_group(config);
+        let groups = config
+            .get("proxy-groups")
+            .and_then(|v| v.as_sequence())
+            .expect("groups sequence");
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].get("name").and_then(|v| v.as_str()), Some("mine"));
+        let group = groups[1].as_mapping().expect("default group mapping");
+        assert_eq!(group.get("name").and_then(|v| v.as_str()), Some("clash5-default"));
+    }
+
+    #[test]
+    fn synthesize_default_group_skipped_on_group_name_collision() {
+        let config = mapping(
+            "proxies:\n  - {name: node-a, type: http, server: 127.0.0.1, port: 8080}\nproxy-groups:\n  - {name: clash5-default, type: select, proxies: [node-a]}\n",
+        );
+        let config = synthesize_default_group(config);
+        let groups = config
+            .get("proxy-groups")
+            .and_then(|v| v.as_sequence())
+            .expect("groups sequence");
+        assert_eq!(groups.len(), 1);
+    }
+
+    #[test]
+    fn synthesize_default_group_skipped_without_members() {
+        let config = mapping("proxies: []\n");
+        let config = synthesize_default_group(config);
+        assert!(config.get("proxy-groups").is_none());
+    }
+
+    #[test]
+    fn synthesize_default_group_skipped_on_name_collision() {
+        let config = mapping("proxies:\n  - {name: clash5-default, type: http, server: 127.0.0.1, port: 8080}\n");
+        let config = synthesize_default_group(config);
+        assert!(config.get("proxy-groups").is_none());
     }
 }

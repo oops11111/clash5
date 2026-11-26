@@ -157,7 +157,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Verge Төп көйләүләр",
+        "title": "clash5 Төп көйләүләр",
         "actions": {
           "browse": "Карау"
         },
@@ -194,7 +194,7 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
-        "title": "Verge Киңәйтелгән көйләүләр",
+        "title": "clash5 Киңәйтелгән көйләүләр",
         "tooltips": {
           "backupInfo": "WebDAV аша конфигурация файлын саклауны хуплый",
           "openConfDir": "Әгәр программада хаталар чыкса, бу папкадагы файлларны саклап калыгыз да, аннары барысын да бетереп, программаны яңадан башлагыз",
@@ -218,7 +218,7 @@
           "liteModeSettings": "LightWeight Mode Settings",
           "exit": "Чыгу",
           "exportDiagnostics": "Export Diagnostic Info",
-          "vergeVersion": "Verge версиясе"
+          "vergeVersion": "clash5 версиясе"
         }
       },
       "theme": {

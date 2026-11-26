@@ -157,7 +157,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Configurações Básicas do Verge",
+        "title": "Configurações Básicas do clash5",
         "actions": {
           "browse": "Procurar"
         },
@@ -194,7 +194,7 @@
         "memoryTelemetryUnavailable": "System memory information is unavailable; automatic protection cannot update."
       },
       "advanced": {
-        "title": "Configurações Avançadas do Verge",
+        "title": "Configurações Avançadas do clash5",
         "tooltips": {
           "backupInfo": "Suporta backup local ou via WebDAV dos arquivos de configuração",
           "openConfDir": "Se o software funcionar de forma anormal, FAÇA BACKUP e exclua todos os arquivos desta pasta e reinicie o software",
@@ -218,7 +218,7 @@
           "liteModeSettings": "Configurações do Modo Leve",
           "exit": "Sair",
           "exportDiagnostics": "Exportar Informações de Diagnóstico",
-          "vergeVersion": "Versão do Verge"
+          "vergeVersion": "Versão do clash5"
         }
       },
       "theme": {

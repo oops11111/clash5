@@ -3,7 +3,7 @@ use crate::{
     core::{CoreManager, backup, proxy_control, proxy_control::SystemProxyStateUnknown},
     process::AsyncHandler,
     utils::{
-        dirs::{PathBufExec as _, app_home_dir, local_backup_dir, verge_path},
+        dirs::{PathBufExec as _, app_config_path, app_home_dir, local_backup_dir},
         help,
     },
 };
@@ -155,7 +155,14 @@ fn extract_backup<R: Read + Seek>(zip: &mut zip::ZipArchive<R>, home: &Path) -> 
                 database_snapshot = Some(staged);
                 continue;
             }
-            let target = home.join(relative);
+            // A backup made before the rename stores the app settings as
+            // `verge.yaml`; restore it under the new name so the reloaded
+            // config is the restored one, never the pre-restore file.
+            let target = if relative == Path::new(crate::utils::dirs::LEGACY_VERGE_CONFIG) {
+                home.join(crate::utils::dirs::CLASH5_CONFIG)
+            } else {
+                home.join(relative)
+            };
             match replace_file_staged(&staged, &target, home) {
                 Ok(previous) => replacements.push((target, previous)),
                 Err(error) => {
@@ -191,7 +198,8 @@ fn is_allowed_backup_path(path: &Path) -> bool {
         [Component::Normal(name)] => name.to_str().is_some_and(|name| {
             name == crate::utils::dirs::BACKUP_MANIFEST
                 || name == crate::utils::dirs::CLASH_CONFIG
-                || name == crate::utils::dirs::VERGE_CONFIG
+                || name == crate::utils::dirs::CLASH5_CONFIG
+                || name == crate::utils::dirs::LEGACY_VERGE_CONFIG
                 || name == crate::utils::dirs::PROFILE_YAML
                 || name == crate::constants::files::DNS_CONFIG
                 || name == crate::utils::dirs::CLASH5_DATA_DB
@@ -249,8 +257,8 @@ async fn finalize_restored_verge_config(
     webdav_username: Option<String>,
     webdav_password: Option<String>,
 ) -> Result<()> {
-    // A broken restored `verge.yaml` is a restore failure, not a reason to load defaults.
-    let mut restored = help::read_yaml::<IVerge>(&verge_path()?).await?;
+    // A broken restored `clash5.yaml` is a restore failure, not a reason to load defaults.
+    let mut restored = help::read_yaml::<IVerge>(&app_config_path()?).await?;
     restored.webdav_url = webdav_url;
     restored.webdav_username = webdav_username;
     restored.webdav_password = webdav_password;
@@ -749,6 +757,9 @@ mod restore_archive_tests {
     #[test]
     fn restore_allowlist_accepts_only_known_backup_files() {
         assert!(is_allowed_backup_path(Path::new("config.yaml")));
+        assert!(is_allowed_backup_path(Path::new("clash5.yaml")));
+        // Backups made before the rename store the settings as verge.yaml.
+        assert!(is_allowed_backup_path(Path::new("verge.yaml")));
         assert!(is_allowed_backup_path(Path::new("profiles/subscription.yaml")));
         assert!(!is_allowed_backup_path(Path::new("plugins/malware.dll")));
         assert!(!is_allowed_backup_path(Path::new("profiles/../outside.yaml")));

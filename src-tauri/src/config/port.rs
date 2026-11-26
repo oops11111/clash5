@@ -88,7 +88,7 @@ impl Config {
     /// Move this session onto `new_port` without touching what is on disk.
     ///
     /// Only the Runtime Configuration changes — the Core is its only reader and it is rebuilt
-    /// every launch. `config.yaml` and `verge.yaml` keep naming `old_port` so the next launch
+    /// every launch. `config.yaml` and `clash5.yaml` keep naming `old_port` so the next launch
     /// asks for it again.
     async fn apply_startup_mixed_port_fallback(old_port: u16, new_port: u16) -> Result<()> {
         let runtime = Self::runtime().await;

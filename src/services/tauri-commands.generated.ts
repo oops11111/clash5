@@ -822,7 +822,7 @@ export type IProfiles_Serialize = {
   items: PrfItem_Serialize[] | null
 }
 
-/**  ### `verge.yaml` schema */
+/**  ### `clash5.yaml` schema */
 export type IVerge = IVerge_Serialize | IVerge_Deserialize
 
 export type IVergeTestItem = {
@@ -845,7 +845,7 @@ export type IVergeTheme = {
   css_injection?: string | null
 }
 
-/**  ### `verge.yaml` schema */
+/**  ### `clash5.yaml` schema */
 export type IVerge_Deserialize = {
   /**  silent | error | warn | info | debug | trace */
   app_log_level?: string | null
@@ -945,7 +945,7 @@ export type IVerge_Deserialize = {
   enable_external_controller?: boolean | null
 }
 
-/**  ### `verge.yaml` schema */
+/**  ### `clash5.yaml` schema */
 export type IVerge_Serialize = {
   /**  silent | error | warn | info | debug | trace */
   app_log_level: string | null
@@ -1188,7 +1188,7 @@ export type PerAppProxyMapping = {
 }
 
 /**
- *  Typed per-app proxy configuration, stored in `verge.yaml` under
+ *  Typed per-app proxy configuration, stored in `clash5.yaml` under
  *  `per_app_proxy`. Replaces the untyped `home_cards` JSON blob for this
  *  feature so the mapping is validated at the config layer.
  */

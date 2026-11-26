@@ -72,7 +72,9 @@ async fn confirm_subscription_import(url: &str, name: Option<&String>) -> bool {
 }
 
 fn extract_subscription_info(link_parsed: &Url) -> Option<(std::string::String, Option<String>)> {
-    if !matches!(link_parsed.scheme(), "clash" | "clash-verge") {
+    // clash5 is the registered scheme; clash and clash-verge stay accepted
+    // so subscription links minted for the old names keep working.
+    if !matches!(link_parsed.scheme(), "clash5" | "clash" | "clash-verge") {
         return None;
     }
 
