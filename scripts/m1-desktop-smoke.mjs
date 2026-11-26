@@ -803,7 +803,7 @@ async function verifyWorkspaceControls() {
 
   phase = 'search controls'
   const search = await browser.$(
-    '.subscription-workspace__nodes .base-page input[placeholder]',
+    '[data-testid="subscriptions-node-pane"] .base-page input[placeholder]',
   )
   await search.setValue('M1-provider')
   await browser.waitUntil(
@@ -1260,11 +1260,11 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
     () =>
       browser.execute(() =>
         Boolean(
-          document.querySelector('[data-testid="subscriptions-source-pane"]') &&
-            document.querySelector('[data-testid="subscriptions-node-pane"]') &&
-            document
-              .querySelector('.subscription-workspace')
-              ?.getAttribute('data-focused-pane') === 'nodes' &&
+          document.querySelector(
+            '[data-testid="subscriptions-node-pane"] .base-page input[placeholder]',
+          ) &&
+            new URLSearchParams(window.location.search).get('section') ===
+              'nodes' &&
             window.location.pathname === '/subscriptions',
         ),
       ),
@@ -1272,7 +1272,7 @@ async function verifyNavigation({ includePluginFixture = true } = {}) {
       timeout: 20_000,
       interval: 250,
       timeoutMsg:
-        'The legacy node route did not open the combined subscription workspace',
+        'The legacy node route did not open the subscription workspace nodes tab',
     },
   )
 
@@ -2349,7 +2349,13 @@ try {
   await browser.waitUntil(
     () =>
       browser.execute(() =>
-        Boolean(document.querySelector('.base-page input[placeholder]')),
+        Boolean(
+          document.querySelector(
+            '[data-testid="subscriptions-node-pane"] .base-page input[placeholder]',
+          ) &&
+            new URLSearchParams(window.location.search).get('section') ===
+              'nodes',
+        ),
       ),
     {
       timeout: 20_000,

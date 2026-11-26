@@ -7,6 +7,7 @@ type WorkspaceSection = {
   id: string
   label: string
   Component: React.ComponentType
+  testId?: string
 }
 
 export const WorkspaceTabs = ({
@@ -47,13 +48,14 @@ export const WorkspaceTabs = ({
           />
         ))}
       </Tabs>
-      {sections.map(({ id, Component }) => (
+      {sections.map(({ id, Component, testId }) => (
         <Box
           key={id}
           className="workspace-tabs__page"
           role="tabpanel"
           id={`${tabsId}-panel-${id}`}
           aria-labelledby={`${tabsId}-tab-${id}`}
+          data-testid={testId}
           hidden={section !== id}
         >
           {section === id && <Component />}

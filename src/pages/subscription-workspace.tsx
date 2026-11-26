@@ -15,11 +15,13 @@ const SubscriptionWorkspace = () => (
         id: 'sources',
         label: 'layout.components.navigation.tabs.profiles',
         Component: SourcesPane,
+        testId: 'subscriptions-source-pane',
       },
       {
         id: 'nodes',
         label: 'layout.components.navigation.tabs.nodePool',
         Component: NodesPane,
+        testId: 'subscriptions-node-pane',
       },
     ]}
   />
