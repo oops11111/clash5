@@ -11,11 +11,11 @@
         "connections": "連線",
         "rules": "規則",
         "logs": "日誌",
-        "unlock": "診斷",
+        "unlock": "解鎖檢測",
         "settings": "設定"
       },
       "proxyGroups": "代理群組",
-      "diagnostics": "解鎖測試",
+      "diagnostics": "解鎖檢測",
       "cancel": "取消",
       "identityError": "身分金鑰服務暫時無法使用。請在系統憑證庫解鎖後重試。",
       "rotationRuntimePending": "身分輪替已儲存，但執行中的設定無法刷新。請刷新設定或重新啟動核心後再繼續。",

@@ -11,11 +11,11 @@
         "connections": "连接",
         "rules": "规则",
         "logs": "日志",
-        "unlock": "诊断",
+        "unlock": "解锁检测",
         "settings": "设置"
       },
       "proxyGroups": "代理组",
-      "diagnostics": "解锁测试",
+      "diagnostics": "解锁检测",
       "cancel": "取消",
       "identityError": "身份密钥服务暂不可用。请在系统凭据库解锁后重试。",
       "rotationRuntimePending": "身份轮换已保存，但运行中的配置未能刷新。请刷新配置或重启核心后再继续。",

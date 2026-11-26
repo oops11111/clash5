@@ -1,6 +1,6 @@
 {
   "apps": {
-    "title": "App routes",
+    "title": "Per-App · Rule Routing",
     "hint": "Choose where each program's traffic goes.",
     "empty": "No app routes yet",
     "direct": "Direct",
@@ -8,7 +8,8 @@
     "target": "Route target",
     "remove": "Remove",
     "placeholder": "Program name, for example browser.exe",
-    "add": "Add route"
+    "add": "Add route",
+    "wfpNote": "Rule routing applies only to traffic captured by the system proxy or TUN. WFP attach for a single app lives on the home page."
   },
   "page": {
     "modes": {
@@ -37,7 +38,8 @@
     "labels": {
       "proxyCount": "Proxy Count",
       "delayCheckReset": "Delay check to cancel fixed",
-      "nodeCount": "{{count}} nodes"
+      "nodeCount": "{{count}} nodes",
+      "defaultGroup": "Default"
     },
     "tooltips": {
       "locate": "locate",

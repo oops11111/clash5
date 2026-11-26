@@ -17,6 +17,7 @@ import {
 } from '@mui/material'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router'
 
 import { BasePage } from '@/components/base'
 import {
@@ -66,11 +67,31 @@ const failureCode = (error: unknown) => {
   return 'C5-CHAIN-000'
 }
 
+const CHAIN_VIEWS = ['visual', 'list', 'templates'] as const
+type ChainView = (typeof CHAIN_VIEWS)[number]
+
 const ChainsPage = () => {
   const { t } = useTranslation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [workspace, setWorkspace] = useState<ChainWorkspace | null>(null)
   const [draft, setDraft] = useState<Clash5Chain | null>(null)
-  const [tab, setTab] = useState('visual')
+  // View state lives in the URL (`view`) so refresh and deep links keep it;
+  // `section` is already taken by the home workspace tab.
+  const requestedView = searchParams.get('view') ?? 'visual'
+  const tab: ChainView = (CHAIN_VIEWS as readonly string[]).includes(
+    requestedView,
+  )
+    ? (requestedView as ChainView)
+    : 'visual'
+  const setTab = useCallback(
+    (value: ChainView) => {
+      const next = new URLSearchParams(searchParams)
+      if (value === 'visual') next.delete('view')
+      else next.set('view', value)
+      setSearchParams(next, { replace: true })
+    },
+    [searchParams, setSearchParams],
+  )
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [severity, setSeverity] = useState<'success' | 'warning' | 'error'>(
@@ -212,7 +233,7 @@ const ChainsPage = () => {
         >
           <Tabs
             value={tab}
-            onChange={(_, value: string) => setTab(value)}
+            onChange={(_, value: ChainView) => setTab(value)}
             variant="scrollable"
           >
             <Tab value="visual" label={t('chains.visual')} />

@@ -8,7 +8,7 @@
       "trafficStats": "Traffic Stats",
       "networkSettings": "Network Settings",
       "proxyMode": "Proxy Mode",
-      "perAppProxy": "Per-App Proxy"
+      "perAppProxy": "Per-App · WFP Attach"
     },
     "title": "Home",
     "tabs": {
@@ -52,7 +52,8 @@
         "title": "Enable Per-App Proxy",
         "body": "Enable proxy for {{processName}} using chain: {{chainName}}",
         "warning": "All traffic from this app will be routed through the selected chain. Continue?"
-      }
+      },
+      "ruleRoutesNote": "WFP attach routes one app through a chain. Rule-based routing for programs lives on the proxies page."
     },
     "dnsLeak": {
       "title": "DNS Leak Check",

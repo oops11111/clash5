@@ -32,6 +32,7 @@ import {
 import { useLockFn } from 'ahooks'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router'
 
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import {
@@ -226,6 +227,7 @@ const AttachConfirmDialog = ({
 
 export const PerAppProxyCard = () => {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const theme = useTheme()
   const { response } = useConnectionData()
   const { runState, isTunModeAvailable } = useSystemState()
@@ -540,6 +542,19 @@ export const PerAppProxyCard = () => {
             {t('home.components.perAppProxy.disabled.nonWindows')}
           </Typography>
         )}
+
+        <Box sx={{ mb: 1 }}>
+          <Typography variant="body2" color="text.secondary">
+            {t('home.components.perAppProxy.ruleRoutesNote')}
+          </Typography>
+          <Button
+            size="small"
+            sx={{ px: 0 }}
+            onClick={() => navigate('/proxies?section=apps')}
+          >
+            {t('proxies.apps.title')}
+          </Button>
+        </Box>
 
         {rows.length === 0 ? (
           <Box

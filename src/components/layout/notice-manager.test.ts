@@ -19,7 +19,6 @@ vi.mock('react', async (importOriginal) => ({
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) =>
     snapshot(),
 }))
-vi.mock('@/utils/open-external-url', () => ({ openExternalUrl: vi.fn() }))
 
 afterEach(() => {
   getSnapshotNotices().forEach(({ id }) => hideNotice(id))
@@ -60,8 +59,10 @@ it.each([
     expect(html).toContain('Close the related app or stop the leftover process')
     expect(html).toContain(detail)
     if (operation === 'sidecar') {
-      expect(html).toContain('service-core-permissions')
       expect(html).toContain('PID 123')
+      // The upstream FAQ link is intentionally gone; the notice text
+      // itself carries the repair guidance.
+      expect(html).not.toContain('clash-verge-rev')
     }
   },
 )

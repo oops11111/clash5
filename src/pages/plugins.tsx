@@ -22,6 +22,7 @@ import {
 } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router'
 
 import { BasePage } from '@/components/base'
 import { IdentityRecoveryPanel } from '@/components/identity-recovery-panel'
@@ -91,7 +92,18 @@ type BindingTargetOption = {
 
 const PluginsPage = () => {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<PluginTab>('installed')
+  const [searchParams, setSearchParams] = useSearchParams()
+  // Tab state lives in the URL (`tab`) so refresh and deep links keep it.
+  const requestedTab = searchParams.get('tab') ?? 'installed'
+  const tab: PluginTab = tabs.includes(requestedTab as PluginTab)
+    ? (requestedTab as PluginTab)
+    : 'installed'
+  const setTab = (value: PluginTab) => {
+    const next = new URLSearchParams(searchParams)
+    if (value === 'installed') next.delete('tab')
+    else next.set('tab', value)
+    setSearchParams(next, { replace: true })
+  }
   const [bindings, setBindings] = useState<Clash5PluginBinding[] | null>(null)
   const [bindingError, setBindingError] = useState(false)
   const [effectiveConfig, setEffectiveConfig] =

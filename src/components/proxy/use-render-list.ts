@@ -107,6 +107,14 @@ const groupOccurrences = <T>(list: T[], size: number): T[][] =>
 
 const CHAIN_DELAY_GROUP = 'chain-mode'
 
+// Synthesized at enhance time; keep in sync with DEFAULT_PROXY_GROUP in enhance/mod.rs.
+// Display order only: the backend synthesis order is unchanged.
+const DEFAULT_PROXY_GROUP = 'clash5-default'
+
+const byDefaultGroupFirst = (left: ProxyGroupView, right: ProxyGroupView) =>
+  (left.name === DEFAULT_PROXY_GROUP ? 0 : 1) -
+  (right.name === DEFAULT_PROXY_GROUP ? 0 : 1)
+
 const virtualGroup = (members: ProxyGroupView['members']): ProxyGroupView => ({
   name: CHAIN_DELAY_GROUP,
   type: 'Selector',
@@ -222,6 +230,7 @@ export const useRenderList = (
 
   const groupCacheRef = useRef<Map<string, GroupCache>>(new Map())
   const prevListRef = useRef<IRenderItem[]>([])
+  const prevOrderRef = useRef('')
 
   const renderList = useMemo<IRenderItem[]>(() => {
     if (!proxyView) return []
@@ -260,10 +269,13 @@ export const useRenderList = (
 
     const useRule = mode === 'rule' || mode === 'script'
     const renderGroups = useRule
-      ? proxyView.groups
+      ? [...proxyView.groups].sort(byDefaultGroupFirst)
       : proxyView.global === null
         ? []
         : [proxyView.global]
+    const orderKey = renderGroups.map((group) => group.name).join('\u0000')
+    const orderChanged = orderKey !== prevOrderRef.current
+    prevOrderRef.current = orderKey
     const cache = groupCacheRef.current
     let anyChanged = false
 
@@ -351,7 +363,11 @@ export const useRenderList = (
     const filtered = !useRule
       ? retList.slice(1)
       : retList.filter((item) => !item.group.hidden)
-    if (!anyChanged && prevListRef.current.length === filtered.length) {
+    if (
+      !anyChanged &&
+      !orderChanged &&
+      prevListRef.current.length === filtered.length
+    ) {
       return prevListRef.current
     }
     prevListRef.current = filtered

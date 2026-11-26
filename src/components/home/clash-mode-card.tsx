@@ -1,24 +1,19 @@
 import {
+  ArrowForwardRounded,
   DirectionsRounded,
   LanguageRounded,
   MultipleStopRounded,
 } from '@mui/icons-material'
-import { Box, Paper, Stack, Typography } from '@mui/material'
-import { useLockFn } from 'ahooks'
-import { type ReactNode, useState } from 'react'
+import { Box, Button, Paper, Stack, Typography } from '@mui/material'
+import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { BaseConfig } from 'tauri-plugin-mihomo-api'
+import { useNavigate } from 'react-router'
 
 import { useClashMode, useRuntimeConfig } from '@/hooks/use-clash'
 import {
-  useAppRefreshers,
   useClashConfigData,
   useCoreDataStatus,
 } from '@/providers/app-data-context'
-import { patchClashMode } from '@/services/cmds'
-import { mutate } from '@/services/mutate'
-import { showNotice } from '@/services/notice-service'
-import { setCacheData } from '@/services/query-client'
 import type { TranslationKey } from '@/types/generated/i18n-keys'
 
 const CLASH_MODES = ['rule', 'global', 'direct'] as const
@@ -56,61 +51,33 @@ const MODE_ICONS: Record<ClashMode, ReactNode> = {
   direct: <DirectionsRounded fontSize="small" />,
 }
 
+// Read-only display of the current proxy mode. The only place that changes
+// the mode is the proxies page; this card links there instead of editing.
 export const ClashModeCard = () => {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { clashConfig } = useClashConfigData()
   const { isCoreDataPending } = useCoreDataStatus()
-  const { refreshClashConfig } = useAppRefreshers()
-
-  const [optimisticMode, setOptimisticMode] = useState<ClashMode | null>(null)
 
   const controllerMode = toClashMode(clashConfig?.mode)
   const needFallback = !controllerMode
   const { data: runtimeConfig, isPending: isRuntimeConfigPending } =
     useRuntimeConfig(needFallback)
   const runtimeMode = toClashMode(runtimeConfig?.mode)
-  const {
-    data: backendMode,
-    isPending: isBackendModePending,
-    refetch: refetchBackendMode,
-  } = useClashMode(needFallback)
+  const { data: backendMode, isPending: isBackendModePending } =
+    useClashMode(needFallback)
   // Saved config is refreshed on mode changes; runtime config may be stale.
   const fallbackMode = toClashMode(backendMode) ?? runtimeMode
 
-  const resolvedMode = controllerMode ?? fallbackMode
-  const currentMode = optimisticMode ?? resolvedMode
+  const currentMode = controllerMode ?? fallbackMode
 
   const modeDescription = currentMode
     ? t(MODE_META[currentMode].description)
     : isCoreDataPending || isRuntimeConfigPending || isBackendModePending
-      ? '\u00A0'
+      ? ' '
       : t('home.components.clashMode.errors.communication')
 
-  const onChangeMode = useLockFn(async (mode: ClashMode) => {
-    if (mode === currentMode) return
-
-    setOptimisticMode(mode)
-    try {
-      await mutate(() => patchClashMode(mode), {
-        id: 'patch-clash-mode',
-        errorNotice: false,
-      })
-    } catch (error) {
-      setOptimisticMode(null)
-      showNotice.error(error)
-      return
-    }
-
-    // Write through the live cache to avoid flashing the old mode during refetch.
-    setCacheData<BaseConfig>(['getClashConfig'], (old) =>
-      old ? { ...old, mode } : old,
-    )
-    await Promise.allSettled([refreshClashConfig(), refetchBackendMode()])
-    setOptimisticMode(null)
-  })
-
   const buttonStyles = (mode: ClashMode) => ({
-    cursor: 'pointer',
     px: 2,
     py: 1.2,
     display: 'flex',
@@ -120,16 +87,8 @@ export const ClashModeCard = () => {
     bgcolor: mode === currentMode ? 'primary.main' : 'background.paper',
     color: mode === currentMode ? 'primary.contrastText' : 'text.primary',
     borderRadius: 1.5,
-    transition: 'all 0.2s ease-in-out',
     position: 'relative',
     overflow: 'visible',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      boxShadow: 1,
-    },
-    '&:active': {
-      transform: 'translateY(1px)',
-    },
     '&::after':
       mode === currentMode
         ? {
@@ -176,7 +135,6 @@ export const ClashModeCard = () => {
           <Paper
             key={mode}
             elevation={mode === currentMode ? 2 : 0}
-            onClick={() => onChangeMode(mode)}
             sx={buttonStyles(mode)}
           >
             {MODE_ICONS[mode]}
@@ -206,6 +164,16 @@ export const ClashModeCard = () => {
         <Typography variant="caption" component="div" sx={descriptionStyles}>
           {modeDescription}
         </Typography>
+      </Box>
+
+      <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+        <Button
+          size="small"
+          endIcon={<ArrowForwardRounded fontSize="small" />}
+          onClick={() => navigate('/proxies')}
+        >
+          {t('layout.components.navigation.tabs.proxies')}
+        </Button>
       </Box>
     </Box>
   )

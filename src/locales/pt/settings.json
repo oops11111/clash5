@@ -1,11 +1,5 @@
 {
   "page": {
-    "actions": {
-      "manual": "Manual",
-      "telegram": "Canal do Telegram",
-      "github": "Repositório do Github"
-    },
-    "actionsGroupLabel": "Links das configurações",
     "title": "Configurações"
   },
   "sections": {
@@ -710,7 +704,6 @@
         "permissionFallback": "{{reason}} Mudou para o modo normal (Sidecar); o TUN requer privilégios de administrador. Siga o guia para corrigir e reinstalar o serviço. Se preferir não corrigir ou não souber como, execute o aplicativo como administrador sem instalar o serviço.",
         "permissionWritableReason": "Contas comuns podem modificar os arquivos do núcleo ou uma pasta superior, então o serviço se recusou a executar o núcleo com privilégios elevados.",
         "permissionRejectedReason": "O serviço não conseguiu confirmar que os arquivos e pastas do núcleo são seguros para execução com privilégios elevados.",
-        "permissionRepairGuide": "Ver instruções de reparo",
         "sidecarFallback": "O serviço não conseguiu iniciar o núcleo. Mudou para o modo Sidecar; o serviço continua indisponível.",
         "uninstallSuccess": "Serviço Desinstalado com Sucesso"
       },
