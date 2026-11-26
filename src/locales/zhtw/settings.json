@@ -157,7 +157,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "Verge 基礎設定",
+        "title": "clash5 基礎設定",
         "actions": {
           "browse": "瀏覽"
         },
@@ -194,18 +194,18 @@
         "memoryTelemetryUnavailable": "無法取得系統記憶體資訊；自動保護暫時無法更新。"
       },
       "advanced": {
-        "title": "Verge 進階設定",
+        "title": "clash5 進階設定",
         "tooltips": {
           "backupInfo": "支援本機或 WebDAV 方式備份配置檔案",
           "openConfDir": "如果軟體執行異常，!備份!並刪除此資料夾下的所有檔案，重新啟動軟體",
           "liteMode": "關閉圖形介面，僅保留內核執行"
         },
         "actions": {
-          "copyVersion": "複製Verge版本號"
+          "copyVersion": "複製clash5版本號"
         },
         "notifications": {
           "latestVersion": "目前已是最新版本",
-          "versionCopied": "Verge版本已複製到剪貼簿"
+          "versionCopied": "clash5版本已複製到剪貼簿"
         },
         "fields": {
           "backupSetting": "備份設定",
@@ -218,7 +218,7 @@
           "liteModeSettings": "輕量模式設定",
           "exit": "離開",
           "exportDiagnostics": "複製已脫敏診斷資訊",
-          "vergeVersion": "Verge 版本"
+          "vergeVersion": "clash5 版本"
         }
       },
       "theme": {

@@ -11,8 +11,8 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 const TASK_NAME_USER: &str = "clash5";
 const TASK_NAME_ADMIN: &str = "clash5 (Admin)";
 const TASK_XML_DIR: &str = "tasks";
-const TASK_XML_USER: &str = "clash-verge-task-user.xml";
-const TASK_XML_ADMIN: &str = "clash-verge-task-admin.xml";
+const TASK_XML_USER: &str = "clash5-task-user.xml";
+const TASK_XML_ADMIN: &str = "clash5-task-admin.xml";
 
 #[derive(Clone, Copy)]
 pub enum TaskMode {

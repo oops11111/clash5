@@ -37,7 +37,7 @@ impl PerformancePreset {
     }
 }
 
-/// ### `verge.yaml` schema
+/// ### `clash5.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize, specta::Type)]
 #[serde(default)]
 pub struct IVerge {
@@ -324,7 +324,7 @@ impl IVerge {
     pub const VALID_CLASH_CORES: &'static [&'static str] = &["verge-mihomo", "verge-mihomo-alpha"];
 
     pub async fn validate_and_fix_config() -> Result<()> {
-        let config_path = dirs::verge_path()?;
+        let config_path = dirs::app_config_path()?;
         let mut config = match help::read_yaml::<Self>(&config_path).await {
             Ok(config) => config,
             Err(_) => Self::template(),
@@ -387,7 +387,7 @@ impl IVerge {
     }
 
     pub async fn new() -> Self {
-        match dirs::verge_path() {
+        match dirs::app_config_path() {
             Ok(path) => match help::read_yaml::<Self>(&path).await {
                 Ok(mut config) => {
                     if let Some(start_page) = config.start_page.clone()
@@ -480,7 +480,7 @@ impl IVerge {
     }
 
     pub async fn save_file(&self) -> Result<()> {
-        help::save_yaml(&dirs::verge_path()?, &self, Some("# clash5 Config")).await
+        help::save_yaml(&dirs::app_config_path()?, &self, Some("# clash5 Config")).await
     }
 
     #[allow(clippy::cognitive_complexity)]
@@ -625,7 +625,7 @@ const fn default_true() -> bool {
     true
 }
 
-/// Typed per-app proxy configuration, stored in `verge.yaml` under
+/// Typed per-app proxy configuration, stored in `clash5.yaml` under
 /// `per_app_proxy`. Replaces the untyped `home_cards` JSON blob for this
 /// feature so the mapping is validated at the config layer.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, specta::Type)]

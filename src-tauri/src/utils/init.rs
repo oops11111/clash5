@@ -454,6 +454,10 @@ async fn ensure_directories() -> Result<()> {
 }
 
 async fn initialize_config_files() -> Result<()> {
+    // Migrate before any config is read or created: a failed copy must not
+    // fall through to a fresh template that would discard the old settings.
+    dirs::migrate_legacy_config_file()?;
+
     if let Ok(path) = dirs::clash_path()
         && !path.exists()
     {
@@ -464,14 +468,14 @@ async fn initialize_config_files() -> Result<()> {
         logging!(info, Type::Setup, "Created clash config at {:?}", path);
     }
 
-    if let Ok(path) = dirs::verge_path()
+    if let Ok(path) = dirs::app_config_path()
         && !path.exists()
     {
         let template = IVerge::template();
         help::save_yaml(&path, &template, Some("# clash5"))
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to create verge config: {}", e))?;
-        logging!(info, Type::Setup, "Created verge config at {:?}", path);
+            .map_err(|e| anyhow::anyhow!("Failed to create clash5 config: {}", e))?;
+        logging!(info, Type::Setup, "Created clash5 config at {:?}", path);
     }
 
     if let Ok(path) = dirs::profiles_path()
@@ -486,7 +490,7 @@ async fn initialize_config_files() -> Result<()> {
 
     IVerge::validate_and_fix_config()
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to validate verge config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to validate clash5 config: {}", e))?;
 
     Ok(())
 }
@@ -600,7 +604,7 @@ pub const fn init_scheme() -> Result<()> {
 }
 
 #[cfg(target_os = "linux")]
-const DEEP_LINK_SCHEMES: &[&str] = &["clash", "clash-verge"];
+const DEEP_LINK_SCHEMES: &[&str] = &["clash5", "clash", "clash-verge"];
 
 pub async fn startup_script() -> Result<()> {
     let app_handle = handle::Handle::app_handle();
